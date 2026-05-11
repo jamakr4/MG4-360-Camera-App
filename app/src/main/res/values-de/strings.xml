@@ -42,4 +42,9 @@
     <string name="settings_tile_corner_radius">Rundung</string>
     <string name="settings_tile_corner_square">Eckig</string>
     <string name="settings_tile_corner_round">Rund</string>
+    <string name="settings_section_overlay_snap">SOFT SNAP</string>
+    <string name="settings_soft_snap">Soft Snap</string>
+    <string name="settings_soft_snap_x_padding">X-Abstand</string>
+    <string name="settings_soft_snap_y_padding">Y-Abstand</string>
+    <string name="settings_soft_snap_padding_value">%1$d px</string>
 </resources>

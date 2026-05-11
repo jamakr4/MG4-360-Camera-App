@@ -29,9 +29,12 @@
         <SeekBar
             android:id="@+id/seekCornerRadius"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
+            android:layout_height="40dp"
             android:layout_weight="1"
             android:max="100"
+            android:minHeight="40dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp"
             android:progress="16"
             android:focusable="false" />
 
@@ -74,5 +77,92 @@
             android:text="@string/settings_tile_corner_round" />
 
     </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginTop="22dp"
+        android:layout_marginBottom="18dp"
+        android:background="@color/settings_divider" />
+
+    <TextView
+        style="@style/DrivehubSettingsSectionHeader"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="18dp"
+        android:text="@string/settings_section_overlay_snap" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="18dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            style="@style/DrivehubSettingsPrimaryText"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/settings_soft_snap" />
+
+        <Switch
+            android:id="@+id/switchSoftSnap"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:checked="false" />
+    </LinearLayout>
+
+    <TextView
+        style="@style/DrivehubSettingsPrimaryText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="12dp"
+        android:text="@string/settings_soft_snap_x_padding" />
+
+    <SeekBar
+        android:id="@+id/seekSoftSnapPaddingX"
+        android:layout_width="match_parent"
+        android:layout_height="40dp"
+        android:layout_marginBottom="4dp"
+        android:max="240"
+        android:minHeight="40dp"
+        android:paddingTop="6dp"
+        android:paddingBottom="6dp"
+        android:progress="32" />
+
+    <TextView
+        android:id="@+id/tvSoftSnapPaddingXValue"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="18dp"
+        android:textColor="@color/settings_text_muted"
+        android:textSize="14sp" />
+
+    <TextView
+        style="@style/DrivehubSettingsPrimaryText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="12dp"
+        android:text="@string/settings_soft_snap_y_padding" />
+
+    <SeekBar
+        android:id="@+id/seekSoftSnapPaddingY"
+        android:layout_width="match_parent"
+        android:layout_height="40dp"
+        android:layout_marginBottom="4dp"
+        android:max="180"
+        android:minHeight="40dp"
+        android:paddingTop="6dp"
+        android:paddingBottom="6dp"
+        android:progress="64" />
+
+    <TextView
+        android:id="@+id/tvSoftSnapPaddingYValue"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="18dp"
+        android:textColor="@color/settings_text_muted"
+        android:textSize="14sp" />
 
 </LinearLayout>

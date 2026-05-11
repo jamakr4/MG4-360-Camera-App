@@ -15,6 +15,7 @@ import android.view.WindowManager;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.ImageButton;
@@ -35,9 +36,19 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
     private static final String AVM_PREFS_NAME = "AVM_Settings";
     private static final String KEY_SAFETY_WARNING = "ShowSafetyWarning";
+    private static final String REC_PREFS_NAME = "rec_prefs";
+    private static final String KEY_TILE_CORNER_RADIUS = "tileCornerRadius";
+    private static final String KEY_SOFT_SNAP_ENABLED = "softSnapEnabled";
+    private static final String KEY_SOFT_SNAP_PADDING_X = "softSnapPaddingX";
+    private static final String KEY_SOFT_SNAP_PADDING_Y = "softSnapPaddingY";
+    private static final int DEFAULT_TILE_CORNER_RADIUS = 16;
+    private static final int DEFAULT_SOFT_SNAP_PADDING_X = 32;
+    private static final int DEFAULT_SOFT_SNAP_PADDING_Y = 64;
 
     private SurfaceHolder surfaceHolder;
     private TextView tvStatus;
+    private FrameLayout softSnapFullscreenPreview;
+    private View softSnapFullscreenTopRight;
     // Initial camera when the app opens: front camera (v15)
     private int currentVideoIndex = 15;
     private boolean previewRunning = false;
@@ -89,6 +100,8 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         surfaceHolder.addCallback(this);
 
         tvStatus = findViewById(R.id.tvStatus);
+        softSnapFullscreenPreview = findViewById(R.id.softSnapFullscreenPreview);
+        softSnapFullscreenTopRight = findViewById(R.id.softSnapFullscreenTopRight);
         ImageButton btnSettings = findViewById(R.id.btnSettings);
 
         btnSettings.setOnClickListener(v -> showSettingsDialog());
@@ -199,16 +212,21 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
         }
 
-        SharedPreferences prefs = getSharedPreferences("rec_prefs", MODE_PRIVATE);
+        SharedPreferences prefs = getSharedPreferences(REC_PREFS_NAME, MODE_PRIVATE);
         SharedPreferences avmPrefs = getSharedPreferences(AVM_PREFS_NAME, MODE_PRIVATE);
         Switch swOverlay = dialog.findViewById(R.id.switchOverlayOnSignal);
         Switch swSafetyWarning = dialog.findViewById(R.id.switchSafetyWarning);
+        Switch swSoftSnap = dialog.findViewById(R.id.switchSoftSnap);
         TextView tabSettings = dialog.findViewById(R.id.tabSettings);
         TextView tabOptik = dialog.findViewById(R.id.tabOptik);
         TextView tabCredits = dialog.findViewById(R.id.tabCredits);
         View sectionSettings = dialog.findViewById(R.id.sectionSettings);
         View sectionOptik = dialog.findViewById(R.id.sectionOptik);
         View sectionCredits = dialog.findViewById(R.id.sectionCredits);
+        SeekBar seekSoftSnapPaddingX = dialog.findViewById(R.id.seekSoftSnapPaddingX);
+        SeekBar seekSoftSnapPaddingY = dialog.findViewById(R.id.seekSoftSnapPaddingY);
+        TextView tvSoftSnapPaddingXValue = dialog.findViewById(R.id.tvSoftSnapPaddingXValue);
+        TextView tvSoftSnapPaddingYValue = dialog.findViewById(R.id.tvSoftSnapPaddingYValue);
 
         swOverlay.setChecked(prefs.getBoolean("overlayOnSignal", false));
         swOverlay.setOnCheckedChangeListener((buttonView, isChecked) -> {
@@ -226,13 +244,13 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
         SeekBar seekCorner = dialog.findViewById(R.id.seekCornerRadius);
         EditText etCorner = dialog.findViewById(R.id.etCornerRadius);
-        int savedRadius = prefs.getInt("tileCornerRadius", 16);
+        int savedRadius = prefs.getInt(KEY_TILE_CORNER_RADIUS, DEFAULT_TILE_CORNER_RADIUS);
         seekCorner.setProgress(savedRadius);
         etCorner.setText(String.valueOf(savedRadius));
 
         seekCorner.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                prefs.edit().putInt("tileCornerRadius", progress).apply();
+                prefs.edit().putInt(KEY_TILE_CORNER_RADIUS, progress).apply();
                 if (fromUser) {
                     etCorner.setText(String.valueOf(progress));
                     etCorner.setSelection(etCorner.getText().length());
@@ -255,13 +273,51 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                         etCorner.setSelection(etCorner.getText().length());
                         return;
                     }
-                    prefs.edit().putInt("tileCornerRadius", value).apply();
+                    prefs.edit().putInt(KEY_TILE_CORNER_RADIUS, value).apply();
                     if (seekCorner.getProgress() != value) {
                         seekCorner.setProgress(value);
                     }
                 } catch (NumberFormatException ignored) {}
             }
         });
+
+        swSoftSnap.setChecked(prefs.getBoolean(KEY_SOFT_SNAP_ENABLED, false));
+        swSoftSnap.setOnCheckedChangeListener((buttonView, isChecked) ->
+                prefs.edit().putBoolean(KEY_SOFT_SNAP_ENABLED, isChecked).apply());
+
+        int paddingX = prefs.getInt(KEY_SOFT_SNAP_PADDING_X, DEFAULT_SOFT_SNAP_PADDING_X);
+        int paddingY = prefs.getInt(KEY_SOFT_SNAP_PADDING_Y, DEFAULT_SOFT_SNAP_PADDING_Y);
+        seekSoftSnapPaddingX.setProgress(paddingX);
+        seekSoftSnapPaddingY.setProgress(paddingY);
+        tvSoftSnapPaddingXValue.setText(getString(R.string.settings_soft_snap_padding_value, paddingX));
+        tvSoftSnapPaddingYValue.setText(getString(R.string.settings_soft_snap_padding_value, paddingY));
+
+        SeekBar.OnSeekBarChangeListener softSnapPaddingListener = new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                if (seekBar.getId() == R.id.seekSoftSnapPaddingX) {
+                    prefs.edit().putInt(KEY_SOFT_SNAP_PADDING_X, progress).apply();
+                    tvSoftSnapPaddingXValue.setText(
+                            getString(R.string.settings_soft_snap_padding_value, progress));
+                } else {
+                    prefs.edit().putInt(KEY_SOFT_SNAP_PADDING_Y, progress).apply();
+                    tvSoftSnapPaddingYValue.setText(
+                            getString(R.string.settings_soft_snap_padding_value, progress));
+                }
+                updateSoftSnapFullscreenPreview(
+                        seekSoftSnapPaddingX.getProgress(),
+                        seekSoftSnapPaddingY.getProgress()
+                );
+            }
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+        };
+        seekSoftSnapPaddingX.setOnSeekBarChangeListener(softSnapPaddingListener);
+        seekSoftSnapPaddingY.setOnSeekBarChangeListener(softSnapPaddingListener);
+
+        softSnapFullscreenPreview.post(() -> updateSoftSnapFullscreenPreview(
+                seekSoftSnapPaddingX.getProgress(),
+                seekSoftSnapPaddingY.getProgress()
+        ));
 
         bindSettingsTab(tabSettings, tabOptik, tabCredits, sectionSettings, sectionOptik, sectionCredits, 0);
         tabSettings.setOnClickListener(v ->
@@ -286,6 +342,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         dialog.findViewById(R.id.btnClose).setOnClickListener(v -> dialog.dismiss());
         dialog.setOnDismissListener(d -> {
             sSettingsDialogOpen = false;
+            setSoftSnapFullscreenPreviewVisible(false);
             SignalService.requestRecheck();
         });
         dialog.show();
@@ -305,6 +362,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         sectionSettings.setVisibility(active == 0 ? View.VISIBLE : View.GONE);
         sectionOptik.setVisibility(active == 1 ? View.VISIBLE : View.GONE);
         sectionCredits.setVisibility(active == 2 ? View.VISIBLE : View.GONE);
+        setSoftSnapFullscreenPreviewVisible(active == 1);
         styleSettingsTab(tabSettings, active == 0);
         styleSettingsTab(tabOptik, active == 1);
         styleSettingsTab(tabCredits, active == 2);
@@ -314,6 +372,44 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         tab.setTextColor(active ? 0xFFFFFFFF : 0xFF777777);
         tab.setTextSize(20f);
         tab.setTypeface(tab.getTypeface(), android.graphics.Typeface.BOLD);
+    }
+
+    private void updateSoftSnapFullscreenPreview(int paddingX, int paddingY) {
+        if (softSnapFullscreenPreview == null) return;
+        int previewWidth = softSnapFullscreenPreview.getWidth();
+        int previewHeight = softSnapFullscreenPreview.getHeight();
+        if (previewWidth <= 0 || previewHeight <= 0) return;
+
+        int zoneWidth = dpToPx(160);
+        int zoneHeight = dpToPx(110);
+        int top = Math.max(0, Math.min(paddingY, Math.max(0, previewHeight - zoneHeight)));
+        int right = Math.max(0, Math.min(previewWidth - zoneWidth - paddingX, Math.max(0, previewWidth - zoneWidth)));
+        positionPreviewZone(softSnapFullscreenTopRight, right, top, zoneWidth, zoneHeight);
+    }
+
+    private void setSoftSnapFullscreenPreviewVisible(boolean visible) {
+        if (softSnapFullscreenPreview == null) return;
+        softSnapFullscreenPreview.setVisibility(visible ? View.VISIBLE : View.GONE);
+        if (visible) {
+            SharedPreferences prefs = getSharedPreferences(REC_PREFS_NAME, MODE_PRIVATE);
+            int paddingX = prefs.getInt(KEY_SOFT_SNAP_PADDING_X, DEFAULT_SOFT_SNAP_PADDING_X);
+            int paddingY = prefs.getInt(KEY_SOFT_SNAP_PADDING_Y, DEFAULT_SOFT_SNAP_PADDING_Y);
+            softSnapFullscreenPreview.post(() ->
+                    updateSoftSnapFullscreenPreview(paddingX, paddingY));
+        }
+    }
+
+    private void positionPreviewZone(View zone, int left, int top, int width, int height) {
+        FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) zone.getLayoutParams();
+        params.width = width;
+        params.height = height;
+        params.leftMargin = left;
+        params.topMargin = top;
+        zone.setLayoutParams(params);
+    }
+
+    private int dpToPx(int dp) {
+        return Math.round(dp * getResources().getDisplayMetrics().density);
     }
 
     private void applyWarningVisibility() {

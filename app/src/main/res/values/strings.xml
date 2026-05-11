@@ -42,4 +42,9 @@
     <string name="settings_tile_corner_radius">Corner radius</string>
     <string name="settings_tile_corner_square">Square</string>
     <string name="settings_tile_corner_round">Round</string>
+    <string name="settings_section_overlay_snap">SOFT SNAP</string>
+    <string name="settings_soft_snap">Soft snap</string>
+    <string name="settings_soft_snap_x_padding">X padding</string>
+    <string name="settings_soft_snap_y_padding">Y padding</string>
+    <string name="settings_soft_snap_padding_value">%1$d px</string>
 </resources>
