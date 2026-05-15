@@ -6,6 +6,7 @@
 #include <cstring>
 
 #include <opencv2/core.hpp>
+#include <opencv2/calib3d.hpp>
 #include <opencv2/imgproc.hpp>
 
 #include <android/log.h>
@@ -119,6 +120,92 @@ static int g_width = 0;
 static int g_height = 0;
 static int g_srcStrideBytes = 0;
 static int g_videoIndex = -1;
+static cv::Mat g_undistortMap1;
+static cv::Mat g_undistortMap2;
+
+struct FisheyeCalibration
+{
+    cv::Matx33d K;
+    cv::Vec4d D;
+};
+
+static bool getCalibrationForVideoIndex(int videoIndex, FisheyeCalibration *out)
+{
+    if (!out)
+        return false;
+
+    // Plausible OEM block mapping derived from MG's calibration blob:
+    // block1=right, block2=left, block3=front, block4=rear.
+    switch (videoIndex)
+    {
+    case 14: // right
+        out->K = cv::Matx33d(
+                197.450968, 0.0, 350.8809805131158,
+                0.0, 179.769482, 246.4031885354052,
+                0.0, 0.0, 1.0);
+        out->D = cv::Vec4d(0.121851, -0.029633, 0.0, 0.0);
+        return true;
+    case 16: // left
+        out->K = cv::Matx33d(
+                196.799498, 0.0, 352.1096473941443,
+                0.0, 174.939944, 251.7309546993812,
+                0.0, 0.0, 1.0);
+        out->D = cv::Vec4d(0.121447, -0.029392, 0.0, 0.0);
+        return true;
+    case 15: // front
+        out->K = cv::Matx33d(
+                197.542865, 0.0, 349.4731477242575,
+                0.0, 179.678174, 242.2744490654553,
+                0.0, 0.0, 1.0);
+        out->D = cv::Vec4d(0.119027, -0.029049, 0.0, 0.0);
+        return true;
+    case 17: // rear
+        out->K = cv::Matx33d(
+                197.213019, 0.0, 353.3940664819203,
+                0.0, 179.503685, 246.0065958061789,
+                0.0, 0.0, 1.0);
+        out->D = cv::Vec4d(0.118051, -0.028805, 0.0, 0.0);
+        return true;
+    default:
+        return false;
+    }
+}
+
+static void buildUndistortMapsIfNeeded(int videoIndex, int width, int height)
+{
+    if (!g_undistortMap1.empty() && !g_undistortMap2.empty() &&
+        g_undistortMap1.cols == width && g_undistortMap1.rows == height)
+    {
+        return;
+    }
+
+    FisheyeCalibration calib{};
+    if (!getCalibrationForVideoIndex(videoIndex, &calib))
+    {
+        g_undistortMap1.release();
+        g_undistortMap2.release();
+        return;
+    }
+
+    cv::Size imageSize(width, height);
+    cv::Matx33d newK;
+    cv::fisheye::estimateNewCameraMatrixForUndistortRectify(
+            calib.K,
+            calib.D,
+            imageSize,
+            cv::Matx33d::eye(),
+            newK,
+            0.0);
+    cv::fisheye::initUndistortRectifyMap(
+            calib.K,
+            calib.D,
+            cv::Matx33d::eye(),
+            newK,
+            imageSize,
+            CV_16SC2,
+            g_undistortMap1,
+            g_undistortMap2);
+}
 
 static void *previewThread(void * /*arg*/)
 {
@@ -205,7 +292,18 @@ static void *previewThread(void * /*arg*/)
                               buffers[buf.index].start, g_srcStrideBytes);
             cv::Mat uyvyCropped = uyvyFrame(cv::Rect(0, 0, displayWidth, displayHeight));
             cv::Mat rgbaFrame(displayHeight, displayWidth, CV_8UC4, dst, dstStrideBytes);
-            cv::cvtColor(uyvyCropped, rgbaFrame, cv::COLOR_YUV2RGBA_UYVY);
+            cv::Mat decodedRgba;
+            cv::cvtColor(uyvyCropped, decodedRgba, cv::COLOR_YUV2RGBA_UYVY);
+
+            buildUndistortMapsIfNeeded(g_videoIndex, displayWidth, displayHeight);
+            if (!g_undistortMap1.empty() && !g_undistortMap2.empty())
+            {
+                cv::remap(decodedRgba, rgbaFrame, g_undistortMap1, g_undistortMap2, cv::INTER_LINEAR);
+            }
+            else
+            {
+                decodedRgba.copyTo(rgbaFrame);
+            }
 
             // Mirror the rear camera (videoIndex 17)
             if (g_videoIndex == 17)
@@ -294,6 +392,8 @@ Java_com_drivehub_kamera_CameraProbe_startPreview(JNIEnv *env, jclass, jint vide
     g_height = fmt.fmt.pix.height;
     g_srcStrideBytes = fmt.fmt.pix.bytesperline;
     g_videoIndex = videoIndex;
+    g_undistortMap1.release();
+    g_undistortMap2.release();
     logi("Using size %dx%d stride=%d", g_width, g_height, g_srcStrideBytes);
 
     g_window = ANativeWindow_fromSurface(env, surface);
@@ -348,4 +448,6 @@ Java_com_drivehub_kamera_CameraProbe_stopPreview(JNIEnv * /*env*/, jclass /*claz
         close(g_fd);
         g_fd = -1;
     }
+    g_undistortMap1.release();
+    g_undistortMap2.release();
 }
