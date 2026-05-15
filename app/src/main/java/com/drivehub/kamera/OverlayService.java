@@ -6,8 +6,10 @@ import android.app.NotificationManager;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Rect;
 import android.graphics.SurfaceTexture;
 import android.graphics.PixelFormat;
+import android.os.Build;
 import android.os.IBinder;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -274,11 +276,10 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
         float aspect = (float) DEFAULT_OVERLAY_WIDTH_PX / (float) DEFAULT_OVERLAY_HEIGHT_PX;
         int maxW = OVERLAY_MAX_WIDTH_PX;
         int maxH = OVERLAY_MAX_WIDTH_PX;
-        if (windowManager != null) {
-            android.util.DisplayMetrics dm = new android.util.DisplayMetrics();
-            windowManager.getDefaultDisplay().getMetrics(dm);
-            maxW = Math.min(maxW, dm.widthPixels);
-            maxH = Math.min(maxH, dm.heightPixels);
+        int[] screenSize = getAvailableScreenSizePx();
+        if (screenSize != null) {
+            maxW = Math.min(maxW, screenSize[0]);
+            maxH = Math.min(maxH, screenSize[1]);
         }
         if (w < OVERLAY_MIN_WIDTH_PX) {
             w = OVERLAY_MIN_WIDTH_PX;
@@ -303,14 +304,29 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
 
     private void clampOverlayPositionToScreen() {
         if (windowManager == null || overlayParams == null) return;
-        android.util.DisplayMetrics dm = new android.util.DisplayMetrics();
-        windowManager.getDefaultDisplay().getMetrics(dm);
-        int maxX = Math.max(0, dm.widthPixels - overlayParams.width);
-        int maxY = Math.max(0, dm.heightPixels - overlayParams.height);
+        int[] screenSize = getAvailableScreenSizePx();
+        if (screenSize == null) return;
+        int maxX = Math.max(0, screenSize[0] - overlayParams.width);
+        int maxY = Math.max(0, screenSize[1] - overlayParams.height);
         if (overlayParams.x < 0) overlayParams.x = 0;
         if (overlayParams.y < 0) overlayParams.y = 0;
         if (overlayParams.x > maxX) overlayParams.x = maxX;
         if (overlayParams.y > maxY) overlayParams.y = maxY;
+    }
+
+    // Android Auto can expose a smaller "current" app viewport than the actual interactive
+    // overlay space. Maximum window metrics are a better fit for drag/resize bounds here.
+    private int[] getAvailableScreenSizePx() {
+        if (windowManager == null) return null;
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            Rect bounds = windowManager.getMaximumWindowMetrics().getBounds();
+            return new int[]{bounds.width(), bounds.height()};
+        }
+
+        android.util.DisplayMetrics dm = new android.util.DisplayMetrics();
+        windowManager.getDefaultDisplay().getRealMetrics(dm);
+        return new int[]{dm.widthPixels, dm.heightPixels};
     }
 
     private void saveOverlayLayoutPrefs() {
