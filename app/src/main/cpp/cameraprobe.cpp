@@ -122,6 +122,7 @@ static int g_srcStrideBytes = 0;
 static int g_videoIndex = -1;
 static cv::Mat g_undistortMap1;
 static cv::Mat g_undistortMap2;
+static cv::Rect g_displayCrop;
 
 struct FisheyeCalibration
 {
@@ -195,7 +196,7 @@ static void buildUndistortMapsIfNeeded(int videoIndex, int width, int height)
             imageSize,
             cv::Matx33d::eye(),
             newK,
-            0.0);
+            1.0);
     cv::fisheye::initUndistortRectifyMap(
             calib.K,
             calib.D,
@@ -284,26 +285,26 @@ static void *previewThread(void * /*arg*/)
         {
             uint8_t *dst = static_cast<uint8_t *>(outBuf.bits);
             int dstStrideBytes = outBuf.stride * 4;
-            int displayWidth = g_width;
-            int displayHeight = g_height / 2; // The driver duplicates the frame vertically, so use the top half.
-
-            // UYVY → RGBA via OpenCV (ARM NEON optimized)
             cv::Mat uyvyFrame(g_height, g_width, CV_8UC2,
                               buffers[buf.index].start, g_srcStrideBytes);
-            cv::Mat uyvyCropped = uyvyFrame(cv::Rect(0, 0, displayWidth, displayHeight));
-            cv::Mat rgbaFrame(displayHeight, displayWidth, CV_8UC4, dst, dstStrideBytes);
-            cv::Mat decodedRgba;
-            cv::cvtColor(uyvyCropped, decodedRgba, cv::COLOR_YUV2RGBA_UYVY);
+            cv::Mat fullDecodedRgba;
+            cv::cvtColor(uyvyFrame, fullDecodedRgba, cv::COLOR_YUV2RGBA_UYVY);
 
-            buildUndistortMapsIfNeeded(g_videoIndex, displayWidth, displayHeight);
+            buildUndistortMapsIfNeeded(g_videoIndex, g_width, g_height);
+
+            cv::Mat fullUndistortedRgba;
             if (!g_undistortMap1.empty() && !g_undistortMap2.empty())
             {
-                cv::remap(decodedRgba, rgbaFrame, g_undistortMap1, g_undistortMap2, cv::INTER_LINEAR);
+                cv::remap(fullDecodedRgba, fullUndistortedRgba, g_undistortMap1, g_undistortMap2, cv::INTER_LINEAR);
             }
             else
             {
-                decodedRgba.copyTo(rgbaFrame);
+                fullUndistortedRgba = fullDecodedRgba;
             }
+
+            cv::Mat croppedUndistorted = fullUndistortedRgba(g_displayCrop);
+            cv::Mat rgbaFrame(g_displayCrop.height, g_displayCrop.width, CV_8UC4, dst, dstStrideBytes);
+            croppedUndistorted.copyTo(rgbaFrame);
 
             // Mirror the rear camera (videoIndex 17)
             if (g_videoIndex == 17)
@@ -394,6 +395,7 @@ Java_com_drivehub_kamera_CameraProbe_startPreview(JNIEnv *env, jclass, jint vide
     g_videoIndex = videoIndex;
     g_undistortMap1.release();
     g_undistortMap2.release();
+    g_displayCrop = cv::Rect(0, 0, g_width, g_height / 2);
     logi("Using size %dx%d stride=%d", g_width, g_height, g_srcStrideBytes);
 
     g_window = ANativeWindow_fromSurface(env, surface);
@@ -405,8 +407,8 @@ Java_com_drivehub_kamera_CameraProbe_startPreview(JNIEnv *env, jclass, jint vide
         return JNI_FALSE;
     }
 
-    int displayWidth = g_width;
-    int displayHeight = g_height / 2;
+    int displayWidth = g_displayCrop.width;
+    int displayHeight = g_displayCrop.height;
 
     ANativeWindow_setBuffersGeometry(g_window,
                                      displayWidth,
