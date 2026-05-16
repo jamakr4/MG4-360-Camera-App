@@ -6,10 +6,8 @@ import android.app.NotificationManager;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
-import android.graphics.Rect;
 import android.graphics.SurfaceTexture;
 import android.graphics.PixelFormat;
-import android.os.Build;
 import android.os.IBinder;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -43,12 +41,13 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
     /** Min/max bounds for two-finger pinch resizing. */
     private static final int OVERLAY_MIN_WIDTH_PX = 240;
     private static final int OVERLAY_MAX_WIDTH_PX = 3840;
-
     private static final String PREFS_NAME = "overlay_prefs";
     private static final String KEY_LAST_X = "last_x";
     private static final String KEY_LAST_Y = "last_y";
     private static final String KEY_OVERLAY_W = "overlay_w";
     private static final String KEY_OVERLAY_H = "overlay_h";
+    private static final String KEY_SCREEN_W = "screen_w";
+    private static final String KEY_SCREEN_H = "screen_h";
 
     private WindowManager windowManager;
     private View overlayView;
@@ -60,6 +59,8 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
     /** Current window size, updated via pinch gestures. */
     private int overlayWidthPx = DEFAULT_OVERLAY_WIDTH_PX;
     private int overlayHeightPx = DEFAULT_OVERLAY_HEIGHT_PX;
+    private int cachedScreenWidthPx;
+    private int cachedScreenHeightPx;
 
     private ScaleGestureDetector scaleGestureDetector;
 
@@ -83,6 +84,7 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
     public void onCreate() {
         super.onCreate();
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
+        initializeCachedScreenBounds();
         createNotificationChannel();
     }
 
@@ -276,7 +278,7 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
         float aspect = (float) DEFAULT_OVERLAY_WIDTH_PX / (float) DEFAULT_OVERLAY_HEIGHT_PX;
         int maxW = OVERLAY_MAX_WIDTH_PX;
         int maxH = OVERLAY_MAX_WIDTH_PX;
-        int[] screenSize = getAvailableScreenSizePx();
+        int[] screenSize = getCachedScreenSizePx();
         if (screenSize != null) {
             maxW = Math.min(maxW, screenSize[0]);
             maxH = Math.min(maxH, screenSize[1]);
@@ -303,8 +305,8 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
     }
 
     private void clampOverlayPositionToScreen() {
-        if (windowManager == null || overlayParams == null) return;
-        int[] screenSize = getAvailableScreenSizePx();
+        if (overlayParams == null) return;
+        int[] screenSize = getCachedScreenSizePx();
         if (screenSize == null) return;
         int maxX = Math.max(0, screenSize[0] - overlayParams.width);
         int maxY = Math.max(0, screenSize[1] - overlayParams.height);
@@ -314,19 +316,48 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
         if (overlayParams.y > maxY) overlayParams.y = maxY;
     }
 
-    // Android Auto can expose a smaller "current" app viewport than the actual interactive
-    // overlay space. Maximum window metrics are a better fit for drag/resize bounds here.
-    private int[] getAvailableScreenSizePx() {
-        if (windowManager == null) return null;
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            Rect bounds = windowManager.getMaximumWindowMetrics().getBounds();
-            return new int[]{bounds.width(), bounds.height()};
+    private void initializeCachedScreenBounds() {
+        try {
+            android.content.SharedPreferences sp =
+                    getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+            int savedW = sp.getInt(KEY_SCREEN_W, 0);
+            int savedH = sp.getInt(KEY_SCREEN_H, 0);
+            if (savedW > 0 && savedH > 0) {
+                cachedScreenWidthPx = savedW;
+                cachedScreenHeightPx = savedH;
+                return;
+            }
+        } catch (Throwable ignored) {
         }
+
+        if (windowManager == null) return;
 
         android.util.DisplayMetrics dm = new android.util.DisplayMetrics();
         windowManager.getDefaultDisplay().getRealMetrics(dm);
-        return new int[]{dm.widthPixels, dm.heightPixels};
+        if (dm.widthPixels <= 0 || dm.heightPixels <= 0) return;
+
+        cachedScreenWidthPx = dm.widthPixels;
+        cachedScreenHeightPx = dm.heightPixels;
+
+        try {
+            android.content.SharedPreferences sp =
+                    getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+            sp.edit()
+                    .putInt(KEY_SCREEN_W, cachedScreenWidthPx)
+                    .putInt(KEY_SCREEN_H, cachedScreenHeightPx)
+                    .apply();
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private int[] getCachedScreenSizePx() {
+        if (cachedScreenWidthPx <= 0 || cachedScreenHeightPx <= 0) {
+            initializeCachedScreenBounds();
+        }
+        if (cachedScreenWidthPx <= 0 || cachedScreenHeightPx <= 0) {
+            return null;
+        }
+        return new int[]{cachedScreenWidthPx, cachedScreenHeightPx};
     }
 
     private void saveOverlayLayoutPrefs() {
