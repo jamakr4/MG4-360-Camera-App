@@ -130,73 +130,91 @@ struct FisheyeCalibration
     cv::Vec4d D;
 };
 
-static bool getCalibrationForVideoIndex(int videoIndex, FisheyeCalibration *out)
+// OEM calibration was performed on a per-camera content image of ~700x490.
+// The principal point (cx ~= 350, cy ~= 246) is centered in that frame, so
+// the calibration coordinate system is the *content image* itself, not the
+// padded V4L2 stream. We therefore scale K by (cropW/700, cropH/490) where
+// the crop is the region of the stream that actually carries fisheye pixels.
+static constexpr double kCalibWidth = 700.0;
+static constexpr double kCalibHeight = 490.0;
+
+static bool getCalibrationForVideoIndex(int videoIndex, int cropWidth, int cropHeight,
+                                        FisheyeCalibration *out)
 {
-    if (!out)
+    if (!out || cropWidth <= 0 || cropHeight <= 0)
         return false;
+
+    double fx, fy, cx, cy, k1, k2;
 
     // Plausible OEM block mapping derived from MG's calibration blob:
     // block1=right, block2=left, block3=front, block4=rear.
     switch (videoIndex)
     {
     case 14: // right
-        out->K = cv::Matx33d(
-                197.450968, 0.0, 350.8809805131158,
-                0.0, 179.769482, 246.4031885354052,
-                0.0, 0.0, 1.0);
-        out->D = cv::Vec4d(0.121851, -0.029633, 0.0, 0.0);
-        return true;
+        fx = 197.450968; fy = 179.769482;
+        cx = 350.8809805131158; cy = 246.4031885354052;
+        k1 = 0.121851; k2 = -0.029633;
+        break;
     case 16: // left
-        out->K = cv::Matx33d(
-                196.799498, 0.0, 352.1096473941443,
-                0.0, 174.939944, 251.7309546993812,
-                0.0, 0.0, 1.0);
-        out->D = cv::Vec4d(0.121447, -0.029392, 0.0, 0.0);
-        return true;
+        fx = 196.799498; fy = 174.939944;
+        cx = 352.1096473941443; cy = 251.7309546993812;
+        k1 = 0.121447; k2 = -0.029392;
+        break;
     case 15: // front
-        out->K = cv::Matx33d(
-                197.542865, 0.0, 349.4731477242575,
-                0.0, 179.678174, 242.2744490654553,
-                0.0, 0.0, 1.0);
-        out->D = cv::Vec4d(0.119027, -0.029049, 0.0, 0.0);
-        return true;
+        fx = 197.542865; fy = 179.678174;
+        cx = 349.4731477242575; cy = 242.2744490654553;
+        k1 = 0.119027; k2 = -0.029049;
+        break;
     case 17: // rear
-        out->K = cv::Matx33d(
-                197.213019, 0.0, 353.3940664819203,
-                0.0, 179.503685, 246.0065958061789,
-                0.0, 0.0, 1.0);
-        out->D = cv::Vec4d(0.118051, -0.028805, 0.0, 0.0);
-        return true;
+        fx = 197.213019; fy = 179.503685;
+        cx = 353.3940664819203; cy = 246.0065958061789;
+        k1 = 0.118051; k2 = -0.028805;
+        break;
     default:
         return false;
     }
+
+    const double sx = static_cast<double>(cropWidth) / kCalibWidth;
+    const double sy = static_cast<double>(cropHeight) / kCalibHeight;
+
+    out->K = cv::Matx33d(
+            fx * sx, 0.0,     cx * sx,
+            0.0,     fy * sy, cy * sy,
+            0.0,     0.0,     1.0);
+    out->D = cv::Vec4d(k1, k2, 0.0, 0.0);
+    return true;
 }
 
-static void buildUndistortMapsIfNeeded(int videoIndex, int width, int height)
+// Build maps sized to the *crop region* (the bottom half of the stream that
+// actually carries the fisheye image), not the full padded stream.
+static void buildUndistortMapsIfNeeded(int videoIndex, int cropWidth, int cropHeight)
 {
     if (!g_undistortMap1.empty() && !g_undistortMap2.empty() &&
-        g_undistortMap1.cols == width && g_undistortMap1.rows == height)
+        g_undistortMap1.cols == cropWidth && g_undistortMap1.rows == cropHeight)
     {
         return;
     }
 
     FisheyeCalibration calib{};
-    if (!getCalibrationForVideoIndex(videoIndex, &calib))
+    if (!getCalibrationForVideoIndex(videoIndex, cropWidth, cropHeight, &calib))
     {
         g_undistortMap1.release();
         g_undistortMap2.release();
         return;
     }
 
-    cv::Size imageSize(width, height);
+    cv::Size imageSize(cropWidth, cropHeight);
     cv::Matx33d newK;
+    // balance=0.0: keep only the inner valid region. balance=1.0 retains the
+    // full FOV including pixels that map outside the source, which on a strong
+    // fisheye produces a mostly-black image.
     cv::fisheye::estimateNewCameraMatrixForUndistortRectify(
             calib.K,
             calib.D,
             imageSize,
             cv::Matx33d::eye(),
             newK,
-            1.0);
+            0.0);
     cv::fisheye::initUndistortRectifyMap(
             calib.K,
             calib.D,
@@ -290,21 +308,38 @@ static void *previewThread(void * /*arg*/)
             cv::Mat fullDecodedRgba;
             cv::cvtColor(uyvyFrame, fullDecodedRgba, cv::COLOR_YUV2RGBA_UYVY);
 
-            buildUndistortMapsIfNeeded(g_videoIndex, g_width, g_height);
+            // Crop to the content region first, then undistort the crop. The
+            // OEM K is in content-image coordinates, not full-stream
+            // coordinates, so undistorting the crop is correct.
+            cv::Mat croppedRaw = fullDecodedRgba(g_displayCrop);
 
-            cv::Mat fullUndistortedRgba;
+            buildUndistortMapsIfNeeded(g_videoIndex,
+                                       g_displayCrop.width,
+                                       g_displayCrop.height);
+
+            cv::Mat displayFrame;
             if (!g_undistortMap1.empty() && !g_undistortMap2.empty())
             {
-                cv::remap(fullDecodedRgba, fullUndistortedRgba, g_undistortMap1, g_undistortMap2, cv::INTER_LINEAR);
+                cv::remap(croppedRaw, displayFrame,
+                          g_undistortMap1, g_undistortMap2,
+                          cv::INTER_LINEAR);
+                // Safety net: if the remap produced an essentially-black
+                // frame (degenerate K scaling, wrong crop, etc.) fall back to
+                // the raw fisheye crop so the user still sees the camera.
+                cv::Scalar m = cv::mean(displayFrame);
+                if ((m[0] + m[1] + m[2]) < 6.0)
+                {
+                    displayFrame = croppedRaw;
+                }
             }
             else
             {
-                fullUndistortedRgba = fullDecodedRgba;
+                displayFrame = croppedRaw;
             }
 
-            cv::Mat croppedUndistorted = fullUndistortedRgba(g_displayCrop);
-            cv::Mat rgbaFrame(g_displayCrop.height, g_displayCrop.width, CV_8UC4, dst, dstStrideBytes);
-            croppedUndistorted.copyTo(rgbaFrame);
+            cv::Mat rgbaFrame(g_displayCrop.height, g_displayCrop.width,
+                              CV_8UC4, dst, dstStrideBytes);
+            displayFrame.copyTo(rgbaFrame);
 
             // Mirror the rear camera (videoIndex 17)
             if (g_videoIndex == 17)
@@ -395,7 +430,9 @@ Java_com_drivehub_kamera_CameraProbe_startPreview(JNIEnv *env, jclass, jint vide
     g_videoIndex = videoIndex;
     g_undistortMap1.release();
     g_undistortMap2.release();
-    g_displayCrop = cv::Rect(0, 0, g_width, g_height / 2);
+    // The V4L2 stream packs the real fisheye image in the bottom half of the
+    // frame (top half is black/padding on this MG hardware). Crop to it.
+    g_displayCrop = cv::Rect(0, g_height / 2, g_width, g_height / 2);
     logi("Using size %dx%d stride=%d", g_width, g_height, g_srcStrideBytes);
 
     g_window = ANativeWindow_fromSurface(env, surface);
