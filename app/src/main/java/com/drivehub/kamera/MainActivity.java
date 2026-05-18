@@ -14,6 +14,8 @@ import android.view.Window;
 import android.view.WindowManager;
 import android.widget.TextView;
 import android.widget.ImageButton;
+import android.widget.Button;
+import android.widget.SeekBar;
 import android.widget.Switch;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -27,16 +29,28 @@ import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
+import java.util.Locale;
+
 public class MainActivity extends AppCompatActivity implements SurfaceHolder.Callback {
 
     private static final String AVM_PREFS_NAME = "AVM_Settings";
     private static final String KEY_SAFETY_WARNING = "ShowSafetyWarning";
+    private static final String DEV_TUNING_PREFS_NAME = "dev_tuning_prefs";
+    private static final String KEY_DEV_BALANCE = "dev_balance";
+    private static final String KEY_DEV_FOV_SCALE = "dev_fov_scale";
 
     private SurfaceHolder surfaceHolder;
     private TextView tvStatus;
+    private View devTuningPanel;
+    private TextView tvDevBalance;
+    private TextView tvDevFovScale;
+    private SeekBar seekDevBalance;
+    private SeekBar seekDevFovScale;
     // Initial camera when the app opens: front camera (v15)
     private int currentVideoIndex = 15;
     private boolean previewRunning = false;
+    private float devBalance = 0.0f;
+    private float devFovScale = 1.0f;
 
     // Swipe detection threshold in pixels
     private static final int SWIPE_THRESHOLD_PX = 140;
@@ -86,6 +100,11 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
         tvStatus = findViewById(R.id.tvStatus);
         ImageButton btnSettings = findViewById(R.id.btnSettings);
+        devTuningPanel = findViewById(R.id.devTuningPanel);
+        tvDevBalance = findViewById(R.id.tvDevBalance);
+        tvDevFovScale = findViewById(R.id.tvDevFovScale);
+        seekDevBalance = findViewById(R.id.seekDevBalance);
+        seekDevFovScale = findViewById(R.id.seekDevFovScale);
 
         btnSettings.setOnClickListener(v -> showSettingsDialog());
 
@@ -96,6 +115,8 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         if (tvStatus != null) {
             tvStatus.setText(getString(R.string.main_preview_status, cameraLabel(currentVideoIndex)));
         }
+        loadDevTuningPrefs();
+        setupDevTuningPanel();
         applyWarningVisibility();
 
         // Keep signal/gear listening always active; overlay visibility is controlled only by settings.
@@ -199,6 +220,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         SharedPreferences avmPrefs = getSharedPreferences(AVM_PREFS_NAME, MODE_PRIVATE);
         Switch swOverlay = dialog.findViewById(R.id.switchOverlayOnSignal);
         Switch swSafetyWarning = dialog.findViewById(R.id.switchSafetyWarning);
+        Button btnOpenDevTuning = dialog.findViewById(R.id.btnOpenDevTuning);
         TextView tabSettings = dialog.findViewById(R.id.tabSettings);
         TextView tabCredits = dialog.findViewById(R.id.tabCredits);
         View sectionSettings = dialog.findViewById(R.id.sectionSettings);
@@ -216,6 +238,11 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         swSafetyWarning.setOnCheckedChangeListener((buttonView, isChecked) -> {
             avmPrefs.edit().putBoolean(KEY_SAFETY_WARNING, isChecked).apply();
             applyWarningVisibility();
+        });
+
+        btnOpenDevTuning.setOnClickListener(v -> {
+            dialog.dismiss();
+            showDevTuningPanel();
         });
 
         bindSimpleSettingsTab(tabSettings, tabCredits, sectionSettings, sectionCredits, true);
@@ -288,6 +315,9 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         stopPreview();
         boolean ok = CameraProbe.startPreview(currentVideoIndex, surfaceHolder.getSurface());
         previewRunning = ok;
+        if (ok) {
+            CameraProbe.setUndistortParams(devBalance, devFovScale);
+        }
         if (tvStatus != null) {
             tvStatus.setText(ok
                     ? getString(R.string.main_preview_status, cameraLabel(currentVideoIndex))
@@ -339,5 +369,95 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             default:
                 return getString(R.string.main_camera_label_unknown, videoIndex);
         }
+    }
+
+    private void setupDevTuningPanel() {
+        if (devTuningPanel == null || seekDevBalance == null || seekDevFovScale == null) {
+            return;
+        }
+
+        ImageButton btnSettings = findViewById(R.id.btnSettings);
+        Button btnCloseDevTuning = findViewById(R.id.btnCloseDevTuning);
+        if (btnCloseDevTuning != null) {
+            btnCloseDevTuning.setOnClickListener(v -> hideDevTuningPanel());
+        }
+        if (btnSettings != null) {
+            devTuningPanel.bringToFront();
+        }
+
+        seekDevBalance.setProgress(Math.round(devBalance * 100f));
+        seekDevFovScale.setProgress(Math.round((devFovScale - 1.0f) * 100f));
+        updateDevTuningLabels();
+
+        seekDevBalance.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                devBalance = progress / 100.0f;
+                updateDevTuningLabels();
+                applyDevTuningParams();
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {}
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {}
+        });
+
+        seekDevFovScale.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                devFovScale = 1.0f + (progress / 100.0f);
+                updateDevTuningLabels();
+                applyDevTuningParams();
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {}
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {}
+        });
+    }
+
+    private void showDevTuningPanel() {
+        if (devTuningPanel != null) {
+            devTuningPanel.setVisibility(View.VISIBLE);
+            devTuningPanel.bringToFront();
+        }
+    }
+
+    private void hideDevTuningPanel() {
+        if (devTuningPanel != null) {
+            devTuningPanel.setVisibility(View.GONE);
+        }
+    }
+
+    private void updateDevTuningLabels() {
+        if (tvDevBalance != null) {
+            tvDevBalance.setText(getString(R.string.dev_tuning_balance, devBalance));
+        }
+        if (tvDevFovScale != null) {
+            tvDevFovScale.setText(getString(R.string.dev_tuning_fov_scale, devFovScale));
+        }
+    }
+
+    private void loadDevTuningPrefs() {
+        SharedPreferences prefs = getSharedPreferences(DEV_TUNING_PREFS_NAME, MODE_PRIVATE);
+        devBalance = clamp(prefs.getFloat(KEY_DEV_BALANCE, 0.0f), 0.0f, 1.0f);
+        devFovScale = clamp(prefs.getFloat(KEY_DEV_FOV_SCALE, 1.0f), 1.0f, 2.0f);
+    }
+
+    private void applyDevTuningParams() {
+        CameraProbe.setUndistortParams(devBalance, devFovScale);
+        getSharedPreferences(DEV_TUNING_PREFS_NAME, MODE_PRIVATE)
+                .edit()
+                .putFloat(KEY_DEV_BALANCE, devBalance)
+                .putFloat(KEY_DEV_FOV_SCALE, devFovScale)
+                .apply();
+    }
+
+    private float clamp(float value, float min, float max) {
+        return Math.max(min, Math.min(max, value));
     }
 }

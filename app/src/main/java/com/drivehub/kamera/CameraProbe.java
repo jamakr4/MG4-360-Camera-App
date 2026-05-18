@@ -16,6 +16,9 @@ public final class CameraProbe {
     /** Stops any running preview. */
     public static native void stopPreview();
 
+    /** Updates the live undistort tuning parameters used by the native preview path. */
+    public static native void setUndistortParams(float balance, float fovScale);
+
     /**
      * Starts MP4 recording from a specific /dev/videoX device.
      * slot: 0..3 to allow multiple concurrent recorders.
@@ -26,4 +29,3 @@ public final class CameraProbe {
     /** Stops MP4 recording for the given slot. */
     public static native void stopMp4Record(int slot);
 }
-

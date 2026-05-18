@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 #include <sstream>
+#include <algorithm>
 #include <cerrno>
 #include <cstring>
 
@@ -123,6 +124,8 @@ static int g_videoIndex = -1;
 static cv::Mat g_undistortMap1;
 static cv::Mat g_undistortMap2;
 static cv::Rect g_displayCrop;
+static float g_balance = 0.0f;
+static float g_fovScale = 1.0f;
 
 struct FisheyeCalibration
 {
@@ -205,16 +208,17 @@ static void buildUndistortMapsIfNeeded(int videoIndex, int cropWidth, int cropHe
 
     cv::Size imageSize(cropWidth, cropHeight);
     cv::Matx33d newK;
-    // balance=0.0: keep only the inner valid region. balance=1.0 retains the
-    // full FOV including pixels that map outside the source, which on a strong
-    // fisheye produces a mostly-black image.
     cv::fisheye::estimateNewCameraMatrixForUndistortRectify(
             calib.K,
             calib.D,
             imageSize,
             cv::Matx33d::eye(),
             newK,
-            0.0);
+            static_cast<double>(g_balance));
+    newK(0, 0) *= static_cast<double>(g_fovScale);
+    newK(1, 1) *= static_cast<double>(g_fovScale);
+    newK(0, 2) = static_cast<double>(cropWidth) / 2.0;
+    newK(1, 2) = static_cast<double>(cropHeight) / 2.0;
     cv::fisheye::initUndistortRectifyMap(
             calib.K,
             calib.D,
@@ -487,6 +491,15 @@ Java_com_drivehub_kamera_CameraProbe_stopPreview(JNIEnv * /*env*/, jclass /*claz
         close(g_fd);
         g_fd = -1;
     }
+    g_undistortMap1.release();
+    g_undistortMap2.release();
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_drivehub_kamera_CameraProbe_setUndistortParams(JNIEnv * /*env*/, jclass /*clazz*/, jfloat balance, jfloat fovScale)
+{
+    g_balance = std::clamp(balance, 0.0f, 1.0f);
+    g_fovScale = std::clamp(fovScale, 1.0f, 2.0f);
     g_undistortMap1.release();
     g_undistortMap2.release();
 }

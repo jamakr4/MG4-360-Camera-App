@@ -5,6 +5,8 @@
     <string name="settings_section_driving">DRIVING</string>
     <string name="settings_section_display">DISPLAY</string>
     <string name="settings_overlay_on_signal">Show tile view on turn signal</string>
+    <string name="settings_dev_tuning">Dev undistort tuning</string>
+    <string name="settings_dev_tuning_open">Open</string>
     <string name="safety_warning_text">Please pay attention to the surrounding environment!</string>
     <string name="show_safety_warning">Show safety warning</string>
     <string name="settings_section_open_source_credits">OPEN SOURCE CREDITS</string>
@@ -37,4 +39,8 @@
     <string name="main_camera_label_unknown">/dev/video%1$d</string>
     <string name="main_button_settings">Settings</string>
     <string name="main_button_close_app">Close app</string>
+    <string name="dev_tuning_title">Dev Undistort Tuning</string>
+    <string name="dev_tuning_close">Close</string>
+    <string name="dev_tuning_balance">Balance: %1$.2f</string>
+    <string name="dev_tuning_fov_scale">FOV scale: %1$.2f</string>
 </resources>
