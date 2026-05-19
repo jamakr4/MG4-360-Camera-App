@@ -3,10 +3,15 @@
     <string name="settings_tab_update">Update</string>
     <string name="settings_tab_settings">Settings</string>
     <string name="settings_tab_signal_camera">Signal Cam</string>
+    <string name="settings_tab_dashcam">Dashcam</string>
     <string name="settings_tab_credits">Credits</string>
     <string name="settings_section_driving">DRIVING</string>
     <string name="settings_section_display">DISPLAY</string>
     <string name="settings_section_signal_camera">SIGNAL CAMERA</string>
+    <string name="settings_section_dashcam">DASHCAM</string>
+    <string name="settings_section_dashcam_loop">LOOP RECORDING</string>
+    <string name="settings_dashcam_enabled">Record automatically on boot</string>
+    <string name="settings_dashcam_loop_hint">Creates four camera clips per segment and keeps the newest recordings within the retention window.</string>
     <string name="settings_overlay_on_signal">Show Signal Camera on turn signal</string>
     <string name="safety_warning_text">Please pay attention to the surrounding environment!</string>
     <string name="show_safety_warning">Show safety warning</string>

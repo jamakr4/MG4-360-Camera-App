@@ -55,6 +55,16 @@
             android:text="@string/settings_tab_signal_camera" />
 
         <TextView
+            android:id="@+id/tabDashcam"
+            style="@style/DrivehubSettingsTabInactive"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="18dp"
+            android:paddingTop="8dp"
+            android:paddingBottom="8dp"
+            android:text="@string/settings_tab_dashcam" />
+
+        <TextView
             android:id="@+id/tabOptik"
             style="@style/DrivehubSettingsTabInactive"
             android:layout_width="wrap_content"
@@ -116,6 +126,8 @@
             <include layout="@layout/dialog_settings_section_settings" />
 
             <include layout="@layout/dialog_settings_section_signal_camera" />
+
+            <include layout="@layout/dialog_settings_section_dashcam" />
 
             <include layout="@layout/dialog_settings_section_optik" />
 

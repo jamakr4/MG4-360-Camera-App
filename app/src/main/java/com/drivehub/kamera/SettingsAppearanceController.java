@@ -26,6 +26,7 @@ final class SettingsAppearanceController {
     private boolean isNormalizingAccentColor;
     private SharedPreferences prefs;
     private Switch swOverlay;
+    private Switch swDashcamEnabled;
     private Switch swSafetyWarning;
     private Switch swAllowBetaUpdates;
     private ImageButton dialogClose;
@@ -39,6 +40,7 @@ final class SettingsAppearanceController {
     private TextView tabUpdate;
     private TextView tabSettings;
     private TextView tabSignalCamera;
+    private TextView tabDashcam;
     private TextView tabOptik;
     private TextView tabCredits;
     private int activeTab;
@@ -57,6 +59,7 @@ final class SettingsAppearanceController {
     void bindSettingsAppearance(
             SharedPreferences prefs,
             Switch swOverlay,
+            Switch swDashcamEnabled,
             Switch swSafetyWarning,
             Switch swAllowBetaUpdates,
             ImageButton dialogClose,
@@ -70,11 +73,13 @@ final class SettingsAppearanceController {
             TextView tabUpdate,
             TextView tabSettings,
             TextView tabSignalCamera,
+            TextView tabDashcam,
             TextView tabOptik,
             TextView tabCredits
     ) {
         this.prefs = prefs;
         this.swOverlay = swOverlay;
+        this.swDashcamEnabled = swDashcamEnabled;
         this.swSafetyWarning = swSafetyWarning;
         this.swAllowBetaUpdates = swAllowBetaUpdates;
         this.dialogClose = dialogClose;
@@ -88,6 +93,7 @@ final class SettingsAppearanceController {
         this.tabUpdate = tabUpdate;
         this.tabSettings = tabSettings;
         this.tabSignalCamera = tabSignalCamera;
+        this.tabDashcam = tabDashcam;
         this.tabOptik = tabOptik;
         this.tabCredits = tabCredits;
         this.activeTab = 1;
@@ -288,6 +294,9 @@ final class SettingsAppearanceController {
         if (swOverlay != null) {
             swOverlay.setTrackTintList(buildToggleTrackTint(accentColor));
         }
+        if (swDashcamEnabled != null) {
+            swDashcamEnabled.setTrackTintList(buildToggleTrackTint(accentColor));
+        }
         if (swSafetyWarning != null) {
             swSafetyWarning.setTrackTintList(buildToggleTrackTint(accentColor));
         }
@@ -303,8 +312,9 @@ final class SettingsAppearanceController {
         if (tabUpdate != null) tabUpdate.setTextColor(activeTab == 0 ? accentColor : 0xFF777777);
         if (tabSettings != null) tabSettings.setTextColor(activeTab == 1 ? accentColor : 0xFF777777);
         if (tabSignalCamera != null) tabSignalCamera.setTextColor(activeTab == 2 ? accentColor : 0xFF777777);
-        if (tabOptik != null) tabOptik.setTextColor(activeTab == 3 ? accentColor : 0xFF777777);
-        if (tabCredits != null) tabCredits.setTextColor(activeTab == 4 ? accentColor : 0xFF777777);
+        if (tabDashcam != null) tabDashcam.setTextColor(activeTab == 3 ? accentColor : 0xFF777777);
+        if (tabOptik != null) tabOptik.setTextColor(activeTab == 4 ? accentColor : 0xFF777777);
+        if (tabCredits != null) tabCredits.setTextColor(activeTab == 5 ? accentColor : 0xFF777777);
     }
 
     private ColorStateList buildToggleTrackTint(int accentColor) {

@@ -3,10 +3,15 @@
     <string name="settings_tab_update">Update</string>
     <string name="settings_tab_settings">Einstellungen</string>
     <string name="settings_tab_signal_camera">Blinker-Kamera</string>
+    <string name="settings_tab_dashcam">Dashcam</string>
     <string name="settings_tab_credits">Credits</string>
     <string name="settings_section_driving">FAHREN</string>
     <string name="settings_section_display">ANZEIGE</string>
     <string name="settings_section_signal_camera">BLINKER-KAMERA</string>
+    <string name="settings_section_dashcam">DASHCAM</string>
+    <string name="settings_section_dashcam_loop">AUFNAHMESCHLEIFE</string>
+    <string name="settings_dashcam_enabled">Beim Start automatisch aufnehmen</string>
+    <string name="settings_dashcam_loop_hint">Erstellt pro Segment vier Kameraclips und behält die neuesten Aufnahmen innerhalb der Speicherzeit.</string>
     <string name="settings_overlay_on_signal">Kamera beim Blinken anzeigen</string>
     <string name="safety_warning_text">Bitte achte auf die Umgebung!</string>
     <string name="show_safety_warning">Sicherheitswarnung anzeigen</string>

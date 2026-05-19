@@ -15,6 +15,7 @@ import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
 import android.view.Window;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.SeekBar;
@@ -46,6 +47,8 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private final SettingsAppearanceController appearanceController = new SettingsAppearanceController(this);
     private final SignalCameraSettingsController signalCameraSettingsController =
             new SignalCameraSettingsController(this);
+    private final DashcamSettingsController dashcamSettingsController =
+            new DashcamSettingsController(this);
 
     private final OtaController otaController = new OtaController(this);
 
@@ -194,6 +197,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         SharedPreferences avmPrefs = getSharedPreferences(AVM_PREFS_NAME, MODE_PRIVATE);
 
         Switch swOverlay = dialog.findViewById(R.id.switchOverlayOnSignal);
+        Switch swDashcamEnabled = dialog.findViewById(R.id.switchDashcamEnabled);
         Switch swSafetyWarning = dialog.findViewById(R.id.switchSafetyWarning);
         swSafetyWarning.setChecked(avmPrefs.getBoolean(KEY_SAFETY_WARNING, true));
         swSafetyWarning.setOnCheckedChangeListener((btn, checked) -> {
@@ -205,6 +209,10 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         EditText etOverlayHideDelayValue = dialog.findViewById(R.id.etOverlayHideDelayValue);
         SeekBar seekOverlayMinShow = dialog.findViewById(R.id.seekOverlayMinShow);
         EditText etOverlayMinShowValue = dialog.findViewById(R.id.etOverlayMinShowValue);
+        EditText etDashcamSegmentMin = dialog.findViewById(R.id.etDashcamSegmentMin);
+        EditText etDashcamTotalMin = dialog.findViewById(R.id.etDashcamTotalMin);
+        TextView tvDashcamRecordsPath = dialog.findViewById(R.id.tvDashcamRecordsPath);
+        Button btnDashcamExportUsb = dialog.findViewById(R.id.btnDashcamExportUsb);
 
         SeekBar seekCorner = dialog.findViewById(R.id.seekCornerRadius);
         EditText etCorner = dialog.findViewById(R.id.etCornerRadius);
@@ -212,11 +220,13 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         TextView tabUpdate = dialog.findViewById(R.id.tabUpdate);
         TextView tabSettings = dialog.findViewById(R.id.tabSettings);
         TextView tabSignalCamera = dialog.findViewById(R.id.tabSignalCamera);
+        TextView tabDashcam = dialog.findViewById(R.id.tabDashcam);
         TextView tabOptik = dialog.findViewById(R.id.tabOptik);
         TextView tabCredits = dialog.findViewById(R.id.tabCredits);
         View sectionUpdate = dialog.findViewById(R.id.sectionUpdate);
         View sectionSettings = dialog.findViewById(R.id.sectionSettings);
         View sectionSignalCamera = dialog.findViewById(R.id.sectionSignalCamera);
+        View sectionDashcam = dialog.findViewById(R.id.sectionDashcam);
         View sectionOptik = dialog.findViewById(R.id.sectionOptik);
         View sectionCredits = dialog.findViewById(R.id.sectionCredits);
         View accentRow = dialog.findViewById(R.id.rowAccentColor);
@@ -230,10 +240,19 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 seekOverlayMinShow,
                 etOverlayMinShowValue
         );
+        dashcamSettingsController.bind(
+                prefs,
+                swDashcamEnabled,
+                etDashcamSegmentMin,
+                etDashcamTotalMin,
+                tvDashcamRecordsPath,
+                btnDashcamExportUsb
+        );
 
         appearanceController.bindSettingsAppearance(
                 prefs,
                 swOverlay,
+                swDashcamEnabled,
                 swSafetyWarning,
                 swAllowBetaUpdates,
                 dialogClose,
@@ -247,37 +266,43 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 tabUpdate,
                 tabSettings,
                 tabSignalCamera,
+                tabDashcam,
                 tabOptik,
                 tabCredits
         );
 
-        bindSettingsTab(tabUpdate, tabSettings, tabSignalCamera, tabOptik, tabCredits,
-                sectionUpdate, sectionSettings, sectionSignalCamera, sectionOptik, sectionCredits, 1);
+        bindSettingsTab(tabUpdate, tabSettings, tabSignalCamera, tabDashcam, tabOptik, tabCredits,
+                sectionUpdate, sectionSettings, sectionSignalCamera, sectionDashcam, sectionOptik, sectionCredits, 1);
         appearanceController.reapplyForActiveTab(1);
         tabUpdate.setOnClickListener(v -> {
-            bindSettingsTab(tabUpdate, tabSettings, tabSignalCamera, tabOptik, tabCredits,
-                    sectionUpdate, sectionSettings, sectionSignalCamera, sectionOptik, sectionCredits, 0);
+            bindSettingsTab(tabUpdate, tabSettings, tabSignalCamera, tabDashcam, tabOptik, tabCredits,
+                    sectionUpdate, sectionSettings, sectionSignalCamera, sectionDashcam, sectionOptik, sectionCredits, 0);
             appearanceController.reapplyForActiveTab(0);
         });
         tabSettings.setOnClickListener(v -> {
-            bindSettingsTab(tabUpdate, tabSettings, tabSignalCamera, tabOptik, tabCredits,
-                    sectionUpdate, sectionSettings, sectionSignalCamera, sectionOptik, sectionCredits, 1);
+            bindSettingsTab(tabUpdate, tabSettings, tabSignalCamera, tabDashcam, tabOptik, tabCredits,
+                    sectionUpdate, sectionSettings, sectionSignalCamera, sectionDashcam, sectionOptik, sectionCredits, 1);
             appearanceController.reapplyForActiveTab(1);
         });
         tabSignalCamera.setOnClickListener(v -> {
-            bindSettingsTab(tabUpdate, tabSettings, tabSignalCamera, tabOptik, tabCredits,
-                    sectionUpdate, sectionSettings, sectionSignalCamera, sectionOptik, sectionCredits, 2);
+            bindSettingsTab(tabUpdate, tabSettings, tabSignalCamera, tabDashcam, tabOptik, tabCredits,
+                    sectionUpdate, sectionSettings, sectionSignalCamera, sectionDashcam, sectionOptik, sectionCredits, 2);
             appearanceController.reapplyForActiveTab(2);
         });
-        tabOptik.setOnClickListener(v -> {
-            bindSettingsTab(tabUpdate, tabSettings, tabSignalCamera, tabOptik, tabCredits,
-                    sectionUpdate, sectionSettings, sectionSignalCamera, sectionOptik, sectionCredits, 3);
+        tabDashcam.setOnClickListener(v -> {
+            bindSettingsTab(tabUpdate, tabSettings, tabSignalCamera, tabDashcam, tabOptik, tabCredits,
+                    sectionUpdate, sectionSettings, sectionSignalCamera, sectionDashcam, sectionOptik, sectionCredits, 3);
             appearanceController.reapplyForActiveTab(3);
         });
-        tabCredits.setOnClickListener(v -> {
-            bindSettingsTab(tabUpdate, tabSettings, tabSignalCamera, tabOptik, tabCredits,
-                    sectionUpdate, sectionSettings, sectionSignalCamera, sectionOptik, sectionCredits, 4);
+        tabOptik.setOnClickListener(v -> {
+            bindSettingsTab(tabUpdate, tabSettings, tabSignalCamera, tabDashcam, tabOptik, tabCredits,
+                    sectionUpdate, sectionSettings, sectionSignalCamera, sectionDashcam, sectionOptik, sectionCredits, 4);
             appearanceController.reapplyForActiveTab(4);
+        });
+        tabCredits.setOnClickListener(v -> {
+            bindSettingsTab(tabUpdate, tabSettings, tabSignalCamera, tabDashcam, tabOptik, tabCredits,
+                    sectionUpdate, sectionSettings, sectionSignalCamera, sectionDashcam, sectionOptik, sectionCredits, 5);
+            appearanceController.reapplyForActiveTab(5);
         });
 
         TextView tvVersion = dialog.findViewById(R.id.tvDialogVersion);
@@ -312,25 +337,31 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         Window shownWindow = dialog.getWindow();
         if (shownWindow != null) {
             float density = getResources().getDisplayMetrics().density;
-            shownWindow.setLayout((int) (700 * density), (int) (560 * density));
+            int screenWidth = getResources().getDisplayMetrics().widthPixels;
+            int horizontalMargin = (int) (48 * density);
+            int preferredWidth = (int) (880 * density);
+            int dialogWidth = Math.min(preferredWidth, screenWidth - horizontalMargin);
+            shownWindow.setLayout(dialogWidth, (int) (560 * density));
         }
     }
 
     private void bindSettingsTab(
-            TextView tabUpdate, TextView tabSettings, TextView tabSignalCamera, TextView tabOptik, TextView tabCredits,
-            View sectionUpdate, View sectionSettings, View sectionSignalCamera, View sectionOptik, View sectionCredits,
+            TextView tabUpdate, TextView tabSettings, TextView tabSignalCamera, TextView tabDashcam, TextView tabOptik, TextView tabCredits,
+            View sectionUpdate, View sectionSettings, View sectionSignalCamera, View sectionDashcam, View sectionOptik, View sectionCredits,
             int active
     ) {
         sectionUpdate.setVisibility(active == 0 ? View.VISIBLE : View.GONE);
         sectionSettings.setVisibility(active == 1 ? View.VISIBLE : View.GONE);
         sectionSignalCamera.setVisibility(active == 2 ? View.VISIBLE : View.GONE);
-        sectionOptik.setVisibility(active == 3 ? View.VISIBLE : View.GONE);
-        sectionCredits.setVisibility(active == 4 ? View.VISIBLE : View.GONE);
+        sectionDashcam.setVisibility(active == 3 ? View.VISIBLE : View.GONE);
+        sectionOptik.setVisibility(active == 4 ? View.VISIBLE : View.GONE);
+        sectionCredits.setVisibility(active == 5 ? View.VISIBLE : View.GONE);
         styleSettingsTab(tabUpdate, active == 0);
         styleSettingsTab(tabSettings, active == 1);
         styleSettingsTab(tabSignalCamera, active == 2);
-        styleSettingsTab(tabOptik, active == 3);
-        styleSettingsTab(tabCredits, active == 4);
+        styleSettingsTab(tabDashcam, active == 3);
+        styleSettingsTab(tabOptik, active == 4);
+        styleSettingsTab(tabCredits, active == 5);
     }
 
     private void styleSettingsTab(TextView tab, boolean active) {
