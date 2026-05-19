@@ -37,8 +37,14 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
     private SurfaceHolder surfaceHolder;
     private TextView tvStatus;
+    private View recordingStatusPill;
+    private View recordingStatusDot;
+    private TextView tvRecordingStatus;
+    private TextView tvDashcamDialogStatus;
+    private Button btnRecordTestClip;
     private int currentVideoIndex = 15;
     private boolean previewRunning = false;
+    private boolean previewPausedForTestClip = false;
     private float downX = 0f;
     private float downY = 0f;
 
@@ -64,6 +70,20 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 tvStatus.setText(getString(R.string.main_preview_status, cameraLabel(currentVideoIndex)));
             }
             startPreviewIfReady();
+        }
+    };
+
+    private final BroadcastReceiver recordingStatusReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (intent == null) return;
+            if (!RecordingService.ACTION_STATUS_CHANGED.equals(intent.getAction())) return;
+            renderRecordingStatus(
+                    intent.getStringExtra(RecordingService.EXTRA_STATUS),
+                    intent.getIntExtra(RecordingService.EXTRA_ACTIVE_CAMERAS, 0),
+                    intent.getIntExtra(RecordingService.EXTRA_TOTAL_CAMERAS, 4),
+                    intent.getStringExtra(RecordingService.EXTRA_LAST_ERROR)
+            );
         }
     };
 
@@ -95,12 +115,25 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         if (tvStatus != null) {
             tvStatus.setText(getString(R.string.main_preview_status, cameraLabel(currentVideoIndex)));
         }
+        recordingStatusPill = findViewById(R.id.recordingStatusPill);
+        recordingStatusDot = findViewById(R.id.recordingStatusDot);
+        tvRecordingStatus = findViewById(R.id.tvRecordingStatus);
+        applyStoredRecordingStatus();
 
         ImageButton btnSettings = findViewById(R.id.btnSettings);
         btnSettings.setOnClickListener(v -> showSettingsDialog());
 
         ImageButton btnClose = findViewById(R.id.btnClose);
         btnClose.setOnClickListener(v -> finishAndRemoveTask());
+
+        btnRecordTestClip = findViewById(R.id.btnRecordTestClip);
+        btnRecordTestClip.setOnClickListener(v -> {
+            btnRecordTestClip.setEnabled(false);
+            btnRecordTestClip.setText(R.string.main_button_record_test_running);
+            previewPausedForTestClip = true;
+            stopPreview();
+            RecordingService.startTestClip(this);
+        });
 
         appearanceController.applyMainUiIconColors();
         applyWarningVisibility();
@@ -150,10 +183,17 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                     new IntentFilter(SignalService.ACTION_ROUTE_CAMERA),
                     ContextCompat.RECEIVER_NOT_EXPORTED
             );
+            ContextCompat.registerReceiver(
+                    this,
+                    recordingStatusReceiver,
+                    new IntentFilter(RecordingService.ACTION_STATUS_CHANGED),
+                    ContextCompat.RECEIVER_NOT_EXPORTED
+            );
         } catch (Throwable ignored) {
         }
         OverlayService.hideOverlay(this);
         applyWarningVisibility();
+        applyStoredRecordingStatus();
     }
 
     @Override
@@ -164,6 +204,10 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         otaController.stop();
         try {
             unregisterReceiver(cameraRouteReceiver);
+        } catch (Throwable ignored) {
+        }
+        try {
+            unregisterReceiver(recordingStatusReceiver);
         } catch (Throwable ignored) {
         }
     }
@@ -212,7 +256,9 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         EditText etDashcamSegmentMin = dialog.findViewById(R.id.etDashcamSegmentMin);
         EditText etDashcamTotalMin = dialog.findViewById(R.id.etDashcamTotalMin);
         TextView tvDashcamRecordsPath = dialog.findViewById(R.id.tvDashcamRecordsPath);
+        tvDashcamDialogStatus = dialog.findViewById(R.id.tvDashcamRecordingStatus);
         Button btnDashcamExportUsb = dialog.findViewById(R.id.btnDashcamExportUsb);
+        applyStoredRecordingStatus();
 
         SeekBar seekCorner = dialog.findViewById(R.id.seekCornerRadius);
         EditText etCorner = dialog.findViewById(R.id.etCornerRadius);
@@ -329,6 +375,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         dialogClose.setOnClickListener(v -> dialog.dismiss());
         dialog.setOnDismissListener(d -> {
             sSettingsDialogOpen = false;
+            tvDashcamDialogStatus = null;
             appearanceController.applyMainUiIconColors();
             SignalService.requestRecheck();
         });
@@ -380,6 +427,71 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         View banner = findViewById(R.id.warningBanner);
         if (bg != null) bg.setVisibility(visibility);
         if (banner != null) banner.setVisibility(visibility);
+    }
+
+    private void applyStoredRecordingStatus() {
+        SharedPreferences prefs = UiPrefs.getPrefs(this);
+        renderRecordingStatus(
+                prefs.getString("recordingStatus", RecordingService.STATUS_OFF),
+                prefs.getInt("recordingActiveCameras", 0),
+                prefs.getInt("recordingTotalCameras", 4),
+                prefs.getString("recordingLastError", "")
+        );
+    }
+
+    private void renderRecordingStatus(String status, int activeCameras, int totalCameras, String lastError) {
+        if (recordingStatusPill == null || recordingStatusDot == null || tvRecordingStatus == null) return;
+        if (status == null || RecordingService.STATUS_OFF.equals(status)) {
+            recordingStatusPill.setVisibility(View.GONE);
+            resetTestClipButton();
+            renderDashcamDialogStatus(getString(R.string.settings_dashcam_status_off));
+            restartPreviewAfterTestClipIfNeeded();
+            return;
+        }
+
+        recordingStatusPill.setVisibility(View.VISIBLE);
+        if (RecordingService.STATUS_RECORDING.equals(status)) {
+            if (btnRecordTestClip != null) btnRecordTestClip.setEnabled(false);
+            recordingStatusDot.setVisibility(View.VISIBLE);
+            tvRecordingStatus.setText(getString(R.string.main_recording_indicator, activeCameras, totalCameras));
+            renderDashcamDialogStatus(getString(R.string.settings_dashcam_status_recording, activeCameras, totalCameras));
+        } else if (RecordingService.STATUS_STARTING.equals(status)) {
+            if (btnRecordTestClip != null) btnRecordTestClip.setEnabled(false);
+            recordingStatusDot.setVisibility(View.VISIBLE);
+            tvRecordingStatus.setText(R.string.main_recording_starting);
+            renderDashcamDialogStatus(getString(R.string.settings_dashcam_status_starting));
+        } else {
+            if (activeCameras <= 0) {
+                resetTestClipButton();
+            }
+            recordingStatusDot.setVisibility(View.GONE);
+            String error = lastError == null || lastError.trim().isEmpty()
+                    ? status
+                    : lastError.trim();
+            tvRecordingStatus.setText(getString(R.string.main_recording_error, error));
+            renderDashcamDialogStatus(getString(R.string.settings_dashcam_status_error, error));
+            if (activeCameras <= 0) {
+                restartPreviewAfterTestClipIfNeeded();
+            }
+        }
+    }
+
+    private void resetTestClipButton() {
+        if (btnRecordTestClip == null) return;
+        btnRecordTestClip.setEnabled(true);
+        btnRecordTestClip.setText(R.string.main_button_record_test_30s);
+    }
+
+    private void renderDashcamDialogStatus(String text) {
+        if (tvDashcamDialogStatus != null) {
+            tvDashcamDialogStatus.setText(text);
+        }
+    }
+
+    private void restartPreviewAfterTestClipIfNeeded() {
+        if (!previewPausedForTestClip) return;
+        previewPausedForTestClip = false;
+        startPreviewIfReady();
     }
 
     // -------------------------------------------------------------------------

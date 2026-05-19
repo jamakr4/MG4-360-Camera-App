@@ -26,14 +26,31 @@ public class RecordingService extends Service {
 
     public static final String ACTION_START = "start_recording";
     public static final String ACTION_STOP = "stop_recording";
+    public static final String ACTION_RECORD_TEST_30S = "record_test_30s";
+    public static final String ACTION_STATUS_CHANGED = "com.drivehub.kamera.ACTION_RECORDING_STATUS_CHANGED";
+    public static final String EXTRA_STATUS = "status";
+    public static final String EXTRA_ACTIVE_CAMERAS = "active_cameras";
+    public static final String EXTRA_TOTAL_CAMERAS = "total_cameras";
+    public static final String EXTRA_LAST_ERROR = "last_error";
+    public static final String STATUS_OFF = "off";
+    public static final String STATUS_STARTING = "starting";
+    public static final String STATUS_RECORDING = "recording";
+    public static final String STATUS_PARTIAL = "partial";
+    public static final String STATUS_ERROR = "error";
 
     private static final String PREFS_NAME = "rec_prefs";
     private static final String KEY_ENABLED = "enabled";
     private static final String KEY_SEGMENT_MIN = "segmentMin";
     private static final String KEY_TOTAL_MIN = "totalMin";
+    private static final String KEY_STATUS = "recordingStatus";
+    private static final String KEY_ACTIVE_CAMERAS = "recordingActiveCameras";
+    private static final String KEY_TOTAL_CAMERAS = "recordingTotalCameras";
+    private static final String KEY_LAST_ERROR = "recordingLastError";
 
     private static final String CHANNEL_ID = "mg4_recording";
     private static final int NOTIF_ID = 42;
+    private static final int TOTAL_CAMERAS = 4;
+    private static final long TEST_RECORDING_MS = 30_000L;
 
     private Thread worker;
     private volatile boolean stopRequested = false;
@@ -53,6 +70,12 @@ public class RecordingService extends Service {
         context.startService(i);
     }
 
+    public static void startTestClip(Context context) {
+        Intent i = new Intent(context, RecordingService.class);
+        i.setAction(ACTION_RECORD_TEST_30S);
+        context.startForegroundService(i);
+    }
+
     @Override
     public void onCreate() {
         super.onCreate();
@@ -66,6 +89,7 @@ public class RecordingService extends Service {
 
         if (ACTION_STOP.equals(action)) {
             stopRequested = true;
+            publishStatus(STATUS_OFF, 0, TOTAL_CAMERAS, "");
             // If recording is still running, stop the native side immediately too.
             // The 4 slots are fixed: 0=F (15), 1=R (17), 2=X (16), 3=Y (14)
             try {
@@ -85,14 +109,41 @@ public class RecordingService extends Service {
 
         if (worker != null) {
             // Do not start again if it is already running.
+            publishCurrentStatus();
             return START_STICKY;
         }
 
         stopRequested = false;
         startForeground(NOTIF_ID, buildNotification(getString(R.string.notification_recording_starting)));
-        worker = new Thread(this::recordLoop, "RecordingServiceWorker");
+        publishStatus(STATUS_STARTING, 0, TOTAL_CAMERAS, "");
+        if (ACTION_RECORD_TEST_30S.equals(action)) {
+            worker = new Thread(this::recordTestClip, "RecordingServiceTestWorker");
+        } else {
+            worker = new Thread(this::recordLoop, "RecordingServiceWorker");
+        }
         worker.start();
         return START_STICKY;
+    }
+
+    private void recordTestClip() {
+        File baseDir = getRecordsBaseDir();
+        //noinspection ResultOfMethodCallIgnored
+        baseDir.mkdirs();
+        if (!baseDir.exists() || !baseDir.canWrite()) {
+            publishStatus(STATUS_ERROR, 0, TOTAL_CAMERAS, "storage not writable");
+            worker = null;
+            stopForeground(true);
+            stopSelf();
+            return;
+        }
+
+        boolean startedAnyCamera = recordClip(baseDir, TEST_RECORDING_MS, "test_" + makeTimestampBaseWithSeconds(System.currentTimeMillis()), -1);
+        worker = null;
+        if (startedAnyCamera) {
+            publishStatus(STATUS_OFF, 0, TOTAL_CAMERAS, "");
+        }
+        stopForeground(true);
+        stopSelf();
     }
 
     private void recordLoop() {
@@ -103,6 +154,8 @@ public class RecordingService extends Service {
         int totalMin = prefs.getInt(KEY_TOTAL_MIN, 30);
 
         if (!enabled || segmentMin <= 0) {
+            publishStatus(STATUS_OFF, 0, TOTAL_CAMERAS, "");
+            worker = null;
             stopSelf();
             return;
         }
@@ -110,52 +163,25 @@ public class RecordingService extends Service {
         File baseDir = getRecordsBaseDir();
         //noinspection ResultOfMethodCallIgnored
         baseDir.mkdirs();
-
-        // Output names for the 4 cameras.
-        // F = v15 (front), R = v17 (rear), X = v16 (left), Y = v14 (right)
-        int[] slots = new int[]{0, 1, 2, 3};
-        int[] videoIndices = new int[]{15, 17, 16, 14};
-        char[] names = new char[]{'F', 'R', 'X', 'Y'};
+        if (!baseDir.exists() || !baseDir.canWrite()) {
+            publishStatus(STATUS_ERROR, 0, TOTAL_CAMERAS, "storage not writable");
+            worker = null;
+            stopSelf();
+            return;
+        }
 
         long segmentMs = segmentMin * 60L * 1000L;
 
         // Convert total duration into a segment count: segmentMin=3, totalMin=30 => keep 10 segments.
         int keepSegments = Math.max(1, totalMin / segmentMin);
+        boolean endedWithFatalError = false;
 
         while (!stopRequested) {
-            long now = System.currentTimeMillis();
-            String ts = makeTimestampBase(now);
-            File clipDir = baseDir; // Store files directly in the folder.
-
-            String[] outPaths = new String[4];
-            for (int i = 0; i < 4; i++) {
-                String fileName = ts + "_" + names[i] + ".mp4";
-                File out = new File(clipDir, fileName);
-                outPaths[i] = out.getAbsolutePath();
+            boolean startedAnyCamera = recordClip(baseDir, segmentMs, makeTimestampBase(System.currentTimeMillis()), keepSegments);
+            if (!startedAnyCamera) {
+                endedWithFatalError = true;
+                break;
             }
-
-            // Start recording all 4 cameras at the same time.
-            for (int i = 0; i < 4; i++) {
-                // width=720 height=240 fps=15 bitrate default 2.5Mbps
-                CameraProbe.startMp4Record(slots[i], videoIndices[i], outPaths[i], 720, 240, 15, 2500000);
-            }
-
-            // Wait until the segment duration is reached.
-            long start = SystemClock.elapsedRealtime();
-            while (!stopRequested && (SystemClock.elapsedRealtime() - start) < segmentMs) {
-                try {
-                    Thread.sleep(200);
-                } catch (InterruptedException ignored) {
-                }
-            }
-
-            // Stop all 4 cameras.
-            for (int i = 0; i < 4; i++) {
-                CameraProbe.stopMp4Record(slots[i]);
-            }
-
-            // Retention: delete the oldest segments.
-            cleanupOldSegments(baseDir, keepSegments);
 
             // Check whether recording has been disabled in prefs.
             enabled = prefs.getBoolean(KEY_ENABLED, false);
@@ -163,8 +189,67 @@ public class RecordingService extends Service {
         }
 
         worker = null;
+        if (!endedWithFatalError) {
+            publishStatus(STATUS_OFF, 0, TOTAL_CAMERAS, "");
+        }
         stopForeground(true);
         stopSelf();
+    }
+
+    private boolean recordClip(File baseDir, long durationMs, String baseName, int keepSegments) {
+        // Output names for the 4 cameras.
+        // F = v15 (front), R = v17 (rear), X = v16 (left), Y = v14 (right)
+        int[] slots = new int[]{0, 1, 2, 3};
+        int[] videoIndices = new int[]{15, 17, 16, 14};
+        char[] names = new char[]{'F', 'R', 'X', 'Y'};
+
+        String[] outPaths = new String[4];
+        for (int i = 0; i < 4; i++) {
+            String fileName = baseName + "_" + names[i] + ".mp4";
+            File out = new File(baseDir, fileName);
+            outPaths[i] = out.getAbsolutePath();
+        }
+
+        int activeCameras = 0;
+        StringBuilder failedCameras = new StringBuilder();
+        for (int i = 0; i < 4; i++) {
+            // width=720 height=240 fps=15 bitrate default 2.5Mbps
+            boolean started = CameraProbe.startMp4Record(slots[i], videoIndices[i], outPaths[i], 720, 240, 15, 2500000);
+            if (started) {
+                activeCameras++;
+            } else {
+                if (failedCameras.length() > 0) failedCameras.append(", ");
+                failedCameras.append(names[i]).append(" /dev/video").append(videoIndices[i]);
+            }
+        }
+
+        if (activeCameras == TOTAL_CAMERAS) {
+            publishStatus(STATUS_RECORDING, activeCameras, TOTAL_CAMERAS, "");
+        } else if (activeCameras > 0) {
+            publishStatus(STATUS_PARTIAL, activeCameras, TOTAL_CAMERAS,
+                    "camera start failed: " + failedCameras);
+        } else {
+            publishStatus(STATUS_ERROR, 0, TOTAL_CAMERAS,
+                    "all camera starts failed: " + failedCameras);
+            return false;
+        }
+
+        long start = SystemClock.elapsedRealtime();
+        while (!stopRequested && (SystemClock.elapsedRealtime() - start) < durationMs) {
+            try {
+                Thread.sleep(200);
+            } catch (InterruptedException ignored) {
+            }
+        }
+
+        for (int slot : slots) {
+            CameraProbe.stopMp4Record(slot);
+        }
+
+        if (keepSegments > 0) {
+            cleanupOldSegments(baseDir, keepSegments);
+        }
+        return true;
     }
 
     private void cleanupOldSegments(File baseDir, int keepSegments) {
@@ -221,6 +306,18 @@ public class RecordingService extends Service {
         return String.format(Locale.US, "%02d%02d%02d%02d%02d", yy, aa, gg, ss, dd);
     }
 
+    private String makeTimestampBaseWithSeconds(long epochMs) {
+        java.util.Calendar cal = java.util.Calendar.getInstance();
+        cal.setTimeInMillis(epochMs);
+        int yy = cal.get(java.util.Calendar.YEAR) % 100;
+        int aa = cal.get(java.util.Calendar.MONTH) + 1;
+        int gg = cal.get(java.util.Calendar.DAY_OF_MONTH);
+        int ss = cal.get(java.util.Calendar.HOUR_OF_DAY);
+        int dd = cal.get(java.util.Calendar.MINUTE);
+        int sec = cal.get(java.util.Calendar.SECOND);
+        return String.format(Locale.US, "%02d%02d%02d%02d%02d%02d", yy, aa, gg, ss, dd, sec);
+    }
+
     private Notification buildNotification(String text) {
         NotificationCompat.Builder b = new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.ic_menu_camera)
@@ -229,6 +326,53 @@ public class RecordingService extends Service {
                 .setOngoing(true)
                 .setPriority(NotificationCompat.PRIORITY_LOW);
         return b.build();
+    }
+
+    private void publishCurrentStatus() {
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        publishStatus(
+                prefs.getString(KEY_STATUS, STATUS_OFF),
+                prefs.getInt(KEY_ACTIVE_CAMERAS, 0),
+                prefs.getInt(KEY_TOTAL_CAMERAS, TOTAL_CAMERAS),
+                prefs.getString(KEY_LAST_ERROR, "")
+        );
+    }
+
+    private void publishStatus(String status, int activeCameras, int totalCameras, String lastError) {
+        if (status == null) status = STATUS_OFF;
+        if (lastError == null) lastError = "";
+        getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit()
+                .putString(KEY_STATUS, status)
+                .putInt(KEY_ACTIVE_CAMERAS, Math.max(0, activeCameras))
+                .putInt(KEY_TOTAL_CAMERAS, Math.max(0, totalCameras))
+                .putString(KEY_LAST_ERROR, lastError)
+                .apply();
+
+        String notificationText;
+        if (STATUS_RECORDING.equals(status)) {
+            notificationText = getString(R.string.notification_recording_status, activeCameras, totalCameras);
+        } else if (STATUS_PARTIAL.equals(status) || STATUS_ERROR.equals(status)) {
+            notificationText = getString(R.string.notification_recording_error, lastError);
+        } else if (STATUS_STARTING.equals(status)) {
+            notificationText = getString(R.string.notification_recording_starting);
+        } else {
+            notificationText = "";
+        }
+
+        if (!notificationText.isEmpty()) {
+            NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+            if (nm != null) {
+                nm.notify(NOTIF_ID, buildNotification(notificationText));
+            }
+        }
+
+        Intent intent = new Intent(ACTION_STATUS_CHANGED);
+        intent.setPackage(getPackageName());
+        intent.putExtra(EXTRA_STATUS, status);
+        intent.putExtra(EXTRA_ACTIVE_CAMERAS, activeCameras);
+        intent.putExtra(EXTRA_TOTAL_CAMERAS, totalCameras);
+        intent.putExtra(EXTRA_LAST_ERROR, lastError);
+        sendBroadcast(intent);
     }
 
     private void createNotificationChannel() {

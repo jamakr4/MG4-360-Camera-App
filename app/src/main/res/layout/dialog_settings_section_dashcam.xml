@@ -37,6 +37,20 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="18dp"
+        android:layout_marginBottom="8dp"
+        android:text="@string/settings_section_dashcam_status" />
+
+    <TextView
+        android:id="@+id/tvDashcamRecordingStatus"
+        style="@style/DrivehubSettingsBodyMuted"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+
+    <TextView
+        style="@style/DrivehubSettingsHeading2"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
         android:layout_marginBottom="12dp"
         android:text="@string/settings_section_dashcam_loop" />
 

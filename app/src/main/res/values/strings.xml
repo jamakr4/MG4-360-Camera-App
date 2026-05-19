@@ -9,9 +9,14 @@
     <string name="settings_section_display">DISPLAY</string>
     <string name="settings_section_signal_camera">SIGNAL CAMERA</string>
     <string name="settings_section_dashcam">DASHCAM</string>
+    <string name="settings_section_dashcam_status">STATUS</string>
     <string name="settings_section_dashcam_loop">LOOP RECORDING</string>
     <string name="settings_dashcam_enabled">Record automatically on boot</string>
     <string name="settings_dashcam_loop_hint">Creates four camera clips per segment and keeps the newest recordings within the retention window.</string>
+    <string name="settings_dashcam_status_off">Recording inactive</string>
+    <string name="settings_dashcam_status_starting">Recording starting…</string>
+    <string name="settings_dashcam_status_recording">%1$d/%2$d cameras recording</string>
+    <string name="settings_dashcam_status_error">Recording error: %1$s</string>
     <string name="settings_overlay_on_signal">Show Signal Camera on turn signal</string>
     <string name="safety_warning_text">Please pay attention to the surrounding environment!</string>
     <string name="show_safety_warning">Show safety warning</string>
@@ -60,6 +65,11 @@
     <string name="main_camera_label_unknown">/dev/video%1$d</string>
     <string name="main_button_settings">Settings</string>
     <string name="main_button_close_app">Close app</string>
+    <string name="main_button_record_test_30s">Record 30s Test</string>
+    <string name="main_button_record_test_running">Recording 30s…</string>
+    <string name="main_recording_indicator">%1$d/%2$d</string>
+    <string name="main_recording_starting">REC starting</string>
+    <string name="main_recording_error">REC error: %1$s</string>
     <string name="settings_tab_optik">Appearance</string>
     <string name="settings_section_tileview">Signal Camera</string>
     <string name="settings_tile_corner_radius">Corner radius</string>
@@ -127,5 +137,7 @@
     <string name="notification_signal_text">Turn signal listener active</string>
     <string name="notification_overlay_text">Signal camera overlay active</string>
     <string name="notification_recording_starting">Starting recording…</string>
+    <string name="notification_recording_status">%1$d/%2$d cameras recording</string>
+    <string name="notification_recording_error">Recording error: %1$s</string>
     <string name="notification_channel_recording">360 Cam Recording</string>
 </resources>

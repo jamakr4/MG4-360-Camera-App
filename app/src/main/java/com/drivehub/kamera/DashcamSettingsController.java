@@ -47,20 +47,16 @@ final class DashcamSettingsController {
             syncingEnabled = false;
             swEnabled.setOnCheckedChangeListener((buttonView, checked) -> {
                 if (syncingEnabled) return;
-                if (checked && !hasStoragePermission()) {
-                    syncingEnabled = true;
-                    swEnabled.setChecked(false);
-                    syncingEnabled = false;
-                    ActivityCompat.requestPermissions(
-                            activity,
-                            new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
-                            REQ_STORAGE
-                    );
-                    Toast.makeText(activity, R.string.settings_storage_permission_required, Toast.LENGTH_SHORT).show();
-                    return;
-                }
                 prefs.edit().putBoolean(KEY_ENABLED, checked).apply();
                 if (checked) {
+                    if (!hasStoragePermission()) {
+                        ActivityCompat.requestPermissions(
+                                activity,
+                                new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
+                                REQ_STORAGE
+                        );
+                        Toast.makeText(activity, R.string.settings_storage_permission_required, Toast.LENGTH_SHORT).show();
+                    }
                     saveDurations(prefs, etSegmentMin, etTotalMin, false);
                     RecordingService.startIfNeeded(activity);
                 } else {
