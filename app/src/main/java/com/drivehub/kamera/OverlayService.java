@@ -56,6 +56,7 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
     private Surface textureSurface;
     private WindowManager.LayoutParams overlayParams;
     private int cameraIndex = 15; // Default: front
+    private int attachedPreviewCameraIndex = -1;
 
     /** Current window size, updated via pinch gestures. */
     private int overlayWidthPx = DEFAULT_OVERLAY_WIDTH_PX;
@@ -440,11 +441,18 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
         if (textureSurface == null || !textureSurface.isValid()) {
             return;
         }
-        CameraProbe.stopPreview();
-        CameraProbe.startPreview(cameraIndex, textureSurface);
+        if (attachedPreviewCameraIndex != -1 && attachedPreviewCameraIndex != cameraIndex) {
+            CameraProbe.detachPreview(attachedPreviewCameraIndex);
+            attachedPreviewCameraIndex = -1;
+        }
+        if (CameraProbe.attachPreview(cameraIndex, textureSurface)) {
+            attachedPreviewCameraIndex = cameraIndex;
+        }
     }
 
     private void stopPreview() {
-        CameraProbe.stopPreview();
+        if (attachedPreviewCameraIndex == -1) return;
+        CameraProbe.detachPreview(attachedPreviewCameraIndex);
+        attachedPreviewCameraIndex = -1;
     }
 }

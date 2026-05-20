@@ -43,14 +43,16 @@ public class TileViewActivity extends AppCompatActivity {
             callbacks[i] = new SurfaceHolder.Callback() {
                 @Override
                 public void surfaceCreated(SurfaceHolder h) {
-                    CameraProbe.startPreview(cameraIndex, h.getSurface());
+                    CameraProbe.attachPreview(cameraIndex, h.getSurface());
                 }
 
                 @Override
                 public void surfaceChanged(SurfaceHolder h, int format, int w, int h2) {}
 
                 @Override
-                public void surfaceDestroyed(SurfaceHolder h) {}
+                public void surfaceDestroyed(SurfaceHolder h) {
+                    CameraProbe.detachPreview(cameraIndex);
+                }
             };
             holder.addCallback(callbacks[i]);
         }
@@ -91,7 +93,9 @@ public class TileViewActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        CameraProbe.stopPreview();
+        for (int cameraIndex : CAMERA_INDICES) {
+            CameraProbe.detachPreview(cameraIndex);
+        }
         for (int i = 0; i < holders.length; i++) {
             if (holders[i] != null && callbacks[i] != null) {
                 holders[i].removeCallback(callbacks[i]);

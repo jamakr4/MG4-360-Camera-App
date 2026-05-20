@@ -10,11 +10,14 @@ public final class CameraProbe {
     /** Probes /dev/video0..maxIndex-1 and returns a human-readable summary. */
     public static native String probeAll(int maxIndex);
 
-    /** Starts preview on the given /dev/video index onto the provided Surface. */
-    public static native boolean startPreview(int videoIndex, android.view.Surface surface);
+    /** Attaches a preview consumer to the given /dev/video index. */
+    public static native boolean attachPreview(int videoIndex, android.view.Surface surface);
 
-    /** Stops any running preview. */
-    public static native void stopPreview();
+    /** Detaches the preview consumer from the given /dev/video index. */
+    public static native void detachPreview(int videoIndex);
+
+    /** Detaches all preview consumers managed by the native camera stream manager. */
+    public static native void detachAllPreviews();
 
     /**
      * Starts MP4 recording from a specific /dev/videoX device.
@@ -26,4 +29,3 @@ public final class CameraProbe {
     /** Stops MP4 recording for the given slot. */
     public static native void stopMp4Record(int slot);
 }
-

@@ -43,6 +43,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private TextView tvDashcamDialogStatus;
     private Button btnRecordTestClip;
     private int currentVideoIndex = 15;
+    private int activePreviewCameraIndex = -1;
     private boolean previewRunning = false;
     private boolean previewPausedForTestClip = false;
     private float downX = 0f;
@@ -504,9 +505,13 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             if (tvStatus != null) tvStatus.setText(R.string.main_surface_not_ready);
             return;
         }
-        stopPreview();
-        boolean ok = CameraProbe.startPreview(currentVideoIndex, surfaceHolder.getSurface());
+        if (activePreviewCameraIndex != -1 && activePreviewCameraIndex != currentVideoIndex) {
+            CameraProbe.detachPreview(activePreviewCameraIndex);
+            activePreviewCameraIndex = -1;
+        }
+        boolean ok = CameraProbe.attachPreview(currentVideoIndex, surfaceHolder.getSurface());
         previewRunning = ok;
+        activePreviewCameraIndex = ok ? currentVideoIndex : -1;
         if (tvStatus != null) {
             tvStatus.setText(ok
                     ? getString(R.string.main_preview_status, cameraLabel(currentVideoIndex))
@@ -515,11 +520,11 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     }
 
     private void stopPreview() {
-        if (previewRunning) {
-            CameraProbe.stopPreview();
-            previewRunning = false;
-            if (tvStatus != null) tvStatus.setText(R.string.main_preview_stopped);
-        }
+        if (activePreviewCameraIndex == -1) return;
+        CameraProbe.detachPreview(activePreviewCameraIndex);
+        activePreviewCameraIndex = -1;
+        previewRunning = false;
+        if (tvStatus != null) tvStatus.setText(R.string.main_preview_stopped);
     }
 
     @Override public void surfaceCreated(SurfaceHolder holder) { startPreviewIfReady(); }
