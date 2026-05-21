@@ -262,6 +262,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         EditText etOverlayMinShowValue = dialog.findViewById(R.id.etOverlayMinShowValue);
         EditText etDashcamSegmentMin = dialog.findViewById(R.id.etDashcamSegmentMin);
         EditText etDashcamTotalMin = dialog.findViewById(R.id.etDashcamTotalMin);
+        EditText etDashcamFps = dialog.findViewById(R.id.etDashcamFps);
         TextView tvDashcamRecordsPath = dialog.findViewById(R.id.tvDashcamRecordsPath);
         tvDashcamDialogStatus = dialog.findViewById(R.id.tvDashcamRecordingStatus);
         Button btnDashcamExportUsb = dialog.findViewById(R.id.btnDashcamExportUsb);
@@ -298,6 +299,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 swDashcamEnabled,
                 etDashcamSegmentMin,
                 etDashcamTotalMin,
+                etDashcamFps,
                 tvDashcamRecordsPath,
                 btnDashcamExportUsb
         );

@@ -101,6 +101,30 @@
 
     </LinearLayout>
 
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_marginTop="10dp"
+        android:layout_marginEnd="12dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            style="@style/DrivehubSettingsLabel"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/settings_dashcam_fps" />
+
+        <EditText
+            android:id="@+id/etDashcamFps"
+            style="@style/DrivehubSettingsSliderValue"
+            android:inputType="number"
+            android:maxLength="2" />
+
+    </LinearLayout>
+
     <TextView
         style="@style/DrivehubSettingsBodyMuted"
         android:layout_width="match_parent"

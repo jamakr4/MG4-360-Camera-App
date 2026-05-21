@@ -12,6 +12,7 @@
     <string name="settings_section_dashcam_status">STATUS</string>
     <string name="settings_section_dashcam_loop">AUFNAHMESCHLEIFE</string>
     <string name="settings_dashcam_enabled">Beim Start automatisch aufnehmen</string>
+    <string name="settings_dashcam_fps">Aufnahme-FPS</string>
     <string name="settings_dashcam_loop_hint">Erstellt pro Segment vier Kameraclips und behält die neuesten Aufnahmen innerhalb der Speicherzeit.</string>
     <string name="settings_dashcam_status_off">Aufnahme inaktiv</string>
     <string name="settings_dashcam_status_starting">Aufnahme startet…</string>

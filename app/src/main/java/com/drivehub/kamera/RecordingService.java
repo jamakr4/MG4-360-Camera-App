@@ -209,6 +209,9 @@ public class RecordingService extends Service {
         int[] slots = new int[]{0, 1, 2, 3};
         int[] videoIndices = new int[]{15, 17, 16, 14};
         char[] names = new char[]{'F', 'R', 'X', 'Y'};
+        int recordingFps = DashcamSettingsController.getRecordingFps(
+                getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        );
 
         String[] outPaths = new String[4];
         for (int i = 0; i < 4; i++) {
@@ -220,8 +223,9 @@ public class RecordingService extends Service {
         int activeCameras = 0;
         StringBuilder failedCameras = new StringBuilder();
         for (int i = 0; i < 4; i++) {
-            // width=720 height=240 fps=15 bitrate default 2.5Mbps
-            boolean started = CameraProbe.startMp4Record(slots[i], videoIndices[i], outPaths[i], 720, 240, 15, 2500000);
+            boolean started = CameraProbe.startMp4Record(
+                    slots[i], videoIndices[i], outPaths[i], 720, 240, recordingFps, 2500000
+            );
             if (started) {
                 activeCameras++;
             } else {
