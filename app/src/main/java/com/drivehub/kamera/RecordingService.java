@@ -10,23 +10,31 @@ import android.content.SharedPreferences;
 import android.os.Environment;
 import android.os.IBinder;
 import android.os.SystemClock;
+import android.util.Log;
 
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Locale;
+import java.util.Set;
 
 public class RecordingService extends Service {
+    private static final String TAG = "RecordingService";
 
     public static final String ACTION_START = "start_recording";
     public static final String ACTION_STOP = "stop_recording";
     public static final String ACTION_RECORD_TEST_30S = "record_test_30s";
+    public static final String ACTION_TRIGGER_EVENT_SAVE = "trigger_event_save";
     public static final String ACTION_STATUS_CHANGED = "com.drivehub.kamera.ACTION_RECORDING_STATUS_CHANGED";
     public static final String EXTRA_STATUS = "status";
     public static final String EXTRA_ACTIVE_CAMERAS = "active_cameras";
@@ -51,9 +59,12 @@ public class RecordingService extends Service {
     private static final int NOTIF_ID = 42;
     private static final int TOTAL_CAMERAS = 4;
     private static final long TEST_RECORDING_MS = 10_000L;
+    private static final long EVENT_PRE_ROLL_MS = 60_000L;
+    private static final long EVENT_POST_ROLL_MS = 60_000L;
 
     private static volatile boolean sServiceRunning = false;
 
+    private final Object eventLock = new Object();
     private Thread worker;
     private volatile boolean stopRequested = false;
 
@@ -81,6 +92,12 @@ public class RecordingService extends Service {
         Intent i = new Intent(context, RecordingService.class);
         i.setAction(ACTION_RECORD_TEST_30S);
         context.startForegroundService(i);
+    }
+
+    public static void triggerEventSave(Context context) {
+        Intent i = new Intent(context, RecordingService.class);
+        i.setAction(ACTION_TRIGGER_EVENT_SAVE);
+        context.startService(i);
     }
 
     @Override
@@ -114,6 +131,14 @@ public class RecordingService extends Service {
             }
             stopForeground(true);
             return START_NOT_STICKY;
+        }
+
+        if (ACTION_TRIGGER_EVENT_SAVE.equals(action)) {
+            if (worker == null || !getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getBoolean(KEY_ENABLED, false)) {
+                return START_STICKY;
+            }
+            armEventCapture();
+            return START_STICKY;
         }
 
         if (worker != null) {
@@ -188,12 +213,14 @@ public class RecordingService extends Service {
         boolean endedWithFatalError = false;
 
         while (!stopRequested) {
-            boolean startedAnyCamera = recordClip(baseDir, segmentMs, makeTimestampBase(System.currentTimeMillis()),
-                    keepSegments);
+            long segmentStartWallMs = System.currentTimeMillis();
+            String baseName = makeTimestampBase(segmentStartWallMs);
+            boolean startedAnyCamera = recordClip(baseDir, segmentMs, baseName, keepSegments);
             if (!startedAnyCamera) {
                 endedWithFatalError = true;
                 break;
             }
+            onSegmentCompleted(baseDir, baseName, segmentStartWallMs, System.currentTimeMillis(), keepSegments);
 
             // Check whether recording has been disabled in prefs.
             enabled = prefs.getBoolean(KEY_ENABLED, false);
@@ -258,17 +285,146 @@ public class RecordingService extends Service {
             }
         }
 
+        boolean allStoppedCleanly = true;
         for (int slot : slots) {
-            CameraProbe.stopMp4Record(slot);
+            if (!CameraProbe.stopMp4Record(slot)) {
+                allStoppedCleanly = false;
+            }
         }
 
-        if (keepSegments > 0) {
-            cleanupOldSegments(baseDir, keepSegments);
+        if (!allStoppedCleanly) {
+            publishStatus(STATUS_ERROR, 0, TOTAL_CAMERAS, "camera stop timeout");
+            return false;
         }
+
         return true;
     }
 
-    private void cleanupOldSegments(File baseDir, int keepSegments) {
+    private void onSegmentCompleted(File baseDir, String baseName, long startMs, long endMs, int keepSegments) {
+        List<EventCopyJob> completedJobs;
+        synchronized (eventLock) {
+            recentSegments.add(new SegmentInfo(baseName, startMs, endMs));
+            while (recentSegments.size() > keepSegments + 4) {
+                recentSegments.remove(0);
+            }
+            completedJobs = finalizeReadyEventRequestsLocked(endMs);
+            Set<String> protectedBases = collectProtectedBasesLocked();
+            cleanupOldSegments(baseDir, keepSegments, protectedBases);
+        }
+        for (EventCopyJob job : completedJobs) {
+            copyEventSegments(job);
+        }
+    }
+
+    private void armEventCapture() {
+        long now = System.currentTimeMillis();
+        synchronized (eventLock) {
+            pendingEventRequests.add(new EventCaptureRequest(
+                    "event_" + makeTimestampBaseWithMillis(now),
+                    now - EVENT_PRE_ROLL_MS,
+                    now + EVENT_POST_ROLL_MS
+            ));
+        }
+    }
+
+    private List<EventCopyJob> finalizeReadyEventRequestsLocked(long completedThroughMs) {
+        List<EventCaptureRequest> completed = new ArrayList<>();
+        List<EventCopyJob> jobs = new ArrayList<>();
+        for (EventCaptureRequest request : pendingEventRequests) {
+            if (completedThroughMs < request.captureEndMs) {
+                continue;
+            }
+            jobs.add(buildEventCopyJobLocked(request));
+            completed.add(request);
+        }
+        pendingEventRequests.removeAll(completed);
+        return jobs;
+    }
+
+    private Set<String> collectProtectedBasesLocked() {
+        Set<String> protectedBases = new HashSet<>();
+        for (EventCaptureRequest request : pendingEventRequests) {
+            for (SegmentInfo segment : recentSegments) {
+                if (segment.overlaps(request.captureStartMs, request.captureEndMs)) {
+                    protectedBases.add(segment.baseName);
+                }
+            }
+        }
+        return protectedBases;
+    }
+
+    private EventCopyJob buildEventCopyJobLocked(EventCaptureRequest request) {
+        List<String> baseNames = new ArrayList<>();
+        Set<String> copiedBases = new HashSet<>();
+        for (SegmentInfo segment : recentSegments) {
+            if (!segment.overlaps(request.captureStartMs, request.captureEndMs)) {
+                continue;
+            }
+            if (copiedBases.add(segment.baseName)) {
+                baseNames.add(segment.baseName);
+            }
+        }
+        return new EventCopyJob(request.eventBaseName, baseNames);
+    }
+
+    private void copyEventSegments(EventCopyJob job) {
+        if (job.baseNames.isEmpty()) {
+            Log.w(TAG, "Skipping empty event copy job for " + job.eventBaseName);
+            return;
+        }
+        File eventDir = new File(getEventsBaseDir(), job.eventBaseName);
+        // noinspection ResultOfMethodCallIgnored
+        eventDir.mkdirs();
+        for (String baseName : job.baseNames) {
+            copySegmentGroup(getRecordsBaseDir(), eventDir, baseName);
+        }
+    }
+
+    private void copySegmentGroup(File sourceDir, File targetDir, String baseName) {
+        char[] suffixes = new char[] { 'F', 'R', 'X', 'Y' };
+        for (char suffix : suffixes) {
+            File source = new File(sourceDir, baseName + "_" + suffix + ".mp4");
+            if (!source.exists()) {
+                continue;
+            }
+            File target = new File(targetDir, source.getName());
+            copyFile(source, target);
+        }
+    }
+
+    private boolean copyFile(File source, File target) {
+        byte[] buffer = new byte[64 * 1024];
+        File temp = new File(target.getParentFile(), target.getName() + ".tmp");
+        if (temp.exists() && !temp.delete()) {
+            Log.w(TAG, "Could not delete stale temp file " + temp.getAbsolutePath());
+        }
+        try (FileInputStream in = new FileInputStream(source);
+                FileOutputStream out = new FileOutputStream(temp)) {
+            int read;
+            while ((read = in.read(buffer)) >= 0) {
+                if (read == 0) {
+                    continue;
+                }
+                out.write(buffer, 0, read);
+            }
+            out.flush();
+            out.getFD().sync();
+            if (target.exists() && !target.delete()) {
+                throw new IOException("delete target failed: " + target.getAbsolutePath());
+            }
+            if (!temp.renameTo(target)) {
+                throw new IOException("rename failed: " + temp.getAbsolutePath() + " -> " + target.getAbsolutePath());
+            }
+            return true;
+        } catch (Throwable t) {
+            Log.e(TAG, "Failed to copy " + source.getAbsolutePath() + " -> " + target.getAbsolutePath(), t);
+            // noinspection ResultOfMethodCallIgnored
+            temp.delete();
+        }
+        return false;
+    }
+
+    private void cleanupOldSegments(File baseDir, int keepSegments, Set<String> protectedBases) {
         File[] files = baseDir.listFiles();
         if (files == null)
             return;
@@ -296,13 +452,18 @@ public class RecordingService extends Service {
         int deleteCount = groups.size() - keepSegments;
 
         char[] suffixes = new char[] { 'F', 'R', 'X', 'Y' };
-        for (int i = 0; i < deleteCount; i++) {
+        int deleted = 0;
+        for (int i = 0; i < groups.size() && deleted < deleteCount; i++) {
             String base = groups.get(i).getKey();
+            if (protectedBases != null && protectedBases.contains(base)) {
+                continue;
+            }
             for (char s : suffixes) {
                 File f = new File(baseDir, base + "_" + s + ".mp4");
                 // noinspection ResultOfMethodCallIgnored
                 f.delete();
             }
+            deleted++;
         }
     }
 
@@ -310,6 +471,13 @@ public class RecordingService extends Service {
         // Android 9: write directly into the Downloads folder.
         File downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
         File dir = new File(downloads, "mg4_cam_records");
+        // noinspection ResultOfMethodCallIgnored
+        dir.mkdirs();
+        return dir;
+    }
+
+    private File getEventsBaseDir() {
+        File dir = new File(getRecordsBaseDir(), "events");
         // noinspection ResultOfMethodCallIgnored
         dir.mkdirs();
         return dir;
@@ -336,6 +504,19 @@ public class RecordingService extends Service {
         int dd = cal.get(java.util.Calendar.MINUTE);
         int sec = cal.get(java.util.Calendar.SECOND);
         return String.format(Locale.US, "%02d%02d%02d%02d%02d%02d", yy, aa, gg, ss, dd, sec);
+    }
+
+    private String makeTimestampBaseWithMillis(long epochMs) {
+        java.util.Calendar cal = java.util.Calendar.getInstance();
+        cal.setTimeInMillis(epochMs);
+        int yy = cal.get(java.util.Calendar.YEAR) % 100;
+        int aa = cal.get(java.util.Calendar.MONTH) + 1;
+        int gg = cal.get(java.util.Calendar.DAY_OF_MONTH);
+        int ss = cal.get(java.util.Calendar.HOUR_OF_DAY);
+        int dd = cal.get(java.util.Calendar.MINUTE);
+        int sec = cal.get(java.util.Calendar.SECOND);
+        int ms = cal.get(java.util.Calendar.MILLISECOND);
+        return String.format(Locale.US, "%02d%02d%02d%02d%02d%02d%03d", yy, aa, gg, ss, dd, sec, ms);
     }
 
     private Notification buildNotification(String text) {
@@ -423,5 +604,46 @@ public class RecordingService extends Service {
             }
         }
         super.onDestroy();
+    }
+
+    private final List<SegmentInfo> recentSegments = new ArrayList<>();
+    private final List<EventCaptureRequest> pendingEventRequests = new ArrayList<>();
+
+    private static final class SegmentInfo {
+        final String baseName;
+        final long startMs;
+        final long endMs;
+
+        SegmentInfo(String baseName, long startMs, long endMs) {
+            this.baseName = baseName;
+            this.startMs = startMs;
+            this.endMs = endMs;
+        }
+
+        boolean overlaps(long windowStartMs, long windowEndMs) {
+            return startMs < windowEndMs && endMs > windowStartMs;
+        }
+    }
+
+    private static final class EventCaptureRequest {
+        final String eventBaseName;
+        final long captureStartMs;
+        final long captureEndMs;
+
+        EventCaptureRequest(String eventBaseName, long captureStartMs, long captureEndMs) {
+            this.eventBaseName = eventBaseName;
+            this.captureStartMs = captureStartMs;
+            this.captureEndMs = captureEndMs;
+        }
+    }
+
+    private static final class EventCopyJob {
+        final String eventBaseName;
+        final List<String> baseNames;
+
+        EventCopyJob(String eventBaseName, List<String> baseNames) {
+            this.eventBaseName = eventBaseName;
+            this.baseNames = baseNames;
+        }
     }
 }

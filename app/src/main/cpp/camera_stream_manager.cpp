@@ -562,19 +562,19 @@ public:
         return started;
     }
 
-    void stopRecording(int slot) {
+    bool stopRecording(int slot) {
         std::shared_ptr<RecordingSink> sink;
         {
             std::lock_guard<std::mutex> lock(mutex_);
             auto it = recordings_.find(slot);
             if (it == recordings_.end()) {
-                return;
+                return true;
             }
             sink = it->second;
         }
 
         sink->requestStop();
-        sink->waitUntilStopped(STOP_WAIT_MS);
+        bool stopped = sink->waitUntilStopped(STOP_WAIT_MS);
 
         bool shouldStop = false;
         {
@@ -587,6 +587,7 @@ public:
         if (shouldStop) {
             requestStopAndJoin();
         }
+        return stopped;
     }
 
     bool isIdle() {
@@ -981,19 +982,20 @@ bool startRecording(JNIEnv* /*env*/, int slot, int videoIndex, const std::string
     return true;
 }
 
-void stopRecording(int slot) {
+bool stopRecording(int slot) {
     int videoIndex = -1;
     auto session = getSessionForSlot(slot, &videoIndex);
     if (session == nullptr) {
-        return;
+        return true;
     }
 
-    session->stopRecording(slot);
+    bool stopped = session->stopRecording(slot);
     {
         std::lock_guard<std::mutex> lock(gManagerMutex);
         gSlotToVideoIndex.erase(slot);
     }
     eraseSessionIfIdle(videoIndex, session);
+    return stopped;
 }
 
 } // namespace camera_stream_manager

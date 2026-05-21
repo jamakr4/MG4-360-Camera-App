@@ -21,6 +21,7 @@ import android.widget.ImageButton;
 import android.widget.SeekBar;
 import android.widget.Switch;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
@@ -138,6 +139,17 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             } catch (Throwable t) {
                 renderRecordingStatus(RecordingService.STATUS_ERROR, 0, 4, t.getClass().getSimpleName());
             }
+        });
+
+        Button btnTriggerEventSave = findViewById(R.id.btnTriggerEventSave);
+        btnTriggerEventSave.setOnClickListener(v -> {
+            SharedPreferences prefs = UiPrefs.getPrefs(this);
+            if (!prefs.getBoolean("enabled", false) || !RecordingService.isRunning()) {
+                Toast.makeText(this, R.string.main_event_save_requires_dashcam, Toast.LENGTH_SHORT).show();
+                return;
+            }
+            RecordingService.triggerEventSave(this);
+            Toast.makeText(this, R.string.main_event_save_armed, Toast.LENGTH_SHORT).show();
         });
 
         applyStoredRecordingStatus();

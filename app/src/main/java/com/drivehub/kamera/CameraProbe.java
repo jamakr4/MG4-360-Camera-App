@@ -27,5 +27,5 @@ public final class CameraProbe {
                                                   int width, int height, int fps, int bitrate);
 
     /** Stops MP4 recording for the given slot. */
-    public static native void stopMp4Record(int slot);
+    public static native boolean stopMp4Record(int slot);
 }

@@ -66,8 +66,11 @@
     <string name="main_camera_label_unknown">/dev/video%1$d</string>
     <string name="main_button_settings">Einstellungen</string>
     <string name="main_button_close_app">App schließen</string>
+    <string name="main_button_trigger_event_save">Letzte + nächste Minute speichern</string>
     <string name="main_button_record_test_30s">30s Test aufnehmen</string>
     <string name="main_button_record_test_running">30s Aufnahme läuft…</string>
+    <string name="main_event_save_armed">Event-Speicherung aktiviert</string>
+    <string name="main_event_save_requires_dashcam">Erst die Dashcam-Aufnahme aktivieren</string>
     <string name="main_recording_indicator">%1$d/%2$d</string>
     <string name="main_recording_starting">REC startet</string>
     <string name="main_recording_error">REC Fehler: %1$s</string>

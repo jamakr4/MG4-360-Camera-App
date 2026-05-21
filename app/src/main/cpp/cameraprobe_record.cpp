@@ -39,7 +39,7 @@ Java_com_drivehub_kamera_CameraProbe_startMp4Record(JNIEnv* env, jclass /*clazz*
 }
 
 extern "C"
-JNIEXPORT void JNICALL
+JNIEXPORT jboolean JNICALL
 Java_com_drivehub_kamera_CameraProbe_stopMp4Record(JNIEnv* /*env*/, jclass /*clazz*/, jint slot) {
-    camera_stream_manager::stopRecording(static_cast<int>(slot));
+    return camera_stream_manager::stopRecording(static_cast<int>(slot)) ? JNI_TRUE : JNI_FALSE;
 }

@@ -66,8 +66,11 @@
     <string name="main_camera_label_unknown">/dev/video%1$d</string>
     <string name="main_button_settings">Settings</string>
     <string name="main_button_close_app">Close app</string>
+    <string name="main_button_trigger_event_save">Save last + next minute</string>
     <string name="main_button_record_test_30s">Record 30s Test</string>
     <string name="main_button_record_test_running">Recording 30s…</string>
+    <string name="main_event_save_armed">Event save armed</string>
+    <string name="main_event_save_requires_dashcam">Enable dashcam recording first</string>
     <string name="main_recording_indicator">%1$d/%2$d</string>
     <string name="main_recording_starting">REC starting</string>
     <string name="main_recording_error">REC error: %1$s</string>

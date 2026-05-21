@@ -118,6 +118,22 @@
         app:layout_constraintStart_toStartOf="parent" />
 
     <Button
+        android:id="@+id/btnTriggerEventSave"
+        android:layout_width="300dp"
+        android:layout_height="62dp"
+        android:layout_marginBottom="108dp"
+        android:background="@drawable/bg_recording_test_button"
+        android:paddingStart="22dp"
+        android:paddingEnd="22dp"
+        android:text="@string/main_button_trigger_event_save"
+        android:textColor="@android:color/white"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <Button
         android:id="@+id/btnRecordTestClip"
         android:layout_width="300dp"
         android:layout_height="76dp"
