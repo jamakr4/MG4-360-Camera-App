@@ -138,6 +138,7 @@ public class RecordingService extends Service {
                 return START_STICKY;
             }
             armEventCapture();
+            DashcamEventOverlayService.showConfirmation(this);
             return START_STICKY;
         }
 

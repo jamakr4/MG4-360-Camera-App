@@ -7,6 +7,7 @@
     <string name="settings_tab_credits">Credits</string>
     <string name="settings_section_driving">FAHREN</string>
     <string name="settings_section_display">ANZEIGE</string>
+    <string name="settings_section_dev">DEV</string>
     <string name="settings_section_signal_camera">BLINKER-KAMERA</string>
     <string name="settings_section_dashcam">DASHCAM</string>
     <string name="settings_section_dashcam_status">STATUS</string>
@@ -29,6 +30,9 @@
     <string name="settings_section_changelog">CHANGELOG</string>
     <string name="settings_allow_beta_updates">Beta-Releases zulassen</string>
     <string name="settings_dialog_close">Schließen</string>
+    <string name="settings_dev_unlocked">Dev-Tools entsperrt</string>
+    <string name="settings_dev_banner_test">Dashcam-Banner testen</string>
+    <string name="settings_dev_banner_test_hint">Zeigt einmal den Event-Banner an, ohne eine Aufnahme zu triggern.</string>
     <string name="settings_version_unknown">Version ?</string>
     <string name="settings_version_format">Version %1$s</string>
     <string name="settings_version_beta">BETA</string>
@@ -140,8 +144,12 @@
     <string name="ota_update_changelog_error">Der Changelog konnte nicht geladen werden.</string>
     <string name="notification_signal_text">Blinker-Listener aktiv</string>
     <string name="notification_overlay_text">Signal-Kamera-Overlay aktiv</string>
+    <string name="notification_dashcam_event_overlay_text">Dashcam-Ereignis wird gesichert</string>
     <string name="notification_recording_starting">Aufnahme wird gestartet…</string>
     <string name="notification_recording_status">%1$d/%2$d Kameras nehmen auf</string>
     <string name="notification_recording_error">Aufnahmefehler: %1$s</string>
     <string name="notification_channel_recording">360 Cam Aufnahme</string>
+    <string name="notification_channel_dashcam_event_overlay">360 Cam Ereignis-Banner</string>
+    <string name="dashcam_event_overlay_title">Event gespeichert</string>
+    <string name="dashcam_event_overlay_subtitle">Die letzte und die nächste Minute werden gesichert.</string>
 </resources>

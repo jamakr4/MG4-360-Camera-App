@@ -7,6 +7,7 @@
     <string name="settings_tab_credits">Credits</string>
     <string name="settings_section_driving">DRIVING</string>
     <string name="settings_section_display">DISPLAY</string>
+    <string name="settings_section_dev">DEV</string>
     <string name="settings_section_signal_camera">SIGNAL CAMERA</string>
     <string name="settings_section_dashcam">DASHCAM</string>
     <string name="settings_section_dashcam_status">STATUS</string>
@@ -29,6 +30,9 @@
     <string name="settings_section_changelog">CHANGELOG</string>
     <string name="settings_allow_beta_updates">Allow beta releases</string>
     <string name="settings_dialog_close">Close</string>
+    <string name="settings_dev_unlocked">Dev tools unlocked</string>
+    <string name="settings_dev_banner_test">Test dashcam banner</string>
+    <string name="settings_dev_banner_test_hint">Shows the event banner once without triggering a recording event.</string>
     <string name="settings_version_unknown">Version ?</string>
     <string name="settings_version_format">Version %1$s</string>
     <string name="settings_version_beta">BETA</string>
@@ -140,8 +144,12 @@
     <string name="ota_update_changelog_error">The changelog could not be loaded.</string>
     <string name="notification_signal_text">Turn signal listener active</string>
     <string name="notification_overlay_text">Signal camera overlay active</string>
+    <string name="notification_dashcam_event_overlay_text">Dashcam event is being secured</string>
     <string name="notification_recording_starting">Starting recording…</string>
     <string name="notification_recording_status">%1$d/%2$d cameras recording</string>
     <string name="notification_recording_error">Recording error: %1$s</string>
     <string name="notification_channel_recording">360 Cam Recording</string>
+    <string name="notification_channel_dashcam_event_overlay">360 Cam Event Banner</string>
+    <string name="dashcam_event_overlay_title">Event saved</string>
+    <string name="dashcam_event_overlay_subtitle">The last and next minute are being secured.</string>
 </resources>

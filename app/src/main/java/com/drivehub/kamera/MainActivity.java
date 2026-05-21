@@ -295,9 +295,11 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         View sectionDashcam = dialog.findViewById(R.id.sectionDashcam);
         View sectionOptik = dialog.findViewById(R.id.sectionOptik);
         View sectionCredits = dialog.findViewById(R.id.sectionCredits);
+        View sectionDevTools = dialog.findViewById(R.id.sectionDevTools);
         View accentRow = dialog.findViewById(R.id.rowAccentColor);
         View accentPreview = dialog.findViewById(R.id.viewAccentPreview);
         EditText etAccentColor = dialog.findViewById(R.id.etAccentColor);
+        Button btnDevTestDashcamBanner = dialog.findViewById(R.id.btnDevTestDashcamBanner);
         signalCameraSettingsController.bind(
                 prefs,
                 swOverlay,
@@ -338,6 +340,11 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 tabCredits
         );
 
+        if (btnDevTestDashcamBanner != null) {
+            btnDevTestDashcamBanner.setOnClickListener(v ->
+                    DashcamEventOverlayService.showConfirmation(MainActivity.this));
+        }
+
         bindSettingsTab(tabUpdate, tabSettings, tabSignalCamera, tabDashcam, tabOptik, tabCredits,
                 sectionUpdate, sectionSettings, sectionSignalCamera, sectionDashcam, sectionOptik, sectionCredits, 1);
         appearanceController.reapplyForActiveTab(1);
@@ -374,6 +381,8 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
         TextView tvVersion = dialog.findViewById(R.id.tvDialogVersion);
         TextView tvBeta = dialog.findViewById(R.id.tvDialogVersionBeta);
+        final int[] devTapCount = {0};
+        final boolean[] devUnlocked = {false};
         try {
             String version = getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
             tvVersion.setText(getString(R.string.settings_version_format, version));
@@ -381,6 +390,25 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             tvVersion.setText(R.string.settings_version_unknown);
         }
         tvBeta.setVisibility(BuildConfig.IS_BETA ? View.VISIBLE : View.GONE);
+        View.OnClickListener unlockDevListener = v -> {
+            if (devUnlocked[0]) {
+                return;
+            }
+            devTapCount[0]++;
+            if (devTapCount[0] < 5) {
+                return;
+            }
+            devUnlocked[0] = true;
+            if (sectionDevTools != null) {
+                sectionDevTools.setVisibility(View.VISIBLE);
+            }
+            bindSettingsTab(tabUpdate, tabSettings, tabSignalCamera, tabDashcam, tabOptik, tabCredits,
+                    sectionUpdate, sectionSettings, sectionSignalCamera, sectionDashcam, sectionOptik, sectionCredits, 1);
+            appearanceController.reapplyForActiveTab(1);
+            Toast.makeText(this, R.string.settings_dev_unlocked, Toast.LENGTH_SHORT).show();
+        };
+        tvVersion.setOnClickListener(unlockDevListener);
+        tvBeta.setOnClickListener(unlockDevListener);
 
         otaController.setup(
                 dialog,
