@@ -122,6 +122,7 @@ public class RecordingService extends Service {
                 for (int s = 0; s < 4; s++) {
                     CameraProbe.stopMp4Record(s);
                 }
+                CameraProbe.stopCombinedMp4Record();
             } catch (Throwable ignored) {
                 // Even if the native layer fails, still continue shutting down the service.
             }
@@ -238,45 +239,22 @@ public class RecordingService extends Service {
     }
 
     private boolean recordClip(File baseDir, long durationMs, String baseName, int keepSegments) {
-        // Output names for the 4 cameras.
-        // F = v15 (front), R = v17 (rear), X = v16 (left), Y = v14 (right)
-        int[] slots = new int[] { 0, 1, 2, 3 };
-        int[] videoIndices = new int[] { 15, 17, 16, 14 };
-        char[] names = new char[] { 'F', 'R', 'X', 'Y' };
         int recordingFps = DashcamSettingsController.getRecordingFps(
                 getSharedPreferences(PREFS_NAME, MODE_PRIVATE));
+        File outputFile = new File(baseDir, baseName + ".mp4");
+        boolean started = CameraProbe.startCombinedMp4Record(
+                outputFile.getAbsolutePath(),
+                720,
+                240,
+                recordingFps,
+                9_000_000);
 
-        String[] outPaths = new String[4];
-        for (int i = 0; i < 4; i++) {
-            String fileName = baseName + "_" + names[i] + ".mp4";
-            File out = new File(baseDir, fileName);
-            outPaths[i] = out.getAbsolutePath();
-        }
-
-        int activeCameras = 0;
-        StringBuilder failedCameras = new StringBuilder();
-        for (int i = 0; i < 4; i++) {
-            boolean started = CameraProbe.startMp4Record(
-                    slots[i], videoIndices[i], outPaths[i], 720, 240, recordingFps, 2500000);
-            if (started) {
-                activeCameras++;
-            } else {
-                if (failedCameras.length() > 0)
-                    failedCameras.append(", ");
-                failedCameras.append(names[i]).append(" /dev/video").append(videoIndices[i]);
-            }
-        }
-
-        if (activeCameras == TOTAL_CAMERAS) {
-            publishStatus(STATUS_RECORDING, activeCameras, TOTAL_CAMERAS, "");
-        } else if (activeCameras > 0) {
-            publishStatus(STATUS_PARTIAL, activeCameras, TOTAL_CAMERAS,
-                    "camera start failed: " + failedCameras);
-        } else {
-            publishStatus(STATUS_ERROR, 0, TOTAL_CAMERAS,
-                    "all camera starts failed: " + failedCameras);
+        if (!started) {
+            publishStatus(STATUS_ERROR, 0, TOTAL_CAMERAS, "grid start failed");
             return false;
         }
+
+        publishStatus(STATUS_RECORDING, TOTAL_CAMERAS, TOTAL_CAMERAS, "");
 
         long start = SystemClock.elapsedRealtime();
         while (!stopRequested && (SystemClock.elapsedRealtime() - start) < durationMs) {
@@ -286,15 +264,8 @@ public class RecordingService extends Service {
             }
         }
 
-        boolean allStoppedCleanly = true;
-        for (int slot : slots) {
-            if (!CameraProbe.stopMp4Record(slot)) {
-                allStoppedCleanly = false;
-            }
-        }
-
-        if (!allStoppedCleanly) {
-            publishStatus(STATUS_ERROR, 0, TOTAL_CAMERAS, "camera stop timeout");
+        if (!CameraProbe.stopCombinedMp4Record()) {
+            publishStatus(STATUS_ERROR, 0, TOTAL_CAMERAS, "grid stop timeout");
             return false;
         }
 
@@ -382,6 +353,12 @@ public class RecordingService extends Service {
     }
 
     private void copySegmentGroup(File sourceDir, File targetDir, String baseName) {
+        File combinedSource = new File(sourceDir, baseName + ".mp4");
+        if (combinedSource.exists()) {
+            copyFile(combinedSource, new File(targetDir, combinedSource.getName()));
+            return;
+        }
+
         char[] suffixes = new char[] { 'F', 'R', 'X', 'Y' };
         for (char suffix : suffixes) {
             File source = new File(sourceDir, baseName + "_" + suffix + ".mp4");
@@ -436,11 +413,13 @@ public class RecordingService extends Service {
             String name = f.getName();
             if (!name.endsWith(".mp4"))
                 continue;
-            // yymmddhhmm_X.mp4
             int underscore = name.indexOf('_');
-            if (underscore <= 0)
-                continue;
-            String base = name.substring(0, underscore);
+            String base;
+            if (underscore > 0) {
+                base = name.substring(0, underscore);
+            } else {
+                base = name.substring(0, name.length() - 4);
+            }
             long t = f.lastModified();
             groupTime.merge(base, t, Math::min);
         }
@@ -452,17 +431,23 @@ public class RecordingService extends Service {
             return;
         int deleteCount = groups.size() - keepSegments;
 
-        char[] suffixes = new char[] { 'F', 'R', 'X', 'Y' };
         int deleted = 0;
         for (int i = 0; i < groups.size() && deleted < deleteCount; i++) {
             String base = groups.get(i).getKey();
             if (protectedBases != null && protectedBases.contains(base)) {
                 continue;
             }
-            for (char s : suffixes) {
-                File f = new File(baseDir, base + "_" + s + ".mp4");
+            File combinedFile = new File(baseDir, base + ".mp4");
+            if (combinedFile.exists()) {
                 // noinspection ResultOfMethodCallIgnored
-                f.delete();
+                combinedFile.delete();
+            } else {
+                char[] suffixes = new char[] { 'F', 'R', 'X', 'Y' };
+                for (char s : suffixes) {
+                    File f = new File(baseDir, base + "_" + s + ".mp4");
+                    // noinspection ResultOfMethodCallIgnored
+                    f.delete();
+                }
             }
             deleted++;
         }

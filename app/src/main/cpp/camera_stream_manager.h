@@ -13,5 +13,8 @@ void detachAllPreviews();
 bool startRecording(JNIEnv* env, int slot, int videoIndex, const std::string& outputPath,
                     int width, int height, int fps, int bitrate);
 bool stopRecording(int slot);
+bool startCombinedRecording(JNIEnv* env, const std::string& outputPath,
+                            int cellWidth, int cellHeight, int fps, int bitrate);
+bool stopCombinedRecording();
 
 } // namespace camera_stream_manager

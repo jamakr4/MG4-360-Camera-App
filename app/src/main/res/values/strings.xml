@@ -14,7 +14,7 @@
     <string name="settings_section_dashcam_loop">LOOP RECORDING</string>
     <string name="settings_dashcam_enabled">Record automatically on boot</string>
     <string name="settings_dashcam_fps">Recording FPS</string>
-    <string name="settings_dashcam_loop_hint">Creates four camera clips per segment and keeps the newest recordings within the retention window.</string>
+    <string name="settings_dashcam_loop_hint">Creates one 2x2 dashcam clip per segment and keeps the newest recordings within the retention window.</string>
     <string name="settings_dashcam_status_off">Recording inactive</string>
     <string name="settings_dashcam_status_starting">Recording starting…</string>
     <string name="settings_dashcam_status_recording">%1$d/%2$d cameras recording</string>
