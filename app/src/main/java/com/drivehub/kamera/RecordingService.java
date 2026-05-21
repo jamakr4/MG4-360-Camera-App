@@ -52,8 +52,14 @@ public class RecordingService extends Service {
     private static final int TOTAL_CAMERAS = 4;
     private static final long TEST_RECORDING_MS = 30_000L;
 
+    private static volatile boolean sServiceRunning = false;
+
     private Thread worker;
     private volatile boolean stopRequested = false;
+
+    public static boolean isRunning() {
+        return sServiceRunning;
+    }
 
     public static void startIfNeeded(Context context) {
         SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
@@ -79,6 +85,7 @@ public class RecordingService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
+        sServiceRunning = true;
         createNotificationChannel();
     }
 
@@ -393,6 +400,7 @@ public class RecordingService extends Service {
 
     @Override
     public void onDestroy() {
+        sServiceRunning = false;
         stopRequested = true;
         if (worker != null) {
             try {

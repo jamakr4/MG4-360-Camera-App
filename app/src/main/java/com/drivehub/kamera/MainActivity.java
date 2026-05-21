@@ -119,7 +119,6 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         recordingStatusPill = findViewById(R.id.recordingStatusPill);
         recordingStatusDot = findViewById(R.id.recordingStatusDot);
         tvRecordingStatus = findViewById(R.id.tvRecordingStatus);
-        applyStoredRecordingStatus();
 
         ImageButton btnSettings = findViewById(R.id.btnSettings);
         btnSettings.setOnClickListener(v -> showSettingsDialog());
@@ -129,12 +128,19 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
         btnRecordTestClip = findViewById(R.id.btnRecordTestClip);
         btnRecordTestClip.setOnClickListener(v -> {
+            renderRecordingStatus(RecordingService.STATUS_STARTING, 0, 4, "");
             btnRecordTestClip.setEnabled(false);
             btnRecordTestClip.setText(R.string.main_button_record_test_running);
             previewPausedForTestClip = true;
             stopPreview();
-            RecordingService.startTestClip(this);
+            try {
+                RecordingService.startTestClip(this);
+            } catch (Throwable t) {
+                renderRecordingStatus(RecordingService.STATUS_ERROR, 0, 4, t.getClass().getSimpleName());
+            }
         });
+
+        applyStoredRecordingStatus();
 
         appearanceController.applyMainUiIconColors();
         applyWarningVisibility();
@@ -432,8 +438,20 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
     private void applyStoredRecordingStatus() {
         SharedPreferences prefs = UiPrefs.getPrefs(this);
+        String status = prefs.getString("recordingStatus", RecordingService.STATUS_OFF);
+        if (status != null
+                && !RecordingService.STATUS_OFF.equals(status)
+                && !RecordingService.isRunning()) {
+            prefs.edit()
+                    .putString("recordingStatus", RecordingService.STATUS_OFF)
+                    .putInt("recordingActiveCameras", 0)
+                    .putInt("recordingTotalCameras", 4)
+                    .putString("recordingLastError", "")
+                    .apply();
+            status = RecordingService.STATUS_OFF;
+        }
         renderRecordingStatus(
-                prefs.getString("recordingStatus", RecordingService.STATUS_OFF),
+                status,
                 prefs.getInt("recordingActiveCameras", 0),
                 prefs.getInt("recordingTotalCameras", 4),
                 prefs.getString("recordingLastError", "")
