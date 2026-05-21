@@ -50,7 +50,7 @@ public class RecordingService extends Service {
     private static final String CHANNEL_ID = "mg4_recording";
     private static final int NOTIF_ID = 42;
     private static final int TOTAL_CAMERAS = 4;
-    private static final long TEST_RECORDING_MS = 30_000L;
+    private static final long TEST_RECORDING_MS = 10_000L;
 
     private static volatile boolean sServiceRunning = false;
 
@@ -64,7 +64,8 @@ public class RecordingService extends Service {
     public static void startIfNeeded(Context context) {
         SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         boolean enabled = prefs.getBoolean(KEY_ENABLED, false);
-        if (!enabled) return;
+        if (!enabled)
+            return;
         Intent i = new Intent(context, RecordingService.class);
         i.setAction(ACTION_START);
         context.startForegroundService(i);
@@ -91,7 +92,8 @@ public class RecordingService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        if (intent == null) return START_STICKY;
+        if (intent == null)
+            return START_STICKY;
         String action = intent.getAction();
 
         if (ACTION_STOP.equals(action)) {
@@ -134,7 +136,7 @@ public class RecordingService extends Service {
 
     private void recordTestClip() {
         File baseDir = getRecordsBaseDir();
-        //noinspection ResultOfMethodCallIgnored
+        // noinspection ResultOfMethodCallIgnored
         baseDir.mkdirs();
         if (!baseDir.exists() || !baseDir.canWrite()) {
             publishStatus(STATUS_ERROR, 0, TOTAL_CAMERAS, "storage not writable");
@@ -144,7 +146,8 @@ public class RecordingService extends Service {
             return;
         }
 
-        boolean startedAnyCamera = recordClip(baseDir, TEST_RECORDING_MS, "test_" + makeTimestampBaseWithSeconds(System.currentTimeMillis()), -1);
+        boolean startedAnyCamera = recordClip(baseDir, TEST_RECORDING_MS,
+                "test_" + makeTimestampBaseWithSeconds(System.currentTimeMillis()), -1);
         worker = null;
         if (startedAnyCamera) {
             publishStatus(STATUS_OFF, 0, TOTAL_CAMERAS, "");
@@ -168,7 +171,7 @@ public class RecordingService extends Service {
         }
 
         File baseDir = getRecordsBaseDir();
-        //noinspection ResultOfMethodCallIgnored
+        // noinspection ResultOfMethodCallIgnored
         baseDir.mkdirs();
         if (!baseDir.exists() || !baseDir.canWrite()) {
             publishStatus(STATUS_ERROR, 0, TOTAL_CAMERAS, "storage not writable");
@@ -179,12 +182,14 @@ public class RecordingService extends Service {
 
         long segmentMs = segmentMin * 60L * 1000L;
 
-        // Convert total duration into a segment count: segmentMin=3, totalMin=30 => keep 10 segments.
+        // Convert total duration into a segment count: segmentMin=3, totalMin=30 =>
+        // keep 10 segments.
         int keepSegments = Math.max(1, totalMin / segmentMin);
         boolean endedWithFatalError = false;
 
         while (!stopRequested) {
-            boolean startedAnyCamera = recordClip(baseDir, segmentMs, makeTimestampBase(System.currentTimeMillis()), keepSegments);
+            boolean startedAnyCamera = recordClip(baseDir, segmentMs, makeTimestampBase(System.currentTimeMillis()),
+                    keepSegments);
             if (!startedAnyCamera) {
                 endedWithFatalError = true;
                 break;
@@ -192,7 +197,8 @@ public class RecordingService extends Service {
 
             // Check whether recording has been disabled in prefs.
             enabled = prefs.getBoolean(KEY_ENABLED, false);
-            if (!enabled) break;
+            if (!enabled)
+                break;
         }
 
         worker = null;
@@ -206,12 +212,11 @@ public class RecordingService extends Service {
     private boolean recordClip(File baseDir, long durationMs, String baseName, int keepSegments) {
         // Output names for the 4 cameras.
         // F = v15 (front), R = v17 (rear), X = v16 (left), Y = v14 (right)
-        int[] slots = new int[]{0, 1, 2, 3};
-        int[] videoIndices = new int[]{15, 17, 16, 14};
-        char[] names = new char[]{'F', 'R', 'X', 'Y'};
+        int[] slots = new int[] { 0, 1, 2, 3 };
+        int[] videoIndices = new int[] { 15, 17, 16, 14 };
+        char[] names = new char[] { 'F', 'R', 'X', 'Y' };
         int recordingFps = DashcamSettingsController.getRecordingFps(
-                getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-        );
+                getSharedPreferences(PREFS_NAME, MODE_PRIVATE));
 
         String[] outPaths = new String[4];
         for (int i = 0; i < 4; i++) {
@@ -224,12 +229,12 @@ public class RecordingService extends Service {
         StringBuilder failedCameras = new StringBuilder();
         for (int i = 0; i < 4; i++) {
             boolean started = CameraProbe.startMp4Record(
-                    slots[i], videoIndices[i], outPaths[i], 720, 240, recordingFps, 2500000
-            );
+                    slots[i], videoIndices[i], outPaths[i], 720, 240, recordingFps, 2500000);
             if (started) {
                 activeCameras++;
             } else {
-                if (failedCameras.length() > 0) failedCameras.append(", ");
+                if (failedCameras.length() > 0)
+                    failedCameras.append(", ");
                 failedCameras.append(names[i]).append(" /dev/video").append(videoIndices[i]);
             }
         }
@@ -265,16 +270,19 @@ public class RecordingService extends Service {
 
     private void cleanupOldSegments(File baseDir, int keepSegments) {
         File[] files = baseDir.listFiles();
-        if (files == null) return;
+        if (files == null)
+            return;
 
         // baseName => earliestModified
         Map<String, Long> groupTime = new HashMap<>();
         for (File f : files) {
             String name = f.getName();
-            if (!name.endsWith(".mp4")) continue;
+            if (!name.endsWith(".mp4"))
+                continue;
             // yymmddhhmm_X.mp4
             int underscore = name.indexOf('_');
-            if (underscore <= 0) continue;
+            if (underscore <= 0)
+                continue;
             String base = name.substring(0, underscore);
             long t = f.lastModified();
             groupTime.merge(base, t, Math::min);
@@ -283,15 +291,16 @@ public class RecordingService extends Service {
         List<Map.Entry<String, Long>> groups = new ArrayList<>(groupTime.entrySet());
         groups.sort(Comparator.comparingLong(Map.Entry::getValue));
 
-        if (groups.size() <= keepSegments) return;
+        if (groups.size() <= keepSegments)
+            return;
         int deleteCount = groups.size() - keepSegments;
 
-        char[] suffixes = new char[]{'F', 'R', 'X', 'Y'};
+        char[] suffixes = new char[] { 'F', 'R', 'X', 'Y' };
         for (int i = 0; i < deleteCount; i++) {
             String base = groups.get(i).getKey();
             for (char s : suffixes) {
                 File f = new File(baseDir, base + "_" + s + ".mp4");
-                //noinspection ResultOfMethodCallIgnored
+                // noinspection ResultOfMethodCallIgnored
                 f.delete();
             }
         }
@@ -301,7 +310,7 @@ public class RecordingService extends Service {
         // Android 9: write directly into the Downloads folder.
         File downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
         File dir = new File(downloads, "mg4_cam_records");
-        //noinspection ResultOfMethodCallIgnored
+        // noinspection ResultOfMethodCallIgnored
         dir.mkdirs();
         return dir;
     }
@@ -345,13 +354,14 @@ public class RecordingService extends Service {
                 prefs.getString(KEY_STATUS, STATUS_OFF),
                 prefs.getInt(KEY_ACTIVE_CAMERAS, 0),
                 prefs.getInt(KEY_TOTAL_CAMERAS, TOTAL_CAMERAS),
-                prefs.getString(KEY_LAST_ERROR, "")
-        );
+                prefs.getString(KEY_LAST_ERROR, ""));
     }
 
     private void publishStatus(String status, int activeCameras, int totalCameras, String lastError) {
-        if (status == null) status = STATUS_OFF;
-        if (lastError == null) lastError = "";
+        if (status == null)
+            status = STATUS_OFF;
+        if (lastError == null)
+            lastError = "";
         getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit()
                 .putString(KEY_STATUS, status)
                 .putInt(KEY_ACTIVE_CAMERAS, Math.max(0, activeCameras))
@@ -390,10 +400,10 @@ public class RecordingService extends Service {
         NotificationChannel ch = new NotificationChannel(
                 CHANNEL_ID,
                 getString(R.string.notification_channel_recording),
-                NotificationManager.IMPORTANCE_LOW
-        );
+                NotificationManager.IMPORTANCE_LOW);
         NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-        if (nm != null) nm.createNotificationChannel(ch);
+        if (nm != null)
+            nm.createNotificationChannel(ch);
     }
 
     @Nullable

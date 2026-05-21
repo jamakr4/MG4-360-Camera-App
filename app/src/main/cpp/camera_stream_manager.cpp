@@ -43,6 +43,8 @@ namespace {
 static constexpr const char* TAG = "CameraStreamManager";
 static constexpr int PREVIEW_SELECT_TIMEOUT_US = 100000;
 static constexpr int STOP_WAIT_MS = 2500;
+static constexpr int COLOR_FORMAT_YUV420_PLANAR = 19;
+static constexpr int COLOR_FORMAT_YUV420_SEMIPLANAR = 21;
 
 void logPrint(int level, const char* fmt, va_list args) {
     __android_log_vprint(level, TAG, fmt, args);
@@ -125,6 +127,20 @@ struct MappedBuffer {
     size_t length = 0;
 };
 
+void packI420ToNv12(const uint8_t* src, uint8_t* dst, int width, int height) {
+    const size_t ySize = static_cast<size_t>(width) * static_cast<size_t>(height);
+    const size_t uvPlaneSize = ySize / 4U;
+    const uint8_t* srcY = src;
+    const uint8_t* srcU = src + ySize;
+    const uint8_t* srcV = srcU + uvPlaneSize;
+    std::memcpy(dst, srcY, ySize);
+    uint8_t* dstUv = dst + ySize;
+    for (size_t i = 0; i < uvPlaneSize; i++) {
+        dstUv[i * 2U] = srcU[i];
+        dstUv[i * 2U + 1U] = srcV[i];
+    }
+}
+
 class RecordingSink {
 public:
     RecordingSink(int slot, int videoIndex, std::string outputPath, int requestedWidth,
@@ -150,34 +166,7 @@ public:
             return false;
         }
 
-        codec_ = AMediaCodec_createEncoderByType("video/avc");
-        if (!codec_) {
-            loge("slot=%d AMediaCodec_createEncoderByType failed", slot_);
-            return false;
-        }
-
-        AMediaFormat* format = AMediaFormat_new();
-        AMediaFormat_setString(format, AMEDIAFORMAT_KEY_MIME, "video/avc");
-        AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_WIDTH, recWidth_);
-        AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_HEIGHT, recHeight_);
-        AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_BIT_RATE, bitrate_);
-        AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_FRAME_RATE, fps_);
-        AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_I_FRAME_INTERVAL, 1);
-        AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_COLOR_FORMAT, 19);
-
-        media_status_t status = AMediaCodec_configure(
-                codec_, format, nullptr, nullptr, AMEDIACODEC_CONFIGURE_FLAG_ENCODE);
-        AMediaFormat_delete(format);
-        if (status != AMEDIA_OK) {
-            loge("slot=%d AMediaCodec_configure failed: %d", slot_, static_cast<int>(status));
-            finalize();
-            return false;
-        }
-
-        status = AMediaCodec_start(codec_);
-        if (status != AMEDIA_OK) {
-            loge("slot=%d AMediaCodec_start failed: %d", slot_, static_cast<int>(status));
-            finalize();
+        if (!initializeCodec()) {
             return false;
         }
 
@@ -196,10 +185,12 @@ public:
         }
 
         i420Frame_.create(recHeight_ + (recHeight_ / 2), recWidth_, CV_8UC1);
+        encoderFrame_.resize(static_cast<size_t>(recWidth_) * static_cast<size_t>(recHeight_) * 3U / 2U);
         frameDurationUs_ = 1000000LL / std::max(1, fps_);
         startUs_ = nowUs();
         nextPtsUs_ = 0;
         frameCount_ = 0;
+        logi("slot=%d /dev/video%d encoder color format=%d", slot_, videoIndex_, encoderColorFormat_);
         return true;
     }
 
@@ -239,14 +230,19 @@ public:
 
         cv::Mat rgbaCrop = rgbaFrame(cv::Rect(0, 0, recWidth_, recHeight_));
         cv::cvtColor(rgbaCrop, i420Frame_, cv::COLOR_RGBA2YUV_I420);
+        if (encoderColorFormat_ == COLOR_FORMAT_YUV420_SEMIPLANAR) {
+            packI420ToNv12(i420Frame_.data, encoderFrame_.data(), recWidth_, recHeight_);
+        } else {
+            std::memcpy(encoderFrame_.data(), i420Frame_.data, encoderFrame_.size());
+        }
 
         ssize_t inputIndex = AMediaCodec_dequeueInputBuffer(codec_, 10000);
         if (inputIndex >= 0) {
             size_t inputSize = 0;
             uint8_t* inputBuffer = AMediaCodec_getInputBuffer(codec_, static_cast<size_t>(inputIndex), &inputSize);
-            const size_t frameSize = static_cast<size_t>(recWidth_) * static_cast<size_t>(recHeight_) * 3U / 2U;
+            const size_t frameSize = encoderFrame_.size();
             if (inputBuffer != nullptr && inputSize >= frameSize) {
-                std::memcpy(inputBuffer, i420Frame_.data, frameSize);
+                std::memcpy(inputBuffer, encoderFrame_.data(), frameSize);
                 const int64_t pts = frameCount_ * frameDurationUs_;
                 if (AMediaCodec_queueInputBuffer(codec_, static_cast<size_t>(inputIndex), 0, frameSize,
                                                  static_cast<uint64_t>(pts), 0) == AMEDIA_OK) {
@@ -302,6 +298,64 @@ public:
     }
 
 private:
+    bool initializeCodec() {
+        const int preferredFormats[] = {
+                COLOR_FORMAT_YUV420_SEMIPLANAR,
+                COLOR_FORMAT_YUV420_PLANAR
+        };
+        for (int colorFormat : preferredFormats) {
+            if (tryInitializeCodec(colorFormat)) {
+                encoderColorFormat_ = colorFormat;
+                return true;
+            }
+            releaseCodecOnly();
+        }
+        loge("slot=%d no usable encoder color format found", slot_);
+        return false;
+    }
+
+    bool tryInitializeCodec(int colorFormat) {
+        codec_ = AMediaCodec_createEncoderByType("video/avc");
+        if (!codec_) {
+            loge("slot=%d AMediaCodec_createEncoderByType failed", slot_);
+            return false;
+        }
+
+        AMediaFormat* format = AMediaFormat_new();
+        AMediaFormat_setString(format, AMEDIAFORMAT_KEY_MIME, "video/avc");
+        AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_WIDTH, recWidth_);
+        AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_HEIGHT, recHeight_);
+        AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_BIT_RATE, bitrate_);
+        AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_FRAME_RATE, fps_);
+        AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_I_FRAME_INTERVAL, 1);
+        AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_COLOR_FORMAT, colorFormat);
+
+        media_status_t status = AMediaCodec_configure(
+                codec_, format, nullptr, nullptr, AMEDIACODEC_CONFIGURE_FLAG_ENCODE);
+        AMediaFormat_delete(format);
+        if (status != AMEDIA_OK) {
+            logw("slot=%d AMediaCodec_configure failed for color format %d: %d",
+                 slot_, colorFormat, static_cast<int>(status));
+            return false;
+        }
+
+        status = AMediaCodec_start(codec_);
+        if (status != AMEDIA_OK) {
+            logw("slot=%d AMediaCodec_start failed for color format %d: %d",
+                 slot_, colorFormat, static_cast<int>(status));
+            return false;
+        }
+        return true;
+    }
+
+    void releaseCodecOnly() {
+        if (codec_ != nullptr) {
+            AMediaCodec_delete(codec_);
+            codec_ = nullptr;
+        }
+        encoderColorFormat_ = COLOR_FORMAT_YUV420_PLANAR;
+    }
+
     void queueEndOfStream() {
         if (eosQueued_ || codec_ == nullptr) {
             return;
@@ -378,6 +432,7 @@ private:
     int64_t startUs_ = 0;
     int64_t nextPtsUs_ = 0;
     int64_t frameCount_ = 0;
+    int encoderColorFormat_ = COLOR_FORMAT_YUV420_PLANAR;
 
     AMediaCodec* codec_ = nullptr;
     AMediaMuxer* muxer_ = nullptr;
@@ -387,6 +442,7 @@ private:
     bool eosQueued_ = false;
 
     cv::Mat i420Frame_;
+    std::vector<uint8_t> encoderFrame_;
 
     std::atomic<bool> stopRequested_{false};
     std::atomic<bool> finalized_{false};
