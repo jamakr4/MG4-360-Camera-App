@@ -517,8 +517,11 @@ public:
             : outputPath_(std::move(outputPath)),
               cellWidth_(cellWidth),
               cellHeight_(cellHeight),
-              gridWidth_(cellWidth * 2),
-              gridHeight_(cellHeight * 2),
+              sideWidth_(cellHeight),
+              sideHeight_(cellWidth),
+              gridWidth_(cellWidth + (cellHeight * 2)),
+              gridHeight_(cellWidth),
+              centerStackTop_((gridHeight_ - (cellHeight * 2)) / 2),
               fps_(fps),
               bitrate_(bitrate) {
     }
@@ -742,10 +745,13 @@ private:
 
     void composeCanvasLocked() {
         rgbaCanvas_.setTo(cv::Scalar(0, 0, 0, 255));
-        latestFrames_[0].copyTo(rgbaCanvas_(cv::Rect(0, 0, cellWidth_, cellHeight_)));
-        latestFrames_[1].copyTo(rgbaCanvas_(cv::Rect(cellWidth_, 0, cellWidth_, cellHeight_)));
-        latestFrames_[2].copyTo(rgbaCanvas_(cv::Rect(0, cellHeight_, cellWidth_, cellHeight_)));
-        latestFrames_[3].copyTo(rgbaCanvas_(cv::Rect(cellWidth_, cellHeight_, cellWidth_, cellHeight_)));
+        cv::rotate(latestFrames_[2], leftRotated_, cv::ROTATE_90_COUNTERCLOCKWISE);
+        cv::rotate(latestFrames_[1], rightRotated_, cv::ROTATE_90_CLOCKWISE);
+
+        leftRotated_.copyTo(rgbaCanvas_(cv::Rect(0, 0, sideWidth_, sideHeight_)));
+        latestFrames_[0].copyTo(rgbaCanvas_(cv::Rect(sideWidth_, centerStackTop_, cellWidth_, cellHeight_)));
+        latestFrames_[3].copyTo(rgbaCanvas_(cv::Rect(sideWidth_, centerStackTop_ + cellHeight_, cellWidth_, cellHeight_)));
+        rightRotated_.copyTo(rgbaCanvas_(cv::Rect(sideWidth_ + cellWidth_, 0, sideWidth_, sideHeight_)));
     }
 
     void queueEndOfStreamLocked() {
@@ -813,8 +819,11 @@ private:
     const std::string outputPath_;
     const int cellWidth_;
     const int cellHeight_;
+    const int sideWidth_;
+    const int sideHeight_;
     const int gridWidth_;
     const int gridHeight_;
+    const int centerStackTop_;
     const int fps_;
     const int bitrate_;
 
@@ -835,6 +844,8 @@ private:
     cv::Mat rgbaCanvas_;
     cv::Mat i420Frame_;
     std::array<cv::Mat, 4> latestFrames_{};
+    cv::Mat leftRotated_;
+    cv::Mat rightRotated_;
     std::vector<uint8_t> encoderFrame_;
 
     std::atomic<bool> stopRequested_{false};
