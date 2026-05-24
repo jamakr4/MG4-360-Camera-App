@@ -51,7 +51,9 @@ Java_com_drivehub_kamera_CameraProbe_startCombinedMp4Record(JNIEnv* env, jclass 
                                                             jint cellWidth,
                                                             jint cellHeight,
                                                             jint fps,
-                                                            jint bitrate) {
+                                                            jint bitrate,
+                                                            jstring signature,
+                                                            jboolean showSpeed) {
     if (outputPath == nullptr) {
         return JNI_FALSE;
     }
@@ -64,13 +66,24 @@ Java_com_drivehub_kamera_CameraProbe_startCombinedMp4Record(JNIEnv* env, jclass 
     std::string output(outputChars);
     env->ReleaseStringUTFChars(outputPath, outputChars);
 
+    std::string signatureText;
+    if (signature != nullptr) {
+        const char* signatureChars = env->GetStringUTFChars(signature, nullptr);
+        if (signatureChars != nullptr) {
+            signatureText.assign(signatureChars);
+            env->ReleaseStringUTFChars(signature, signatureChars);
+        }
+    }
+
     return camera_stream_manager::startCombinedRecording(
             env,
             output,
             static_cast<int>(cellWidth),
             static_cast<int>(cellHeight),
             static_cast<int>(fps),
-            static_cast<int>(bitrate)
+            static_cast<int>(bitrate),
+            signatureText,
+            showSpeed == JNI_TRUE
     ) ? JNI_TRUE : JNI_FALSE;
 }
 
@@ -78,4 +91,11 @@ extern "C"
 JNIEXPORT jboolean JNICALL
 Java_com_drivehub_kamera_CameraProbe_stopCombinedMp4Record(JNIEnv* /*env*/, jclass /*clazz*/) {
     return camera_stream_manager::stopCombinedRecording() ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_drivehub_kamera_CameraProbe_updateCombinedRecordingSpeed(JNIEnv* /*env*/, jclass /*clazz*/,
+                                                                  jint speedKmh) {
+    camera_stream_manager::updateCombinedRecordingSpeed(static_cast<int>(speedKmh));
 }

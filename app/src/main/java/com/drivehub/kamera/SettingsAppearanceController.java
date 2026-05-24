@@ -27,6 +27,7 @@ final class SettingsAppearanceController {
     private SharedPreferences prefs;
     private Switch swOverlay;
     private Switch swDashcamEnabled;
+    private Switch swDashcamShowSpeed;
     private Switch swSafetyWarning;
     private Switch swAllowBetaUpdates;
     private ImageButton dialogClose;
@@ -60,6 +61,7 @@ final class SettingsAppearanceController {
             SharedPreferences prefs,
             Switch swOverlay,
             Switch swDashcamEnabled,
+            Switch swDashcamShowSpeed,
             Switch swSafetyWarning,
             Switch swAllowBetaUpdates,
             ImageButton dialogClose,
@@ -80,6 +82,7 @@ final class SettingsAppearanceController {
         this.prefs = prefs;
         this.swOverlay = swOverlay;
         this.swDashcamEnabled = swDashcamEnabled;
+        this.swDashcamShowSpeed = swDashcamShowSpeed;
         this.swSafetyWarning = swSafetyWarning;
         this.swAllowBetaUpdates = swAllowBetaUpdates;
         this.dialogClose = dialogClose;
@@ -296,6 +299,9 @@ final class SettingsAppearanceController {
         }
         if (swDashcamEnabled != null) {
             swDashcamEnabled.setTrackTintList(buildToggleTrackTint(accentColor));
+        }
+        if (swDashcamShowSpeed != null) {
+            swDashcamShowSpeed.setTrackTintList(buildToggleTrackTint(accentColor));
         }
         if (swSafetyWarning != null) {
             swSafetyWarning.setTrackTintList(buildToggleTrackTint(accentColor));

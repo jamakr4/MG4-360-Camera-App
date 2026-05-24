@@ -36,6 +36,8 @@ public class SignalService extends Service {
     private static final String TAG = "SignalService";
     private static final String CHANNEL_ID = "mg4_signal";
     private static final int NOTIF_ID = 100;
+    private static final int HAZARD_LAMP_VALUE = 3;
+    private static final long HAZARD_TRIGGER_COOLDOWN_MS = 30_000L;
 
     private static final int TURN_PROP_ID = 0x21409326;
     private static final int REVERSE_GEAR_VALUE = 2;
@@ -57,6 +59,7 @@ public class SignalService extends Service {
     private int currentGear = 0;
     private int currentMode = -1; // -1:init, 0:none, 1:left, 2:right, 3:reverse
     private volatile long overlayShownAtMs = 0L;
+    private volatile long lastHazardTriggerAtMs = 0L;
 
     private static final String PREFS_NAME = "rec_prefs";
     private final Handler mainHandler = new Handler();
@@ -220,8 +223,10 @@ public class SignalService extends Service {
         if (currentLamp == lastLamp && currentGear == readCachedGear()) {
             return;
         }
+        int previousLamp = lastLamp;
         cacheGear(currentGear);
         lastLamp = currentLamp;
+        maybeTriggerDashcamEventForHazards(previousLamp);
 
         int nextMode;
         if (currentGear == REVERSE_GEAR_VALUE) {
@@ -293,6 +298,23 @@ public class SignalService extends Service {
             mainHandler.postDelayed(hideRunnable, delayMs);
             Log.i(TAG, "Signal/gear off => will hide overlay after " + delayMs + "ms");
         }
+    }
+
+    private void maybeTriggerDashcamEventForHazards(int previousLamp) {
+        if (currentLamp != HAZARD_LAMP_VALUE) {
+            return;
+        }
+        if (previousLamp == Integer.MIN_VALUE || previousLamp == HAZARD_LAMP_VALUE) {
+            return;
+        }
+        long now = SystemClock.elapsedRealtime();
+        if ((now - lastHazardTriggerAtMs) < HAZARD_TRIGGER_COOLDOWN_MS) {
+            Log.i(TAG, "Hazard trigger ignored due to cooldown");
+            return;
+        }
+        lastHazardTriggerAtMs = now;
+        RecordingService.triggerEventSave(this);
+        Log.i(TAG, "Hazard lights => dashcam event trigger");
     }
 
     // Simple gear-change cache so mode transitions are not missed.

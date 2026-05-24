@@ -14,7 +14,9 @@ bool startRecording(JNIEnv* env, int slot, int videoIndex, const std::string& ou
                     int width, int height, int fps, int bitrate);
 bool stopRecording(int slot);
 bool startCombinedRecording(JNIEnv* env, const std::string& outputPath,
-                            int cellWidth, int cellHeight, int fps, int bitrate);
+                            int cellWidth, int cellHeight, int fps, int bitrate,
+                            const std::string& signature, bool showSpeed);
 bool stopCombinedRecording();
+void updateCombinedRecordingSpeed(int speedKmh);
 
 } // namespace camera_stream_manager

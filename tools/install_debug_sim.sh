@@ -9,6 +9,7 @@ PACKAGE_NAME="com.drivehub.kamera"
 MAIN_ACTIVITY="${PACKAGE_NAME}/.MainActivity"
 APK_PATH="app/build/outputs/apk/debug/app-debug.apk"
 SDK_DIR="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/Users/jan/Library/Android/sdk}}"
+DEFAULT_JAVA_HOME="/Library/Java/JavaVirtualMachines/jdk-17.jdk/Contents/Home"
 OPEN_SETTINGS=0
 SCREENSHOT_PATH="${SCREENSHOT_PATH:-/tmp/drivehub_settings_open.png}"
 
@@ -47,8 +48,17 @@ if [[ ! -f local.properties ]]; then
   echo "sdk.dir=${SDK_DIR}" > local.properties
 fi
 
+if [[ -z "${JAVA_HOME:-}" && -d "${DEFAULT_JAVA_HOME}" ]]; then
+  export JAVA_HOME="${DEFAULT_JAVA_HOME}"
+fi
+
+if [[ -n "${JAVA_HOME:-}" ]]; then
+  export PATH="${JAVA_HOME}/bin:${PATH}"
+  echo "Using JAVA_HOME=${JAVA_HOME}"
+fi
+
 echo "Building debug APK..."
-./gradlew :app:assembleDebug
+./gradlew --no-daemon :app:assembleDebug
 
 echo "Waiting for Android device: ${SERIAL}"
 adb -s "$SERIAL" wait-for-device

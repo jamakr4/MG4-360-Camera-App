@@ -21,6 +21,7 @@
 #include <condition_variable>
 #include <cstdarg>
 #include <cstdint>
+#include <ctime>
 #include <cstdio>
 #include <cstring>
 #include <memory>
@@ -513,7 +514,8 @@ private:
 
 class CombinedRecordingSink : public std::enable_shared_from_this<CombinedRecordingSink> {
 public:
-    CombinedRecordingSink(std::string outputPath, int cellWidth, int cellHeight, int fps, int bitrate)
+    CombinedRecordingSink(std::string outputPath, int cellWidth, int cellHeight, int fps, int bitrate,
+                          std::string signature, bool showSpeed)
             : outputPath_(std::move(outputPath)),
               cellWidth_(cellWidth),
               cellHeight_(cellHeight),
@@ -521,9 +523,13 @@ public:
               sideHeight_(cellWidth),
               gridWidth_(cellWidth + (cellHeight * 2)),
               gridHeight_(cellWidth),
+              footerHeight_(80),
+              totalHeight_(gridHeight_ + footerHeight_),
               centerStackTop_((gridHeight_ - (cellHeight * 2)) / 2),
               fps_(fps),
-              bitrate_(bitrate) {
+              bitrate_(bitrate),
+              signature_(std::move(signature)),
+              showSpeed_(showSpeed) {
     }
 
     ~CombinedRecordingSink() {
@@ -554,9 +560,9 @@ public:
             return false;
         }
 
-        rgbaCanvas_.create(gridHeight_, gridWidth_, CV_8UC4);
-        i420Frame_.create(gridHeight_ + (gridHeight_ / 2), gridWidth_, CV_8UC1);
-        encoderFrame_.resize(static_cast<size_t>(gridWidth_) * static_cast<size_t>(gridHeight_) * 3U / 2U);
+        rgbaCanvas_.create(totalHeight_, gridWidth_, CV_8UC4);
+        i420Frame_.create(totalHeight_ + (totalHeight_ / 2), gridWidth_, CV_8UC1);
+        encoderFrame_.resize(static_cast<size_t>(gridWidth_) * static_cast<size_t>(totalHeight_) * 3U / 2U);
         for (cv::Mat& frame : latestFrames_) {
             frame.create(cellHeight_, cellWidth_, CV_8UC4);
             frame.setTo(cv::Scalar(0, 0, 0, 255));
@@ -565,7 +571,7 @@ public:
         startUs_ = nowUs();
         nextPtsUs_ = 0;
         frameCount_ = 0;
-        logi("combined encoder color format=%d size=%dx%d", encoderColorFormat_, gridWidth_, gridHeight_);
+        logi("combined encoder color format=%d size=%dx%d", encoderColorFormat_, gridWidth_, totalHeight_);
         return true;
     }
 
@@ -586,6 +592,10 @@ public:
         return waitCv_.wait_for(lock, std::chrono::milliseconds(timeoutMs), [this]() {
             return stopped_;
         });
+    }
+
+    void updateSpeedKmh(int speedKmh) {
+        currentSpeedKmh_.store(std::max(0, speedKmh));
     }
 
     void processSourceFrame(int sourceIndex, const cv::Mat& rgbaFrame) {
@@ -617,7 +627,7 @@ public:
         composeCanvasLocked();
         cv::cvtColor(rgbaCanvas_, i420Frame_, cv::COLOR_RGBA2YUV_I420);
         if (encoderColorFormat_ == COLOR_FORMAT_YUV420_SEMIPLANAR) {
-            packI420ToNv12(i420Frame_.data, encoderFrame_.data(), gridWidth_, gridHeight_);
+            packI420ToNv12(i420Frame_.data, encoderFrame_.data(), gridWidth_, totalHeight_);
         } else {
             std::memcpy(encoderFrame_.data(), i420Frame_.data, encoderFrame_.size());
         }
@@ -711,7 +721,7 @@ private:
         AMediaFormat* format = AMediaFormat_new();
         AMediaFormat_setString(format, AMEDIAFORMAT_KEY_MIME, "video/avc");
         AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_WIDTH, gridWidth_);
-        AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_HEIGHT, gridHeight_);
+        AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_HEIGHT, totalHeight_);
         AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_BIT_RATE, bitrate_);
         AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_FRAME_RATE, fps_);
         AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_I_FRAME_INTERVAL, 1);
@@ -752,6 +762,76 @@ private:
         latestFrames_[0].copyTo(rgbaCanvas_(cv::Rect(sideWidth_, centerStackTop_, cellWidth_, cellHeight_)));
         latestFrames_[3].copyTo(rgbaCanvas_(cv::Rect(sideWidth_, centerStackTop_ + cellHeight_, cellWidth_, cellHeight_)));
         rightRotated_.copyTo(rgbaCanvas_(cv::Rect(sideWidth_ + cellWidth_, 0, sideWidth_, sideHeight_)));
+        drawFooterLocked();
+    }
+
+    void drawFooterLocked() {
+        cv::Rect footerRect(0, gridHeight_, gridWidth_, footerHeight_);
+        cv::Mat footer = rgbaCanvas_(footerRect);
+        footer.setTo(cv::Scalar(14, 14, 14, 255));
+        cv::line(rgbaCanvas_,
+                 cv::Point(0, gridHeight_),
+                 cv::Point(gridWidth_, gridHeight_),
+                 cv::Scalar(70, 70, 70, 255),
+                 2,
+                 cv::LINE_AA);
+
+        const int baselineY = gridHeight_ + 50;
+        const double fontScale = 0.78;
+        const int thickness = 2;
+        const int marginX = 24;
+        const cv::Scalar textColor(235, 235, 235, 255);
+
+        if (!signature_.empty()) {
+            cv::putText(rgbaCanvas_,
+                        signature_,
+                        cv::Point(marginX, baselineY),
+                        cv::FONT_HERSHEY_SIMPLEX,
+                        fontScale,
+                        textColor,
+                        thickness,
+                        cv::LINE_AA);
+        }
+
+        std::string rightText = buildRightFooterText();
+        int baseline = 0;
+        cv::Size textSize = cv::getTextSize(
+                rightText,
+                cv::FONT_HERSHEY_SIMPLEX,
+                fontScale,
+                thickness,
+                &baseline
+        );
+        cv::putText(rgbaCanvas_,
+                    rightText,
+                    cv::Point(std::max(marginX, gridWidth_ - marginX - textSize.width), baselineY),
+                    cv::FONT_HERSHEY_SIMPLEX,
+                    fontScale,
+                    textColor,
+                    thickness,
+                    cv::LINE_AA);
+    }
+
+    std::string buildRightFooterText() const {
+        std::time_t now = std::time(nullptr);
+        std::tm localNow{};
+#if defined(_WIN32)
+        localtime_s(&localNow, &now);
+#else
+        localtime_r(&now, &localNow);
+#endif
+        char dateBuffer[64];
+        if (std::strftime(dateBuffer, sizeof(dateBuffer), "%d.%m.%Y %H:%M:%S", &localNow) == 0) {
+            std::snprintf(dateBuffer, sizeof(dateBuffer), "--.--.---- --:--:--");
+        }
+
+        std::string text(dateBuffer);
+        if (showSpeed_) {
+            text += "  |  ";
+            text += std::to_string(currentSpeedKmh_.load());
+            text += " km/h";
+        }
+        return text;
     }
 
     void queueEndOfStreamLocked() {
@@ -823,9 +903,13 @@ private:
     const int sideHeight_;
     const int gridWidth_;
     const int gridHeight_;
+    const int footerHeight_;
+    const int totalHeight_;
     const int centerStackTop_;
     const int fps_;
     const int bitrate_;
+    const std::string signature_;
+    const bool showSpeed_;
 
     int64_t frameDurationUs_ = 0;
     int64_t startUs_ = 0;
@@ -847,6 +931,7 @@ private:
     cv::Mat leftRotated_;
     cv::Mat rightRotated_;
     std::vector<uint8_t> encoderFrame_;
+    std::atomic<int> currentSpeedKmh_{0};
 
     std::atomic<bool> stopRequested_{false};
     std::atomic<bool> finalized_{false};
@@ -1466,7 +1551,8 @@ bool startRecording(JNIEnv* /*env*/, int slot, int videoIndex, const std::string
 }
 
 bool startCombinedRecording(JNIEnv* /*env*/, const std::string& outputPath,
-                            int cellWidth, int cellHeight, int fps, int bitrate) {
+                            int cellWidth, int cellHeight, int fps, int bitrate,
+                            const std::string& signature, bool showSpeed) {
     std::lock_guard<std::mutex> combinedLock(gCombinedMutex);
     std::shared_ptr<CombinedRecordingSink> sink;
     if (gCombinedRecordingActive) {
@@ -1474,7 +1560,15 @@ bool startCombinedRecording(JNIEnv* /*env*/, const std::string& outputPath,
         return false;
     }
 
-    sink = std::make_shared<CombinedRecordingSink>(outputPath, cellWidth, cellHeight, fps, bitrate);
+    sink = std::make_shared<CombinedRecordingSink>(
+            outputPath,
+            cellWidth,
+            cellHeight,
+            fps,
+            bitrate,
+            signature,
+            showSpeed
+    );
     if (!sink->initialize()) {
         return false;
     }
@@ -1547,6 +1641,17 @@ bool stopCombinedRecording() {
 
     const bool sinkStopped = sink->waitUntilStopped(STOP_WAIT_MS);
     return allConsumersStopped && sinkStopped;
+}
+
+void updateCombinedRecordingSpeed(int speedKmh) {
+    std::shared_ptr<CombinedRecordingSink> sink;
+    {
+        std::lock_guard<std::mutex> combinedLock(gCombinedMutex);
+        sink = gCombinedSink;
+    }
+    if (sink != nullptr) {
+        sink->updateSpeedKmh(speedKmh);
+    }
 }
 
 } // namespace camera_stream_manager

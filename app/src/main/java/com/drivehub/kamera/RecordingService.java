@@ -241,13 +241,18 @@ public class RecordingService extends Service {
     private boolean recordClip(File baseDir, long durationMs, String baseName, int keepSegments) {
         int recordingFps = DashcamSettingsController.getRecordingFps(
                 getSharedPreferences(PREFS_NAME, MODE_PRIVATE));
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        String signature = DashcamSettingsController.getRecordingSignature(prefs);
+        boolean showSpeed = DashcamSettingsController.shouldShowSpeed(prefs);
         File outputFile = new File(baseDir, baseName + ".mp4");
         boolean started = CameraProbe.startCombinedMp4Record(
                 outputFile.getAbsolutePath(),
                 720,
                 240,
                 recordingFps,
-                9_000_000);
+                9_000_000,
+                signature,
+                showSpeed);
 
         if (!started) {
             publishStatus(STATUS_ERROR, 0, TOTAL_CAMERAS, "grid start failed");
@@ -258,6 +263,9 @@ public class RecordingService extends Service {
 
         long start = SystemClock.elapsedRealtime();
         while (!stopRequested && (SystemClock.elapsedRealtime() - start) < durationMs) {
+            if (showSpeed) {
+                CameraProbe.updateCombinedRecordingSpeed(readSpeedKmhFromSystemProperty());
+            }
             try {
                 Thread.sleep(200);
             } catch (InterruptedException ignored) {
@@ -270,6 +278,20 @@ public class RecordingService extends Service {
         }
 
         return true;
+    }
+
+    private int readSpeedKmhFromSystemProperty() {
+        try {
+            Class<?> sp = Class.forName("android.os.SystemProperties");
+            java.lang.reflect.Method get = sp.getMethod("get", String.class, String.class);
+            String value = (String) get.invoke(null, "arcsoft.avm.mCurCarSpeed", "");
+            if (value == null || value.isEmpty()) {
+                return 0;
+            }
+            return Math.max(0, Math.round(Float.parseFloat(value)));
+        } catch (Throwable ignored) {
+            return 0;
+        }
     }
 
     private void onSegmentCompleted(File baseDir, String baseName, long startMs, long endMs, int keepSegments) {

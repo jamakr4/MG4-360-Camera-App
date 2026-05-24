@@ -32,8 +32,13 @@ public final class CameraProbe {
     /** Starts a single 2x2 grid MP4 recording that combines all four cameras. */
     public static native boolean startCombinedMp4Record(String outputPath,
                                                         int cellWidth, int cellHeight,
-                                                        int fps, int bitrate);
+                                                        int fps, int bitrate,
+                                                        String signature,
+                                                        boolean showSpeed);
 
     /** Stops the currently running combined 2x2 grid recording. */
     public static native boolean stopCombinedMp4Record();
+
+    /** Updates the current speed shown in the active combined recording overlay. */
+    public static native void updateCombinedRecordingSpeed(int speedKmh);
 }
