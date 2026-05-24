@@ -482,6 +482,11 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             recordingStatusDot.setVisibility(View.VISIBLE);
             tvRecordingStatus.setText(getString(R.string.main_recording_indicator, activeCameras, totalCameras));
             renderDashcamDialogStatus(getString(R.string.settings_dashcam_status_recording, activeCameras, totalCameras));
+        } else if (RecordingService.STATUS_PAUSED_OEM.equals(status)) {
+            if (btnRecordTestClip != null) btnRecordTestClip.setEnabled(false);
+            recordingStatusDot.setVisibility(View.GONE);
+            tvRecordingStatus.setText(R.string.main_recording_paused_oem);
+            renderDashcamDialogStatus(getString(R.string.settings_dashcam_status_paused_oem));
         } else if (RecordingService.STATUS_STARTING.equals(status)) {
             if (btnRecordTestClip != null) btnRecordTestClip.setEnabled(false);
             recordingStatusDot.setVisibility(View.VISIBLE);

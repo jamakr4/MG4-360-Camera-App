@@ -78,6 +78,17 @@
             </intent-filter>
         </receiver>
 
+        <receiver
+            android:name=".OemAvmReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.saicmotor.360camera.show" />
+                <action android:name="com.saicmotor.360camera.close" />
+                <action android:name="com.saicmotor.hmi.aroundview.mod.ACTION_STOP" />
+            </intent-filter>
+        </receiver>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

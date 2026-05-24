@@ -20,6 +20,7 @@
     <string name="settings_dashcam_status_off">Recording inactive</string>
     <string name="settings_dashcam_status_starting">Recording starting…</string>
     <string name="settings_dashcam_status_recording">%1$d/%2$d cameras recording</string>
+    <string name="settings_dashcam_status_paused_oem">Recording paused while OEM camera is being opened</string>
     <string name="settings_dashcam_status_error">Recording error: %1$s</string>
     <string name="settings_overlay_on_signal">Show Signal Camera on turn signal</string>
     <string name="safety_warning_text">Please pay attention to the surrounding environment!</string>
@@ -79,6 +80,7 @@
     <string name="main_event_save_requires_dashcam">Enable dashcam recording first</string>
     <string name="main_recording_indicator">%1$d/%2$d</string>
     <string name="main_recording_starting">REC starting</string>
+    <string name="main_recording_paused_oem">REC paused (OEM launch)</string>
     <string name="main_recording_error">REC error: %1$s</string>
     <string name="settings_tab_optik">Appearance</string>
     <string name="settings_section_tileview">Signal Camera</string>
@@ -147,11 +149,15 @@
     <string name="notification_signal_text">Turn signal listener active</string>
     <string name="notification_overlay_text">Signal camera overlay active</string>
     <string name="notification_dashcam_event_overlay_text">Dashcam event is being secured</string>
+    <string name="notification_dashcam_oem_pause_overlay_text">Dashcam paused so the OEM camera can open</string>
     <string name="notification_recording_starting">Starting recording…</string>
     <string name="notification_recording_status">%1$d/%2$d cameras recording</string>
+    <string name="notification_recording_paused_oem">Recording paused so the OEM camera can open</string>
     <string name="notification_recording_error">Recording error: %1$s</string>
     <string name="notification_channel_recording">360 Cam Recording</string>
     <string name="notification_channel_dashcam_event_overlay">360 Cam Event Banner</string>
     <string name="dashcam_event_overlay_title">Event saved</string>
     <string name="dashcam_event_overlay_subtitle">The last and next minute are being secured.</string>
+    <string name="dashcam_oem_pause_overlay_title">Dashcam paused</string>
+    <string name="dashcam_oem_pause_overlay_subtitle">The OEM camera is being opened. Recording resumes automatically afterwards.</string>
 </resources>

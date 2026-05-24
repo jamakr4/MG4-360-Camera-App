@@ -23,15 +23,41 @@ public class DashcamEventOverlayService extends Service {
     private static final String CHANNEL_ID = "mg4_dashcam_event_overlay";
     private static final int NOTIF_ID = 103;
     private static final long AUTO_HIDE_MS = 4_000L;
+    private static final String EXTRA_TITLE_RES_ID = "title_res_id";
+    private static final String EXTRA_SUBTITLE_RES_ID = "subtitle_res_id";
+    private static final String EXTRA_NOTIFICATION_TEXT_RES_ID = "notification_text_res_id";
 
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final Runnable hideRunnable = this::stopSelf;
 
     private WindowManager windowManager;
     private View overlayView;
+    private android.widget.TextView titleView;
+    private android.widget.TextView subtitleView;
 
     public static void showConfirmation(Context context) {
+        showBanner(
+                context,
+                R.string.dashcam_event_overlay_title,
+                R.string.dashcam_event_overlay_subtitle,
+                R.string.notification_dashcam_event_overlay_text
+        );
+    }
+
+    public static void showOemPause(Context context) {
+        showBanner(
+                context,
+                R.string.dashcam_oem_pause_overlay_title,
+                R.string.dashcam_oem_pause_overlay_subtitle,
+                R.string.notification_dashcam_oem_pause_overlay_text
+        );
+    }
+
+    private static void showBanner(Context context, int titleResId, int subtitleResId, int notificationTextResId) {
         Intent intent = new Intent(context, DashcamEventOverlayService.class);
+        intent.putExtra(EXTRA_TITLE_RES_ID, titleResId);
+        intent.putExtra(EXTRA_SUBTITLE_RES_ID, subtitleResId);
+        intent.putExtra(EXTRA_NOTIFICATION_TEXT_RES_ID, notificationTextResId);
         context.startForegroundService(intent);
     }
 
@@ -44,10 +70,19 @@ public class DashcamEventOverlayService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        int titleResId = intent != null
+                ? intent.getIntExtra(EXTRA_TITLE_RES_ID, R.string.dashcam_event_overlay_title)
+                : R.string.dashcam_event_overlay_title;
+        int subtitleResId = intent != null
+                ? intent.getIntExtra(EXTRA_SUBTITLE_RES_ID, R.string.dashcam_event_overlay_subtitle)
+                : R.string.dashcam_event_overlay_subtitle;
+        int notificationTextResId = intent != null
+                ? intent.getIntExtra(EXTRA_NOTIFICATION_TEXT_RES_ID, R.string.notification_dashcam_event_overlay_text)
+                : R.string.notification_dashcam_event_overlay_text;
         Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.ic_menu_camera)
                 .setContentTitle(getString(R.string.app_name))
-                .setContentText(getString(R.string.notification_dashcam_event_overlay_text))
+                .setContentText(getString(notificationTextResId))
                 .setOngoing(true)
                 .setPriority(NotificationCompat.PRIORITY_LOW)
                 .build();
@@ -56,6 +91,7 @@ public class DashcamEventOverlayService extends Service {
         if (overlayView == null) {
             showOverlayWindow();
         }
+        bindText(titleResId, subtitleResId);
         mainHandler.removeCallbacks(hideRunnable);
         mainHandler.postDelayed(hideRunnable, AUTO_HIDE_MS);
         return START_NOT_STICKY;
@@ -78,7 +114,18 @@ public class DashcamEventOverlayService extends Service {
         params.y = dpToPx(32);
 
         overlayView = LayoutInflater.from(this).inflate(R.layout.overlay_dashcam_event, null, false);
+        titleView = overlayView.findViewById(R.id.tvDashcamOverlayTitle);
+        subtitleView = overlayView.findViewById(R.id.tvDashcamOverlaySubtitle);
         windowManager.addView(overlayView, params);
+    }
+
+    private void bindText(int titleResId, int subtitleResId) {
+        if (titleView != null) {
+            titleView.setText(titleResId);
+        }
+        if (subtitleView != null) {
+            subtitleView.setText(subtitleResId);
+        }
     }
 
     private int dpToPx(int dp) {
@@ -92,6 +139,8 @@ public class DashcamEventOverlayService extends Service {
             windowManager.removeView(overlayView);
         }
         overlayView = null;
+        titleView = null;
+        subtitleView = null;
         stopForeground(true);
         super.onDestroy();
     }

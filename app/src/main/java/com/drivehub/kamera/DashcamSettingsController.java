@@ -25,11 +25,11 @@ final class DashcamSettingsController {
     private static final String KEY_SIGNATURE = "recordingSignature";
     private static final String KEY_SHOW_SPEED = "recordingShowSpeed";
     private static final int REQ_STORAGE = 1337;
-    private static final int DEFAULT_RECORDING_FPS = 15;
+    private static final int DEFAULT_RECORDING_FPS = 25;
     private static final int MIN_RECORDING_FPS = 1;
     private static final int MAX_RECORDING_FPS = 60;
     private static final int MAX_SIGNATURE_LENGTH = 40;
-    private static final String RECORDS_DIR_NAME = "mg4_cam_records";
+    private static final String RECORDS_DIR_NAME = "dashcam";
 
     private final MainActivity activity;
     private boolean syncingEnabled;
@@ -47,8 +47,7 @@ final class DashcamSettingsController {
             EditText etSignature,
             Switch swShowSpeed,
             TextView tvRecordsPath,
-            Button btnExportUsb
-    ) {
+            Button btnExportUsb) {
         int segmentMin = prefs.getInt(KEY_SEGMENT_MIN, 3);
         int totalMin = Math.max(segmentMin, prefs.getInt(KEY_TOTAL_MIN, 30));
         int recordingFps = getRecordingFps(prefs);
@@ -59,16 +58,17 @@ final class DashcamSettingsController {
             swEnabled.setChecked(prefs.getBoolean(KEY_ENABLED, false));
             syncingEnabled = false;
             swEnabled.setOnCheckedChangeListener((buttonView, checked) -> {
-                if (syncingEnabled) return;
+                if (syncingEnabled)
+                    return;
                 prefs.edit().putBoolean(KEY_ENABLED, checked).apply();
                 if (checked) {
                     if (!hasStoragePermission()) {
                         ActivityCompat.requestPermissions(
                                 activity,
-                                new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
-                                REQ_STORAGE
-                        );
-                        Toast.makeText(activity, R.string.settings_storage_permission_required, Toast.LENGTH_SHORT).show();
+                                new String[] { Manifest.permission.WRITE_EXTERNAL_STORAGE },
+                                REQ_STORAGE);
+                        Toast.makeText(activity, R.string.settings_storage_permission_required, Toast.LENGTH_SHORT)
+                                .show();
                     }
                     saveFields(prefs, etSegmentMin, etTotalMin, etRecordingFps, etSignature, false);
                     RecordingService.startIfNeeded(activity);
@@ -96,9 +96,8 @@ final class DashcamSettingsController {
         }
         if (swShowSpeed != null) {
             swShowSpeed.setChecked(shouldShowSpeed(prefs));
-            swShowSpeed.setOnCheckedChangeListener((buttonView, checked) ->
-                    prefs.edit().putBoolean(KEY_SHOW_SPEED, checked).apply()
-            );
+            swShowSpeed.setOnCheckedChangeListener(
+                    (buttonView, checked) -> prefs.edit().putBoolean(KEY_SHOW_SPEED, checked).apply());
         }
         bindFields(prefs, etSegmentMin, etTotalMin, etRecordingFps, etSignature);
 
@@ -106,15 +105,15 @@ final class DashcamSettingsController {
             tvRecordsPath.setText(getRecordsBaseDir().getAbsolutePath());
         }
         if (btnExportUsb != null) {
-            btnExportUsb.setVisibility(findMountedUsbRoot() == null ? android.view.View.GONE : android.view.View.VISIBLE);
-            btnExportUsb.setOnClickListener(v ->
-                    Toast.makeText(activity, R.string.settings_usb_export_todo, Toast.LENGTH_LONG).show()
-            );
+            btnExportUsb
+                    .setVisibility(findMountedUsbRoot() == null ? android.view.View.GONE : android.view.View.VISIBLE);
+            btnExportUsb.setOnClickListener(
+                    v -> Toast.makeText(activity, R.string.settings_usb_export_todo, Toast.LENGTH_LONG).show());
         }
     }
 
     private void bindFields(SharedPreferences prefs, EditText etSegmentMin, EditText etTotalMin,
-                            EditText etRecordingFps, EditText etSignature) {
+            EditText etRecordingFps, EditText etSignature) {
         android.text.TextWatcher watcher = new SimpleTextWatcher() {
             @Override
             public void afterTextChanged(Editable s) {
@@ -129,27 +128,31 @@ final class DashcamSettingsController {
     }
 
     private void bindEditText(EditText editText, android.text.TextWatcher watcher, Runnable onBlur) {
-        if (editText == null) return;
+        if (editText == null)
+            return;
         editText.addTextChangedListener(watcher);
         editText.setOnFocusChangeListener((v, hasFocus) -> {
-            if (!hasFocus) onBlur.run();
+            if (!hasFocus)
+                onBlur.run();
         });
     }
 
     private void saveFields(SharedPreferences prefs, EditText etSegmentMin, EditText etTotalMin,
-                            EditText etRecordingFps, EditText etSignature, boolean normalizeFields) {
+            EditText etRecordingFps, EditText etSignature, boolean normalizeFields) {
         int segmentMin = parsePositiveInt(textOf(etSegmentMin), 3);
         int totalMin = parsePositiveInt(textOf(etTotalMin), 30);
         int recordingFps = clampRecordingFps(parsePositiveInt(textOf(etRecordingFps), DEFAULT_RECORDING_FPS));
         String signature = normalizeSignature(textOf(etSignature));
-        if (totalMin < segmentMin) totalMin = segmentMin;
+        if (totalMin < segmentMin)
+            totalMin = segmentMin;
         prefs.edit()
                 .putInt(KEY_SEGMENT_MIN, segmentMin)
                 .putInt(KEY_TOTAL_MIN, totalMin)
                 .putInt(KEY_RECORDING_FPS, recordingFps)
                 .putString(KEY_SIGNATURE, signature)
                 .apply();
-        if (!normalizeFields) return;
+        if (!normalizeFields)
+            return;
         normalizeField(etSegmentMin, segmentMin);
         normalizeField(etTotalMin, totalMin);
         normalizeField(etRecordingFps, recordingFps);
@@ -173,18 +176,22 @@ final class DashcamSettingsController {
     }
 
     private void normalizeField(EditText editText, int value) {
-        if (editText == null) return;
+        if (editText == null)
+            return;
         String normalized = String.valueOf(value);
         String current = textOf(editText);
-        if (normalized.equals(current)) return;
+        if (normalized.equals(current))
+            return;
         editText.setText(normalized);
         editText.setSelection(editText.getText().length());
     }
 
     private void normalizeField(EditText editText, String value) {
-        if (editText == null) return;
+        if (editText == null)
+            return;
         String current = textOf(editText);
-        if (value.equals(current)) return;
+        if (value.equals(current))
+            return;
         editText.setText(value);
         editText.setSelection(editText.getText().length());
     }
@@ -203,7 +210,8 @@ final class DashcamSettingsController {
     }
 
     private static String normalizeSignature(String value) {
-        if (value == null) return "";
+        if (value == null)
+            return "";
         String trimmed = value.trim();
         if (trimmed.length() <= MAX_SIGNATURE_LENGTH) {
             return trimmed;
@@ -212,23 +220,25 @@ final class DashcamSettingsController {
     }
 
     private boolean hasStoragePermission() {
-        return ContextCompat.checkSelfPermission(activity, Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                == PackageManager.PERMISSION_GRANTED;
+        return ContextCompat.checkSelfPermission(activity,
+                Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED;
     }
 
     static File getRecordsBaseDir() {
         File downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
         File dir = new File(downloads, RECORDS_DIR_NAME);
-        //noinspection ResultOfMethodCallIgnored
+        // noinspection ResultOfMethodCallIgnored
         dir.mkdirs();
         return dir;
     }
 
     private File findMountedUsbRoot() {
         File storageDir = new File("/storage");
-        if (!storageDir.exists()) return null;
+        if (!storageDir.exists())
+            return null;
         File[] roots = storageDir.listFiles();
-        if (roots == null) return null;
+        if (roots == null)
+            return null;
         for (File root : roots) {
             if (root.isDirectory() && root.canRead() && root.canWrite()) {
                 return root;

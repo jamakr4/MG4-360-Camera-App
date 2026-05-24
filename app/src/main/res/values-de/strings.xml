@@ -20,6 +20,7 @@
     <string name="settings_dashcam_status_off">Aufnahme inaktiv</string>
     <string name="settings_dashcam_status_starting">Aufnahme startet…</string>
     <string name="settings_dashcam_status_recording">%1$d/%2$d Kameras nehmen auf</string>
+    <string name="settings_dashcam_status_paused_oem">Aufnahme pausiert, damit die OEM-Kamera geoeffnet werden kann</string>
     <string name="settings_dashcam_status_error">Aufnahmefehler: %1$s</string>
     <string name="settings_overlay_on_signal">Kamera beim Blinken anzeigen</string>
     <string name="safety_warning_text">Bitte achte auf die Umgebung!</string>
@@ -79,6 +80,7 @@
     <string name="main_event_save_requires_dashcam">Erst die Dashcam-Aufnahme aktivieren</string>
     <string name="main_recording_indicator">%1$d/%2$d</string>
     <string name="main_recording_starting">REC startet</string>
+    <string name="main_recording_paused_oem">REC pausiert (OEM-Start)</string>
     <string name="main_recording_error">REC Fehler: %1$s</string>
     <string name="settings_tab_optik">Darstellung</string>
     <string name="settings_section_tileview">Blinker-Kamera</string>
@@ -147,11 +149,15 @@
     <string name="notification_signal_text">Blinker-Listener aktiv</string>
     <string name="notification_overlay_text">Signal-Kamera-Overlay aktiv</string>
     <string name="notification_dashcam_event_overlay_text">Dashcam-Ereignis wird gesichert</string>
+    <string name="notification_dashcam_oem_pause_overlay_text">Dashcam pausiert, damit die OEM-Kamera geoeffnet werden kann</string>
     <string name="notification_recording_starting">Aufnahme wird gestartet…</string>
     <string name="notification_recording_status">%1$d/%2$d Kameras nehmen auf</string>
+    <string name="notification_recording_paused_oem">Aufnahme pausiert, damit die OEM-Kamera geoeffnet werden kann</string>
     <string name="notification_recording_error">Aufnahmefehler: %1$s</string>
     <string name="notification_channel_recording">360 Cam Aufnahme</string>
     <string name="notification_channel_dashcam_event_overlay">360 Cam Ereignis-Banner</string>
     <string name="dashcam_event_overlay_title">Event gespeichert</string>
     <string name="dashcam_event_overlay_subtitle">Die letzte und die nächste Minute werden gesichert.</string>
+    <string name="dashcam_oem_pause_overlay_title">Dashcam pausiert</string>
+    <string name="dashcam_oem_pause_overlay_subtitle">Die OEM-Kamera wird geoeffnet. Danach startet die Aufnahme automatisch weiter.</string>
 </resources>

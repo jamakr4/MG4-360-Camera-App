@@ -5,7 +5,6 @@
     android:layout_marginHorizontal="20dp"
     android:background="@drawable/shape_tile_container"
     android:clipToOutline="true"
-    android:elevation="16dp"
     android:gravity="center_vertical"
     android:orientation="horizontal"
     android:paddingStart="18dp"
@@ -25,6 +24,7 @@
         android:orientation="vertical">
 
         <TextView
+            android:id="@+id/tvDashcamOverlayTitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/dashcam_event_overlay_title"
@@ -33,6 +33,7 @@
             android:textStyle="bold" />
 
         <TextView
+            android:id="@+id/tvDashcamOverlaySubtitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"

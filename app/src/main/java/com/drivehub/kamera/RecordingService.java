@@ -35,6 +35,8 @@ public class RecordingService extends Service {
     public static final String ACTION_STOP = "stop_recording";
     public static final String ACTION_RECORD_TEST_30S = "record_test_30s";
     public static final String ACTION_TRIGGER_EVENT_SAVE = "trigger_event_save";
+    public static final String ACTION_PAUSE_FOR_OEM_REQUEST = "pause_for_oem_request";
+    public static final String ACTION_RESUME_AFTER_OEM_REQUEST = "resume_after_oem_request";
     public static final String ACTION_STATUS_CHANGED = "com.drivehub.kamera.ACTION_RECORDING_STATUS_CHANGED";
     public static final String EXTRA_STATUS = "status";
     public static final String EXTRA_ACTIVE_CAMERAS = "active_cameras";
@@ -43,6 +45,7 @@ public class RecordingService extends Service {
     public static final String STATUS_OFF = "off";
     public static final String STATUS_STARTING = "starting";
     public static final String STATUS_RECORDING = "recording";
+    public static final String STATUS_PAUSED_OEM = "paused_oem";
     public static final String STATUS_PARTIAL = "partial";
     public static final String STATUS_ERROR = "error";
 
@@ -61,8 +64,11 @@ public class RecordingService extends Service {
     private static volatile boolean sServiceRunning = false;
 
     private final Object eventLock = new Object();
+    private final Object stateLock = new Object();
     private Thread worker;
     private volatile boolean stopRequested = false;
+    private volatile boolean segmentStopRequested = false;
+    private volatile boolean oemPauseRequested = false;
 
     public static boolean isRunning() {
         return sServiceRunning;
@@ -96,6 +102,26 @@ public class RecordingService extends Service {
         context.startService(i);
     }
 
+    public static void pauseForOemRequest(Context context) {
+        SharedPreferences prefs = UiPrefs.getPrefs(context);
+        if (!prefs.getBoolean(DashcamSettingsController.KEY_ENABLED, false) && !isRunning()) {
+            return;
+        }
+        Intent i = new Intent(context, RecordingService.class);
+        i.setAction(ACTION_PAUSE_FOR_OEM_REQUEST);
+        context.startForegroundService(i);
+    }
+
+    public static void resumeAfterOemRequest(Context context) {
+        SharedPreferences prefs = UiPrefs.getPrefs(context);
+        if (!prefs.getBoolean(DashcamSettingsController.KEY_ENABLED, false) && !isRunning()) {
+            return;
+        }
+        Intent i = new Intent(context, RecordingService.class);
+        i.setAction(ACTION_RESUME_AFTER_OEM_REQUEST);
+        context.startForegroundService(i);
+    }
+
     @Override
     public void onCreate() {
         super.onCreate();
@@ -111,6 +137,11 @@ public class RecordingService extends Service {
 
         if (ACTION_STOP.equals(action)) {
             stopRequested = true;
+            segmentStopRequested = true;
+            oemPauseRequested = false;
+            synchronized (stateLock) {
+                stateLock.notifyAll();
+            }
             publishStatus(STATUS_OFF, 0, TOTAL_CAMERAS, "");
             // If recording is still running, stop the native side immediately too.
             // The 4 slots are fixed: 0=F (15), 1=R (17), 2=X (16), 3=Y (14)
@@ -127,7 +158,53 @@ public class RecordingService extends Service {
                 worker.interrupt();
             }
             stopForeground(true);
+            stopSelf();
             return START_NOT_STICKY;
+        }
+
+        if (ACTION_PAUSE_FOR_OEM_REQUEST.equals(action)) {
+            boolean enabled = prefs().getBoolean(DashcamSettingsController.KEY_ENABLED, false);
+            boolean changed = !oemPauseRequested;
+            oemPauseRequested = true;
+            segmentStopRequested = true;
+            if (enabled) {
+                if (worker == null) {
+                    stopRequested = false;
+                    startForeground(NOTIF_ID, buildNotification(getString(R.string.notification_recording_paused_oem)));
+                }
+                publishStatus(STATUS_PAUSED_OEM, 0, TOTAL_CAMERAS, "");
+                if (changed) {
+                    DashcamEventOverlayService.showOemPause(this);
+                }
+            }
+            return START_STICKY;
+        }
+
+        if (ACTION_RESUME_AFTER_OEM_REQUEST.equals(action)) {
+            oemPauseRequested = false;
+            segmentStopRequested = false;
+            synchronized (stateLock) {
+                stateLock.notifyAll();
+            }
+            boolean enabled = prefs().getBoolean(DashcamSettingsController.KEY_ENABLED, false);
+            if (!enabled) {
+                if (worker == null) {
+                    publishStatus(STATUS_OFF, 0, TOTAL_CAMERAS, "");
+                    stopForeground(true);
+                    stopSelf();
+                }
+                return START_NOT_STICKY;
+            }
+            if (worker == null) {
+                stopRequested = false;
+                startForeground(NOTIF_ID, buildNotification(getString(R.string.notification_recording_starting)));
+                publishStatus(STATUS_STARTING, 0, TOTAL_CAMERAS, "");
+                worker = new Thread(this::recordLoop, "RecordingServiceWorker");
+                worker.start();
+            } else if (STATUS_PAUSED_OEM.equals(prefs().getString(KEY_STATUS, STATUS_OFF))) {
+                publishStatus(STATUS_STARTING, 0, TOTAL_CAMERAS, "");
+            }
+            return START_STICKY;
         }
 
         if (ACTION_TRIGGER_EVENT_SAVE.equals(action)) {
@@ -205,6 +282,9 @@ public class RecordingService extends Service {
         boolean endedWithFatalError = false;
 
         while (!stopRequested) {
+            if (!waitForOemPauseToClear(prefs)) {
+                break;
+            }
             long segmentStartWallMs = System.currentTimeMillis();
             String baseName = makeTimestampBase(segmentStartWallMs, "yyMMddHHmm");
             boolean startedAnyCamera = recordClip(baseDir, segmentMs, baseName, keepSegments);
@@ -251,7 +331,9 @@ public class RecordingService extends Service {
         publishStatus(STATUS_RECORDING, TOTAL_CAMERAS, TOTAL_CAMERAS, "");
 
         long start = SystemClock.elapsedRealtime();
-        while (!stopRequested && (SystemClock.elapsedRealtime() - start) < durationMs) {
+        while (!stopRequested
+                && !segmentStopRequested
+                && (SystemClock.elapsedRealtime() - start) < durationMs) {
             if (showSpeed) {
                 CameraProbe.updateCombinedRecordingSpeed(readSpeedKmhFromSystemProperty());
             }
@@ -266,6 +348,33 @@ public class RecordingService extends Service {
             return false;
         }
 
+        return true;
+    }
+
+    private boolean waitForOemPauseToClear(SharedPreferences prefs) {
+        boolean announcedPause = false;
+        while (!stopRequested
+                && prefs.getBoolean(DashcamSettingsController.KEY_ENABLED, false)
+                && oemPauseRequested) {
+            segmentStopRequested = true;
+            if (!announcedPause) {
+                publishStatus(STATUS_PAUSED_OEM, 0, TOTAL_CAMERAS, "");
+                announcedPause = true;
+            }
+            synchronized (stateLock) {
+                try {
+                    stateLock.wait(1000L);
+                } catch (InterruptedException ignored) {
+                }
+            }
+        }
+        if (stopRequested || !prefs.getBoolean(DashcamSettingsController.KEY_ENABLED, false)) {
+            return false;
+        }
+        segmentStopRequested = false;
+        if (announcedPause) {
+            publishStatus(STATUS_STARTING, 0, TOTAL_CAMERAS, "");
+        }
         return true;
     }
 
@@ -520,6 +629,8 @@ public class RecordingService extends Service {
         String notificationText;
         if (STATUS_RECORDING.equals(status)) {
             notificationText = getString(R.string.notification_recording_status, activeCameras, totalCameras);
+        } else if (STATUS_PAUSED_OEM.equals(status)) {
+            notificationText = getString(R.string.notification_recording_paused_oem);
         } else if (STATUS_PARTIAL.equals(status) || STATUS_ERROR.equals(status)) {
             notificationText = getString(R.string.notification_recording_error, lastError);
         } else if (STATUS_STARTING.equals(status)) {
