@@ -55,6 +55,10 @@ final class UiPrefs {
         return clampOverlayMinShowMs((int) value);
     }
 
+    static boolean isOverlayOnSignalEnabled(SharedPreferences prefs) {
+        return prefs.getBoolean(KEY_OVERLAY_ON_SIGNAL, true);
+    }
+
     static boolean isOverlayRotationToDrivingDirectionEnabled(SharedPreferences prefs) {
         return prefs.getBoolean(KEY_OVERLAY_ROTATE_TO_DRIVING_DIRECTION, false);
     }

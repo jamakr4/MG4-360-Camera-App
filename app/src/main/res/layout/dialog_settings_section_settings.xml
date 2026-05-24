@@ -6,29 +6,34 @@
     android:orientation="vertical">
 
     <TextView
-        style="@style/DrivehubSettingsHeading2"
-        android:layout_width="match_parent"
+        style="@style/DrivehubSettingsCardLabel"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="2dp"
+        android:layout_marginBottom="8dp"
         android:text="@string/settings_section_display" />
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="60dp"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_settings_inline_card"
         android:gravity="center_vertical"
-        android:orientation="horizontal">
+        android:minHeight="56dp"
+        android:orientation="horizontal"
+        android:paddingStart="18dp"
+        android:paddingTop="8dp"
+        android:paddingEnd="18dp"
+        android:paddingBottom="8dp">
 
         <TextView
-            style="@style/DrivehubSettingsLabel"
+            style="@style/DrivehubSettingsCardRowLabel"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="@string/show_safety_warning" />
 
         <Switch
-            style="@style/DrivehubSettingsSwitch"
             android:id="@+id/switchSafetyWarning"
-            />
+            style="@style/DrivehubSettingsSwitch" />
 
     </LinearLayout>
 

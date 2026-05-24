@@ -327,8 +327,7 @@ public class SignalService extends Service {
 
     private boolean isOverlayEnabled() {
         try {
-            SharedPreferences sp = UiPrefs.getPrefs(this);
-            return sp.getBoolean(UiPrefs.KEY_OVERLAY_ON_SIGNAL, false);
+            return UiPrefs.isOverlayOnSignalEnabled(UiPrefs.getPrefs(this));
         } catch (Throwable t) {
             return false;
         }

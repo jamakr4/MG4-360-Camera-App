@@ -3,12 +3,13 @@
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
     <color name="settings_surface">#1A1A1A</color>
+    <color name="settings_card_surface">#222222</color>
     <color name="settings_accent">#E7E7E7</color>
     <color name="settings_tab_inactive">#777777</color>
     <color name="settings_text_primary">#FFFFFFFF</color>
-    <color name="settings_text_secondary">#888888</color>
+    <color name="settings_text_secondary">#C0C0C0</color>
     <color name="settings_text_highlight">#B3E7E7E7</color>
-    <color name="settings_text_muted">#555555</color>
+    <color name="settings_text_muted">#A0A0A0</color>
     <color name="settings_beta">#FF5A5A</color>
     <color name="settings_update_ok_bg">#1F5E9F3A</color>
     <color name="settings_update_ok_text">#BDE99C</color>

@@ -1,13 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- H1: primary navigation labels at the top of the settings dialog. -->
+    <!-- H1: primary navigation labels in the settings dialog sidebar. -->
     <style name="DrivehubSettingsHeading1Tab" parent="">
-        <item name="android:textSize">20sp</item>
+        <item name="android:textSize">18sp</item>
         <item name="android:textStyle">bold</item>
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">2dp</item>
+        <item name="android:paddingStart">14dp</item>
+        <item name="android:paddingTop">12dp</item>
+        <item name="android:paddingEnd">14dp</item>
+        <item name="android:paddingBottom">12dp</item>
+        <item name="android:gravity">start|center_vertical</item>
+        <item name="android:background">@android:color/transparent</item>
     </style>
 
     <style name="DrivehubSettingsTabActive" parent="@style/DrivehubSettingsHeading1Tab">
         <item name="android:textColor">@color/settings_accent</item>
+        <item name="android:background">@drawable/bg_settings_tab_active</item>
     </style>
 
     <style name="DrivehubSettingsTabInactive" parent="@style/DrivehubSettingsHeading1Tab">
@@ -103,6 +113,21 @@
     <style name="DrivehubSettingsCaption" parent="">
         <item name="android:textColor">@color/settings_text_muted</item>
         <item name="android:textSize">14sp</item>
+    </style>
+
+    <!-- Small sentence-case label sitting above an inline settings card. -->
+    <style name="DrivehubSettingsCardLabel" parent="">
+        <item name="android:textColor">@color/settings_text_secondary</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:letterSpacing">0.02</item>
+        <item name="android:paddingStart">4dp</item>
+    </style>
+
+    <!-- In-card row label — less bulky than the global 22sp label. -->
+    <style name="DrivehubSettingsCardRowLabel" parent="">
+        <item name="android:textColor">@color/settings_text_primary</item>
+        <item name="android:textSize">18sp</item>
     </style>
 
     <!-- Version label shown at the bottom of the dialog. -->

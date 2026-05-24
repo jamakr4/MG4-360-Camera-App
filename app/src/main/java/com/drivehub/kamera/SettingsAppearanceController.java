@@ -183,8 +183,8 @@ final class SettingsAppearanceController {
         int activeColor = UiPrefs.getAccentColorInt(prefs);
         int inactiveColor = ContextCompat.getColor(activity, R.color.settings_tab_inactive);
         tab.setTextColor(active ? activeColor : inactiveColor);
-        tab.setTextSize(20f);
         tab.setTypeface(tab.getTypeface(), Typeface.BOLD);
+        tab.setBackgroundResource(active ? R.drawable.bg_settings_tab_active : 0);
     }
 
     private void showAccentColorPicker() {

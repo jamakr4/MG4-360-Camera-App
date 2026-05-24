@@ -7,35 +7,54 @@
     android:visibility="gone">
 
     <TextView
-        style="@style/DrivehubSettingsHeading2"
-        android:layout_width="match_parent"
+        style="@style/DrivehubSettingsCardLabel"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="12dp"
+        android:layout_marginBottom="8dp"
         android:text="@string/settings_section_open_source_credits" />
 
-    <TextView
-        style="@style/DrivehubSettingsBody"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="OpenCV 4.9.0 (opencv.org) - Apache License 2.0&#10;AndroidX AppCompat 1.7.1 - Apache License 2.0&#10;AndroidX Activity 1.12.4 - Apache License 2.0&#10;AndroidX ConstraintLayout 2.2.1 - Apache License 2.0&#10;Material Components for Android 1.13.0 - Apache License 2.0&#10;Icons based on Google Material Symbols - Apache License 2.0" />
+        android:background="@drawable/bg_settings_inline_card"
+        android:orientation="vertical"
+        android:paddingStart="18dp"
+        android:paddingTop="14dp"
+        android:paddingEnd="18dp"
+        android:paddingBottom="14dp">
 
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:layout_marginTop="20dp"
-        android:layout_marginBottom="20dp"
-        android:background="@color/settings_divider" />
+        <TextView
+            style="@style/DrivehubSettingsBody"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="OpenCV 4.9.0 (opencv.org) - Apache License 2.0&#10;AndroidX AppCompat 1.7.1 - Apache License 2.0&#10;AndroidX Activity 1.12.4 - Apache License 2.0&#10;AndroidX ConstraintLayout 2.2.1 - Apache License 2.0&#10;Material Components for Android 1.13.0 - Apache License 2.0&#10;Icons based on Google Material Symbols - Apache License 2.0" />
+
+    </LinearLayout>
 
     <TextView
-        style="@style/DrivehubSettingsHeading2"
-        android:layout_width="match_parent"
+        style="@style/DrivehubSettingsCardLabel"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="12dp"
+        android:layout_marginTop="22dp"
+        android:layout_marginBottom="8dp"
         android:text="@string/settings_section_additional_credits" />
 
-    <TextView
-        style="@style/DrivehubSettingsBody"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Thanks to the community from XDA Forums - MG4 Electric AAOS 9&#10;Thanks to merth4n for providing the base application" />
+        android:background="@drawable/bg_settings_inline_card"
+        android:orientation="vertical"
+        android:paddingStart="18dp"
+        android:paddingTop="14dp"
+        android:paddingEnd="18dp"
+        android:paddingBottom="14dp">
+
+        <TextView
+            style="@style/DrivehubSettingsBody"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Thanks to the community from XDA Forums - MG4 Electric AAOS 9&#10;Thanks to merth4n for providing the base application" />
+
+    </LinearLayout>
+
 </LinearLayout>

@@ -26,7 +26,7 @@ final class SignalCameraSettingsController {
             EditText etOverlayMinShowValue
     ) {
         if (swOverlay != null) {
-            swOverlay.setChecked(prefs.getBoolean(UiPrefs.KEY_OVERLAY_ON_SIGNAL, false));
+            swOverlay.setChecked(UiPrefs.isOverlayOnSignalEnabled(prefs));
             swOverlay.setOnCheckedChangeListener((btn, checked) -> {
                 prefs.edit().putBoolean(UiPrefs.KEY_OVERLAY_ON_SIGNAL, checked).apply();
                 if (!checked) {
