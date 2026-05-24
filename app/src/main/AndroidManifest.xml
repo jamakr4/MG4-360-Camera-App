@@ -43,10 +43,6 @@
         </activity>
 
         <activity
-            android:name=".SettingsActivity"
-            android:exported="false" />
-
-        <activity
             android:name=".TileViewActivity"
             android:exported="false" />
 

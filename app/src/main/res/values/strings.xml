@@ -12,7 +12,7 @@
     <string name="settings_section_dashcam">DASHCAM</string>
     <string name="settings_section_dashcam_status">STATUS</string>
     <string name="settings_section_dashcam_loop">LOOP RECORDING</string>
-    <string name="settings_dashcam_enabled">Record automatically on boot</string>
+    <string name="settings_dashcam_enabled">Enable dashcam</string>
     <string name="settings_dashcam_fps">Recording FPS</string>
     <string name="settings_dashcam_signature">Signature</string>
     <string name="settings_dashcam_show_speed">Show speed in video</string>
@@ -39,9 +39,6 @@
     <string name="settings_version_unknown">Version ?</string>
     <string name="settings_version_format">Version %1$s</string>
     <string name="settings_version_beta">BETA</string>
-    <string name="settings_back">Back</string>
-    <string name="settings_record_enabled">Recording enabled (start automatically on boot)</string>
-    <string name="settings_kill_oem_on_reverse">Disable OEM 360 camera application</string>
     <string name="settings_overlay_hide_delay">Overlay hide delay</string>
     <string name="settings_overlay_hide_delay_value">%1$d ms</string>
     <string name="settings_overlay_hide_delay_default_input">0</string>

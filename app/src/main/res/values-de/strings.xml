@@ -12,7 +12,7 @@
     <string name="settings_section_dashcam">DASHCAM</string>
     <string name="settings_section_dashcam_status">STATUS</string>
     <string name="settings_section_dashcam_loop">AUFNAHMESCHLEIFE</string>
-    <string name="settings_dashcam_enabled">Beim Start automatisch aufnehmen</string>
+    <string name="settings_dashcam_enabled">Dashcam aktivieren</string>
     <string name="settings_dashcam_fps">Aufnahme-FPS</string>
     <string name="settings_dashcam_signature">Signatur</string>
     <string name="settings_dashcam_show_speed">Geschwindigkeit im Video anzeigen</string>
@@ -39,9 +39,6 @@
     <string name="settings_version_unknown">Version ?</string>
     <string name="settings_version_format">Version %1$s</string>
     <string name="settings_version_beta">BETA</string>
-    <string name="settings_back">Zurück</string>
-    <string name="settings_record_enabled">Aufnahme aktiv (beim Start automatisch beginnen)</string>
-    <string name="settings_kill_oem_on_reverse">OEM-360-Kamera-App deaktivieren</string>
     <string name="settings_overlay_hide_delay">Nachlauf Kamera</string>
     <string name="settings_overlay_hide_delay_value">%1$d ms</string>
     <string name="settings_overlay_hide_delay_default_input">0</string>
