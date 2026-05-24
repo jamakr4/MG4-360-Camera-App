@@ -44,7 +44,6 @@ final class OtaController {
         this.activity = activity;
     }
 
-    // Called once per settings dialog open.
     void setup(
             Dialog settingsDialog,
             TextView updateTag,
@@ -93,7 +92,6 @@ final class OtaController {
         triggerCheck(settingsDialog, updateTag, false);
     }
 
-    // Called from onStop and onDestroy.
     void stop() {
         stopProgressWatcher();
     }

@@ -4,6 +4,9 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+source "${ROOT_DIR}/tools/java_env.sh"
+configure_gradle_java
+
 SERIAL="${ANDROID_SERIAL:-emulator-5554}"
 PACKAGE_NAME="com.drivehub.kamera"
 MAIN_ACTIVITY="${PACKAGE_NAME}/.MainActivity"

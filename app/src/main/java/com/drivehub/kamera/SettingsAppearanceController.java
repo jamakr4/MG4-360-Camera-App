@@ -18,6 +18,7 @@ import android.widget.Switch;
 import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 
 final class SettingsAppearanceController {
 
@@ -26,7 +27,6 @@ final class SettingsAppearanceController {
     private SharedPreferences prefs;
     private ImageButton dialogClose;
     private SeekBar seekCorner;
-    private EditText etCorner;
     private View accentRow;
     private View accentPreview;
     private EditText etAccentColor;
@@ -49,6 +49,7 @@ final class SettingsAppearanceController {
     void bindSettingsAppearance(
             SharedPreferences prefs,
             Switch swOverlay,
+            Switch swRotateToDrivingDirection,
             Switch swDashcamEnabled,
             Switch swDashcamShowSpeed,
             Switch swSafetyWarning,
@@ -66,19 +67,34 @@ final class SettingsAppearanceController {
             TextView tabSignalCamera,
             TextView tabDashcam,
             TextView tabOptik,
-            TextView tabCredits
+            TextView tabCredits,
+            TextView tabDev
     ) {
         this.prefs = prefs;
         this.dialogClose = dialogClose;
         this.seekCorner = seekCorner;
-        this.etCorner = etCorner;
         this.accentRow = accentRow;
         this.accentPreview = accentPreview;
         this.etAccentColor = etAccentColor;
         this.activeTab = 1;
         this.tintedSeekBars = new SeekBar[]{seekCorner, seekOverlayHideDelay, seekOverlayMinShow};
-        this.tintedSwitches = new Switch[]{swOverlay, swDashcamEnabled, swDashcamShowSpeed, swSafetyWarning, swAllowBetaUpdates};
-        this.tabs = new TextView[]{tabUpdate, tabSettings, tabSignalCamera, tabDashcam, tabOptik, tabCredits};
+        this.tintedSwitches = new Switch[]{
+                swOverlay,
+                swRotateToDrivingDirection,
+                swDashcamEnabled,
+                swDashcamShowSpeed,
+                swSafetyWarning,
+                swAllowBetaUpdates
+        };
+        this.tabs = new TextView[]{
+                tabUpdate,
+                tabSettings,
+                tabSignalCamera,
+                tabDashcam,
+                tabOptik,
+                tabCredits,
+                tabDev
+        };
 
         int savedRadius = UiPrefs.getTileCornerRadiusSetting(prefs);
         int accentColor = UiPrefs.getAccentColorInt(prefs);
@@ -88,21 +104,26 @@ final class SettingsAppearanceController {
         etCorner.setText(String.valueOf(savedRadius));
         etAccentColor.setText(UiPrefs.getAccentColorSetting(prefs));
         syncAccentRowToSliderInset();
-        // The preview square doubles as the entry point for the visual picker dialog.
         accentPreview.setOnClickListener(v -> showAccentColorPicker());
 
         applyAccentColorToSettingsDialog(accentColor);
 
         seekCorner.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                if (!fromUser) return;
                 prefs.edit().putInt(UiPrefs.KEY_TILE_CORNER_RADIUS, progress).apply();
-                if (fromUser) {
-                    etCorner.setText(String.valueOf(progress));
-                    etCorner.setSelection(etCorner.getText().length());
-                }
+                etCorner.setText(String.valueOf(progress));
+                etCorner.setSelection(etCorner.getText().length());
             }
-            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
-            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+            }
         });
 
         etCorner.addTextChangedListener(new SimpleTextWatcher() {
@@ -121,7 +142,8 @@ final class SettingsAppearanceController {
                     if (seekCorner.getProgress() != value) {
                         seekCorner.setProgress(value);
                     }
-                } catch (NumberFormatException ignored) {}
+                } catch (NumberFormatException ignored) {
+                }
             }
         });
 
@@ -159,7 +181,8 @@ final class SettingsAppearanceController {
 
     void styleSettingsTab(TextView tab, boolean active) {
         int activeColor = UiPrefs.getAccentColorInt(prefs);
-        tab.setTextColor(active ? activeColor : 0xFF777777);
+        int inactiveColor = ContextCompat.getColor(activity, R.color.settings_tab_inactive);
+        tab.setTextColor(active ? activeColor : inactiveColor);
         tab.setTextSize(20f);
         tab.setTypeface(tab.getTypeface(), Typeface.BOLD);
     }
@@ -187,7 +210,6 @@ final class SettingsAppearanceController {
         Color.colorToHSV(UiPrefs.getAccentColorInt(prefs), hsv);
         final int[] selectedColor = new int[]{UiPrefs.getAccentColorInt(prefs)};
 
-        // Seed both picker surfaces from the currently saved accent so reopening feels stateful.
         hueView.setHue(hsv[0]);
         saturationValueView.setColor(hsv[0], hsv[1], hsv[2]);
         updateColorPickerUi(tvHex, preview, btnApply, applyButtonBackground, selectedColor[0]);
@@ -232,7 +254,6 @@ final class SettingsAppearanceController {
             ((GradientDrawable) previewBackground.mutate()).setColor(color);
         }
         applyButtonBackground.setColor(color);
-        // Very bright accents need dark text and a border so the Apply button stays visible.
         if (UiPrefs.isLightColor(color)) {
             applyButtonBackground.setStroke((int) dp(1f), 0x33000000);
             btnApply.setTextColor(0xFF111111);
@@ -243,7 +264,6 @@ final class SettingsAppearanceController {
     }
 
     private void applySelectedAccentColor(int color) {
-        // Reuse the same stored string format as the manual hex field so both inputs stay in sync.
         String normalized = String.format("#%06X", 0xFFFFFF & color);
         prefs.edit().putString(UiPrefs.KEY_ACCENT_COLOR, normalized).apply();
         isNormalizingAccentColor = true;
@@ -269,7 +289,9 @@ final class SettingsAppearanceController {
         ColorStateList toggleTint = buildToggleTrackTint(accentColor);
         if (tintedSwitches != null) {
             for (Switch sw : tintedSwitches) {
-                if (sw != null) sw.setTrackTintList(toggleTint);
+                if (sw != null) {
+                    sw.setTrackTintList(toggleTint);
+                }
             }
         }
         if (accentPreview != null) {
@@ -278,9 +300,12 @@ final class SettingsAppearanceController {
                 ((GradientDrawable) background.mutate()).setColor(accentColor);
             }
         }
+        int inactiveColor = ContextCompat.getColor(activity, R.color.settings_tab_inactive);
         if (tabs != null) {
             for (int i = 0; i < tabs.length; i++) {
-                if (tabs[i] != null) tabs[i].setTextColor(i == activeTab ? accentColor : 0xFF777777);
+                if (tabs[i] != null) {
+                    tabs[i].setTextColor(i == activeTab ? accentColor : inactiveColor);
+                }
             }
         }
     }
@@ -293,7 +318,7 @@ final class SettingsAppearanceController {
                 },
                 new int[]{
                         accentColor,
-                        0xFF383838
+                        ContextCompat.getColor(activity, R.color.settings_slider_track_bg)
                 }
         );
     }
@@ -311,5 +336,4 @@ final class SettingsAppearanceController {
     private float dp(float value) {
         return value * activity.getResources().getDisplayMetrics().density;
     }
-
 }

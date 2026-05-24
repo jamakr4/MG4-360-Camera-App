@@ -32,6 +32,25 @@
 
     </LinearLayout>
 
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            style="@style/DrivehubSettingsLabel"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/settings_overlay_rotate_to_driving_direction" />
+
+        <Switch
+            android:id="@+id/switchOverlayRotateToDrivingDirection"
+            style="@style/DrivehubSettingsSwitch" />
+
+    </LinearLayout>
+
     <TextView
         style="@style/DrivehubSettingsHeading2"
         android:layout_width="match_parent"

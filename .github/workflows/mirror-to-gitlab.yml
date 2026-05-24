@@ -36,44 +36,45 @@ jobs:
           GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
           GITLAB_PROJECT_ID: ${{ secrets.GITLAB_PROJECT_ID }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_NAME: ${{ github.event.release.name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_BODY: ${{ github.event.release.body }}
+          RELEASE_DATE: ${{ github.event.release.published_at }}
         run: |
-          TAG="${{ github.event.release.tag_name }}"
-          NAME="${{ github.event.release.name }}"
-          DESCRIPTION="${{ github.event.release.body }}"
-          IS_PRERELEASE="${{ github.event.release.prerelease }}"
-
           # Release in GitLab erstellen
-          curl --fail -X POST \
-            "https://gitlab.com/api/v4/projects/${GITLAB_PROJECT_ID}/releases" \
-            --header "PRIVATE-TOKEN: ${GITLAB_TOKEN}" \
-            --header "Content-Type: application/json" \
-            --data "{
-              \"name\": \"${NAME}\",
-              \"tag_name\": \"${TAG}\",
-              \"description\": \"${DESCRIPTION}\",
-              \"released_at\": \"${{ github.event.release.published_at }}\"
-            }"
+          jq -n \
+            --arg name "$RELEASE_NAME" \
+            --arg tag  "$RELEASE_TAG" \
+            --arg desc "$RELEASE_BODY" \
+            --arg date "$RELEASE_DATE" \
+            '{name: $name, tag_name: $tag, description: $desc, released_at: $date}' \
+          | curl --fail -X POST \
+              "https://gitlab.com/api/v4/projects/${GITLAB_PROJECT_ID}/releases" \
+              --header "PRIVATE-TOKEN: ${GITLAB_TOKEN}" \
+              --header "Content-Type: application/json" \
+              --data @-
 
           # Assets (APKs etc.) runterladen und zu GitLab hochladen
-          gh release download "${TAG}" --dir ./assets
+          gh release download "$RELEASE_TAG" --dir ./assets
 
           for file in ./assets/*; do
             filename=$(basename "$file")
-            
+
             # Asset zu GitLab Package Registry hochladen
             curl --fail -X PUT \
-              "https://gitlab.com/api/v4/projects/${GITLAB_PROJECT_ID}/packages/generic/${TAG}/1.0.0/${filename}" \
+              "https://gitlab.com/api/v4/projects/${GITLAB_PROJECT_ID}/packages/generic/${RELEASE_TAG}/1.0.0/${filename}" \
               --header "PRIVATE-TOKEN: ${GITLAB_TOKEN}" \
               --upload-file "$file"
 
             # Asset mit Release verknüpfen
-            curl --fail -X POST \
-              "https://gitlab.com/api/v4/projects/${GITLAB_PROJECT_ID}/releases/${TAG}/assets/links" \
-              --header "PRIVATE-TOKEN: ${GITLAB_TOKEN}" \
-              --header "Content-Type: application/json" \
-              --data "{
-                \"name\": \"${filename}\",
-                \"url\": \"https://gitlab.com/jamakr4/mg4-360-camera-app/-/package_files/generic/${TAG}/1.0.0/${filename}\"
-              }"
+            jq -n \
+              --arg name "$filename" \
+              --arg url  "https://gitlab.com/jamakr4/mg4-360-camera-app/-/package_files/generic/${RELEASE_TAG}/1.0.0/${filename}" \
+              '{name: $name, url: $url}' \
+            | curl --fail -X POST \
+                "https://gitlab.com/api/v4/projects/${GITLAB_PROJECT_ID}/releases/${RELEASE_TAG}/assets/links" \
+                --header "PRIVATE-TOKEN: ${GITLAB_TOKEN}" \
+                --header "Content-Type: application/json" \
+                --data @-
           done
 

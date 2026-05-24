@@ -1,6 +1,9 @@
 package com.drivehub.kamera;
 
-abstract class SimpleTextWatcher implements android.text.TextWatcher {
+import android.text.Editable;
+import android.text.TextWatcher;
+
+abstract class SimpleTextWatcher implements TextWatcher {
     @Override
     public void beforeTextChanged(CharSequence s, int start, int count, int after) {
     }
@@ -8,4 +11,7 @@ abstract class SimpleTextWatcher implements android.text.TextWatcher {
     @Override
     public void onTextChanged(CharSequence s, int start, int before, int count) {
     }
+
+    @Override
+    public abstract void afterTextChanged(Editable s);
 }

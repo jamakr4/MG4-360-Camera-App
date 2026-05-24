@@ -73,6 +73,8 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
             (sharedPreferences, key) -> {
                 if (UiPrefs.KEY_TILE_CORNER_RADIUS.equals(key)) {
                     applyOverlayCornerRadius();
+                } else if (UiPrefs.KEY_OVERLAY_ROTATE_TO_DRIVING_DIRECTION.equals(key)) {
+                    updateOverlayPresentation(true);
                 }
             };
 
@@ -115,6 +117,7 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
             showFloatingWindow();
         } else {
             applyOverlayCornerRadius();
+            updateOverlayPresentation(false);
             // If the overlay is already open and only the camera index changed, switch the feed.
             if (textureSurface != null && textureSurface.isValid()) {
                 startPreview();
@@ -140,6 +143,7 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
             }
         } catch (Throwable ignored) {
         }
+        normalizeOverlaySizeForCurrentMode();
 
         overlayParams = new WindowManager.LayoutParams(
                 overlayWidthPx,
@@ -182,6 +186,7 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
                         overlayParams.height = overlayHeightPx;
                         clampOverlayPositionToScreen();
                         windowManager.updateViewLayout(overlayView, overlayParams);
+                        applyPreviewTransform();
                         return true;
                     }
 
@@ -192,6 +197,7 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
                 });
 
         windowManager.addView(overlayView, overlayParams);
+        applyPreviewTransform();
 
         overlayView.setOnTouchListener((v, event) -> {
             // Two fingers: pinch to resize, with no dragging.
@@ -300,9 +306,9 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
         return Math.round(dp * getResources().getDisplayMetrics().density);
     }
 
-    /** Keeps the 1000:480 aspect ratio while clamping size to screen and min/max bounds. */
+    /** Keeps the active overlay aspect ratio while clamping size to screen and min/max bounds. */
     private int[] clampOverlaySize(int w) {
-        float aspect = (float) DEFAULT_OVERLAY_WIDTH_PX / (float) DEFAULT_OVERLAY_HEIGHT_PX;
+        float aspect = getActiveOverlayAspect();
         int maxW = OVERLAY_MAX_WIDTH_PX;
         int maxH = OVERLAY_MAX_WIDTH_PX;
         int[] screenSize = getAvailableScreenSizePx();
@@ -329,6 +335,79 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
             h = Math.round(w / aspect);
         }
         return new int[]{w, h};
+    }
+
+    private void normalizeOverlaySizeForCurrentMode() {
+        boolean shouldRotate = shouldRotatePreviewToDrivingDirection();
+        boolean isLandscape = overlayWidthPx >= overlayHeightPx;
+        if (shouldRotate == isLandscape) {
+            int swappedWidth = overlayHeightPx;
+            overlayHeightPx = overlayWidthPx;
+            overlayWidthPx = swappedWidth;
+        }
+        int[] clamped = clampOverlaySize(overlayWidthPx);
+        overlayWidthPx = clamped[0];
+        overlayHeightPx = clamped[1];
+    }
+
+    private float getActiveOverlayAspect() {
+        return shouldRotatePreviewToDrivingDirection()
+                ? (float) DEFAULT_OVERLAY_HEIGHT_PX / (float) DEFAULT_OVERLAY_WIDTH_PX
+                : (float) DEFAULT_OVERLAY_WIDTH_PX / (float) DEFAULT_OVERLAY_HEIGHT_PX;
+    }
+
+    private boolean shouldRotatePreviewToDrivingDirection() {
+        return uiPrefs != null
+                && UiPrefs.isOverlayRotationToDrivingDirectionEnabled(uiPrefs)
+                && (cameraIndex == 14 || cameraIndex == 16);
+    }
+
+    private float getPreviewRotationDegrees() {
+        if (!shouldRotatePreviewToDrivingDirection()) {
+            return 0f;
+        }
+        return cameraIndex == 16 ? -90f : 90f;
+    }
+
+    private void updateOverlayPresentation(boolean persist) {
+        normalizeOverlaySizeForCurrentMode();
+        if (overlayParams != null) {
+            overlayParams.width = overlayWidthPx;
+            overlayParams.height = overlayHeightPx;
+            clampOverlayPositionToScreen();
+            if (windowManager != null && overlayView != null) {
+                windowManager.updateViewLayout(overlayView, overlayParams);
+            }
+        }
+        applyPreviewTransform();
+        if (persist) {
+            saveOverlayLayoutPrefs();
+        }
+    }
+
+    private void applyPreviewTransform() {
+        if (textureView == null) return;
+        textureView.post(() -> {
+            if (textureView == null) return;
+            FrameLayout.LayoutParams params;
+            if (shouldRotatePreviewToDrivingDirection()) {
+                params = new FrameLayout.LayoutParams(
+                        overlayHeightPx,
+                        overlayWidthPx,
+                        Gravity.CENTER
+                );
+            } else {
+                params = new FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        Gravity.CENTER
+                );
+            }
+            textureView.setLayoutParams(params);
+            textureView.setScaleX(1f);
+            textureView.setScaleY(1f);
+            textureView.setRotation(getPreviewRotationDegrees());
+        });
     }
 
     private void clampOverlayPositionToScreen() {
@@ -414,12 +493,13 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
     @Override
     public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
         textureSurface = new Surface(surface);
+        applyPreviewTransform();
         startPreview();
     }
 
     @Override
     public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width, int height) {
-        // no-op
+        applyPreviewTransform();
     }
 
     @Override
@@ -441,9 +521,13 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
         if (textureSurface == null || !textureSurface.isValid()) {
             return;
         }
+        applyPreviewTransform();
         if (attachedPreviewCameraIndex != -1 && attachedPreviewCameraIndex != cameraIndex) {
             CameraProbe.detachPreview(attachedPreviewCameraIndex);
             attachedPreviewCameraIndex = -1;
+        }
+        if (attachedPreviewCameraIndex == cameraIndex) {
+            return;
         }
         if (CameraProbe.attachPreview(cameraIndex, textureSurface)) {
             attachedPreviewCameraIndex = cameraIndex;

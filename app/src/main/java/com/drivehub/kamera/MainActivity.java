@@ -57,7 +57,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             new SignalCameraSettingsController(this);
     private final DashcamSettingsController dashcamSettingsController =
             new DashcamSettingsController(this);
-
+    private final DevSettingsController devSettingsController = new DevSettingsController();
     private final OtaController otaController = new OtaController(this);
 
     private final BroadcastReceiver cameraRouteReceiver = new BroadcastReceiver() {
@@ -239,10 +239,6 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         stopPreview();
     }
 
-    // -------------------------------------------------------------------------
-    // Settings dialog
-    // -------------------------------------------------------------------------
-
     @SuppressWarnings("deprecation")
     private void showSettingsDialog() {
         sSettingsDialogOpen = true;
@@ -260,6 +256,8 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         SharedPreferences avmPrefs = getSharedPreferences(AVM_PREFS_NAME, MODE_PRIVATE);
 
         Switch swOverlay = dialog.findViewById(R.id.switchOverlayOnSignal);
+        Switch swRotateToDrivingDirection =
+                dialog.findViewById(R.id.switchOverlayRotateToDrivingDirection);
         Switch swDashcamEnabled = dialog.findViewById(R.id.switchDashcamEnabled);
         Switch swSafetyWarning = dialog.findViewById(R.id.switchSafetyWarning);
         swSafetyWarning.setChecked(avmPrefs.getBoolean(KEY_SAFETY_WARNING, true));
@@ -280,6 +278,9 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         TextView tvDashcamRecordsPath = dialog.findViewById(R.id.tvDashcamRecordsPath);
         tvDashcamDialogStatus = dialog.findViewById(R.id.tvDashcamRecordingStatus);
         Button btnDashcamExportUsb = dialog.findViewById(R.id.btnDashcamExportUsb);
+        EditText etDevDefaultPollMs = dialog.findViewById(R.id.etDevDefaultPollMs);
+        EditText etDevSignalOffPollMs = dialog.findViewById(R.id.etDevSignalOffPollMs);
+        Button btnDevResetDefaults = dialog.findViewById(R.id.btnDevResetDefaults);
         applyStoredRecordingStatus();
 
         SeekBar seekCorner = dialog.findViewById(R.id.seekCornerRadius);
@@ -291,22 +292,41 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         TextView tabDashcam = dialog.findViewById(R.id.tabDashcam);
         TextView tabOptik = dialog.findViewById(R.id.tabOptik);
         TextView tabCredits = dialog.findViewById(R.id.tabCredits);
-        TextView[] settingsTabs = {tabUpdate, tabSettings, tabSignalCamera, tabDashcam, tabOptik, tabCredits};
+        TextView tabDev = dialog.findViewById(R.id.tabDev);
+        TextView[] settingsTabs = {
+                tabUpdate,
+                tabSettings,
+                tabSignalCamera,
+                tabDashcam,
+                tabOptik,
+                tabCredits,
+                tabDev
+        };
         View sectionUpdate = dialog.findViewById(R.id.sectionUpdate);
         View sectionSettings = dialog.findViewById(R.id.sectionSettings);
         View sectionSignalCamera = dialog.findViewById(R.id.sectionSignalCamera);
         View sectionDashcam = dialog.findViewById(R.id.sectionDashcam);
         View sectionOptik = dialog.findViewById(R.id.sectionOptik);
         View sectionCredits = dialog.findViewById(R.id.sectionCredits);
-        View[] settingsSections = {sectionUpdate, sectionSettings, sectionSignalCamera, sectionDashcam, sectionOptik, sectionCredits};
-        View sectionDevTools = dialog.findViewById(R.id.sectionDevTools);
+        View sectionDev = dialog.findViewById(R.id.sectionDev);
+        View[] settingsSections = {
+                sectionUpdate,
+                sectionSettings,
+                sectionSignalCamera,
+                sectionDashcam,
+                sectionOptik,
+                sectionCredits,
+                sectionDev
+        };
         View accentRow = dialog.findViewById(R.id.rowAccentColor);
         View accentPreview = dialog.findViewById(R.id.viewAccentPreview);
         EditText etAccentColor = dialog.findViewById(R.id.etAccentColor);
         Button btnDevTestDashcamBanner = dialog.findViewById(R.id.btnDevTestDashcamBanner);
+
         signalCameraSettingsController.bind(
                 prefs,
                 swOverlay,
+                swRotateToDrivingDirection,
                 seekOverlayHideDelay,
                 etOverlayHideDelayValue,
                 seekOverlayMinShow,
@@ -323,10 +343,17 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 tvDashcamRecordsPath,
                 btnDashcamExportUsb
         );
+        devSettingsController.bind(
+                prefs,
+                etDevDefaultPollMs,
+                etDevSignalOffPollMs,
+                btnDevResetDefaults
+        );
 
         appearanceController.bindSettingsAppearance(
                 prefs,
                 swOverlay,
+                swRotateToDrivingDirection,
                 swDashcamEnabled,
                 swDashcamShowSpeed,
                 swSafetyWarning,
@@ -344,7 +371,8 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 tabSignalCamera,
                 tabDashcam,
                 tabOptik,
-                tabCredits
+                tabCredits,
+                tabDev
         );
 
         if (btnDevTestDashcamBanner != null) {
@@ -355,7 +383,9 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         switchSettingsTab(settingsTabs, settingsSections, 1);
         for (int i = 0; i < settingsTabs.length; i++) {
             final int tabIndex = i;
-            settingsTabs[i].setOnClickListener(v -> switchSettingsTab(settingsTabs, settingsSections, tabIndex));
+            TextView tab = settingsTabs[i];
+            if (tab == null) continue;
+            tab.setOnClickListener(v -> switchSettingsTab(settingsTabs, settingsSections, tabIndex));
         }
 
         TextView tvVersion = dialog.findViewById(R.id.tvDialogVersion);
@@ -378,10 +408,10 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 return;
             }
             devUnlocked[0] = true;
-            if (sectionDevTools != null) {
-                sectionDevTools.setVisibility(View.VISIBLE);
+            if (tabDev != null) {
+                tabDev.setVisibility(View.VISIBLE);
             }
-            switchSettingsTab(settingsTabs, settingsSections, 1);
+            switchSettingsTab(settingsTabs, settingsSections, 6);
             Toast.makeText(this, R.string.settings_dev_unlocked, Toast.LENGTH_SHORT).show();
         };
         tvVersion.setOnClickListener(unlockDevListener);
@@ -419,9 +449,15 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     }
 
     private void switchSettingsTab(TextView[] tabs, View[] sections, int activeIndex) {
+        for (int i = 0; i < sections.length; i++) {
+            if (sections[i] != null) {
+                sections[i].setVisibility(i == activeIndex ? View.VISIBLE : View.GONE);
+            }
+        }
         for (int i = 0; i < tabs.length; i++) {
-            sections[i].setVisibility(i == activeIndex ? View.VISIBLE : View.GONE);
-            styleSettingsTab(tabs[i], i == activeIndex);
+            if (tabs[i] != null) {
+                styleSettingsTab(tabs[i], i == activeIndex);
+            }
         }
         appearanceController.reapplyForActiveTab(activeIndex);
     }
@@ -429,10 +465,6 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private void styleSettingsTab(TextView tab, boolean active) {
         appearanceController.styleSettingsTab(tab, active);
     }
-
-    // -------------------------------------------------------------------------
-    // Warning banner
-    // -------------------------------------------------------------------------
 
     private void applyWarningVisibility() {
         boolean show = getSharedPreferences(AVM_PREFS_NAME, MODE_PRIVATE)
@@ -526,10 +558,6 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         startPreviewIfReady();
     }
 
-    // -------------------------------------------------------------------------
-    // Camera preview
-    // -------------------------------------------------------------------------
-
     private void startPreviewIfReady() {
         if (surfaceHolder == null || surfaceHolder.getSurface() == null ||
                 !surfaceHolder.getSurface().isValid()) {
@@ -558,17 +586,32 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         if (tvStatus != null) tvStatus.setText(R.string.main_preview_stopped);
     }
 
-    @Override public void surfaceCreated(SurfaceHolder holder) { startPreviewIfReady(); }
-    @Override public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {}
-    @Override public void surfaceDestroyed(SurfaceHolder holder) { stopPreview(); }
+    @Override
+    public void surfaceCreated(SurfaceHolder holder) {
+        startPreviewIfReady();
+    }
+
+    @Override
+    public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
+    }
+
+    @Override
+    public void surfaceDestroyed(SurfaceHolder holder) {
+        stopPreview();
+    }
 
     private String cameraLabel(int videoIndex) {
         switch (videoIndex) {
-            case 14: return getString(R.string.main_camera_label_right);
-            case 15: return getString(R.string.main_camera_label_front);
-            case 16: return getString(R.string.main_camera_label_left);
-            case 17: return getString(R.string.main_camera_label_rear);
-            default: return getString(R.string.main_camera_label_unknown, videoIndex);
+            case 14:
+                return getString(R.string.main_camera_label_right);
+            case 15:
+                return getString(R.string.main_camera_label_front);
+            case 16:
+                return getString(R.string.main_camera_label_left);
+            case 17:
+                return getString(R.string.main_camera_label_rear);
+            default:
+                return getString(R.string.main_camera_label_unknown, videoIndex);
         }
     }
 }

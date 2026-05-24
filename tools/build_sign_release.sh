@@ -4,6 +4,9 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
 
+source "${ROOT_DIR}/tools/java_env.sh"
+configure_gradle_java
+
 VERSION_NAME="$(sed -n 's/.*versionName "\(.*\)".*/\1/p' app/build.gradle | head -n 1)"
 if [[ -z "${VERSION_NAME}" ]]; then
   echo "Could not determine versionName from app/build.gradle" >&2
@@ -22,7 +25,7 @@ ARTIFACT_BASENAME="MG4-360-Camera-App-v${VERSION_NAME}-release.apk"
 SIGNED_APK="${RELEASE_DIR}/${ARTIFACT_BASENAME}"
 SHA_FILE="${SIGNED_APK}.sha256"
 
-./gradlew clean assembleRelease
+./gradlew --no-daemon clean assembleRelease
 
 "${APKSIGNER}" sign \
   --key tools/platform.pk8 \

@@ -89,9 +89,20 @@
             style="@style/DrivehubSettingsTabInactive"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginEnd="18dp"
             android:paddingTop="8dp"
             android:paddingBottom="8dp"
             android:text="@string/settings_tab_credits" />
+
+        <TextView
+            android:id="@+id/tabDev"
+            style="@style/DrivehubSettingsTabInactive"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingTop="8dp"
+            android:paddingBottom="8dp"
+            android:text="@string/settings_tab_dev"
+            android:visibility="gone" />
 
     </LinearLayout>
 
@@ -132,6 +143,8 @@
             <include layout="@layout/dialog_settings_section_optik" />
 
             <include layout="@layout/dialog_settings_section_credits" />
+
+            <include layout="@layout/dialog_settings_section_dev" />
 
         </FrameLayout>
     </ScrollView>

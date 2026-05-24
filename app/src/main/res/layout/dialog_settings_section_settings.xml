@@ -32,40 +32,4 @@
 
     </LinearLayout>
 
-    <LinearLayout
-        android:id="@+id/sectionDevTools"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="18dp"
-        android:orientation="vertical"
-        android:visibility="gone">
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:layout_marginBottom="16dp"
-            android:background="@color/settings_divider" />
-
-        <TextView
-            style="@style/DrivehubSettingsHeading2"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="8dp"
-            android:text="@string/settings_section_dev" />
-
-        <TextView
-            style="@style/DrivehubSettingsBodyMuted"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="14dp"
-            android:text="@string/settings_dev_banner_test_hint" />
-
-        <Button
-            android:id="@+id/btnDevTestDashcamBanner"
-            style="@style/DrivehubDialogButtonSecondary"
-            android:layout_width="match_parent"
-            android:layout_height="44dp"
-            android:text="@string/settings_dev_banner_test" />
-
-    </LinearLayout>
 </LinearLayout>

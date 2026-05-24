@@ -11,16 +11,23 @@ final class UiPrefs {
     static final String KEY_ACCENT_COLOR = "accentColor";
     static final String KEY_ALLOW_BETA_UPDATES = "allowBetaUpdates";
     static final String KEY_OVERLAY_ON_SIGNAL = "overlayOnSignal";
+    static final String KEY_OVERLAY_ROTATE_TO_DRIVING_DIRECTION = "overlayRotateToDrivingDirection";
     static final String KEY_OVERLAY_HIDE_DELAY_MS = "overlayHideDelayMs";
     static final String KEY_OVERLAY_MIN_SHOW_MS = "overlayMinShowMs";
+    static final String KEY_DEV_DEFAULT_POLL_MS = "devDefaultPollMs";
+    static final String KEY_DEV_SIGNAL_OFF_POLL_MS = "devSignalOffPollMs";
     static final int MAX_TILE_CORNER_RADIUS = 35;
     static final int MAX_OVERLAY_HIDE_DELAY_MS = 3000;
     static final int MAX_OVERLAY_MIN_SHOW_MS = 6000;
+    static final int MIN_DEV_POLLING_MS = 20;
+    static final int MAX_DEV_POLLING_MS = 5000;
     static final int OVERLAY_HIDE_DELAY_STEP_MS = 100;
     static final int OVERLAY_MIN_SHOW_STEP_MS = 100;
     private static final int DEFAULT_TILE_CORNER_RADIUS = 16;
     private static final int DEFAULT_OVERLAY_HIDE_DELAY_MS = 0;
     private static final int DEFAULT_OVERLAY_MIN_SHOW_MS = 3000;
+    static final int DEFAULT_DEV_DEFAULT_POLLING_MS = 100;
+    static final int DEFAULT_DEV_SIGNAL_OFF_POLLING_MS = 20;
     private static final String DEFAULT_ACCENT_COLOR = "#E7E7E7";
 
     private UiPrefs() {
@@ -46,6 +53,18 @@ final class UiPrefs {
     static int getOverlayMinShowMs(SharedPreferences prefs) {
         long value = prefs.getLong(KEY_OVERLAY_MIN_SHOW_MS, DEFAULT_OVERLAY_MIN_SHOW_MS);
         return clampOverlayMinShowMs((int) value);
+    }
+
+    static boolean isOverlayRotationToDrivingDirectionEnabled(SharedPreferences prefs) {
+        return prefs.getBoolean(KEY_OVERLAY_ROTATE_TO_DRIVING_DIRECTION, false);
+    }
+
+    static int getDevDefaultPollMs(SharedPreferences prefs) {
+        return clampDevPollingMs(prefs.getInt(KEY_DEV_DEFAULT_POLL_MS, DEFAULT_DEV_DEFAULT_POLLING_MS));
+    }
+
+    static int getDevSignalOffPollMs(SharedPreferences prefs) {
+        return clampDevPollingMs(prefs.getInt(KEY_DEV_SIGNAL_OFF_POLL_MS, DEFAULT_DEV_SIGNAL_OFF_POLLING_MS));
     }
 
     static float getCornerRadiusFraction(SharedPreferences prefs) {
@@ -121,5 +140,9 @@ final class UiPrefs {
 
     static int clampOverlayMinShowMs(int value) {
         return Math.max(0, Math.min(MAX_OVERLAY_MIN_SHOW_MS, value));
+    }
+
+    static int clampDevPollingMs(int value) {
+        return Math.max(MIN_DEV_POLLING_MS, Math.min(MAX_DEV_POLLING_MS, value));
     }
 }
