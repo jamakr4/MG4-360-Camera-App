@@ -7,7 +7,6 @@ import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.os.Environment;
 import android.os.IBinder;
 import android.os.SystemClock;
 import android.util.Log;
@@ -19,6 +18,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -46,10 +46,6 @@ public class RecordingService extends Service {
     public static final String STATUS_PARTIAL = "partial";
     public static final String STATUS_ERROR = "error";
 
-    private static final String PREFS_NAME = "rec_prefs";
-    private static final String KEY_ENABLED = "enabled";
-    private static final String KEY_SEGMENT_MIN = "segmentMin";
-    private static final String KEY_TOTAL_MIN = "totalMin";
     private static final String KEY_STATUS = "recordingStatus";
     private static final String KEY_ACTIVE_CAMERAS = "recordingActiveCameras";
     private static final String KEY_TOTAL_CAMERAS = "recordingTotalCameras";
@@ -73,8 +69,8 @@ public class RecordingService extends Service {
     }
 
     public static void startIfNeeded(Context context) {
-        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        boolean enabled = prefs.getBoolean(KEY_ENABLED, false);
+        SharedPreferences prefs = UiPrefs.getPrefs(context);
+        boolean enabled = prefs.getBoolean(DashcamSettingsController.KEY_ENABLED, false);
         if (!enabled)
             return;
         Intent i = new Intent(context, RecordingService.class);
@@ -135,7 +131,7 @@ public class RecordingService extends Service {
         }
 
         if (ACTION_TRIGGER_EVENT_SAVE.equals(action)) {
-            if (worker == null || !getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getBoolean(KEY_ENABLED, false)) {
+            if (worker == null || !prefs().getBoolean(DashcamSettingsController.KEY_ENABLED, false)) {
                 return START_STICKY;
             }
             armEventCapture();
@@ -162,11 +158,8 @@ public class RecordingService extends Service {
     }
 
     private void recordTestClip() {
-        File baseDir = getRecordsBaseDir();
-        // noinspection ResultOfMethodCallIgnored
-        baseDir.mkdirs();
-        if (!baseDir.exists() || !baseDir.canWrite()) {
-            publishStatus(STATUS_ERROR, 0, TOTAL_CAMERAS, "storage not writable");
+        File baseDir = requireBaseDir();
+        if (baseDir == null) {
             worker = null;
             stopForeground(true);
             stopSelf();
@@ -174,7 +167,7 @@ public class RecordingService extends Service {
         }
 
         boolean startedAnyCamera = recordClip(baseDir, TEST_RECORDING_MS,
-                "test_" + makeTimestampBaseWithSeconds(System.currentTimeMillis()), -1);
+                "test_" + makeTimestampBase(System.currentTimeMillis(), "yyMMddHHmmss"), -1);
         worker = null;
         if (startedAnyCamera) {
             publishStatus(STATUS_OFF, 0, TOTAL_CAMERAS, "");
@@ -185,10 +178,10 @@ public class RecordingService extends Service {
 
     private void recordLoop() {
         // NOTE: For now we only record MP4 clips, not speed or turn-signal data.
-        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        boolean enabled = prefs.getBoolean(KEY_ENABLED, false);
-        int segmentMin = prefs.getInt(KEY_SEGMENT_MIN, 3);
-        int totalMin = prefs.getInt(KEY_TOTAL_MIN, 30);
+        SharedPreferences prefs = prefs();
+        boolean enabled = prefs.getBoolean(DashcamSettingsController.KEY_ENABLED, false);
+        int segmentMin = prefs.getInt(DashcamSettingsController.KEY_SEGMENT_MIN, 3);
+        int totalMin = prefs.getInt(DashcamSettingsController.KEY_TOTAL_MIN, 30);
 
         if (!enabled || segmentMin <= 0) {
             publishStatus(STATUS_OFF, 0, TOTAL_CAMERAS, "");
@@ -197,11 +190,8 @@ public class RecordingService extends Service {
             return;
         }
 
-        File baseDir = getRecordsBaseDir();
-        // noinspection ResultOfMethodCallIgnored
-        baseDir.mkdirs();
-        if (!baseDir.exists() || !baseDir.canWrite()) {
-            publishStatus(STATUS_ERROR, 0, TOTAL_CAMERAS, "storage not writable");
+        File baseDir = requireBaseDir();
+        if (baseDir == null) {
             worker = null;
             stopSelf();
             return;
@@ -216,7 +206,7 @@ public class RecordingService extends Service {
 
         while (!stopRequested) {
             long segmentStartWallMs = System.currentTimeMillis();
-            String baseName = makeTimestampBase(segmentStartWallMs);
+            String baseName = makeTimestampBase(segmentStartWallMs, "yyMMddHHmm");
             boolean startedAnyCamera = recordClip(baseDir, segmentMs, baseName, keepSegments);
             if (!startedAnyCamera) {
                 endedWithFatalError = true;
@@ -225,7 +215,7 @@ public class RecordingService extends Service {
             onSegmentCompleted(baseDir, baseName, segmentStartWallMs, System.currentTimeMillis(), keepSegments);
 
             // Check whether recording has been disabled in prefs.
-            enabled = prefs.getBoolean(KEY_ENABLED, false);
+            enabled = prefs.getBoolean(DashcamSettingsController.KEY_ENABLED, false);
             if (!enabled)
                 break;
         }
@@ -239,9 +229,8 @@ public class RecordingService extends Service {
     }
 
     private boolean recordClip(File baseDir, long durationMs, String baseName, int keepSegments) {
-        int recordingFps = DashcamSettingsController.getRecordingFps(
-                getSharedPreferences(PREFS_NAME, MODE_PRIVATE));
-        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        SharedPreferences prefs = prefs();
+        int recordingFps = DashcamSettingsController.getRecordingFps(prefs);
         String signature = DashcamSettingsController.getRecordingSignature(prefs);
         boolean showSpeed = DashcamSettingsController.shouldShowSpeed(prefs);
         File outputFile = new File(baseDir, baseName + ".mp4");
@@ -314,7 +303,7 @@ public class RecordingService extends Service {
         long now = System.currentTimeMillis();
         synchronized (eventLock) {
             pendingEventRequests.add(new EventCaptureRequest(
-                    "event_" + makeTimestampBaseWithMillis(now),
+                    "event_" + makeTimestampBase(now, "yyMMddHHmmssSSS"),
                     now - EVENT_PRE_ROLL_MS,
                     now + EVENT_POST_ROLL_MS
             ));
@@ -370,7 +359,7 @@ public class RecordingService extends Service {
         // noinspection ResultOfMethodCallIgnored
         eventDir.mkdirs();
         for (String baseName : job.baseNames) {
-            copySegmentGroup(getRecordsBaseDir(), eventDir, baseName);
+            copySegmentGroup(DashcamSettingsController.getRecordsBaseDir(), eventDir, baseName);
         }
     }
 
@@ -475,56 +464,26 @@ public class RecordingService extends Service {
         }
     }
 
-    private File getRecordsBaseDir() {
-        // Android 9: write directly into the Downloads folder.
-        File downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
-        File dir = new File(downloads, "mg4_cam_records");
-        // noinspection ResultOfMethodCallIgnored
-        dir.mkdirs();
-        return dir;
-    }
-
     private File getEventsBaseDir() {
-        File dir = new File(getRecordsBaseDir(), "events");
+        File dir = new File(DashcamSettingsController.getRecordsBaseDir(), "events");
         // noinspection ResultOfMethodCallIgnored
         dir.mkdirs();
         return dir;
     }
 
-    private String makeTimestampBase(long epochMs) {
-        java.util.Calendar cal = java.util.Calendar.getInstance();
-        cal.setTimeInMillis(epochMs);
-        int yy = cal.get(java.util.Calendar.YEAR) % 100;
-        int aa = cal.get(java.util.Calendar.MONTH) + 1;
-        int gg = cal.get(java.util.Calendar.DAY_OF_MONTH);
-        int ss = cal.get(java.util.Calendar.HOUR_OF_DAY);
-        int dd = cal.get(java.util.Calendar.MINUTE);
-        return String.format(Locale.US, "%02d%02d%02d%02d%02d", yy, aa, gg, ss, dd);
+    private File requireBaseDir() {
+        File baseDir = DashcamSettingsController.getRecordsBaseDir();
+        // noinspection ResultOfMethodCallIgnored
+        baseDir.mkdirs();
+        if (baseDir.exists() && baseDir.canWrite()) {
+            return baseDir;
+        }
+        publishStatus(STATUS_ERROR, 0, TOTAL_CAMERAS, "storage not writable");
+        return null;
     }
 
-    private String makeTimestampBaseWithSeconds(long epochMs) {
-        java.util.Calendar cal = java.util.Calendar.getInstance();
-        cal.setTimeInMillis(epochMs);
-        int yy = cal.get(java.util.Calendar.YEAR) % 100;
-        int aa = cal.get(java.util.Calendar.MONTH) + 1;
-        int gg = cal.get(java.util.Calendar.DAY_OF_MONTH);
-        int ss = cal.get(java.util.Calendar.HOUR_OF_DAY);
-        int dd = cal.get(java.util.Calendar.MINUTE);
-        int sec = cal.get(java.util.Calendar.SECOND);
-        return String.format(Locale.US, "%02d%02d%02d%02d%02d%02d", yy, aa, gg, ss, dd, sec);
-    }
-
-    private String makeTimestampBaseWithMillis(long epochMs) {
-        java.util.Calendar cal = java.util.Calendar.getInstance();
-        cal.setTimeInMillis(epochMs);
-        int yy = cal.get(java.util.Calendar.YEAR) % 100;
-        int aa = cal.get(java.util.Calendar.MONTH) + 1;
-        int gg = cal.get(java.util.Calendar.DAY_OF_MONTH);
-        int ss = cal.get(java.util.Calendar.HOUR_OF_DAY);
-        int dd = cal.get(java.util.Calendar.MINUTE);
-        int sec = cal.get(java.util.Calendar.SECOND);
-        int ms = cal.get(java.util.Calendar.MILLISECOND);
-        return String.format(Locale.US, "%02d%02d%02d%02d%02d%02d%03d", yy, aa, gg, ss, dd, sec, ms);
+    private String makeTimestampBase(long epochMs, String pattern) {
+        return new SimpleDateFormat(pattern, Locale.US).format(epochMs);
     }
 
     private Notification buildNotification(String text) {
@@ -538,7 +497,7 @@ public class RecordingService extends Service {
     }
 
     private void publishCurrentStatus() {
-        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        SharedPreferences prefs = prefs();
         publishStatus(
                 prefs.getString(KEY_STATUS, STATUS_OFF),
                 prefs.getInt(KEY_ACTIVE_CAMERAS, 0),
@@ -551,7 +510,7 @@ public class RecordingService extends Service {
             status = STATUS_OFF;
         if (lastError == null)
             lastError = "";
-        getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit()
+        prefs().edit()
                 .putString(KEY_STATUS, status)
                 .putInt(KEY_ACTIVE_CAMERAS, Math.max(0, activeCameras))
                 .putInt(KEY_TOTAL_CAMERAS, Math.max(0, totalCameras))
@@ -585,6 +544,10 @@ public class RecordingService extends Service {
         sendBroadcast(intent);
     }
 
+    private SharedPreferences prefs() {
+        return UiPrefs.getPrefs(this);
+    }
+
     private void createNotificationChannel() {
         NotificationChannel ch = new NotificationChannel(
                 CHANNEL_ID,
@@ -606,6 +569,7 @@ public class RecordingService extends Service {
         sServiceRunning = false;
         stopRequested = true;
         if (worker != null) {
+            worker.interrupt();
             try {
                 worker.join(1000);
             } catch (InterruptedException ignored) {

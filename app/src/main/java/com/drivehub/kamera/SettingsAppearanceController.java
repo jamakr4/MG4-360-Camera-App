@@ -9,7 +9,6 @@ import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.text.Editable;
-import android.text.TextWatcher;
 import android.view.View;
 import android.view.Window;
 import android.widget.EditText;
@@ -25,26 +24,16 @@ final class SettingsAppearanceController {
     private final AppCompatActivity activity;
     private boolean isNormalizingAccentColor;
     private SharedPreferences prefs;
-    private Switch swOverlay;
-    private Switch swDashcamEnabled;
-    private Switch swDashcamShowSpeed;
-    private Switch swSafetyWarning;
-    private Switch swAllowBetaUpdates;
     private ImageButton dialogClose;
-    private SeekBar seekOverlayHideDelay;
-    private SeekBar seekOverlayMinShow;
     private SeekBar seekCorner;
     private EditText etCorner;
     private View accentRow;
     private View accentPreview;
     private EditText etAccentColor;
-    private TextView tabUpdate;
-    private TextView tabSettings;
-    private TextView tabSignalCamera;
-    private TextView tabDashcam;
-    private TextView tabOptik;
-    private TextView tabCredits;
     private int activeTab;
+    private SeekBar[] tintedSeekBars;
+    private Switch[] tintedSwitches;
+    private TextView[] tabs;
 
     SettingsAppearanceController(AppCompatActivity activity) {
         this.activity = activity;
@@ -80,26 +69,16 @@ final class SettingsAppearanceController {
             TextView tabCredits
     ) {
         this.prefs = prefs;
-        this.swOverlay = swOverlay;
-        this.swDashcamEnabled = swDashcamEnabled;
-        this.swDashcamShowSpeed = swDashcamShowSpeed;
-        this.swSafetyWarning = swSafetyWarning;
-        this.swAllowBetaUpdates = swAllowBetaUpdates;
         this.dialogClose = dialogClose;
-        this.seekOverlayHideDelay = seekOverlayHideDelay;
-        this.seekOverlayMinShow = seekOverlayMinShow;
         this.seekCorner = seekCorner;
         this.etCorner = etCorner;
         this.accentRow = accentRow;
         this.accentPreview = accentPreview;
         this.etAccentColor = etAccentColor;
-        this.tabUpdate = tabUpdate;
-        this.tabSettings = tabSettings;
-        this.tabSignalCamera = tabSignalCamera;
-        this.tabDashcam = tabDashcam;
-        this.tabOptik = tabOptik;
-        this.tabCredits = tabCredits;
         this.activeTab = 1;
+        this.tintedSeekBars = new SeekBar[]{seekCorner, seekOverlayHideDelay, seekOverlayMinShow};
+        this.tintedSwitches = new Switch[]{swOverlay, swDashcamEnabled, swDashcamShowSpeed, swSafetyWarning, swAllowBetaUpdates};
+        this.tabs = new TextView[]{tabUpdate, tabSettings, tabSignalCamera, tabDashcam, tabOptik, tabCredits};
 
         int savedRadius = UiPrefs.getTileCornerRadiusSetting(prefs);
         int accentColor = UiPrefs.getAccentColorInt(prefs);
@@ -126,10 +105,9 @@ final class SettingsAppearanceController {
             @Override public void onStopTrackingTouch(SeekBar seekBar) {}
         });
 
-        etCorner.addTextChangedListener(new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
-            @Override public void afterTextChanged(Editable s) {
+        etCorner.addTextChangedListener(new SimpleTextWatcher() {
+            @Override
+            public void afterTextChanged(Editable s) {
                 if (s.length() == 0) return;
                 try {
                     int value = Math.min(UiPrefs.MAX_TILE_CORNER_RADIUS, Math.max(0, Integer.parseInt(s.toString())));
@@ -160,10 +138,9 @@ final class SettingsAppearanceController {
             applyMainUiIconColors();
         });
 
-        etAccentColor.addTextChangedListener(new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
-            @Override public void afterTextChanged(Editable s) {
+        etAccentColor.addTextChangedListener(new SimpleTextWatcher() {
+            @Override
+            public void afterTextChanged(Editable s) {
                 if (isNormalizingAccentColor) return;
                 Integer parsed = UiPrefs.tryParseAccentColorOrNull(s == null ? null : s.toString());
                 if (parsed == null) return;
@@ -181,7 +158,7 @@ final class SettingsAppearanceController {
     }
 
     void styleSettingsTab(TextView tab, boolean active) {
-        int activeColor = UiPrefs.getAccentColorInt(UiPrefs.getPrefs(activity));
+        int activeColor = UiPrefs.getAccentColorInt(prefs);
         tab.setTextColor(active ? activeColor : 0xFF777777);
         tab.setTextSize(20f);
         tab.setTypeface(tab.getTypeface(), Typeface.BOLD);
@@ -217,7 +194,6 @@ final class SettingsAppearanceController {
 
         hueView.setOnHueChangedListener(hue -> {
             hsv[0] = hue;
-            // When hue changes, keep the current saturation/value and rebuild the final color.
             saturationValueView.setColor(hue, hsv[1], hsv[2]);
             selectedColor[0] = Color.HSVToColor(hsv);
             updateColorPickerUi(tvHex, preview, btnApply, applyButtonBackground, selectedColor[0]);
@@ -267,8 +243,8 @@ final class SettingsAppearanceController {
     }
 
     private void applySelectedAccentColor(int color) {
-        String normalized = String.format("#%06X", 0xFFFFFF & color);
         // Reuse the same stored string format as the manual hex field so both inputs stay in sync.
+        String normalized = String.format("#%06X", 0xFFFFFF & color);
         prefs.edit().putString(UiPrefs.KEY_ACCENT_COLOR, normalized).apply();
         isNormalizingAccentColor = true;
         etAccentColor.setText(normalized);
@@ -282,32 +258,19 @@ final class SettingsAppearanceController {
         if (dialogClose != null) {
             dialogClose.setColorFilter(Color.WHITE);
         }
-        if (seekCorner != null) {
-            seekCorner.setProgressTintList(ColorStateList.valueOf(accentColor));
-            seekCorner.setThumbTintList(ColorStateList.valueOf(accentColor));
+        ColorStateList accentTint = ColorStateList.valueOf(accentColor);
+        if (tintedSeekBars != null) {
+            for (SeekBar bar : tintedSeekBars) {
+                if (bar == null) continue;
+                bar.setProgressTintList(accentTint);
+                bar.setThumbTintList(accentTint);
+            }
         }
-        if (seekOverlayHideDelay != null) {
-            seekOverlayHideDelay.setProgressTintList(ColorStateList.valueOf(accentColor));
-            seekOverlayHideDelay.setThumbTintList(ColorStateList.valueOf(accentColor));
-        }
-        if (seekOverlayMinShow != null) {
-            seekOverlayMinShow.setProgressTintList(ColorStateList.valueOf(accentColor));
-            seekOverlayMinShow.setThumbTintList(ColorStateList.valueOf(accentColor));
-        }
-        if (swOverlay != null) {
-            swOverlay.setTrackTintList(buildToggleTrackTint(accentColor));
-        }
-        if (swDashcamEnabled != null) {
-            swDashcamEnabled.setTrackTintList(buildToggleTrackTint(accentColor));
-        }
-        if (swDashcamShowSpeed != null) {
-            swDashcamShowSpeed.setTrackTintList(buildToggleTrackTint(accentColor));
-        }
-        if (swSafetyWarning != null) {
-            swSafetyWarning.setTrackTintList(buildToggleTrackTint(accentColor));
-        }
-        if (swAllowBetaUpdates != null) {
-            swAllowBetaUpdates.setTrackTintList(buildToggleTrackTint(accentColor));
+        ColorStateList toggleTint = buildToggleTrackTint(accentColor);
+        if (tintedSwitches != null) {
+            for (Switch sw : tintedSwitches) {
+                if (sw != null) sw.setTrackTintList(toggleTint);
+            }
         }
         if (accentPreview != null) {
             Drawable background = accentPreview.getBackground();
@@ -315,12 +278,11 @@ final class SettingsAppearanceController {
                 ((GradientDrawable) background.mutate()).setColor(accentColor);
             }
         }
-        if (tabUpdate != null) tabUpdate.setTextColor(activeTab == 0 ? accentColor : 0xFF777777);
-        if (tabSettings != null) tabSettings.setTextColor(activeTab == 1 ? accentColor : 0xFF777777);
-        if (tabSignalCamera != null) tabSignalCamera.setTextColor(activeTab == 2 ? accentColor : 0xFF777777);
-        if (tabDashcam != null) tabDashcam.setTextColor(activeTab == 3 ? accentColor : 0xFF777777);
-        if (tabOptik != null) tabOptik.setTextColor(activeTab == 4 ? accentColor : 0xFF777777);
-        if (tabCredits != null) tabCredits.setTextColor(activeTab == 5 ? accentColor : 0xFF777777);
+        if (tabs != null) {
+            for (int i = 0; i < tabs.length; i++) {
+                if (tabs[i] != null) tabs[i].setTextColor(i == activeTab ? accentColor : 0xFF777777);
+            }
+        }
     }
 
     private ColorStateList buildToggleTrackTint(int accentColor) {

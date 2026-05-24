@@ -18,9 +18,9 @@ import java.io.File;
 
 final class DashcamSettingsController {
 
-    private static final String KEY_ENABLED = "enabled";
-    private static final String KEY_SEGMENT_MIN = "segmentMin";
-    private static final String KEY_TOTAL_MIN = "totalMin";
+    static final String KEY_ENABLED = "enabled";
+    static final String KEY_SEGMENT_MIN = "segmentMin";
+    static final String KEY_TOTAL_MIN = "totalMin";
     private static final String KEY_RECORDING_FPS = "recordingFps";
     private static final String KEY_SIGNATURE = "recordingSignature";
     private static final String KEY_SHOW_SPEED = "recordingShowSpeed";
@@ -29,6 +29,7 @@ final class DashcamSettingsController {
     private static final int MIN_RECORDING_FPS = 1;
     private static final int MAX_RECORDING_FPS = 60;
     private static final int MAX_SIGNATURE_LENGTH = 40;
+    private static final String RECORDS_DIR_NAME = "mg4_cam_records";
 
     private final MainActivity activity;
     private boolean syncingEnabled;
@@ -120,30 +121,19 @@ final class DashcamSettingsController {
                 saveFields(prefs, etSegmentMin, etTotalMin, etRecordingFps, etSignature, false);
             }
         };
-        if (etSegmentMin != null) {
-            etSegmentMin.addTextChangedListener(watcher);
-            etSegmentMin.setOnFocusChangeListener((v, hasFocus) -> {
-                if (!hasFocus) saveFields(prefs, etSegmentMin, etTotalMin, etRecordingFps, etSignature, true);
-            });
-        }
-        if (etTotalMin != null) {
-            etTotalMin.addTextChangedListener(watcher);
-            etTotalMin.setOnFocusChangeListener((v, hasFocus) -> {
-                if (!hasFocus) saveFields(prefs, etSegmentMin, etTotalMin, etRecordingFps, etSignature, true);
-            });
-        }
-        if (etRecordingFps != null) {
-            etRecordingFps.addTextChangedListener(watcher);
-            etRecordingFps.setOnFocusChangeListener((v, hasFocus) -> {
-                if (!hasFocus) saveFields(prefs, etSegmentMin, etTotalMin, etRecordingFps, etSignature, true);
-            });
-        }
-        if (etSignature != null) {
-            etSignature.addTextChangedListener(watcher);
-            etSignature.setOnFocusChangeListener((v, hasFocus) -> {
-                if (!hasFocus) saveFields(prefs, etSegmentMin, etTotalMin, etRecordingFps, etSignature, true);
-            });
-        }
+        Runnable normalize = () -> saveFields(prefs, etSegmentMin, etTotalMin, etRecordingFps, etSignature, true);
+        bindEditText(etSegmentMin, watcher, normalize);
+        bindEditText(etTotalMin, watcher, normalize);
+        bindEditText(etRecordingFps, watcher, normalize);
+        bindEditText(etSignature, watcher, normalize);
+    }
+
+    private void bindEditText(EditText editText, android.text.TextWatcher watcher, Runnable onBlur) {
+        if (editText == null) return;
+        editText.addTextChangedListener(watcher);
+        editText.setOnFocusChangeListener((v, hasFocus) -> {
+            if (!hasFocus) onBlur.run();
+        });
     }
 
     private void saveFields(SharedPreferences prefs, EditText etSegmentMin, EditText etTotalMin,
@@ -226,9 +216,9 @@ final class DashcamSettingsController {
                 == PackageManager.PERMISSION_GRANTED;
     }
 
-    private File getRecordsBaseDir() {
+    static File getRecordsBaseDir() {
         File downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
-        File dir = new File(downloads, "mg4_cam_records");
+        File dir = new File(downloads, RECORDS_DIR_NAME);
         //noinspection ResultOfMethodCallIgnored
         dir.mkdirs();
         return dir;
@@ -245,15 +235,5 @@ final class DashcamSettingsController {
             }
         }
         return null;
-    }
-
-    private abstract static class SimpleTextWatcher implements android.text.TextWatcher {
-        @Override
-        public void beforeTextChanged(CharSequence s, int start, int count, int after) {
-        }
-
-        @Override
-        public void onTextChanged(CharSequence s, int start, int before, int count) {
-        }
     }
 }

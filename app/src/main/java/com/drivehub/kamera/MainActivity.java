@@ -291,12 +291,14 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         TextView tabDashcam = dialog.findViewById(R.id.tabDashcam);
         TextView tabOptik = dialog.findViewById(R.id.tabOptik);
         TextView tabCredits = dialog.findViewById(R.id.tabCredits);
+        TextView[] settingsTabs = {tabUpdate, tabSettings, tabSignalCamera, tabDashcam, tabOptik, tabCredits};
         View sectionUpdate = dialog.findViewById(R.id.sectionUpdate);
         View sectionSettings = dialog.findViewById(R.id.sectionSettings);
         View sectionSignalCamera = dialog.findViewById(R.id.sectionSignalCamera);
         View sectionDashcam = dialog.findViewById(R.id.sectionDashcam);
         View sectionOptik = dialog.findViewById(R.id.sectionOptik);
         View sectionCredits = dialog.findViewById(R.id.sectionCredits);
+        View[] settingsSections = {sectionUpdate, sectionSettings, sectionSignalCamera, sectionDashcam, sectionOptik, sectionCredits};
         View sectionDevTools = dialog.findViewById(R.id.sectionDevTools);
         View accentRow = dialog.findViewById(R.id.rowAccentColor);
         View accentPreview = dialog.findViewById(R.id.viewAccentPreview);
@@ -350,39 +352,11 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                     DashcamEventOverlayService.showConfirmation(MainActivity.this));
         }
 
-        bindSettingsTab(tabUpdate, tabSettings, tabSignalCamera, tabDashcam, tabOptik, tabCredits,
-                sectionUpdate, sectionSettings, sectionSignalCamera, sectionDashcam, sectionOptik, sectionCredits, 1);
-        appearanceController.reapplyForActiveTab(1);
-        tabUpdate.setOnClickListener(v -> {
-            bindSettingsTab(tabUpdate, tabSettings, tabSignalCamera, tabDashcam, tabOptik, tabCredits,
-                    sectionUpdate, sectionSettings, sectionSignalCamera, sectionDashcam, sectionOptik, sectionCredits, 0);
-            appearanceController.reapplyForActiveTab(0);
-        });
-        tabSettings.setOnClickListener(v -> {
-            bindSettingsTab(tabUpdate, tabSettings, tabSignalCamera, tabDashcam, tabOptik, tabCredits,
-                    sectionUpdate, sectionSettings, sectionSignalCamera, sectionDashcam, sectionOptik, sectionCredits, 1);
-            appearanceController.reapplyForActiveTab(1);
-        });
-        tabSignalCamera.setOnClickListener(v -> {
-            bindSettingsTab(tabUpdate, tabSettings, tabSignalCamera, tabDashcam, tabOptik, tabCredits,
-                    sectionUpdate, sectionSettings, sectionSignalCamera, sectionDashcam, sectionOptik, sectionCredits, 2);
-            appearanceController.reapplyForActiveTab(2);
-        });
-        tabDashcam.setOnClickListener(v -> {
-            bindSettingsTab(tabUpdate, tabSettings, tabSignalCamera, tabDashcam, tabOptik, tabCredits,
-                    sectionUpdate, sectionSettings, sectionSignalCamera, sectionDashcam, sectionOptik, sectionCredits, 3);
-            appearanceController.reapplyForActiveTab(3);
-        });
-        tabOptik.setOnClickListener(v -> {
-            bindSettingsTab(tabUpdate, tabSettings, tabSignalCamera, tabDashcam, tabOptik, tabCredits,
-                    sectionUpdate, sectionSettings, sectionSignalCamera, sectionDashcam, sectionOptik, sectionCredits, 4);
-            appearanceController.reapplyForActiveTab(4);
-        });
-        tabCredits.setOnClickListener(v -> {
-            bindSettingsTab(tabUpdate, tabSettings, tabSignalCamera, tabDashcam, tabOptik, tabCredits,
-                    sectionUpdate, sectionSettings, sectionSignalCamera, sectionDashcam, sectionOptik, sectionCredits, 5);
-            appearanceController.reapplyForActiveTab(5);
-        });
+        switchSettingsTab(settingsTabs, settingsSections, 1);
+        for (int i = 0; i < settingsTabs.length; i++) {
+            final int tabIndex = i;
+            settingsTabs[i].setOnClickListener(v -> switchSettingsTab(settingsTabs, settingsSections, tabIndex));
+        }
 
         TextView tvVersion = dialog.findViewById(R.id.tvDialogVersion);
         TextView tvBeta = dialog.findViewById(R.id.tvDialogVersionBeta);
@@ -407,9 +381,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             if (sectionDevTools != null) {
                 sectionDevTools.setVisibility(View.VISIBLE);
             }
-            bindSettingsTab(tabUpdate, tabSettings, tabSignalCamera, tabDashcam, tabOptik, tabCredits,
-                    sectionUpdate, sectionSettings, sectionSignalCamera, sectionDashcam, sectionOptik, sectionCredits, 1);
-            appearanceController.reapplyForActiveTab(1);
+            switchSettingsTab(settingsTabs, settingsSections, 1);
             Toast.makeText(this, R.string.settings_dev_unlocked, Toast.LENGTH_SHORT).show();
         };
         tvVersion.setOnClickListener(unlockDevListener);
@@ -446,23 +418,12 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         }
     }
 
-    private void bindSettingsTab(
-            TextView tabUpdate, TextView tabSettings, TextView tabSignalCamera, TextView tabDashcam, TextView tabOptik, TextView tabCredits,
-            View sectionUpdate, View sectionSettings, View sectionSignalCamera, View sectionDashcam, View sectionOptik, View sectionCredits,
-            int active
-    ) {
-        sectionUpdate.setVisibility(active == 0 ? View.VISIBLE : View.GONE);
-        sectionSettings.setVisibility(active == 1 ? View.VISIBLE : View.GONE);
-        sectionSignalCamera.setVisibility(active == 2 ? View.VISIBLE : View.GONE);
-        sectionDashcam.setVisibility(active == 3 ? View.VISIBLE : View.GONE);
-        sectionOptik.setVisibility(active == 4 ? View.VISIBLE : View.GONE);
-        sectionCredits.setVisibility(active == 5 ? View.VISIBLE : View.GONE);
-        styleSettingsTab(tabUpdate, active == 0);
-        styleSettingsTab(tabSettings, active == 1);
-        styleSettingsTab(tabSignalCamera, active == 2);
-        styleSettingsTab(tabDashcam, active == 3);
-        styleSettingsTab(tabOptik, active == 4);
-        styleSettingsTab(tabCredits, active == 5);
+    private void switchSettingsTab(TextView[] tabs, View[] sections, int activeIndex) {
+        for (int i = 0; i < tabs.length; i++) {
+            sections[i].setVisibility(i == activeIndex ? View.VISIBLE : View.GONE);
+            styleSettingsTab(tabs[i], i == activeIndex);
+        }
+        appearanceController.reapplyForActiveTab(activeIndex);
     }
 
     private void styleSettingsTab(TextView tab, boolean active) {
