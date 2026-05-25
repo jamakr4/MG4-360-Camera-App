@@ -174,6 +174,7 @@
     <string name="notification_overlay_text">Signal camera overlay active</string>
     <string name="notification_dashcam_event_overlay_text">Dashcam event is being secured</string>
     <string name="notification_dashcam_oem_pause_overlay_text">Dashcam paused so the OEM camera can open</string>
+    <string name="notification_dashcam_oem_resume_overlay_text">Dashcam recording is resuming after the OEM camera closed</string>
     <string name="notification_dashcam_recording_error_text">Dashcam recording needs attention</string>
     <string name="notification_dashcam_recording_error_storage_text">Dashcam cannot write to storage</string>
     <string name="notification_dashcam_recording_error_start_failed_text">Dashcam recording could not start</string>
@@ -189,6 +190,8 @@
     <string name="dashcam_event_overlay_subtitle">The last and next minute are being secured.</string>
     <string name="dashcam_oem_pause_overlay_title">Dashcam paused</string>
     <string name="dashcam_oem_pause_overlay_subtitle">The OEM camera is being opened. Recording resumes automatically afterwards.</string>
+    <string name="dashcam_oem_resume_overlay_title">Dashcam resuming</string>
+    <string name="dashcam_oem_resume_overlay_subtitle">The OEM camera closed. Recording is starting again.</string>
     <string name="dashcam_recording_error_overlay_title">Dashcam inactive</string>
     <string name="dashcam_recording_error_overlay_subtitle_generic">Recording is currently unavailable.</string>
     <string name="dashcam_recording_error_overlay_subtitle_storage">Storage is not writable. Check free space and media availability.</string>

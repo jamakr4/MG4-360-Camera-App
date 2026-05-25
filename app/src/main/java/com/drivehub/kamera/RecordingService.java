@@ -194,6 +194,7 @@ public class RecordingService extends Service {
         }
 
         if (ACTION_RESUME_AFTER_OEM_REQUEST.equals(action)) {
+            boolean wasPaused = STATUS_PAUSED_OEM.equals(prefs().getString(KEY_STATUS, STATUS_OFF));
             oemPauseRequested = false;
             segmentStopRequested = false;
             synchronized (stateLock) {
@@ -212,10 +213,14 @@ public class RecordingService extends Service {
                 stopRequested = false;
                 startForeground(NOTIF_ID, buildNotification(getString(R.string.notification_recording_starting)));
                 publishStatus(STATUS_STARTING, 0, TOTAL_CAMERAS, "");
+                if (wasPaused) {
+                    DashcamEventOverlayService.showOemResume(this);
+                }
                 worker = new Thread(this::recordLoop, "RecordingServiceWorker");
                 worker.start();
-            } else if (STATUS_PAUSED_OEM.equals(prefs().getString(KEY_STATUS, STATUS_OFF))) {
+            } else if (wasPaused) {
                 publishStatus(STATUS_STARTING, 0, TOTAL_CAMERAS, "");
+                DashcamEventOverlayService.showOemResume(this);
             }
             return START_STICKY;
         }

@@ -80,6 +80,29 @@ public class SignalService extends Service {
         return sInstance != null;
     }
 
+    public static void setOemAvmActive(Context context, boolean active) {
+        SharedPreferences prefs = UiPrefs.getPrefs(context);
+        UiPrefs.setOemAvmActive(prefs, active);
+        SignalService inst = sInstance;
+        if (inst == null) {
+            if (active) {
+                OverlayService.hideOverlay(context);
+            }
+            return;
+        }
+        inst.mainHandler.post(() -> {
+            if (active) {
+                inst.mainHandler.removeCallbacks(inst.hideRunnable);
+                inst.clearOverlayShownTimestamp();
+                OverlayService.hideOverlay(inst);
+            }
+            inst.lastLamp = Integer.MIN_VALUE;
+            inst.lastGear = Integer.MIN_VALUE;
+            inst.currentMode = -1;
+            inst.updateOverlayDecision();
+        });
+    }
+
     public static void requestRecheck() {
         SignalService inst = sInstance;
         if (inst == null) return;
@@ -278,12 +301,13 @@ public class SignalService extends Service {
             return;
         }
 
-        // For non-reverse signal states, skip the overlay if the OEM AVM is already in the foreground.
-        if (isOemAvmInForeground()) {
+        // Prefer the OEM AVM latch from broadcasts so we can react immediately before
+        // ActivityManager catches up and the OEM app is actually top-most.
+        if (isOemAvmLatchedActive() || isOemAvmInForeground()) {
             mainHandler.removeCallbacks(hideRunnable);
             clearOverlayShownTimestamp();
             OverlayService.hideOverlay(this);
-            Log.i(TAG, "OEM AVM visible (turn signal) => skip overlay.");
+            Log.i(TAG, "OEM AVM active/visible (turn signal) => skip overlay.");
             return;
         }
 
@@ -385,6 +409,14 @@ public class SignalService extends Service {
             ActivityManager.RunningTaskInfo t = tasks.get(0);
             if (t.topActivity == null) return false;
             return OEM_AVM_PACKAGE.equals(t.topActivity.getPackageName());
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private boolean isOemAvmLatchedActive() {
+        try {
+            return UiPrefs.isOemAvmActive(UiPrefs.getPrefs(this));
         } catch (Throwable ignored) {
             return false;
         }

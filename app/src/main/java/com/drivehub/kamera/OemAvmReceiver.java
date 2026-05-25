@@ -23,11 +23,13 @@ public class OemAvmReceiver extends BroadcastReceiver {
         }
         if (ACTION_CAMERA_SHOW.equals(action)) {
             Log.i(TAG, "OEM AVM show request received");
+            SignalService.setOemAvmActive(context, true);
             RecordingService.pauseForOemRequest(context);
             return;
         }
         if (ACTION_CAMERA_CLOSE.equals(action) || ACTION_OEM_STOP.equals(action)) {
             Log.i(TAG, "OEM AVM close/stop received: " + action);
+            SignalService.setOemAvmActive(context, false);
             RecordingService.resumeAfterOemRequest(context);
         }
     }

@@ -17,6 +17,7 @@ final class UiPrefs {
     static final String KEY_DEV_DEFAULT_POLL_MS = "devDefaultPollMs";
     static final String KEY_DEV_SIGNAL_OFF_POLL_MS = "devSignalOffPollMs";
     static final String KEY_SAFETY_WARNING = "safetyWarning";
+    static final String KEY_OEM_AVM_ACTIVE = "oemAvmActive";
     private static final String LEGACY_AVM_PREFS_NAME = "AVM_Settings";
     private static final String LEGACY_KEY_SAFETY_WARNING = "ShowSafetyWarning";
     static final int MAX_TILE_CORNER_RADIUS = 35;
@@ -72,6 +73,14 @@ final class UiPrefs {
 
     static void setSafetyWarningEnabled(SharedPreferences prefs, boolean enabled) {
         prefs.edit().putBoolean(KEY_SAFETY_WARNING, enabled).apply();
+    }
+
+    static boolean isOemAvmActive(SharedPreferences prefs) {
+        return prefs.getBoolean(KEY_OEM_AVM_ACTIVE, false);
+    }
+
+    static void setOemAvmActive(SharedPreferences prefs, boolean active) {
+        prefs.edit().putBoolean(KEY_OEM_AVM_ACTIVE, active).apply();
     }
 
     /**

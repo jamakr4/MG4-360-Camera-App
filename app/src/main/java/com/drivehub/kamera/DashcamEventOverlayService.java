@@ -54,6 +54,14 @@ public class DashcamEventOverlayService extends Service {
                 R.string.notification_dashcam_oem_pause_overlay_text);
     }
 
+    public static void showOemResume(Context context) {
+        showBanner(
+                context,
+                R.string.dashcam_oem_resume_overlay_title,
+                R.string.dashcam_oem_resume_overlay_subtitle,
+                R.string.notification_dashcam_oem_resume_overlay_text);
+    }
+
     public static void showRecordingError(Context context, int subtitleResId, int notificationTextResId) {
         showBanner(
                 context,
