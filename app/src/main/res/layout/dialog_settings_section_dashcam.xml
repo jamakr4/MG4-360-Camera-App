@@ -76,7 +76,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center_vertical"
-            android:minHeight="44dp"
+            android:minHeight="56dp"
             android:orientation="horizontal">
 
             <TextView
@@ -169,9 +169,13 @@
             <EditText
                 android:id="@+id/etDashcamSignature"
                 style="@style/DrivehubSettingsSliderValue"
-                android:layout_width="180dp"
-                android:inputType="textCapWords"
-                android:maxLength="40" />
+                android:layout_width="220dp"
+                android:minHeight="44dp"
+                android:gravity="start|center_vertical"
+                android:inputType="textCapWords|textNoSuggestions"
+                android:imeOptions="flagNoExtractUi"
+                android:maxLength="40"
+                android:maxLines="1" />
 
         </LinearLayout>
 

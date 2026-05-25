@@ -7,6 +7,10 @@ import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.media.MediaCodec;
+import android.media.MediaExtractor;
+import android.media.MediaFormat;
+import android.media.MediaMuxer;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
@@ -20,6 +24,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -455,6 +460,7 @@ public class RecordingService extends Service {
 
     private EventCopyJob buildEventCopyJobLocked(EventCaptureRequest request) {
         List<String> baseNames = new ArrayList<>();
+        List<SegmentSlice> slices = new ArrayList<>();
         Set<String> copiedBases = new HashSet<>();
         for (SegmentInfo segment : recentSegments) {
             if (!segment.overlaps(request.captureStartMs, request.captureEndMs)) {
@@ -463,8 +469,13 @@ public class RecordingService extends Service {
             if (copiedBases.add(segment.baseName)) {
                 baseNames.add(segment.baseName);
             }
+            long sliceStartMs = Math.max(request.captureStartMs, segment.startMs);
+            long sliceEndMs = Math.min(request.captureEndMs, segment.endMs);
+            if (sliceEndMs > sliceStartMs) {
+                slices.add(new SegmentSlice(segment.baseName, segment.startMs, sliceStartMs, sliceEndMs));
+            }
         }
-        return new EventCopyJob(request.eventBaseName, baseNames);
+        return new EventCopyJob(request.eventBaseName, baseNames, slices);
     }
 
     private void copyEventSegments(EventCopyJob job) {
@@ -475,9 +486,183 @@ public class RecordingService extends Service {
         File eventDir = new File(getEventsBaseDir(), job.eventBaseName);
         // noinspection ResultOfMethodCallIgnored
         eventDir.mkdirs();
+        if (exportTrimmedEventClip(job, eventDir)) {
+            return;
+        }
         for (String baseName : job.baseNames) {
             copySegmentGroup(DashcamSettingsController.getRecordsBaseDir(), eventDir, baseName);
         }
+    }
+
+    private boolean exportTrimmedEventClip(EventCopyJob job, File eventDir) {
+        if (job.slices.isEmpty()) {
+            return false;
+        }
+        for (SegmentSlice slice : job.slices) {
+            if (!new File(DashcamSettingsController.getRecordsBaseDir(), slice.baseName + ".mp4").exists()) {
+                return false;
+            }
+        }
+
+        File outputFile = new File(eventDir, job.eventBaseName + ".mp4");
+        File tempFile = new File(eventDir, job.eventBaseName + ".tmp.mp4");
+        if (tempFile.exists() && !tempFile.delete()) {
+            Log.w(TAG, "Could not delete stale temp event file " + tempFile.getAbsolutePath());
+        }
+
+        MediaMuxer muxer = null;
+        ByteBuffer buffer = ByteBuffer.allocate(1024 * 1024);
+        int muxerTrackIndex = -1;
+        long outputOffsetUs = 0L;
+        boolean wroteAnySamples = false;
+
+        try {
+            muxer = new MediaMuxer(tempFile.getAbsolutePath(), MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
+            for (SegmentSlice slice : job.slices) {
+                MuxSliceResult result = appendSegmentSliceToMuxer(
+                        muxer, muxerTrackIndex, buffer, slice, outputOffsetUs);
+                muxerTrackIndex = result.trackIndex;
+                buffer = result.buffer;
+                outputOffsetUs = result.nextOutputOffsetUs;
+                wroteAnySamples |= result.wroteSamples;
+            }
+            if (!wroteAnySamples) {
+                Log.w(TAG, "No samples written for event clip " + job.eventBaseName);
+                return false;
+            }
+            muxer.stop();
+            muxer.release();
+            muxer = null;
+
+            if (outputFile.exists() && !outputFile.delete()) {
+                throw new IOException("delete old event clip failed: " + outputFile.getAbsolutePath());
+            }
+            if (!tempFile.renameTo(outputFile)) {
+                throw new IOException("rename event clip failed: " + tempFile.getAbsolutePath() + " -> " + outputFile.getAbsolutePath());
+            }
+            return true;
+        } catch (Throwable t) {
+            Log.e(TAG, "Failed to export trimmed event clip for " + job.eventBaseName, t);
+            return false;
+        } finally {
+            if (muxer != null) {
+                try {
+                    muxer.release();
+                } catch (Throwable ignored) {
+                }
+            }
+            if (tempFile.exists() && !outputFile.exists()) {
+                // noinspection ResultOfMethodCallIgnored
+                tempFile.delete();
+            }
+        }
+    }
+
+    private MuxSliceResult appendSegmentSliceToMuxer(
+            MediaMuxer muxer,
+            int existingTrackIndex,
+            ByteBuffer sharedBuffer,
+            SegmentSlice slice,
+            long outputOffsetUs
+    ) throws IOException {
+        MediaExtractor extractor = new MediaExtractor();
+        try {
+            File sourceFile = new File(DashcamSettingsController.getRecordsBaseDir(), slice.baseName + ".mp4");
+            extractor.setDataSource(sourceFile.getAbsolutePath());
+            int sourceTrackIndex = selectMuxableTrack(extractor);
+            if (sourceTrackIndex < 0) {
+                throw new IOException("No muxable track found in " + sourceFile.getAbsolutePath());
+            }
+            extractor.selectTrack(sourceTrackIndex);
+
+            long trimStartUs = Math.max(0L, (slice.sliceStartMs - slice.segmentStartMs) * 1000L);
+            long trimEndUs = Math.max(trimStartUs, (slice.sliceEndMs - slice.segmentStartMs) * 1000L);
+            extractor.seekTo(trimStartUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC);
+
+            int muxTrackIndex = existingTrackIndex;
+            if (muxTrackIndex < 0) {
+                MediaFormat format = extractor.getTrackFormat(sourceTrackIndex);
+                muxTrackIndex = muxer.addTrack(format);
+                muxer.start();
+            }
+
+            MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
+            long firstWrittenSourceTimeUs = -1L;
+            long previousWrittenSourceTimeUs = -1L;
+            long lastSampleDurationUs = 33_333L;
+            long lastWrittenOutputTimeUs = outputOffsetUs;
+            boolean wroteSamples = false;
+            ByteBuffer buffer = sharedBuffer;
+
+            while (true) {
+                long sampleTimeUs = extractor.getSampleTime();
+                if (sampleTimeUs < 0 || sampleTimeUs > trimEndUs) {
+                    break;
+                }
+
+                int sampleSize = (int) extractor.getSampleSize();
+                if (sampleSize <= 0) {
+                    if (!extractor.advance()) {
+                        break;
+                    }
+                    continue;
+                }
+
+                if (buffer.capacity() < sampleSize) {
+                    buffer = ByteBuffer.allocate(sampleSize * 2);
+                }
+                buffer.clear();
+
+                int bytesRead = extractor.readSampleData(buffer, 0);
+                if (bytesRead <= 0) {
+                    break;
+                }
+
+                if (firstWrittenSourceTimeUs < 0) {
+                    firstWrittenSourceTimeUs = sampleTimeUs;
+                }
+                if (previousWrittenSourceTimeUs >= 0) {
+                    lastSampleDurationUs = Math.max(1L, sampleTimeUs - previousWrittenSourceTimeUs);
+                }
+
+                long outputTimeUs = outputOffsetUs + Math.max(0L, sampleTimeUs - firstWrittenSourceTimeUs);
+                info.offset = 0;
+                info.size = bytesRead;
+                info.presentationTimeUs = outputTimeUs;
+                info.flags = extractor.getSampleFlags();
+                muxer.writeSampleData(muxTrackIndex, buffer, info);
+
+                previousWrittenSourceTimeUs = sampleTimeUs;
+                lastWrittenOutputTimeUs = outputTimeUs;
+                wroteSamples = true;
+
+                if (!extractor.advance()) {
+                    break;
+                }
+            }
+
+            long nextOutputOffsetUs = outputOffsetUs;
+            if (wroteSamples) {
+                nextOutputOffsetUs = lastWrittenOutputTimeUs + lastSampleDurationUs;
+            }
+            return new MuxSliceResult(muxTrackIndex, buffer, nextOutputOffsetUs, wroteSamples);
+        } finally {
+            try {
+                extractor.release();
+            } catch (Throwable ignored) {
+            }
+        }
+    }
+
+    private int selectMuxableTrack(MediaExtractor extractor) {
+        for (int i = 0; i < extractor.getTrackCount(); i++) {
+            MediaFormat format = extractor.getTrackFormat(i);
+            String mime = format.getString(MediaFormat.KEY_MIME);
+            if (mime != null && mime.startsWith("video/")) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     private void copySegmentGroup(File sourceDir, File targetDir, String baseName) {
@@ -855,10 +1040,40 @@ public class RecordingService extends Service {
     private static final class EventCopyJob {
         final String eventBaseName;
         final List<String> baseNames;
+        final List<SegmentSlice> slices;
 
-        EventCopyJob(String eventBaseName, List<String> baseNames) {
+        EventCopyJob(String eventBaseName, List<String> baseNames, List<SegmentSlice> slices) {
             this.eventBaseName = eventBaseName;
             this.baseNames = baseNames;
+            this.slices = slices;
+        }
+    }
+
+    private static final class SegmentSlice {
+        final String baseName;
+        final long segmentStartMs;
+        final long sliceStartMs;
+        final long sliceEndMs;
+
+        SegmentSlice(String baseName, long segmentStartMs, long sliceStartMs, long sliceEndMs) {
+            this.baseName = baseName;
+            this.segmentStartMs = segmentStartMs;
+            this.sliceStartMs = sliceStartMs;
+            this.sliceEndMs = sliceEndMs;
+        }
+    }
+
+    private static final class MuxSliceResult {
+        final int trackIndex;
+        final ByteBuffer buffer;
+        final long nextOutputOffsetUs;
+        final boolean wroteSamples;
+
+        MuxSliceResult(int trackIndex, ByteBuffer buffer, long nextOutputOffsetUs, boolean wroteSamples) {
+            this.trackIndex = trackIndex;
+            this.buffer = buffer;
+            this.nextOutputOffsetUs = nextOutputOffsetUs;
+            this.wroteSamples = wroteSamples;
         }
     }
 
