@@ -3,19 +3,24 @@ package com.drivehub.kamera;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.util.Log;
 
 public class BootReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
-        if (intent == null || intent.getAction() == null) return;
-        if (!Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())) return;
+        if (intent == null || intent.getAction() == null)
+            return;
+        if (!Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction()))
+            return;
 
-        // On boot, start both recording (if enabled) and the signal listener.
-        // The `overlayOnSignal` setting controls overlay behavior; without the signal service, the overlay cannot trigger.
-        RecordingService.startIfNeeded(context);
+        RecordingService.startIfDashcamEnabled(context);
+
+        // SignalService startup binds the Car API and may fall back to polling — guard
+        // so a binding failure surfaces in logcat instead of crashing the boot receiver.
         try {
             SignalService.start(context);
-        } catch (Throwable ignored) {
+        } catch (Exception e) {
+            Log.w("BootReceiver", "Failed to start SignalService on boot", e);
         }
     }
 }

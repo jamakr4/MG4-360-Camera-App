@@ -156,6 +156,11 @@
     <string name="notification_overlay_text">Signal camera overlay active</string>
     <string name="notification_dashcam_event_overlay_text">Dashcam event is being secured</string>
     <string name="notification_dashcam_oem_pause_overlay_text">Dashcam paused so the OEM camera can open</string>
+    <string name="notification_dashcam_recording_error_text">Dashcam recording needs attention</string>
+    <string name="notification_dashcam_recording_error_storage_text">Dashcam cannot write to storage</string>
+    <string name="notification_dashcam_recording_error_start_failed_text">Dashcam recording could not start</string>
+    <string name="notification_dashcam_recording_error_stop_failed_text">Dashcam recording stopped unexpectedly</string>
+    <string name="notification_dashcam_recording_recovered_text">Dashcam recording resumed</string>
     <string name="notification_recording_starting">Starting recording…</string>
     <string name="notification_recording_status">%1$d/%2$d cameras recording</string>
     <string name="notification_recording_paused_oem">Recording paused so the OEM camera can open</string>
@@ -166,4 +171,11 @@
     <string name="dashcam_event_overlay_subtitle">The last and next minute are being secured.</string>
     <string name="dashcam_oem_pause_overlay_title">Dashcam paused</string>
     <string name="dashcam_oem_pause_overlay_subtitle">The OEM camera is being opened. Recording resumes automatically afterwards.</string>
+    <string name="dashcam_recording_error_overlay_title">Dashcam inactive</string>
+    <string name="dashcam_recording_error_overlay_subtitle_generic">Recording is currently unavailable.</string>
+    <string name="dashcam_recording_error_overlay_subtitle_storage">Storage is not writable. Check free space and media availability.</string>
+    <string name="dashcam_recording_error_overlay_subtitle_start_failed">Recording could not be started.</string>
+    <string name="dashcam_recording_error_overlay_subtitle_stop_failed">Recording stopped unexpectedly.</string>
+    <string name="dashcam_recording_recovered_overlay_title">Dashcam active again</string>
+    <string name="dashcam_recording_recovered_overlay_subtitle">Recording has resumed automatically.</string>
 </resources>

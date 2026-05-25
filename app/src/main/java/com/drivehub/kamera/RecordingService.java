@@ -7,7 +7,9 @@ import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.os.SystemClock;
 import android.util.Log;
 
@@ -60,21 +62,27 @@ public class RecordingService extends Service {
     private static final long TEST_RECORDING_MS = 10_000L;
     private static final long EVENT_PRE_ROLL_MS = 60_000L;
     private static final long EVENT_POST_ROLL_MS = 60_000L;
+    private static final long ERROR_OVERLAY_DELAY_MS = 5_000L;
 
     private static volatile boolean sServiceRunning = false;
 
     private final Object eventLock = new Object();
     private final Object stateLock = new Object();
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private Thread worker;
     private volatile boolean stopRequested = false;
     private volatile boolean segmentStopRequested = false;
     private volatile boolean oemPauseRequested = false;
+    private volatile int pendingErrorSubtitleResId = 0;
+    private volatile int pendingErrorNotificationResId = 0;
+    private volatile int pendingErrorGeneration = 0;
+    private volatile boolean errorOverlayShown = false;
 
     public static boolean isRunning() {
         return sServiceRunning;
     }
 
-    public static void startIfNeeded(Context context) {
+    public static void startIfDashcamEnabled(Context context) {
         SharedPreferences prefs = UiPrefs.getPrefs(context);
         boolean enabled = prefs.getBoolean(DashcamSettingsController.KEY_ENABLED, false);
         if (!enabled)
@@ -646,6 +654,8 @@ public class RecordingService extends Service {
             }
         }
 
+        updateDashcamOverlayState(status, lastError);
+
         Intent intent = new Intent(ACTION_STATUS_CHANGED);
         intent.setPackage(getPackageName());
         intent.putExtra(EXTRA_STATUS, status);
@@ -653,6 +663,77 @@ public class RecordingService extends Service {
         intent.putExtra(EXTRA_TOTAL_CAMERAS, totalCameras);
         intent.putExtra(EXTRA_LAST_ERROR, lastError);
         sendBroadcast(intent);
+    }
+
+    private void updateDashcamOverlayState(String status, String lastError) {
+        if (STATUS_ERROR.equals(status) || STATUS_PARTIAL.equals(status)) {
+            scheduleDelayedErrorOverlay(lastError);
+            return;
+        }
+
+        cancelPendingErrorOverlay();
+        if (errorOverlayShown && STATUS_RECORDING.equals(status)) {
+            errorOverlayShown = false;
+            DashcamEventOverlayService.showRecordingRecovered(this);
+        } else if (!STATUS_RECORDING.equals(status)) {
+            errorOverlayShown = false;
+        }
+    }
+
+    private void scheduleDelayedErrorOverlay(String lastError) {
+        OverlayMessageSpec spec = mapRecordingError(lastError);
+        if (spec == null) {
+            cancelPendingErrorOverlay();
+            return;
+        }
+        if (errorOverlayShown
+                && pendingErrorSubtitleResId == spec.subtitleResId
+                && pendingErrorNotificationResId == spec.notificationTextResId) {
+            return;
+        }
+
+        pendingErrorSubtitleResId = spec.subtitleResId;
+        pendingErrorNotificationResId = spec.notificationTextResId;
+        final int generation = ++pendingErrorGeneration;
+        mainHandler.removeCallbacksAndMessages(this);
+        mainHandler.postAtTime(() -> {
+            if (generation != pendingErrorGeneration) {
+                return;
+            }
+            errorOverlayShown = true;
+            DashcamEventOverlayService.showRecordingError(
+                    RecordingService.this,
+                    pendingErrorSubtitleResId,
+                    pendingErrorNotificationResId);
+        }, this, SystemClock.uptimeMillis() + ERROR_OVERLAY_DELAY_MS);
+    }
+
+    private void cancelPendingErrorOverlay() {
+        pendingErrorGeneration++;
+        pendingErrorSubtitleResId = 0;
+        pendingErrorNotificationResId = 0;
+        mainHandler.removeCallbacksAndMessages(this);
+    }
+
+    private OverlayMessageSpec mapRecordingError(String lastError) {
+        if ("storage not writable".equals(lastError)) {
+            return new OverlayMessageSpec(
+                    R.string.dashcam_recording_error_overlay_subtitle_storage,
+                    R.string.notification_dashcam_recording_error_storage_text);
+        }
+        if ("grid start failed".equals(lastError)) {
+            return new OverlayMessageSpec(
+                    R.string.dashcam_recording_error_overlay_subtitle_start_failed,
+                    R.string.notification_dashcam_recording_error_start_failed_text);
+        }
+        if ("grid stop timeout".equals(lastError)) {
+            return new OverlayMessageSpec(
+                    R.string.dashcam_recording_error_overlay_subtitle_stop_failed,
+                    R.string.notification_dashcam_recording_error_stop_failed_text);
+        }
+        return new OverlayMessageSpec(
+                R.string.dashcam_recording_error_overlay_subtitle_generic,
+                R.string.notification_dashcam_recording_error_text);
     }
 
     private SharedPreferences prefs() {
@@ -679,6 +760,7 @@ public class RecordingService extends Service {
     public void onDestroy() {
         sServiceRunning = false;
         stopRequested = true;
+        cancelPendingErrorOverlay();
         if (worker != null) {
             worker.interrupt();
             try {
@@ -727,6 +809,16 @@ public class RecordingService extends Service {
         EventCopyJob(String eventBaseName, List<String> baseNames) {
             this.eventBaseName = eventBaseName;
             this.baseNames = baseNames;
+        }
+    }
+
+    private static final class OverlayMessageSpec {
+        final int subtitleResId;
+        final int notificationTextResId;
+
+        OverlayMessageSpec(int subtitleResId, int notificationTextResId) {
+            this.subtitleResId = subtitleResId;
+            this.notificationTextResId = notificationTextResId;
         }
     }
 }

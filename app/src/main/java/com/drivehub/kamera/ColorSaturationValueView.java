@@ -46,7 +46,7 @@ final class ColorSaturationValueView extends View {
 
     private void init() {
         markerPaint.setStyle(Paint.Style.FILL);
-        markerPaint.setColor(0x00FFFFFF);
+        markerPaint.setColor(0x00FFFFFF); // Transparent
         markerOutlinePaint.setStyle(Paint.Style.STROKE);
         markerOutlinePaint.setStrokeWidth(dp(2f));
         markerOutlinePaint.setColor(0xFFFFFFFF);
@@ -76,7 +76,8 @@ final class ColorSaturationValueView extends View {
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
         float radius = dp(12f);
-        // Build the picker field in layers: pure hue, then wash it with white and black gradients.
+        // Build the picker field in layers: pure hue, then wash it with white and black
+        // gradients.
         canvas.drawRoundRect(contentRect, radius, radius, fieldPaint);
         canvas.drawRoundRect(contentRect, radius, radius, saturationOverlayPaint);
         canvas.drawRoundRect(contentRect, radius, radius, valueOverlayPaint);
@@ -90,7 +91,8 @@ final class ColorSaturationValueView extends View {
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
-        if (event == null) return false;
+        if (event == null)
+            return false;
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
             case MotionEvent.ACTION_MOVE:
@@ -103,8 +105,10 @@ final class ColorSaturationValueView extends View {
     }
 
     private void updateFromTouch(float x, float y) {
-        if (contentRect.width() <= 0f || contentRect.height() <= 0f) return;
-        // Horizontal movement changes saturation, vertical movement changes brightness/value.
+        if (contentRect.width() <= 0f || contentRect.height() <= 0f)
+            return;
+        // Horizontal movement changes saturation, vertical movement changes
+        // brightness/value.
         saturation = clamp((x - contentRect.left) / contentRect.width(), 0f, 1f);
         value = clamp(1f - ((y - contentRect.top) / contentRect.height()), 0f, 1f);
         invalidate();
@@ -114,8 +118,9 @@ final class ColorSaturationValueView extends View {
     }
 
     private void updateShader() {
-        if (contentRect.width() <= 0f || contentRect.height() <= 0f) return;
-        int hueColor = android.graphics.Color.HSVToColor(new float[]{hue, 1f, 1f});
+        if (contentRect.width() <= 0f || contentRect.height() <= 0f)
+            return;
+        int hueColor = android.graphics.Color.HSVToColor(new float[] { hue, 1f, 1f });
         fieldPaint.setShader(null);
         fieldPaint.setColor(hueColor);
 
@@ -127,8 +132,7 @@ final class ColorSaturationValueView extends View {
                 contentRect.top,
                 0xFFFFFFFF,
                 0x00FFFFFF,
-                Shader.TileMode.CLAMP
-        );
+                Shader.TileMode.CLAMP);
         saturationOverlayPaint.setShader(saturationShader);
 
         // Fade from transparent to black to cover value/brightness on the Y axis.
@@ -139,8 +143,7 @@ final class ColorSaturationValueView extends View {
                 contentRect.bottom,
                 0x00FFFFFF,
                 0xFF000000,
-                Shader.TileMode.CLAMP
-        );
+                Shader.TileMode.CLAMP);
         valueOverlayPaint.setShader(valueShader);
     }
 

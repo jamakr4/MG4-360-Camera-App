@@ -18,6 +18,8 @@ final class ColorHueStripView extends View {
         void onHueChanged(float hue);
     }
 
+    // Six primary/secondary hue stops with red repeated at the end so the gradient closes
+    // the wheel back to red instead of fading out at magenta.
     private static final int[] HUE_COLORS = new int[]{
             0xFFFF0000,
             0xFFFFFF00,

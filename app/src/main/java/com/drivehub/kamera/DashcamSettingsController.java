@@ -71,7 +71,7 @@ final class DashcamSettingsController {
                                 .show();
                     }
                     saveFields(prefs, etSegmentMin, etTotalMin, etRecordingFps, etSignature, false);
-                    RecordingService.startIfNeeded(activity);
+                    RecordingService.startIfDashcamEnabled(activity);
                 } else {
                     RecordingService.stopIfRunning(activity);
                 }

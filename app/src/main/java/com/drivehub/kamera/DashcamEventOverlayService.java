@@ -35,22 +35,39 @@ public class DashcamEventOverlayService extends Service {
     private android.widget.TextView titleView;
     private android.widget.TextView subtitleView;
 
+    // Show the standard dashcam event confirmation banner using string resources.
     public static void showConfirmation(Context context) {
         showBanner(
                 context,
                 R.string.dashcam_event_overlay_title,
                 R.string.dashcam_event_overlay_subtitle,
-                R.string.notification_dashcam_event_overlay_text
-        );
+                R.string.notification_dashcam_event_overlay_text);
     }
 
+    // Show the OEM pause banner when recording must pause while the OEM app is
+    // foregrounded.
     public static void showOemPause(Context context) {
         showBanner(
                 context,
                 R.string.dashcam_oem_pause_overlay_title,
                 R.string.dashcam_oem_pause_overlay_subtitle,
-                R.string.notification_dashcam_oem_pause_overlay_text
-        );
+                R.string.notification_dashcam_oem_pause_overlay_text);
+    }
+
+    public static void showRecordingError(Context context, int subtitleResId, int notificationTextResId) {
+        showBanner(
+                context,
+                R.string.dashcam_recording_error_overlay_title,
+                subtitleResId,
+                notificationTextResId);
+    }
+
+    public static void showRecordingRecovered(Context context) {
+        showBanner(
+                context,
+                R.string.dashcam_recording_recovered_overlay_title,
+                R.string.dashcam_recording_recovered_overlay_subtitle,
+                R.string.notification_dashcam_recording_recovered_text);
     }
 
     private static void showBanner(Context context, int titleResId, int subtitleResId, int notificationTextResId) {
@@ -108,8 +125,7 @@ public class DashcamEventOverlayService extends Service {
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
                         | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
                         | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-                PixelFormat.TRANSLUCENT
-        );
+                PixelFormat.TRANSLUCENT);
         params.gravity = Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
         params.y = dpToPx(32);
 
@@ -149,10 +165,8 @@ public class DashcamEventOverlayService extends Service {
         NotificationChannel channel = new NotificationChannel(
                 CHANNEL_ID,
                 getString(R.string.notification_channel_dashcam_event_overlay),
-                NotificationManager.IMPORTANCE_LOW
-        );
-        NotificationManager notificationManager =
-                (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+                NotificationManager.IMPORTANCE_LOW);
+        NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         if (notificationManager != null) {
             notificationManager.createNotificationChannel(channel);
         }

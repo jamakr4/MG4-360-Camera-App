@@ -156,6 +156,11 @@
     <string name="notification_overlay_text">Signal-Kamera-Overlay aktiv</string>
     <string name="notification_dashcam_event_overlay_text">Dashcam-Ereignis wird gesichert</string>
     <string name="notification_dashcam_oem_pause_overlay_text">Dashcam pausiert, damit die OEM-Kamera geoeffnet werden kann</string>
+    <string name="notification_dashcam_recording_error_text">Dashcam-Aufnahme braucht Aufmerksamkeit</string>
+    <string name="notification_dashcam_recording_error_storage_text">Dashcam kann nicht auf den Speicher schreiben</string>
+    <string name="notification_dashcam_recording_error_start_failed_text">Dashcam-Aufnahme konnte nicht gestartet werden</string>
+    <string name="notification_dashcam_recording_error_stop_failed_text">Dashcam-Aufnahme wurde unerwartet beendet</string>
+    <string name="notification_dashcam_recording_recovered_text">Dashcam-Aufnahme wurde fortgesetzt</string>
     <string name="notification_recording_starting">Aufnahme wird gestartet…</string>
     <string name="notification_recording_status">%1$d/%2$d Kameras nehmen auf</string>
     <string name="notification_recording_paused_oem">Aufnahme pausiert, damit die OEM-Kamera geoeffnet werden kann</string>
@@ -166,4 +171,11 @@
     <string name="dashcam_event_overlay_subtitle">Die letzte und die nächste Minute werden gesichert.</string>
     <string name="dashcam_oem_pause_overlay_title">Dashcam pausiert</string>
     <string name="dashcam_oem_pause_overlay_subtitle">Die OEM-Kamera wird geoeffnet. Danach startet die Aufnahme automatisch weiter.</string>
+    <string name="dashcam_recording_error_overlay_title">Dashcam inaktiv</string>
+    <string name="dashcam_recording_error_overlay_subtitle_generic">Die Aufnahme ist derzeit nicht verfuegbar.</string>
+    <string name="dashcam_recording_error_overlay_subtitle_storage">Auf den Speicher kann nicht geschrieben werden. Bitte freien Speicher und Medium pruefen.</string>
+    <string name="dashcam_recording_error_overlay_subtitle_start_failed">Die Aufnahme konnte nicht gestartet werden.</string>
+    <string name="dashcam_recording_error_overlay_subtitle_stop_failed">Die Aufnahme wurde unerwartet beendet.</string>
+    <string name="dashcam_recording_recovered_overlay_title">Dashcam wieder aktiv</string>
+    <string name="dashcam_recording_recovered_overlay_subtitle">Die Aufnahme wurde automatisch fortgesetzt.</string>
 </resources>
