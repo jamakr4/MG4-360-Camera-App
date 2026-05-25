@@ -68,7 +68,8 @@ final class SettingsAppearanceController {
             TextView tabDashcam,
             TextView tabOptik,
             TextView tabCredits,
-            TextView tabDev
+            TextView tabDev,
+            TextView tabDevStatus
     ) {
         this.prefs = prefs;
         this.dialogClose = dialogClose;
@@ -93,7 +94,8 @@ final class SettingsAppearanceController {
                 tabDashcam,
                 tabOptik,
                 tabCredits,
-                tabDev
+                tabDev,
+                tabDevStatus
         };
 
         int savedRadius = UiPrefs.getTileCornerRadiusSetting(prefs);

@@ -76,6 +76,10 @@ public class SignalService extends Service {
         context.startForegroundService(i);
     }
 
+    public static boolean isRunning() {
+        return sInstance != null;
+    }
+
     public static void requestRecheck() {
         SignalService inst = sInstance;
         if (inst == null) return;

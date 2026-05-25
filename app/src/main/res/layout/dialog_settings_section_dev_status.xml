@@ -1,0 +1,250 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/sectionDevStatus"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:visibility="gone">
+
+    <TextView
+        style="@style/DrivehubSettingsCardLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="8dp"
+        android:text="@string/settings_dev_status_runtime" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_settings_inline_card"
+        android:orientation="vertical"
+        android:paddingStart="18dp"
+        android:paddingTop="14dp"
+        android:paddingEnd="18dp"
+        android:paddingBottom="14dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:minHeight="36dp"
+            android:orientation="horizontal">
+
+            <TextView
+                style="@style/DrivehubSettingsCardRowLabel"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/settings_dev_status_signal_service" />
+
+            <TextView
+                android:id="@+id/tvDevStatusSignalService"
+                style="@style/DrivehubSettingsBodyMuted"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:minHeight="36dp"
+            android:orientation="horizontal">
+
+            <TextView
+                style="@style/DrivehubSettingsCardRowLabel"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/settings_dev_status_recording_service" />
+
+            <TextView
+                android:id="@+id/tvDevStatusRecordingService"
+                style="@style/DrivehubSettingsBodyMuted"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:minHeight="36dp"
+            android:orientation="horizontal">
+
+            <TextView
+                style="@style/DrivehubSettingsCardRowLabel"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/settings_dev_status_dashcam_enabled" />
+
+            <TextView
+                android:id="@+id/tvDevStatusDashcamEnabled"
+                style="@style/DrivehubSettingsBodyMuted"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:minHeight="36dp"
+            android:orientation="horizontal">
+
+            <TextView
+                style="@style/DrivehubSettingsCardRowLabel"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/settings_dev_status_recording_state" />
+
+            <TextView
+                android:id="@+id/tvDevStatusRecordingState"
+                style="@style/DrivehubSettingsBodyMuted"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:minHeight="36dp"
+            android:orientation="horizontal">
+
+            <TextView
+                style="@style/DrivehubSettingsCardRowLabel"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/settings_dev_status_last_error" />
+
+            <TextView
+                android:id="@+id/tvDevStatusLastError"
+                style="@style/DrivehubSettingsBodyMuted"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <TextView
+        style="@style/DrivehubSettingsCardLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="22dp"
+        android:layout_marginBottom="8dp"
+        android:text="@string/settings_dev_status_cameras" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_settings_inline_card"
+        android:orientation="vertical"
+        android:paddingStart="18dp"
+        android:paddingTop="14dp"
+        android:paddingEnd="18dp"
+        android:paddingBottom="14dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:minHeight="36dp"
+            android:orientation="horizontal">
+
+            <TextView
+                style="@style/DrivehubSettingsCardRowLabel"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/settings_dev_status_available_cameras" />
+
+            <TextView
+                android:id="@+id/tvDevStatusAvailableCameras"
+                style="@style/DrivehubSettingsBodyMuted"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+
+        </LinearLayout>
+
+        <TextView
+            style="@style/DrivehubSettingsCardRowLabel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="@string/settings_dev_status_camera_probe" />
+
+        <TextView
+            android:id="@+id/tvDevStatusCameraProbe"
+            style="@style/DrivehubSettingsBodyMuted"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp" />
+
+    </LinearLayout>
+
+    <TextView
+        style="@style/DrivehubSettingsCardLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="22dp"
+        android:layout_marginBottom="8dp"
+        android:text="@string/settings_dev_status_storage" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_settings_inline_card"
+        android:orientation="vertical"
+        android:paddingStart="18dp"
+        android:paddingTop="14dp"
+        android:paddingEnd="18dp"
+        android:paddingBottom="14dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:minHeight="36dp"
+            android:orientation="horizontal">
+
+            <TextView
+                style="@style/DrivehubSettingsCardRowLabel"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/settings_dev_status_storage_writable" />
+
+            <TextView
+                android:id="@+id/tvDevStatusStorageWritable"
+                style="@style/DrivehubSettingsBodyMuted"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+
+        </LinearLayout>
+
+        <TextView
+            style="@style/DrivehubSettingsCardRowLabel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="@string/settings_dev_status_records_path" />
+
+        <TextView
+            android:id="@+id/tvDevStatusRecordsPath"
+            style="@style/DrivehubSettingsBodyMuted"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp" />
+
+    </LinearLayout>
+
+</LinearLayout>

@@ -30,6 +30,8 @@ import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
+import java.io.File;
+
 public class MainActivity extends AppCompatActivity implements SurfaceHolder.Callback {
 
     private static final String AVM_PREFS_NAME = "AVM_Settings";
@@ -42,6 +44,15 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private View recordingStatusDot;
     private TextView tvRecordingStatus;
     private TextView tvDashcamDialogStatus;
+    private TextView tvDevStatusSignalService;
+    private TextView tvDevStatusRecordingService;
+    private TextView tvDevStatusDashcamEnabled;
+    private TextView tvDevStatusRecordingState;
+    private TextView tvDevStatusLastError;
+    private TextView tvDevStatusAvailableCameras;
+    private TextView tvDevStatusCameraProbe;
+    private TextView tvDevStatusStorageWritable;
+    private TextView tvDevStatusRecordsPath;
     private Button btnRecordTestClip;
     private int currentVideoIndex = 15;
     private int activePreviewCameraIndex = -1;
@@ -293,6 +304,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         TextView tabOptik = dialog.findViewById(R.id.tabOptik);
         TextView tabCredits = dialog.findViewById(R.id.tabCredits);
         TextView tabDev = dialog.findViewById(R.id.tabDev);
+        TextView tabDevStatus = dialog.findViewById(R.id.tabDevStatus);
         TextView[] settingsTabs = {
                 tabUpdate,
                 tabSettings,
@@ -300,7 +312,8 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 tabDashcam,
                 tabOptik,
                 tabCredits,
-                tabDev
+                tabDev,
+                tabDevStatus
         };
         View sectionUpdate = dialog.findViewById(R.id.sectionUpdate);
         View sectionSettings = dialog.findViewById(R.id.sectionSettings);
@@ -309,6 +322,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         View sectionOptik = dialog.findViewById(R.id.sectionOptik);
         View sectionCredits = dialog.findViewById(R.id.sectionCredits);
         View sectionDev = dialog.findViewById(R.id.sectionDev);
+        View sectionDevStatus = dialog.findViewById(R.id.sectionDevStatus);
         View[] settingsSections = {
                 sectionUpdate,
                 sectionSettings,
@@ -316,12 +330,23 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 sectionDashcam,
                 sectionOptik,
                 sectionCredits,
-                sectionDev
+                sectionDev,
+                sectionDevStatus
         };
         View accentRow = dialog.findViewById(R.id.rowAccentColor);
         View accentPreview = dialog.findViewById(R.id.viewAccentPreview);
         EditText etAccentColor = dialog.findViewById(R.id.etAccentColor);
         Button btnDevTestDashcamBanner = dialog.findViewById(R.id.btnDevTestDashcamBanner);
+        tvDevStatusSignalService = dialog.findViewById(R.id.tvDevStatusSignalService);
+        tvDevStatusRecordingService = dialog.findViewById(R.id.tvDevStatusRecordingService);
+        tvDevStatusDashcamEnabled = dialog.findViewById(R.id.tvDevStatusDashcamEnabled);
+        tvDevStatusRecordingState = dialog.findViewById(R.id.tvDevStatusRecordingState);
+        tvDevStatusLastError = dialog.findViewById(R.id.tvDevStatusLastError);
+        tvDevStatusAvailableCameras = dialog.findViewById(R.id.tvDevStatusAvailableCameras);
+        tvDevStatusCameraProbe = dialog.findViewById(R.id.tvDevStatusCameraProbe);
+        tvDevStatusStorageWritable = dialog.findViewById(R.id.tvDevStatusStorageWritable);
+        tvDevStatusRecordsPath = dialog.findViewById(R.id.tvDevStatusRecordsPath);
+        refreshDevStatusSection();
 
         signalCameraSettingsController.bind(
                 prefs,
@@ -372,7 +397,8 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 tabDashcam,
                 tabOptik,
                 tabCredits,
-                tabDev
+                tabDev,
+                tabDevStatus
         );
 
         if (btnDevTestDashcamBanner != null) {
@@ -411,6 +437,9 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             if (tabDev != null) {
                 tabDev.setVisibility(View.VISIBLE);
             }
+            if (tabDevStatus != null) {
+                tabDevStatus.setVisibility(View.VISIBLE);
+            }
             switchSettingsTab(settingsTabs, settingsSections, 6);
             Toast.makeText(this, R.string.settings_dev_unlocked, Toast.LENGTH_SHORT).show();
         };
@@ -432,6 +461,15 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         dialog.setOnDismissListener(d -> {
             sSettingsDialogOpen = false;
             tvDashcamDialogStatus = null;
+            tvDevStatusSignalService = null;
+            tvDevStatusRecordingService = null;
+            tvDevStatusDashcamEnabled = null;
+            tvDevStatusRecordingState = null;
+            tvDevStatusLastError = null;
+            tvDevStatusAvailableCameras = null;
+            tvDevStatusCameraProbe = null;
+            tvDevStatusStorageWritable = null;
+            tvDevStatusRecordsPath = null;
             appearanceController.applyMainUiIconColors();
             SignalService.requestRecheck();
         });
@@ -504,26 +542,28 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             recordingStatusPill.setVisibility(View.GONE);
             resetTestClipButton();
             renderDashcamDialogStatus(getString(R.string.settings_dashcam_status_off));
+            refreshDevStatusSection(status, activeCameras, totalCameras, lastError);
             restartPreviewAfterTestClipIfNeeded();
             return;
         }
 
         recordingStatusPill.setVisibility(View.VISIBLE);
+        String dialogStatusText = buildRecordingStatusText(status, activeCameras, totalCameras, lastError);
         if (RecordingService.STATUS_RECORDING.equals(status)) {
             if (btnRecordTestClip != null) btnRecordTestClip.setEnabled(false);
             recordingStatusDot.setVisibility(View.VISIBLE);
             tvRecordingStatus.setText(getString(R.string.main_recording_indicator, activeCameras, totalCameras));
-            renderDashcamDialogStatus(getString(R.string.settings_dashcam_status_recording, activeCameras, totalCameras));
+            renderDashcamDialogStatus(dialogStatusText);
         } else if (RecordingService.STATUS_PAUSED_OEM.equals(status)) {
             if (btnRecordTestClip != null) btnRecordTestClip.setEnabled(false);
             recordingStatusDot.setVisibility(View.GONE);
             tvRecordingStatus.setText(R.string.main_recording_paused_oem);
-            renderDashcamDialogStatus(getString(R.string.settings_dashcam_status_paused_oem));
+            renderDashcamDialogStatus(dialogStatusText);
         } else if (RecordingService.STATUS_STARTING.equals(status)) {
             if (btnRecordTestClip != null) btnRecordTestClip.setEnabled(false);
             recordingStatusDot.setVisibility(View.VISIBLE);
             tvRecordingStatus.setText(R.string.main_recording_starting);
-            renderDashcamDialogStatus(getString(R.string.settings_dashcam_status_starting));
+            renderDashcamDialogStatus(dialogStatusText);
         } else {
             if (activeCameras <= 0) {
                 resetTestClipButton();
@@ -533,11 +573,12 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                     ? status
                     : lastError.trim();
             tvRecordingStatus.setText(getString(R.string.main_recording_error, error));
-            renderDashcamDialogStatus(getString(R.string.settings_dashcam_status_error, error));
+            renderDashcamDialogStatus(dialogStatusText);
             if (activeCameras <= 0) {
                 restartPreviewAfterTestClipIfNeeded();
             }
         }
+        refreshDevStatusSection(status, activeCameras, totalCameras, lastError);
     }
 
     private void resetTestClipButton() {
@@ -550,6 +591,105 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         if (tvDashcamDialogStatus != null) {
             tvDashcamDialogStatus.setText(text);
         }
+    }
+
+    private String buildRecordingStatusText(String status, int activeCameras, int totalCameras, String lastError) {
+        if (status == null || RecordingService.STATUS_OFF.equals(status)) {
+            return getString(R.string.settings_dashcam_status_off);
+        }
+        if (RecordingService.STATUS_RECORDING.equals(status)) {
+            return getString(R.string.settings_dashcam_status_recording, activeCameras, totalCameras);
+        }
+        if (RecordingService.STATUS_PAUSED_OEM.equals(status)) {
+            return getString(R.string.settings_dashcam_status_paused_oem);
+        }
+        if (RecordingService.STATUS_STARTING.equals(status)) {
+            return getString(R.string.settings_dashcam_status_starting);
+        }
+        String error = lastError == null || lastError.trim().isEmpty()
+                ? status
+                : lastError.trim();
+        return getString(R.string.settings_dashcam_status_error, error);
+    }
+
+    private void refreshDevStatusSection() {
+        SharedPreferences prefs = UiPrefs.getPrefs(this);
+        refreshDevStatusSection(
+                prefs.getString("recordingStatus", RecordingService.STATUS_OFF),
+                prefs.getInt("recordingActiveCameras", 0),
+                prefs.getInt("recordingTotalCameras", 4),
+                prefs.getString("recordingLastError", "")
+        );
+    }
+
+    private void refreshDevStatusSection(String recordingStatus, int activeCameras, int totalCameras, String lastError) {
+        if (tvDevStatusSignalService == null
+                || tvDevStatusRecordingService == null
+                || tvDevStatusDashcamEnabled == null
+                || tvDevStatusRecordingState == null
+                || tvDevStatusLastError == null
+                || tvDevStatusAvailableCameras == null
+                || tvDevStatusCameraProbe == null
+                || tvDevStatusStorageWritable == null
+                || tvDevStatusRecordsPath == null) {
+            return;
+        }
+
+        SharedPreferences prefs = UiPrefs.getPrefs(this);
+        File recordsDir = DashcamSettingsController.getRecordsBaseDir();
+        String error = lastError == null || lastError.trim().isEmpty()
+                ? getString(R.string.settings_status_none)
+                : lastError.trim();
+        String cameraProbe = readCameraProbeSummary();
+
+        tvDevStatusSignalService.setText(getString(
+                SignalService.isRunning() ? R.string.settings_status_active : R.string.settings_status_inactive));
+        tvDevStatusRecordingService.setText(getString(
+                RecordingService.isRunning() ? R.string.settings_status_active : R.string.settings_status_inactive));
+        tvDevStatusDashcamEnabled.setText(getString(
+                prefs.getBoolean(DashcamSettingsController.KEY_ENABLED, false)
+                        ? R.string.settings_status_enabled
+                        : R.string.settings_status_disabled));
+        tvDevStatusRecordingState.setText(buildRecordingStatusText(
+                recordingStatus,
+                activeCameras,
+                totalCameras,
+                lastError));
+        tvDevStatusLastError.setText(error);
+        tvDevStatusAvailableCameras.setText(String.valueOf(countExpectedAvailableCameras(cameraProbe)));
+        tvDevStatusCameraProbe.setText(cameraProbe);
+        tvDevStatusStorageWritable.setText(getString(
+                recordsDir.exists() && recordsDir.canWrite()
+                        ? R.string.settings_status_active
+                        : R.string.settings_status_inactive));
+        tvDevStatusRecordsPath.setText(recordsDir.getAbsolutePath());
+    }
+
+    private String readCameraProbeSummary() {
+        try {
+            String summary = CameraProbe.probeAll(18);
+            if (summary == null || summary.trim().isEmpty()) {
+                return getString(R.string.settings_status_none);
+            }
+            return summary.trim();
+        } catch (Throwable t) {
+            return t.getClass().getSimpleName();
+        }
+    }
+
+    private int countExpectedAvailableCameras(String cameraProbe) {
+        if (cameraProbe == null || cameraProbe.trim().isEmpty()) {
+            return 0;
+        }
+        int[] expectedVideoIndexes = {14, 15, 16, 17};
+        int count = 0;
+        for (int videoIndex : expectedVideoIndexes) {
+            if (cameraProbe.contains("/dev/video" + videoIndex)
+                    || cameraProbe.contains("video" + videoIndex)) {
+                count++;
+            }
+        }
+        return count;
     }
 
     private void restartPreviewAfterTestClipIfNeeded() {
