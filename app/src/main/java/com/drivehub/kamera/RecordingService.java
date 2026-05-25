@@ -613,13 +613,63 @@ public class RecordingService extends Service {
         return b.build();
     }
 
-    private void publishCurrentStatus() {
-        SharedPreferences prefs = prefs();
-        publishStatus(
+    public static final class PersistedStatus {
+        public final String status;
+        public final int activeCameras;
+        public final int totalCameras;
+        public final String lastError;
+
+        PersistedStatus(String status, int activeCameras, int totalCameras, String lastError) {
+            this.status = status;
+            this.activeCameras = activeCameras;
+            this.totalCameras = totalCameras;
+            this.lastError = lastError;
+        }
+    }
+
+    public static PersistedStatus readPersistedStatus(SharedPreferences prefs) {
+        return new PersistedStatus(
                 prefs.getString(KEY_STATUS, STATUS_OFF),
                 prefs.getInt(KEY_ACTIVE_CAMERAS, 0),
                 prefs.getInt(KEY_TOTAL_CAMERAS, TOTAL_CAMERAS),
                 prefs.getString(KEY_LAST_ERROR, ""));
+    }
+
+    public static String formatStatusText(Context context, String status, int activeCameras, int totalCameras, String lastError) {
+        if (status == null || STATUS_OFF.equals(status)) {
+            return context.getString(R.string.settings_dashcam_status_off);
+        }
+        if (STATUS_RECORDING.equals(status)) {
+            return context.getString(R.string.settings_dashcam_status_recording, activeCameras, totalCameras);
+        }
+        if (STATUS_PAUSED_OEM.equals(status)) {
+            return context.getString(R.string.settings_dashcam_status_paused_oem);
+        }
+        if (STATUS_STARTING.equals(status)) {
+            return context.getString(R.string.settings_dashcam_status_starting);
+        }
+        String error = lastError == null || lastError.trim().isEmpty() ? status : lastError.trim();
+        return context.getString(R.string.settings_dashcam_status_error, error);
+    }
+
+    /**
+     * If the prefs say we were recording but the service isn't actually running (e.g. crash,
+     * OOM kill), reset the persisted state so the UI doesn't show a stale "RECORDING" pill.
+     */
+    public static void resetPersistedStatusIfStale(SharedPreferences prefs) {
+        String status = prefs.getString(KEY_STATUS, STATUS_OFF);
+        if (status == null || STATUS_OFF.equals(status) || isRunning()) return;
+        prefs.edit()
+                .putString(KEY_STATUS, STATUS_OFF)
+                .putInt(KEY_ACTIVE_CAMERAS, 0)
+                .putInt(KEY_TOTAL_CAMERAS, TOTAL_CAMERAS)
+                .putString(KEY_LAST_ERROR, "")
+                .apply();
+    }
+
+    private void publishCurrentStatus() {
+        PersistedStatus s = readPersistedStatus(prefs());
+        publishStatus(s.status, s.activeCameras, s.totalCameras, s.lastError);
     }
 
     private void publishStatus(String status, int activeCameras, int totalCameras, String lastError) {

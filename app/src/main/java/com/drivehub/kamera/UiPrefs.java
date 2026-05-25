@@ -16,6 +16,9 @@ final class UiPrefs {
     static final String KEY_OVERLAY_MIN_SHOW_MS = "overlayMinShowMs";
     static final String KEY_DEV_DEFAULT_POLL_MS = "devDefaultPollMs";
     static final String KEY_DEV_SIGNAL_OFF_POLL_MS = "devSignalOffPollMs";
+    static final String KEY_SAFETY_WARNING = "safetyWarning";
+    private static final String LEGACY_AVM_PREFS_NAME = "AVM_Settings";
+    private static final String LEGACY_KEY_SAFETY_WARNING = "ShowSafetyWarning";
     static final int MAX_TILE_CORNER_RADIUS = 35;
     static final int MAX_OVERLAY_HIDE_DELAY_MS = 3000;
     static final int MAX_OVERLAY_MIN_SHOW_MS = 6000;
@@ -57,6 +60,32 @@ final class UiPrefs {
 
     static boolean isOverlayOnSignalEnabled(SharedPreferences prefs) {
         return prefs.getBoolean(KEY_OVERLAY_ON_SIGNAL, true);
+    }
+
+    static boolean isDashcamEnabled(SharedPreferences prefs) {
+        return prefs.getBoolean(DashcamSettingsController.KEY_ENABLED, false);
+    }
+
+    static boolean isSafetyWarningEnabled(SharedPreferences prefs) {
+        return prefs.getBoolean(KEY_SAFETY_WARNING, true);
+    }
+
+    static void setSafetyWarningEnabled(SharedPreferences prefs, boolean enabled) {
+        prefs.edit().putBoolean(KEY_SAFETY_WARNING, enabled).apply();
+    }
+
+    /**
+     * One-shot migration from the legacy AVM_Settings file. Safe to call on every cold start —
+     * only copies values when the new key is missing AND the legacy key exists.
+     */
+    static void migrateLegacyPrefsIfNeeded(Context context) {
+        SharedPreferences prefs = getPrefs(context);
+        if (prefs.contains(KEY_SAFETY_WARNING)) return;
+        SharedPreferences legacy = context.getSharedPreferences(LEGACY_AVM_PREFS_NAME, Context.MODE_PRIVATE);
+        if (!legacy.contains(LEGACY_KEY_SAFETY_WARNING)) return;
+        prefs.edit()
+                .putBoolean(KEY_SAFETY_WARNING, legacy.getBoolean(LEGACY_KEY_SAFETY_WARNING, true))
+                .apply();
     }
 
     static boolean isOverlayRotationToDrivingDirectionEnabled(SharedPreferences prefs) {
