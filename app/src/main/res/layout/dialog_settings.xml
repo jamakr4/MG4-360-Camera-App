@@ -28,52 +28,63 @@
             android:src="@drawable/ic_close"
             android:tint="@color/settings_accent" />
 
-        <TextView
-            android:id="@+id/tabSettings"
-            style="@style/DrivehubSettingsTabInactive"
-            android:text="@string/settings_tab_settings" />
-
-        <TextView
-            android:id="@+id/tabSignalCamera"
-            style="@style/DrivehubSettingsTabInactive"
-            android:text="@string/settings_tab_signal_camera" />
-
-        <TextView
-            android:id="@+id/tabDashcam"
-            style="@style/DrivehubSettingsTabInactive"
-            android:text="@string/settings_tab_dashcam" />
-
-        <TextView
-            android:id="@+id/tabOptik"
-            style="@style/DrivehubSettingsTabInactive"
-            android:text="@string/settings_tab_optik" />
-
-        <TextView
-            android:id="@+id/tabUpdate"
-            style="@style/DrivehubSettingsTabInactive"
-            android:text="@string/settings_tab_update" />
-
-        <TextView
-            android:id="@+id/tabCredits"
-            style="@style/DrivehubSettingsTabInactive"
-            android:text="@string/settings_tab_credits" />
-
-        <TextView
-            android:id="@+id/tabDev"
-            style="@style/DrivehubSettingsTabInactive"
-            android:text="@string/settings_tab_dev"
-            android:visibility="gone" />
-
-        <TextView
-            android:id="@+id/tabDevStatus"
-            style="@style/DrivehubSettingsTabInactive"
-            android:text="@string/settings_tab_dev_status"
-            android:visibility="gone" />
-
-        <Space
+        <ScrollView
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="1" />
+            android:layout_weight="1"
+            android:layout_marginTop="4dp"
+            android:overScrollMode="ifContentScrolls"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tabSettings"
+                    style="@style/DrivehubSettingsTabInactive"
+                    android:text="@string/settings_tab_settings" />
+
+                <TextView
+                    android:id="@+id/tabSignalCamera"
+                    style="@style/DrivehubSettingsTabInactive"
+                    android:text="@string/settings_tab_signal_camera" />
+
+                <TextView
+                    android:id="@+id/tabDashcam"
+                    style="@style/DrivehubSettingsTabInactive"
+                    android:text="@string/settings_tab_dashcam" />
+
+                <TextView
+                    android:id="@+id/tabOptik"
+                    style="@style/DrivehubSettingsTabInactive"
+                    android:text="@string/settings_tab_optik" />
+
+                <TextView
+                    android:id="@+id/tabUpdate"
+                    style="@style/DrivehubSettingsTabInactive"
+                    android:text="@string/settings_tab_update" />
+
+                <TextView
+                    android:id="@+id/tabCredits"
+                    style="@style/DrivehubSettingsTabInactive"
+                    android:text="@string/settings_tab_credits" />
+
+                <TextView
+                    android:id="@+id/tabDev"
+                    style="@style/DrivehubSettingsTabInactive"
+                    android:text="@string/settings_tab_dev"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:id="@+id/tabDevStatus"
+                    style="@style/DrivehubSettingsTabInactive"
+                    android:text="@string/settings_tab_dev_status"
+                    android:visibility="gone" />
+
+            </LinearLayout>
+        </ScrollView>
 
         <TextView
             android:id="@+id/tvDialogUpdateTag"
