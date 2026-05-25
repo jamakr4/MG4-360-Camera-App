@@ -461,6 +461,9 @@ final class OtaReleaseFetcher {
         while (trimmed.startsWith("v") || trimmed.startsWith("V")) {
             trimmed = trimmed.substring(1);
         }
+        while (!trimmed.isEmpty() && !Character.isDigit(trimmed.charAt(0))) {
+            trimmed = trimmed.substring(1);
+        }
         return trimmed;
     }
 
