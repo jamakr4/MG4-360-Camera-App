@@ -114,6 +114,21 @@ public class SignalService extends Service {
         });
     }
 
+    public static String getCurrentTurnLampDebugText() {
+        SignalService inst = sInstance;
+        if (inst != null) {
+            return String.valueOf(inst.currentLamp);
+        }
+        try {
+            Class<?> sp = Class.forName("android.os.SystemProperties");
+            Method get = sp.getMethod("get", String.class, String.class);
+            String value = (String) get.invoke(null, "arcsoft.avm.mCurCarTurnLamp", "");
+            return value == null || value.isEmpty() ? "null" : value;
+        } catch (Throwable ignored) {
+            return "null";
+        }
+    }
+
     @Override
     public void onCreate() {
         super.onCreate();

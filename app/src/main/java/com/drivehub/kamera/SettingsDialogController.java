@@ -188,6 +188,7 @@ final class SettingsDialogController {
         v.tvBeta = dialog.findViewById(R.id.tvDialogVersionBeta);
         v.tvDevStatusSignalService = dialog.findViewById(R.id.tvDevStatusSignalService);
         v.tvDevStatusRecordingService = dialog.findViewById(R.id.tvDevStatusRecordingService);
+        v.tvDevStatusTurnLamp = dialog.findViewById(R.id.tvDevStatusTurnLamp);
         v.tvDevStatusDashcamEnabled = dialog.findViewById(R.id.tvDevStatusDashcamEnabled);
         v.tvDevStatusRecordingState = dialog.findViewById(R.id.tvDevStatusRecordingState);
         v.tvDevStatusLastError = dialog.findViewById(R.id.tvDevStatusLastError);
@@ -334,6 +335,7 @@ final class SettingsDialogController {
         if (views == null
                 || views.tvDevStatusSignalService == null
                 || views.tvDevStatusRecordingService == null
+                || views.tvDevStatusTurnLamp == null
                 || views.tvDevStatusDashcamEnabled == null
                 || views.tvDevStatusRecordingState == null
                 || views.tvDevStatusLastError == null
@@ -355,6 +357,7 @@ final class SettingsDialogController {
                 SignalService.isRunning() ? R.string.settings_status_active : R.string.settings_status_inactive));
         views.tvDevStatusRecordingService.setText(activity.getString(
                 RecordingService.isRunning() ? R.string.settings_status_active : R.string.settings_status_inactive));
+        views.tvDevStatusTurnLamp.setText(SignalService.getCurrentTurnLampDebugText());
         views.tvDevStatusDashcamEnabled.setText(activity.getString(
                 UiPrefs.isDashcamEnabled(prefs)
                         ? R.string.settings_status_enabled
@@ -447,6 +450,7 @@ final class SettingsDialogController {
         TextView tvBeta;
         TextView tvDevStatusSignalService;
         TextView tvDevStatusRecordingService;
+        TextView tvDevStatusTurnLamp;
         TextView tvDevStatusDashcamEnabled;
         TextView tvDevStatusRecordingState;
         TextView tvDevStatusLastError;
