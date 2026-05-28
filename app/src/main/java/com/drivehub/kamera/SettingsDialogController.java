@@ -4,6 +4,8 @@ import android.app.Dialog;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
@@ -26,10 +28,12 @@ final class SettingsDialogController {
 
     private static final int DEFAULT_TAB_INDEX = 1; // Settings
     private static final int DEV_TAB_INDEX = 6;
+    private static final int DEV_STATUS_TAB_INDEX = 7;
     private static final int DEV_UNLOCK_TAPS = 5;
     private static final int EXPECTED_TOTAL_CAMERAS = 4;
     private static final int CAMERA_PROBE_MAX_INDEX = 18;
     private static final int[] EXPECTED_VIDEO_INDEXES = {14, 15, 16, 17};
+    private static final long DEV_STATUS_REFRESH_INTERVAL_MS = 500L;
 
     private final MainActivity activity;
     private final SettingsAppearanceController appearance;
@@ -39,6 +43,17 @@ final class SettingsDialogController {
     private final SignalCameraSettingsController signalCam;
     private final DashcamSettingsController dashcam;
     private final DevSettingsController dev = new DevSettingsController();
+
+    private final Handler devStatusHandler = new Handler(Looper.getMainLooper());
+    private final Runnable devStatusRefreshRunnable = new Runnable() {
+        @Override
+        public void run() {
+            if (views == null) return;
+            RecordingService.PersistedStatus s = RecordingService.readPersistedStatus(UiPrefs.getPrefs(activity));
+            refreshDevStatusSection(s.status, s.activeCameras, s.totalCameras, s.lastError);
+            devStatusHandler.postDelayed(this, DEV_STATUS_REFRESH_INTERVAL_MS);
+        }
+    };
 
     private Dialog dialog;
     private Views views;
@@ -112,6 +127,7 @@ final class SettingsDialogController {
 
     private void handleDismiss() {
         MainActivity.setSettingsDialogOpen(false);
+        devStatusHandler.removeCallbacks(devStatusRefreshRunnable);
         views = null;
         dialog = null;
         appearance.applyMainUiIconColors();
@@ -290,6 +306,12 @@ final class SettingsDialogController {
             }
         }
         appearance.reapplyForActiveTab(activeIndex);
+        // Dev-Status zeigt live-updates (turn lamp, dashcam enabled, ...) — periodisch
+        // pollen, sonst friert die Anzeige auf dem Stand vom Dialog-Öffnen ein.
+        devStatusHandler.removeCallbacks(devStatusRefreshRunnable);
+        if (activeIndex == DEV_STATUS_TAB_INDEX) {
+            devStatusHandler.post(devStatusRefreshRunnable);
+        }
     }
 
     private void wireDevUnlock() {
