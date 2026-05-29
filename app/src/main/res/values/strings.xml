@@ -52,6 +52,7 @@
     <string name="settings_dev_status_signal_service">Signal listener</string>
     <string name="settings_dev_status_recording_service">Recording service</string>
     <string name="settings_dev_status_turn_lamp">Turn lamp raw</string>
+    <string name="settings_dev_status_hazard_lights">Hazard raw</string>
     <string name="settings_dev_status_dashcam_enabled">Dashcam enabled</string>
     <string name="settings_dev_status_recording_state">Recording state</string>
     <string name="settings_dev_status_last_error">Last error</string>

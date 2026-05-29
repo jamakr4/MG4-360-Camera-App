@@ -205,6 +205,7 @@ final class SettingsDialogController {
         v.tvDevStatusSignalService = dialog.findViewById(R.id.tvDevStatusSignalService);
         v.tvDevStatusRecordingService = dialog.findViewById(R.id.tvDevStatusRecordingService);
         v.tvDevStatusTurnLamp = dialog.findViewById(R.id.tvDevStatusTurnLamp);
+        v.tvDevStatusHazardLights = dialog.findViewById(R.id.tvDevStatusHazardLights);
         v.tvDevStatusDashcamEnabled = dialog.findViewById(R.id.tvDevStatusDashcamEnabled);
         v.tvDevStatusRecordingState = dialog.findViewById(R.id.tvDevStatusRecordingState);
         v.tvDevStatusLastError = dialog.findViewById(R.id.tvDevStatusLastError);
@@ -358,6 +359,7 @@ final class SettingsDialogController {
                 || views.tvDevStatusSignalService == null
                 || views.tvDevStatusRecordingService == null
                 || views.tvDevStatusTurnLamp == null
+                || views.tvDevStatusHazardLights == null
                 || views.tvDevStatusDashcamEnabled == null
                 || views.tvDevStatusRecordingState == null
                 || views.tvDevStatusLastError == null
@@ -380,6 +382,7 @@ final class SettingsDialogController {
         views.tvDevStatusRecordingService.setText(activity.getString(
                 RecordingService.isRunning() ? R.string.settings_status_active : R.string.settings_status_inactive));
         views.tvDevStatusTurnLamp.setText(SignalService.getCurrentTurnLampDebugText());
+        views.tvDevStatusHazardLights.setText(SignalService.getCurrentHazardDebugText(activity));
         views.tvDevStatusDashcamEnabled.setText(activity.getString(
                 UiPrefs.isDashcamEnabled(prefs)
                         ? R.string.settings_status_enabled
@@ -473,6 +476,7 @@ final class SettingsDialogController {
         TextView tvDevStatusSignalService;
         TextView tvDevStatusRecordingService;
         TextView tvDevStatusTurnLamp;
+        TextView tvDevStatusHazardLights;
         TextView tvDevStatusDashcamEnabled;
         TextView tvDevStatusRecordingState;
         TextView tvDevStatusLastError;

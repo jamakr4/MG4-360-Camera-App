@@ -52,6 +52,7 @@
     <string name="settings_dev_status_signal_service">Signal-Listener</string>
     <string name="settings_dev_status_recording_service">Recording-Service</string>
     <string name="settings_dev_status_turn_lamp">Blinker-Rohwert</string>
+    <string name="settings_dev_status_hazard_lights">Warnblinker-Rohwert</string>
     <string name="settings_dev_status_dashcam_enabled">Dashcam aktiviert</string>
     <string name="settings_dev_status_recording_state">Aufnahmezustand</string>
     <string name="settings_dev_status_last_error">Letzter Fehler</string>

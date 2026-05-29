@@ -40,6 +40,8 @@ public class SignalService extends Service {
     private static final long HAZARD_TRIGGER_COOLDOWN_MS = 30_000L;
 
     private static final int TURN_PROP_ID = 0x21409326;
+    private static final int HAZARD_LIGHTS_STATE_PROP_ID = 0x11400e03;
+    private static final int HAZARD_LIGHTS_SWITCH_PROP_ID = 0x11400e13;
     private static final int REVERSE_GEAR_VALUE = 2;
     private static final String OEM_AVM_PACKAGE = "com.saicmotor.hmi.aroundview";
     public static final String ACTION_ROUTE_CAMERA = "com.drivehub.kamera.ACTION_ROUTE_CAMERA";
@@ -127,6 +129,15 @@ public class SignalService extends Service {
         } catch (Throwable ignored) {
             return "null";
         }
+    }
+
+    public static String getCurrentHazardDebugText(Context context) {
+        SignalService inst = sInstance;
+        if (inst != null) {
+            return inst.readHazardDebugText();
+        }
+        return buildHazardDebugText(readHazardPropertyValue(context, null, HAZARD_LIGHTS_STATE_PROP_ID),
+                readHazardPropertyValue(context, null, HAZARD_LIGHTS_SWITCH_PROP_ID));
     }
 
     @Override
@@ -257,6 +268,56 @@ public class SignalService extends Service {
         } catch (Throwable ignored) {
         }
         return def;
+    }
+
+    private String readHazardDebugText() {
+        return buildHazardDebugText(
+                readHazardPropertyValue(this, car, HAZARD_LIGHTS_STATE_PROP_ID),
+                readHazardPropertyValue(this, car, HAZARD_LIGHTS_SWITCH_PROP_ID)
+        );
+    }
+
+    private static String buildHazardDebugText(Integer stateValue, Integer switchValue) {
+        return "state=" + formatHazardDebugValue(stateValue) + " switch=" + formatHazardDebugValue(switchValue);
+    }
+
+    private static String formatHazardDebugValue(Integer value) {
+        return value == null ? "null" : String.valueOf(value);
+    }
+
+    private static Integer readHazardPropertyValue(Context context, Object existingCar, int propertyId) {
+        Object localCar = existingCar;
+        boolean disconnectAfterRead = false;
+        try {
+            if (localCar == null) {
+                Class<?> carClass = Class.forName("android.car.Car");
+                Method createCar = carClass.getMethod("createCar", Context.class);
+                localCar = createCar.invoke(null, context);
+                if (localCar == null) return null;
+                Method connect = carClass.getMethod("connect");
+                connect.invoke(localCar);
+                disconnectAfterRead = true;
+            }
+
+            Method getCarManager = localCar.getClass().getMethod("getCarManager", String.class);
+            Object propertyManager = getCarManager.invoke(localCar, "property");
+            if (propertyManager == null) return null;
+
+            Method getProperty = propertyManager.getClass().getMethod(
+                    "getProperty", Class.class, int.class, int.class);
+            Object value = getProperty.invoke(propertyManager, Integer.class, propertyId, 0);
+            return value instanceof Integer ? (Integer) value : null;
+        } catch (Throwable ignored) {
+            return null;
+        } finally {
+            if (disconnectAfterRead && localCar != null) {
+                try {
+                    Method disconnect = localCar.getClass().getMethod("disconnect");
+                    disconnect.invoke(localCar);
+                } catch (Throwable ignored) {
+                }
+            }
+        }
     }
 
     private void updateOverlayDecision() {
