@@ -53,7 +53,7 @@
 
     </LinearLayout>
 
-    <!-- ============ LOOP RECORDING ============ -->
+    <!-- ============ RECORDING ============ -->
     <TextView
         style="@style/DrivehubSettingsCardLabel"
         android:layout_width="wrap_content"
@@ -71,64 +71,6 @@
         android:paddingTop="14dp"
         android:paddingEnd="18dp"
         android:paddingBottom="16dp">
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:gravity="center_vertical"
-            android:minHeight="56dp"
-            android:orientation="horizontal">
-
-            <TextView
-                style="@style/DrivehubSettingsCardRowLabel"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/settings_record_loop" />
-
-            <EditText
-                android:id="@+id/etDashcamSegmentMin"
-                style="@style/DrivehubSettingsSliderValue"
-                android:inputType="number"
-                android:maxLength="3" />
-
-        </LinearLayout>
-
-        <TextView
-            style="@style/DrivehubSettingsCaption"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="10dp"
-            android:text="@string/settings_record_loop_hint" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:gravity="center_vertical"
-            android:minHeight="44dp"
-            android:orientation="horizontal">
-
-            <TextView
-                style="@style/DrivehubSettingsCardRowLabel"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/settings_total_retention" />
-
-            <EditText
-                android:id="@+id/etDashcamTotalMin"
-                style="@style/DrivehubSettingsSliderValue"
-                android:inputType="number"
-                android:maxLength="4" />
-
-        </LinearLayout>
-
-        <TextView
-            style="@style/DrivehubSettingsCaption"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="10dp"
-            android:text="@string/settings_total_retention_hint" />
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -171,7 +113,7 @@
                 style="@style/DrivehubSettingsSliderValue"
                 android:layout_width="220dp"
                 android:minHeight="44dp"
-                android:gravity="start|center_vertical"
+                android:gravity="end|center_vertical"
                 android:inputType="textCapWords|textNoSuggestions"
                 android:imeOptions="flagNoExtractUi"
                 android:maxLength="40"

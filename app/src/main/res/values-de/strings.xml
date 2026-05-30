@@ -10,15 +10,13 @@
     <string name="settings_section_display">Anzeige</string>
     <string name="settings_section_signal_camera">Blinker-Kamera</string>
     <string name="settings_section_dashcam_status">Status</string>
-    <string name="settings_section_dashcam_loop">Aufnahmeschleife</string>
+    <string name="settings_section_dashcam_loop">Aufnahme</string>
     <string name="settings_section_dashcam_overlay">Aufnahme-Overlay</string>
     <string name="settings_section_dashcam_storage">Speicher</string>
     <string name="settings_dashcam_enabled">Dashcam aktivieren</string>
     <string name="settings_dashcam_fps">Aufnahme-FPS</string>
     <string name="settings_dashcam_signature">Signatur</string>
     <string name="settings_dashcam_show_speed">Geschwindigkeit im Video anzeigen</string>
-    <string name="settings_record_loop_hint">Länge jedes gespeicherten Clips.</string>
-    <string name="settings_total_retention_hint">Ältere Clips werden gelöscht, sobald diese Gesamtdauer überschritten ist.</string>
     <string name="settings_dashcam_signature_hint">Optionaler Text, der in jedem aufgenommenen Frame links unten eingeblendet wird.</string>
     <string name="settings_dashcam_status_off">Aufnahme inaktiv</string>
     <string name="settings_dashcam_status_starting">Aufnahme startet…</string>
@@ -81,8 +79,6 @@
     <string name="settings_overlay_min_show_min">0 ms</string>
     <string name="settings_overlay_min_show_max">6000 ms</string>
     <string name="settings_overlay_min_show_hint">Wie lange die Blinker-Kamera bei kurzem Antippen sichtbar ist.</string>
-    <string name="settings_record_loop">Aufnahmeschleife (Min.)</string>
-    <string name="settings_total_retention">Gesamtspeicherzeit (Min.)</string>
     <string name="settings_records_path">Aufnahmepfad</string>
     <string name="settings_export_usb">Aufnahmen auf USB exportieren (TODO)</string>
     <string name="settings_storage_permission_required">Speicherberechtigung erforderlich</string>

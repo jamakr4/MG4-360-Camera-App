@@ -13,10 +13,6 @@ import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.media.MediaCodec;
-import android.media.MediaExtractor;
-import android.media.MediaFormat;
-import android.media.MediaMuxer;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
@@ -30,7 +26,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -71,8 +66,8 @@ public class RecordingService extends Service {
     private static final int NOTIF_ID = 42;
     private static final int TOTAL_CAMERAS = 4;
     private static final long TEST_RECORDING_MS = 10_000L;
-    private static final long EVENT_PRE_ROLL_MS = 60_000L;
-    private static final long EVENT_POST_ROLL_MS = 60_000L;
+    private static final int EVENT_SEGMENTS_BEFORE_CURRENT = 2;
+    private static final int EVENT_SEGMENTS_AFTER_CURRENT = 2;
     private static final long ERROR_OVERLAY_DELAY_MS = 5_000L;
 
     private static volatile boolean sServiceRunning = false;
@@ -88,6 +83,7 @@ public class RecordingService extends Service {
     private volatile int pendingErrorNotificationResId = 0;
     private volatile int pendingErrorGeneration = 0;
     private volatile boolean errorOverlayShown = false;
+    private long completedSegmentCount = 0L;
 
     public static boolean isRunning() {
         return sServiceRunning;
@@ -286,14 +282,9 @@ public class RecordingService extends Service {
         // NOTE: For now we only record MP4 clips, not speed or turn-signal data.
         SharedPreferences prefs = prefs();
         boolean enabled = prefs.getBoolean(DashcamSettingsController.KEY_ENABLED, false);
-        int segmentMin = prefs.getInt(
-                DashcamSettingsController.KEY_SEGMENT_MIN,
-                DashcamSettingsController.DEFAULT_SEGMENT_MIN);
-        int totalMin = prefs.getInt(
-                DashcamSettingsController.KEY_TOTAL_MIN,
-                DashcamSettingsController.DEFAULT_TOTAL_RETENTION_MIN);
+        int segmentSec = DashcamSettingsController.getSegmentDurationSec();
 
-        if (!enabled || segmentMin <= 0) {
+        if (!enabled || segmentSec <= 0) {
             publishStatus(STATUS_OFF, 0, TOTAL_CAMERAS, "");
             worker = null;
             stopSelf();
@@ -307,11 +298,11 @@ public class RecordingService extends Service {
             return;
         }
 
-        long segmentMs = segmentMin * 60L * 1000L;
+        long segmentMs = segmentSec * 1000L;
 
-        // Convert total duration into a segment count: segmentMin=3, totalMin=3
-        // => keep 1 segment.
-        int keepSegments = Math.max(1, totalMin / segmentMin);
+        // Convert total retention into a segment count, e.g. segmentSec=30, retention=5 min => keep 10 segments.
+        int keepSegments = Math.max(1,
+                (int) ((DashcamSettingsController.DEFAULT_TOTAL_RETENTION_MIN * 60L) / segmentSec));
         boolean endedWithFatalError = false;
 
         while (!stopRequested) {
@@ -319,7 +310,7 @@ public class RecordingService extends Service {
                 break;
             }
             long segmentStartWallMs = System.currentTimeMillis();
-            String baseName = makeTimestampBase(segmentStartWallMs, "yyMMddHHmm");
+            String baseName = makeTimestampBase(segmentStartWallMs, "yyMMddHHmmss");
             boolean startedAnyCamera = recordClip(baseDir, segmentMs, baseName, keepSegments);
             if (!startedAnyCamera) {
                 endedWithFatalError = true;
@@ -428,11 +419,12 @@ public class RecordingService extends Service {
     private void onSegmentCompleted(File baseDir, String baseName, long startMs, long endMs, int keepSegments) {
         List<EventCopyJob> completedJobs;
         synchronized (eventLock) {
-            recentSegments.add(new SegmentInfo(baseName, startMs, endMs));
-            while (recentSegments.size() > keepSegments + 4) {
+            long segmentOrdinal = ++completedSegmentCount;
+            recentSegments.add(new SegmentInfo(segmentOrdinal, baseName, startMs, endMs));
+            while (recentSegments.size() > keepSegments + 6) {
                 recentSegments.remove(0);
             }
-            completedJobs = finalizeReadyEventRequestsLocked(endMs);
+            completedJobs = finalizeReadyEventRequestsLocked(segmentOrdinal);
             Set<String> protectedBases = collectProtectedBasesLocked();
             cleanupOldSegments(baseDir, keepSegments, protectedBases);
         }
@@ -444,19 +436,20 @@ public class RecordingService extends Service {
     private void armEventCapture() {
         long now = System.currentTimeMillis();
         synchronized (eventLock) {
+            long currentSegmentOrdinal = completedSegmentCount + 1L;
             pendingEventRequests.add(new EventCaptureRequest(
                     "event_" + makeTimestampBase(now, "yyMMddHHmmssSSS"),
-                    now - EVENT_PRE_ROLL_MS,
-                    now + EVENT_POST_ROLL_MS
+                    Math.max(1L, currentSegmentOrdinal - EVENT_SEGMENTS_BEFORE_CURRENT),
+                    currentSegmentOrdinal + EVENT_SEGMENTS_AFTER_CURRENT
             ));
         }
     }
 
-    private List<EventCopyJob> finalizeReadyEventRequestsLocked(long completedThroughMs) {
+    private List<EventCopyJob> finalizeReadyEventRequestsLocked(long completedThroughOrdinal) {
         List<EventCaptureRequest> completed = new ArrayList<>();
         List<EventCopyJob> jobs = new ArrayList<>();
         for (EventCaptureRequest request : pendingEventRequests) {
-            if (completedThroughMs < request.captureEndMs) {
+            if (completedThroughOrdinal < request.lastSegmentOrdinal) {
                 continue;
             }
             jobs.add(buildEventCopyJobLocked(request));
@@ -470,7 +463,8 @@ public class RecordingService extends Service {
         Set<String> protectedBases = new HashSet<>();
         for (EventCaptureRequest request : pendingEventRequests) {
             for (SegmentInfo segment : recentSegments) {
-                if (segment.overlaps(request.captureStartMs, request.captureEndMs)) {
+                if (segment.ordinal >= request.firstSegmentOrdinal
+                        && segment.ordinal <= request.lastSegmentOrdinal) {
                     protectedBases.add(segment.baseName);
                 }
             }
@@ -480,22 +474,17 @@ public class RecordingService extends Service {
 
     private EventCopyJob buildEventCopyJobLocked(EventCaptureRequest request) {
         List<String> baseNames = new ArrayList<>();
-        List<SegmentSlice> slices = new ArrayList<>();
         Set<String> copiedBases = new HashSet<>();
         for (SegmentInfo segment : recentSegments) {
-            if (!segment.overlaps(request.captureStartMs, request.captureEndMs)) {
+            if (segment.ordinal < request.firstSegmentOrdinal
+                    || segment.ordinal > request.lastSegmentOrdinal) {
                 continue;
             }
             if (copiedBases.add(segment.baseName)) {
                 baseNames.add(segment.baseName);
             }
-            long sliceStartMs = Math.max(request.captureStartMs, segment.startMs);
-            long sliceEndMs = Math.min(request.captureEndMs, segment.endMs);
-            if (sliceEndMs > sliceStartMs) {
-                slices.add(new SegmentSlice(segment.baseName, segment.startMs, sliceStartMs, sliceEndMs));
-            }
         }
-        return new EventCopyJob(request.eventBaseName, baseNames, slices);
+        return new EventCopyJob(request.eventBaseName, baseNames);
     }
 
     private void copyEventSegments(EventCopyJob job) {
@@ -506,183 +495,9 @@ public class RecordingService extends Service {
         File eventDir = new File(getEventsBaseDir(), job.eventBaseName);
         // noinspection ResultOfMethodCallIgnored
         eventDir.mkdirs();
-        if (exportTrimmedEventClip(job, eventDir)) {
-            return;
-        }
         for (String baseName : job.baseNames) {
             copySegmentGroup(DashcamSettingsController.getRecordsBaseDir(), eventDir, baseName);
         }
-    }
-
-    private boolean exportTrimmedEventClip(EventCopyJob job, File eventDir) {
-        if (job.slices.isEmpty()) {
-            return false;
-        }
-        for (SegmentSlice slice : job.slices) {
-            if (!new File(DashcamSettingsController.getRecordsBaseDir(), slice.baseName + ".mp4").exists()) {
-                return false;
-            }
-        }
-
-        File outputFile = new File(eventDir, job.eventBaseName + ".mp4");
-        File tempFile = new File(eventDir, job.eventBaseName + ".tmp.mp4");
-        if (tempFile.exists() && !tempFile.delete()) {
-            Log.w(TAG, "Could not delete stale temp event file " + tempFile.getAbsolutePath());
-        }
-
-        MediaMuxer muxer = null;
-        ByteBuffer buffer = ByteBuffer.allocate(1024 * 1024);
-        int muxerTrackIndex = -1;
-        long outputOffsetUs = 0L;
-        boolean wroteAnySamples = false;
-
-        try {
-            muxer = new MediaMuxer(tempFile.getAbsolutePath(), MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
-            for (SegmentSlice slice : job.slices) {
-                MuxSliceResult result = appendSegmentSliceToMuxer(
-                        muxer, muxerTrackIndex, buffer, slice, outputOffsetUs);
-                muxerTrackIndex = result.trackIndex;
-                buffer = result.buffer;
-                outputOffsetUs = result.nextOutputOffsetUs;
-                wroteAnySamples |= result.wroteSamples;
-            }
-            if (!wroteAnySamples) {
-                Log.w(TAG, "No samples written for event clip " + job.eventBaseName);
-                return false;
-            }
-            muxer.stop();
-            muxer.release();
-            muxer = null;
-
-            if (outputFile.exists() && !outputFile.delete()) {
-                throw new IOException("delete old event clip failed: " + outputFile.getAbsolutePath());
-            }
-            if (!tempFile.renameTo(outputFile)) {
-                throw new IOException("rename event clip failed: " + tempFile.getAbsolutePath() + " -> " + outputFile.getAbsolutePath());
-            }
-            return true;
-        } catch (Throwable t) {
-            Log.e(TAG, "Failed to export trimmed event clip for " + job.eventBaseName, t);
-            return false;
-        } finally {
-            if (muxer != null) {
-                try {
-                    muxer.release();
-                } catch (Throwable ignored) {
-                }
-            }
-            if (tempFile.exists() && !outputFile.exists()) {
-                // noinspection ResultOfMethodCallIgnored
-                tempFile.delete();
-            }
-        }
-    }
-
-    private MuxSliceResult appendSegmentSliceToMuxer(
-            MediaMuxer muxer,
-            int existingTrackIndex,
-            ByteBuffer sharedBuffer,
-            SegmentSlice slice,
-            long outputOffsetUs
-    ) throws IOException {
-        MediaExtractor extractor = new MediaExtractor();
-        try {
-            File sourceFile = new File(DashcamSettingsController.getRecordsBaseDir(), slice.baseName + ".mp4");
-            extractor.setDataSource(sourceFile.getAbsolutePath());
-            int sourceTrackIndex = selectMuxableTrack(extractor);
-            if (sourceTrackIndex < 0) {
-                throw new IOException("No muxable track found in " + sourceFile.getAbsolutePath());
-            }
-            extractor.selectTrack(sourceTrackIndex);
-
-            long trimStartUs = Math.max(0L, (slice.sliceStartMs - slice.segmentStartMs) * 1000L);
-            long trimEndUs = Math.max(trimStartUs, (slice.sliceEndMs - slice.segmentStartMs) * 1000L);
-            extractor.seekTo(trimStartUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC);
-
-            int muxTrackIndex = existingTrackIndex;
-            if (muxTrackIndex < 0) {
-                MediaFormat format = extractor.getTrackFormat(sourceTrackIndex);
-                muxTrackIndex = muxer.addTrack(format);
-                muxer.start();
-            }
-
-            MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
-            long firstWrittenSourceTimeUs = -1L;
-            long previousWrittenSourceTimeUs = -1L;
-            long lastSampleDurationUs = 33_333L;
-            long lastWrittenOutputTimeUs = outputOffsetUs;
-            boolean wroteSamples = false;
-            ByteBuffer buffer = sharedBuffer;
-
-            while (true) {
-                long sampleTimeUs = extractor.getSampleTime();
-                if (sampleTimeUs < 0 || sampleTimeUs > trimEndUs) {
-                    break;
-                }
-
-                int sampleSize = (int) extractor.getSampleSize();
-                if (sampleSize <= 0) {
-                    if (!extractor.advance()) {
-                        break;
-                    }
-                    continue;
-                }
-
-                if (buffer.capacity() < sampleSize) {
-                    buffer = ByteBuffer.allocate(sampleSize * 2);
-                }
-                buffer.clear();
-
-                int bytesRead = extractor.readSampleData(buffer, 0);
-                if (bytesRead <= 0) {
-                    break;
-                }
-
-                if (firstWrittenSourceTimeUs < 0) {
-                    firstWrittenSourceTimeUs = sampleTimeUs;
-                }
-                if (previousWrittenSourceTimeUs >= 0) {
-                    lastSampleDurationUs = Math.max(1L, sampleTimeUs - previousWrittenSourceTimeUs);
-                }
-
-                long outputTimeUs = outputOffsetUs + Math.max(0L, sampleTimeUs - firstWrittenSourceTimeUs);
-                info.offset = 0;
-                info.size = bytesRead;
-                info.presentationTimeUs = outputTimeUs;
-                info.flags = extractor.getSampleFlags();
-                muxer.writeSampleData(muxTrackIndex, buffer, info);
-
-                previousWrittenSourceTimeUs = sampleTimeUs;
-                lastWrittenOutputTimeUs = outputTimeUs;
-                wroteSamples = true;
-
-                if (!extractor.advance()) {
-                    break;
-                }
-            }
-
-            long nextOutputOffsetUs = outputOffsetUs;
-            if (wroteSamples) {
-                nextOutputOffsetUs = lastWrittenOutputTimeUs + lastSampleDurationUs;
-            }
-            return new MuxSliceResult(muxTrackIndex, buffer, nextOutputOffsetUs, wroteSamples);
-        } finally {
-            try {
-                extractor.release();
-            } catch (Throwable ignored) {
-            }
-        }
-    }
-
-    private int selectMuxableTrack(MediaExtractor extractor) {
-        for (int i = 0; i < extractor.getTrackCount(); i++) {
-            MediaFormat format = extractor.getTrackFormat(i);
-            String mime = format.getString(MediaFormat.KEY_MIME);
-            if (mime != null && mime.startsWith("video/")) {
-                return i;
-            }
-        }
-        return -1;
     }
 
     private void copySegmentGroup(File sourceDir, File targetDir, String baseName) {
@@ -1030,70 +845,38 @@ public class RecordingService extends Service {
     private final List<EventCaptureRequest> pendingEventRequests = new ArrayList<>();
 
     private static final class SegmentInfo {
+        final long ordinal;
         final String baseName;
         final long startMs;
         final long endMs;
 
-        SegmentInfo(String baseName, long startMs, long endMs) {
+        SegmentInfo(long ordinal, String baseName, long startMs, long endMs) {
+            this.ordinal = ordinal;
             this.baseName = baseName;
             this.startMs = startMs;
             this.endMs = endMs;
-        }
-
-        boolean overlaps(long windowStartMs, long windowEndMs) {
-            return startMs < windowEndMs && endMs > windowStartMs;
         }
     }
 
     private static final class EventCaptureRequest {
         final String eventBaseName;
-        final long captureStartMs;
-        final long captureEndMs;
+        final long firstSegmentOrdinal;
+        final long lastSegmentOrdinal;
 
-        EventCaptureRequest(String eventBaseName, long captureStartMs, long captureEndMs) {
+        EventCaptureRequest(String eventBaseName, long firstSegmentOrdinal, long lastSegmentOrdinal) {
             this.eventBaseName = eventBaseName;
-            this.captureStartMs = captureStartMs;
-            this.captureEndMs = captureEndMs;
+            this.firstSegmentOrdinal = firstSegmentOrdinal;
+            this.lastSegmentOrdinal = lastSegmentOrdinal;
         }
     }
 
     private static final class EventCopyJob {
         final String eventBaseName;
         final List<String> baseNames;
-        final List<SegmentSlice> slices;
 
-        EventCopyJob(String eventBaseName, List<String> baseNames, List<SegmentSlice> slices) {
+        EventCopyJob(String eventBaseName, List<String> baseNames) {
             this.eventBaseName = eventBaseName;
             this.baseNames = baseNames;
-            this.slices = slices;
-        }
-    }
-
-    private static final class SegmentSlice {
-        final String baseName;
-        final long segmentStartMs;
-        final long sliceStartMs;
-        final long sliceEndMs;
-
-        SegmentSlice(String baseName, long segmentStartMs, long sliceStartMs, long sliceEndMs) {
-            this.baseName = baseName;
-            this.segmentStartMs = segmentStartMs;
-            this.sliceStartMs = sliceStartMs;
-            this.sliceEndMs = sliceEndMs;
-        }
-    }
-
-    private static final class MuxSliceResult {
-        final int trackIndex;
-        final ByteBuffer buffer;
-        final long nextOutputOffsetUs;
-        final boolean wroteSamples;
-
-        MuxSliceResult(int trackIndex, ByteBuffer buffer, long nextOutputOffsetUs, boolean wroteSamples) {
-            this.trackIndex = trackIndex;
-            this.buffer = buffer;
-            this.nextOutputOffsetUs = nextOutputOffsetUs;
-            this.wroteSamples = wroteSamples;
         }
     }
 

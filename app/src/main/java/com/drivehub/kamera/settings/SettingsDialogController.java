@@ -173,8 +173,6 @@ public final class SettingsDialogController {
         v.etOverlayHideDelayValue = dialog.findViewById(R.id.etOverlayHideDelayValue);
         v.seekOverlayMinShow = dialog.findViewById(R.id.seekOverlayMinShow);
         v.etOverlayMinShowValue = dialog.findViewById(R.id.etOverlayMinShowValue);
-        v.etDashcamSegmentMin = dialog.findViewById(R.id.etDashcamSegmentMin);
-        v.etDashcamTotalMin = dialog.findViewById(R.id.etDashcamTotalMin);
         v.etDashcamFps = dialog.findViewById(R.id.etDashcamFps);
         v.etDashcamSignature = dialog.findViewById(R.id.etDashcamSignature);
         v.swDashcamShowSpeed = dialog.findViewById(R.id.switchDashcamShowSpeed);
@@ -252,8 +250,6 @@ public final class SettingsDialogController {
         dashcam.bind(
                 prefs,
                 views.swDashcamEnabled,
-                views.etDashcamSegmentMin,
-                views.etDashcamTotalMin,
                 views.etDashcamFps,
                 views.etDashcamSignature,
                 views.swDashcamShowSpeed,
@@ -465,8 +461,6 @@ public final class SettingsDialogController {
         EditText etOverlayHideDelayValue;
         SeekBar seekOverlayMinShow;
         EditText etOverlayMinShowValue;
-        EditText etDashcamSegmentMin;
-        EditText etDashcamTotalMin;
         EditText etDashcamFps;
         EditText etDashcamSignature;
         Switch swDashcamShowSpeed;

@@ -10,15 +10,13 @@
     <string name="settings_section_display">Display</string>
     <string name="settings_section_signal_camera">Signal camera</string>
     <string name="settings_section_dashcam_status">Status</string>
-    <string name="settings_section_dashcam_loop">Loop recording</string>
+    <string name="settings_section_dashcam_loop">Recording</string>
     <string name="settings_section_dashcam_overlay">Recording overlay</string>
     <string name="settings_section_dashcam_storage">Storage</string>
     <string name="settings_dashcam_enabled">Enable dashcam</string>
     <string name="settings_dashcam_fps">Recording FPS</string>
     <string name="settings_dashcam_signature">Signature</string>
     <string name="settings_dashcam_show_speed">Show speed in video</string>
-    <string name="settings_record_loop_hint">Length of each saved clip file.</string>
-    <string name="settings_total_retention_hint">Older clips are deleted once this total is exceeded.</string>
     <string name="settings_dashcam_signature_hint">Optional text shown in the bottom-left corner of every recorded frame.</string>
     <string name="settings_dashcam_status_off">Recording inactive</string>
     <string name="settings_dashcam_status_starting">Recording starting…</string>
@@ -81,8 +79,6 @@
     <string name="settings_overlay_min_show_min">0 ms</string>
     <string name="settings_overlay_min_show_max">6000 ms</string>
     <string name="settings_overlay_min_show_hint">How long the camera is visible for short tap-to-signal events.</string>
-    <string name="settings_record_loop">Recording loop (min)</string>
-    <string name="settings_total_retention">Total retention (min)</string>
     <string name="settings_records_path">Recording path</string>
     <string name="settings_export_usb">Export recordings to USB (TODO)</string>
     <string name="settings_storage_permission_required">Storage permission required</string>

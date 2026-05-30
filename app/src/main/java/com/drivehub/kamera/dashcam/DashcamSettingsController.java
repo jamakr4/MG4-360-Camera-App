@@ -24,9 +24,7 @@ import java.io.File;
 public final class DashcamSettingsController {
 
     public static final String KEY_ENABLED = "enabled";
-    static final String KEY_SEGMENT_MIN = "segmentMin";
-    static final String KEY_TOTAL_MIN = "totalMin";
-    public static final int DEFAULT_SEGMENT_MIN = 3;
+    public static final int DEFAULT_SEGMENT_SEC = 30;
     public static final int DEFAULT_TOTAL_RETENTION_MIN = 5;
     private static final String KEY_RECORDING_FPS = "recordingFps";
     private static final String KEY_SIGNATURE = "recordingSignature";
@@ -48,15 +46,11 @@ public final class DashcamSettingsController {
     public void bind(
             SharedPreferences prefs,
             Switch swEnabled,
-            EditText etSegmentMin,
-            EditText etTotalMin,
             EditText etRecordingFps,
             EditText etSignature,
             Switch swShowSpeed,
             TextView tvRecordsPath,
             Button btnExportUsb) {
-        int segmentMin = prefs.getInt(KEY_SEGMENT_MIN, DEFAULT_SEGMENT_MIN);
-        int totalMin = Math.max(segmentMin, prefs.getInt(KEY_TOTAL_MIN, DEFAULT_TOTAL_RETENTION_MIN));
         int recordingFps = getRecordingFps(prefs);
         String signature = getRecordingSignature(prefs);
 
@@ -77,7 +71,7 @@ public final class DashcamSettingsController {
                         Toast.makeText(activity, R.string.settings_storage_permission_required, Toast.LENGTH_SHORT)
                                 .show();
                     }
-                    saveFields(prefs, etSegmentMin, etTotalMin, etRecordingFps, etSignature, false);
+                    saveFields(prefs, etRecordingFps, etSignature, false);
                     RecordingService.startIfDashcamEnabled(activity);
                 } else {
                     RecordingService.stopIfRunning(activity);
@@ -85,14 +79,6 @@ public final class DashcamSettingsController {
             });
         }
 
-        if (etSegmentMin != null) {
-            etSegmentMin.setText(String.valueOf(segmentMin));
-            etSegmentMin.setSelection(etSegmentMin.getText().length());
-        }
-        if (etTotalMin != null) {
-            etTotalMin.setText(String.valueOf(totalMin));
-            etTotalMin.setSelection(etTotalMin.getText().length());
-        }
         if (etRecordingFps != null) {
             etRecordingFps.setText(String.valueOf(recordingFps));
             etRecordingFps.setSelection(etRecordingFps.getText().length());
@@ -106,7 +92,7 @@ public final class DashcamSettingsController {
             swShowSpeed.setOnCheckedChangeListener(
                     (buttonView, checked) -> prefs.edit().putBoolean(KEY_SHOW_SPEED, checked).apply());
         }
-        bindFields(prefs, etSegmentMin, etTotalMin, etRecordingFps, etSignature);
+        bindFields(prefs, etRecordingFps, etSignature);
 
         if (tvRecordsPath != null) {
             tvRecordsPath.setText(getRecordsBaseDir().getAbsolutePath());
@@ -119,17 +105,14 @@ public final class DashcamSettingsController {
         }
     }
 
-    private void bindFields(SharedPreferences prefs, EditText etSegmentMin, EditText etTotalMin,
-            EditText etRecordingFps, EditText etSignature) {
+    private void bindFields(SharedPreferences prefs, EditText etRecordingFps, EditText etSignature) {
         android.text.TextWatcher watcher = new SimpleTextWatcher() {
             @Override
             public void afterTextChanged(Editable s) {
-                saveFields(prefs, etSegmentMin, etTotalMin, etRecordingFps, etSignature, false);
+                saveFields(prefs, etRecordingFps, etSignature, false);
             }
         };
-        Runnable normalize = () -> saveFields(prefs, etSegmentMin, etTotalMin, etRecordingFps, etSignature, true);
-        bindEditText(etSegmentMin, watcher, normalize);
-        bindEditText(etTotalMin, watcher, normalize);
+        Runnable normalize = () -> saveFields(prefs, etRecordingFps, etSignature, true);
         bindEditText(etRecordingFps, watcher, normalize);
         bindEditText(etSignature, watcher, normalize);
     }
@@ -144,26 +127,22 @@ public final class DashcamSettingsController {
         });
     }
 
-    private void saveFields(SharedPreferences prefs, EditText etSegmentMin, EditText etTotalMin,
-            EditText etRecordingFps, EditText etSignature, boolean normalizeFields) {
-        int segmentMin = parsePositiveInt(textOf(etSegmentMin), DEFAULT_SEGMENT_MIN);
-        int totalMin = parsePositiveInt(textOf(etTotalMin), DEFAULT_TOTAL_RETENTION_MIN);
+    private void saveFields(SharedPreferences prefs, EditText etRecordingFps, EditText etSignature,
+            boolean normalizeFields) {
         int recordingFps = clampRecordingFps(parsePositiveInt(textOf(etRecordingFps), DEFAULT_RECORDING_FPS));
         String signature = normalizeSignature(textOf(etSignature));
-        if (totalMin < segmentMin)
-            totalMin = segmentMin;
         prefs.edit()
-                .putInt(KEY_SEGMENT_MIN, segmentMin)
-                .putInt(KEY_TOTAL_MIN, totalMin)
                 .putInt(KEY_RECORDING_FPS, recordingFps)
                 .putString(KEY_SIGNATURE, signature)
                 .apply();
         if (!normalizeFields)
             return;
-        normalizeField(etSegmentMin, segmentMin);
-        normalizeField(etTotalMin, totalMin);
         normalizeField(etRecordingFps, recordingFps);
         normalizeField(etSignature, signature);
+    }
+
+    static int getSegmentDurationSec() {
+        return DEFAULT_SEGMENT_SEC;
     }
 
     static int getRecordingFps(SharedPreferences prefs) {
