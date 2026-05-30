@@ -106,7 +106,6 @@
     <string name="main_recording_starting">REC startet</string>
     <string name="main_recording_paused_oem">REC pausiert (OEM-Start)</string>
     <string name="main_recording_error">REC Fehler: %1$s</string>
-    <string name="settings_tab_optik">Darstellung</string>
     <string name="settings_section_tileview">Blinker-Kamera</string>
     <string name="settings_tile_corner_radius">Rundung</string>
     <string name="settings_tile_corner_square">Eckig</string>

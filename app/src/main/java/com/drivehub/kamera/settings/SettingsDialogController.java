@@ -41,8 +41,8 @@ import java.io.File;
 public final class SettingsDialogController {
 
     private static final int DEFAULT_TAB_INDEX = 1; // Settings
-    private static final int DEV_TAB_INDEX = 6;
-    private static final int DEV_STATUS_TAB_INDEX = 7;
+    private static final int DEV_TAB_INDEX = 5;
+    private static final int DEV_STATUS_TAB_INDEX = 6;
     private static final int DEV_UNLOCK_TAPS = 5;
     private static final int EXPECTED_TOTAL_CAMERAS = 4;
     private static final int CAMERA_PROBE_MAX_INDEX = 18;
@@ -189,25 +189,23 @@ public final class SettingsDialogController {
         v.tabSettings = dialog.findViewById(R.id.tabSettings);
         v.tabSignalCamera = dialog.findViewById(R.id.tabSignalCamera);
         v.tabDashcam = dialog.findViewById(R.id.tabDashcam);
-        v.tabOptik = dialog.findViewById(R.id.tabOptik);
         v.tabCredits = dialog.findViewById(R.id.tabCredits);
         v.tabDev = dialog.findViewById(R.id.tabDev);
         v.tabDevStatus = dialog.findViewById(R.id.tabDevStatus);
         v.settingsTabs = new TextView[]{
                 v.tabUpdate, v.tabSettings, v.tabSignalCamera, v.tabDashcam,
-                v.tabOptik, v.tabCredits, v.tabDev, v.tabDevStatus
+                v.tabCredits, v.tabDev, v.tabDevStatus
         };
         v.sectionUpdate = dialog.findViewById(R.id.sectionUpdate);
         v.sectionSettings = dialog.findViewById(R.id.sectionSettings);
         v.sectionSignalCamera = dialog.findViewById(R.id.sectionSignalCamera);
         v.sectionDashcam = dialog.findViewById(R.id.sectionDashcam);
-        v.sectionOptik = dialog.findViewById(R.id.sectionOptik);
         v.sectionCredits = dialog.findViewById(R.id.sectionCredits);
         v.sectionDev = dialog.findViewById(R.id.sectionDev);
         v.sectionDevStatus = dialog.findViewById(R.id.sectionDevStatus);
         v.settingsSections = new View[]{
                 v.sectionUpdate, v.sectionSettings, v.sectionSignalCamera, v.sectionDashcam,
-                v.sectionOptik, v.sectionCredits, v.sectionDev, v.sectionDevStatus
+                v.sectionCredits, v.sectionDev, v.sectionDevStatus
         };
         v.accentRow = dialog.findViewById(R.id.rowAccentColor);
         v.accentPreview = dialog.findViewById(R.id.viewAccentPreview);
@@ -285,7 +283,6 @@ public final class SettingsDialogController {
                 views.tabSettings,
                 views.tabSignalCamera,
                 views.tabDashcam,
-                views.tabOptik,
                 views.tabCredits,
                 views.tabDev,
                 views.tabDevStatus
@@ -477,7 +474,6 @@ public final class SettingsDialogController {
         TextView tabSettings;
         TextView tabSignalCamera;
         TextView tabDashcam;
-        TextView tabOptik;
         TextView tabCredits;
         TextView tabDev;
         TextView tabDevStatus;
@@ -486,7 +482,6 @@ public final class SettingsDialogController {
         View sectionSettings;
         View sectionSignalCamera;
         View sectionDashcam;
-        View sectionOptik;
         View sectionCredits;
         View sectionDev;
         View sectionDevStatus;

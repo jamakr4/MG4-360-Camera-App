@@ -106,7 +106,6 @@
     <string name="main_recording_starting">REC starting</string>
     <string name="main_recording_paused_oem">REC paused (OEM launch)</string>
     <string name="main_recording_error">REC error: %1$s</string>
-    <string name="settings_tab_optik">Appearance</string>
     <string name="settings_section_tileview">Signal Camera</string>
     <string name="settings_tile_corner_radius">Corner radius</string>
     <string name="settings_tile_corner_square">Square</string>

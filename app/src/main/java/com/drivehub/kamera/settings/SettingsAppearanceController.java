@@ -71,7 +71,6 @@ public final class SettingsAppearanceController {
             TextView tabSettings,
             TextView tabSignalCamera,
             TextView tabDashcam,
-            TextView tabOptik,
             TextView tabCredits,
             TextView tabDev,
             TextView tabDevStatus
@@ -97,7 +96,6 @@ public final class SettingsAppearanceController {
                 tabSettings,
                 tabSignalCamera,
                 tabDashcam,
-                tabOptik,
                 tabCredits,
                 tabDev,
                 tabDevStatus
@@ -110,7 +108,6 @@ public final class SettingsAppearanceController {
         seekCorner.setProgress(savedRadius);
         etCorner.setText(String.valueOf(savedRadius));
         etAccentColor.setText(UiPrefs.getAccentColorSetting(prefs));
-        syncAccentRowToSliderInset();
         accentPreview.setOnClickListener(v -> showAccentColorPicker());
 
         applyAccentColorToSettingsDialog(accentColor);
@@ -328,16 +325,6 @@ public final class SettingsAppearanceController {
                         ContextCompat.getColor(activity, R.color.settings_slider_track_bg)
                 }
         );
-    }
-
-    private void syncAccentRowToSliderInset() {
-        if (accentRow == null || seekCorner == null) return;
-        accentRow.post(() -> accentRow.setPaddingRelative(
-                seekCorner.getPaddingLeft(),
-                accentRow.getPaddingTop(),
-                accentRow.getPaddingEnd(),
-                accentRow.getPaddingBottom()
-        ));
     }
 
     private float dp(float value) {

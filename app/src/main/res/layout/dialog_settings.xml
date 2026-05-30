@@ -57,11 +57,6 @@
                     android:text="@string/settings_tab_dashcam" />
 
                 <TextView
-                    android:id="@+id/tabOptik"
-                    style="@style/DrivehubSettingsTabInactive"
-                    android:text="@string/settings_tab_optik" />
-
-                <TextView
                     android:id="@+id/tabUpdate"
                     style="@style/DrivehubSettingsTabInactive"
                     android:text="@string/settings_tab_update" />
@@ -160,8 +155,6 @@
             <include layout="@layout/dialog_settings_section_signal_camera" />
 
             <include layout="@layout/dialog_settings_section_dashcam" />
-
-            <include layout="@layout/dialog_settings_section_optik" />
 
             <include layout="@layout/dialog_settings_section_credits" />
 
