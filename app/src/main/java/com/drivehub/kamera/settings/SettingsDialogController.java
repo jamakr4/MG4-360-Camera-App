@@ -176,11 +176,12 @@ public final class SettingsDialogController {
         v.etDashcamFps = dialog.findViewById(R.id.etDashcamFps);
         v.etDashcamSignature = dialog.findViewById(R.id.etDashcamSignature);
         v.swDashcamShowSpeed = dialog.findViewById(R.id.switchDashcamShowSpeed);
-        v.tvDashcamRecordsPath = dialog.findViewById(R.id.tvDashcamRecordsPath);
-        v.btnDashcamExportUsb = dialog.findViewById(R.id.btnDashcamExportUsb);
         v.tvDashcamRecordingStatus = dialog.findViewById(R.id.tvDashcamRecordingStatus);
         v.etDevDefaultPollMs = dialog.findViewById(R.id.etDevDefaultPollMs);
         v.etDevSignalOffPollMs = dialog.findViewById(R.id.etDevSignalOffPollMs);
+        v.etDevDashcamRecordsPath = dialog.findViewById(R.id.etDevDashcamRecordsPath);
+        v.tvDevDashcamRecordsPath = dialog.findViewById(R.id.tvDevDashcamRecordsPath);
+        v.btnDevDashcamBrowseFolder = dialog.findViewById(R.id.btnDevDashcamBrowseFolder);
         v.btnDevResetDefaults = dialog.findViewById(R.id.btnDevResetDefaults);
         v.seekCorner = dialog.findViewById(R.id.seekCornerRadius);
         v.etCorner = dialog.findViewById(R.id.etCornerRadius);
@@ -250,14 +251,15 @@ public final class SettingsDialogController {
                 views.swDashcamEnabled,
                 views.etDashcamFps,
                 views.etDashcamSignature,
-                views.swDashcamShowSpeed,
-                views.tvDashcamRecordsPath,
-                views.btnDashcamExportUsb
+                views.swDashcamShowSpeed
         );
         dev.bind(
                 prefs,
                 views.etDevDefaultPollMs,
                 views.etDevSignalOffPollMs,
+                views.etDevDashcamRecordsPath,
+                views.tvDevDashcamRecordsPath,
+                views.btnDevDashcamBrowseFolder,
                 views.btnDevResetDefaults
         );
     }
@@ -393,7 +395,7 @@ public final class SettingsDialogController {
         }
 
         SharedPreferences prefs = UiPrefs.getPrefs(activity);
-        File recordsDir = DashcamSettingsController.getRecordsBaseDir();
+        File recordsDir = DashcamSettingsController.getRecordsBaseDir(activity);
         String error = lastError == null || lastError.trim().isEmpty()
                 ? activity.getString(R.string.settings_status_none)
                 : lastError.trim();
@@ -461,11 +463,12 @@ public final class SettingsDialogController {
         EditText etDashcamFps;
         EditText etDashcamSignature;
         Switch swDashcamShowSpeed;
-        TextView tvDashcamRecordsPath;
         TextView tvDashcamRecordingStatus;
-        Button btnDashcamExportUsb;
         EditText etDevDefaultPollMs;
         EditText etDevSignalOffPollMs;
+        EditText etDevDashcamRecordsPath;
+        TextView tvDevDashcamRecordsPath;
+        Button btnDevDashcamBrowseFolder;
         Button btnDevResetDefaults;
         SeekBar seekCorner;
         EditText etCorner;

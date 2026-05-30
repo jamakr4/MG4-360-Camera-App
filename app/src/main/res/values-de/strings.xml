@@ -44,6 +44,7 @@
     <string name="settings_dev_unlocked">Dev-Tools entsperrt</string>
     <string name="settings_dev_banner_test">Dashcam-Banner testen</string>
     <string name="settings_dev_banner_test_hint">Zeigt einmal den Event-Banner an, ohne eine Aufnahme zu triggern.</string>
+    <string name="settings_dev_storage_override">Speicher-Override</string>
     <string name="settings_dev_status_runtime">Runtime-Status</string>
     <string name="settings_dev_status_cameras">Kamera-Status</string>
     <string name="settings_dev_status_storage">Speicher-Status</string>
@@ -80,6 +81,12 @@
     <string name="settings_overlay_min_show_max">6000 ms</string>
     <string name="settings_overlay_min_show_hint">Wie lange die Blinker-Kamera bei kurzem Antippen sichtbar ist.</string>
     <string name="settings_records_path">Aufnahmepfad</string>
+    <string name="settings_records_path_hint">Optionaler eigener Pfad (zum Beispiel /storage/usb1/dashcam)</string>
+    <string name="settings_records_path_default_hint">Leer lassen, um standardmäßig Downloads/dashcam zu verwenden.</string>
+    <string name="settings_browse_folder">Ordner auswählen</string>
+    <string name="settings_records_path_use_default">Standardordner verwenden</string>
+    <string name="settings_records_path_use_this_folder">Diesen Ordner verwenden</string>
+    <string name="settings_records_path_empty_folder">Hier wurden keine lesbaren Unterordner gefunden.</string>
     <string name="settings_export_usb">Aufnahmen auf USB exportieren (TODO)</string>
     <string name="settings_storage_permission_required">Speicherberechtigung erforderlich</string>
     <string name="settings_usb_export_todo">USB-Export TODO (derzeit deaktiviert)</string>

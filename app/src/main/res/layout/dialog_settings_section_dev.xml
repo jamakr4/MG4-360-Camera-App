@@ -85,6 +85,61 @@
 
     </LinearLayout>
 
+    <!-- ============ STORAGE OVERRIDE ============ -->
+    <TextView
+        style="@style/DrivehubSettingsCardLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="22dp"
+        android:layout_marginBottom="8dp"
+        android:text="@string/settings_dev_storage_override" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_settings_inline_card"
+        android:orientation="vertical"
+        android:paddingStart="18dp"
+        android:paddingTop="14dp"
+        android:paddingEnd="18dp"
+        android:paddingBottom="14dp">
+
+        <EditText
+            android:id="@+id/etDevDashcamRecordsPath"
+            style="@style/DrivehubSettingsAccentValue"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="@string/settings_records_path_hint"
+            android:imeOptions="flagNoExtractUi"
+            android:inputType="textUri|textNoSuggestions"
+            android:maxLines="1" />
+
+        <TextView
+            style="@style/DrivehubSettingsCaption"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/settings_records_path_default_hint" />
+
+        <TextView
+            android:id="@+id/tvDevDashcamRecordsPath"
+            style="@style/DrivehubSettingsBodyMuted"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:textIsSelectable="true" />
+
+        <Button
+            android:id="@+id/btnDevDashcamBrowseFolder"
+            style="@style/DrivehubDialogButtonSecondary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:minHeight="44dp"
+            android:text="@string/settings_browse_folder" />
+
+    </LinearLayout>
+
     <!-- ============ BANNER TEST ============ -->
     <TextView
         style="@style/DrivehubSettingsCardLabel"

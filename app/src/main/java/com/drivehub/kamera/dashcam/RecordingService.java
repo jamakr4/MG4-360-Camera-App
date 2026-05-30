@@ -496,7 +496,7 @@ public class RecordingService extends Service {
         // noinspection ResultOfMethodCallIgnored
         eventDir.mkdirs();
         for (String baseName : job.baseNames) {
-            copySegmentGroup(DashcamSettingsController.getRecordsBaseDir(), eventDir, baseName);
+            copySegmentGroup(DashcamSettingsController.getRecordsBaseDir(this), eventDir, baseName);
         }
     }
 
@@ -602,14 +602,14 @@ public class RecordingService extends Service {
     }
 
     private File getEventsBaseDir() {
-        File dir = new File(DashcamSettingsController.getRecordsBaseDir(), "events");
+        File dir = new File(DashcamSettingsController.getRecordsBaseDir(this), "events");
         // noinspection ResultOfMethodCallIgnored
         dir.mkdirs();
         return dir;
     }
 
     private File requireBaseDir() {
-        File baseDir = DashcamSettingsController.getRecordsBaseDir();
+        File baseDir = DashcamSettingsController.getRecordsBaseDir(this);
         // noinspection ResultOfMethodCallIgnored
         baseDir.mkdirs();
         if (baseDir.exists() && baseDir.canWrite()) {

@@ -2,14 +2,17 @@ package com.drivehub.kamera.dev;
 
 import com.drivehub.kamera.R;
 
+import com.drivehub.kamera.dashcam.DashcamSettingsController;
 import com.drivehub.kamera.settings.SimpleTextWatcher;
 import com.drivehub.kamera.settings.UiPrefs;
 import com.drivehub.kamera.signal.SignalService;
 
+import android.content.Context;
 import android.content.SharedPreferences;
 import android.text.Editable;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.TextView;
 import android.widget.Toast;
 
 public final class DevSettingsController {
@@ -21,6 +24,9 @@ public final class DevSettingsController {
             SharedPreferences prefs,
             EditText etDefaultPollMs,
             EditText etSignalOffPollMs,
+            EditText etDashcamRecordsPath,
+            TextView tvDashcamRecordsPath,
+            Button btnBrowseFolder,
             Button btnResetDefaults
     ) {
         bindPollingField(
@@ -35,7 +41,56 @@ public final class DevSettingsController {
                 UiPrefs.KEY_DEV_SIGNAL_OFF_POLL_MS,
                 UiPrefs.getDevSignalOffPollMs(prefs)
         );
+        bindDashcamStorageOverride(prefs, etDashcamRecordsPath, tvDashcamRecordsPath, btnBrowseFolder);
         bindResetDefaultsButton(prefs, etDefaultPollMs, etSignalOffPollMs, btnResetDefaults);
+    }
+
+    private void bindDashcamStorageOverride(
+            SharedPreferences prefs,
+            EditText etDashcamRecordsPath,
+            TextView tvDashcamRecordsPath,
+            Button btnBrowseFolder
+    ) {
+        if (etDashcamRecordsPath != null) {
+            String configuredPath = DashcamSettingsController.getConfiguredRecordsPath(prefs);
+            etDashcamRecordsPath.setText(configuredPath);
+            etDashcamRecordsPath.setSelection(etDashcamRecordsPath.getText().length());
+            etDashcamRecordsPath.addTextChangedListener(new SimpleTextWatcher() {
+                @Override
+                public void afterTextChanged(Editable s) {
+                    DashcamSettingsController.setConfiguredRecordsPath(prefs, s == null ? "" : s.toString());
+                    refreshDashcamStoragePath(tvDashcamRecordsPath, etDashcamRecordsPath.getContext());
+                }
+            });
+            etDashcamRecordsPath.setOnFocusChangeListener((v, hasFocus) -> {
+                if (hasFocus) return;
+                String normalized = DashcamSettingsController.getConfiguredRecordsPath(prefs);
+                if (!normalized.contentEquals(etDashcamRecordsPath.getText())) {
+                    etDashcamRecordsPath.setText(normalized);
+                    etDashcamRecordsPath.setSelection(etDashcamRecordsPath.getText().length());
+                }
+                refreshDashcamStoragePath(tvDashcamRecordsPath, v.getContext());
+            });
+        }
+        refreshDashcamStoragePath(tvDashcamRecordsPath, btnBrowseFolder != null
+                ? btnBrowseFolder.getContext()
+                : etDashcamRecordsPath != null ? etDashcamRecordsPath.getContext() : null);
+        if (btnBrowseFolder != null) {
+            btnBrowseFolder.setOnClickListener(v -> DashcamFolderPicker.show(
+                    v.getContext(),
+                    etDashcamRecordsPath == null ? "" : editableToString(etDashcamRecordsPath),
+                    new DashcamFolderPicker.Listener() {
+                        @Override
+                        public void onFolderSelected(String absolutePath) {
+                            applyDashcamStoragePath(prefs, etDashcamRecordsPath, tvDashcamRecordsPath, v.getContext(), absolutePath);
+                        }
+
+                        @Override
+                        public void onUseDefault() {
+                            applyDashcamStoragePath(prefs, etDashcamRecordsPath, tvDashcamRecordsPath, v.getContext(), "");
+                        }
+                    }));
+        }
     }
 
     private void bindResetDefaultsButton(
@@ -107,6 +162,31 @@ public final class DevSettingsController {
         } catch (Throwable ignored) {
             return null;
         }
+    }
+
+    private void applyDashcamStoragePath(
+            SharedPreferences prefs,
+            EditText etDashcamRecordsPath,
+            TextView tvDashcamRecordsPath,
+            Context context,
+            String path
+    ) {
+        DashcamSettingsController.setConfiguredRecordsPath(prefs, path);
+        String normalized = DashcamSettingsController.getConfiguredRecordsPath(prefs);
+        if (etDashcamRecordsPath != null && !normalized.contentEquals(etDashcamRecordsPath.getText())) {
+            etDashcamRecordsPath.setText(normalized);
+            etDashcamRecordsPath.setSelection(etDashcamRecordsPath.getText().length());
+        }
+        refreshDashcamStoragePath(tvDashcamRecordsPath, context);
+    }
+
+    private void refreshDashcamStoragePath(TextView tvDashcamRecordsPath, Context context) {
+        if (tvDashcamRecordsPath == null || context == null) return;
+        tvDashcamRecordsPath.setText(DashcamSettingsController.getRecordsBaseDir(context).getAbsolutePath());
+    }
+
+    private String editableToString(EditText editText) {
+        return editText == null || editText.getText() == null ? "" : editText.getText().toString();
     }
 
 }

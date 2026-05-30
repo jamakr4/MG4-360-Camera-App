@@ -4,16 +4,15 @@ import com.drivehub.kamera.R;
 
 import com.drivehub.kamera.MainActivity;
 import com.drivehub.kamera.settings.SimpleTextWatcher;
+import com.drivehub.kamera.settings.UiPrefs;
 
 import android.Manifest;
+import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
-import android.os.Environment;
 import android.text.Editable;
-import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Switch;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.core.app.ActivityCompat;
@@ -26,6 +25,7 @@ public final class DashcamSettingsController {
     public static final String KEY_ENABLED = "enabled";
     public static final int DEFAULT_SEGMENT_SEC = 30;
     public static final int DEFAULT_TOTAL_RETENTION_MIN = 5;
+    private static final String KEY_RECORDS_PATH = "recordsPath";
     private static final String KEY_RECORDING_FPS = "recordingFps";
     private static final String KEY_SIGNATURE = "recordingSignature";
     private static final String KEY_SHOW_SPEED = "recordingShowSpeed";
@@ -48,9 +48,7 @@ public final class DashcamSettingsController {
             Switch swEnabled,
             EditText etRecordingFps,
             EditText etSignature,
-            Switch swShowSpeed,
-            TextView tvRecordsPath,
-            Button btnExportUsb) {
+            Switch swShowSpeed) {
         int recordingFps = getRecordingFps(prefs);
         String signature = getRecordingSignature(prefs);
 
@@ -93,16 +91,6 @@ public final class DashcamSettingsController {
                     (buttonView, checked) -> prefs.edit().putBoolean(KEY_SHOW_SPEED, checked).apply());
         }
         bindFields(prefs, etRecordingFps, etSignature);
-
-        if (tvRecordsPath != null) {
-            tvRecordsPath.setText(getRecordsBaseDir().getAbsolutePath());
-        }
-        if (btnExportUsb != null) {
-            btnExportUsb
-                    .setVisibility(findMountedUsbRoot() == null ? android.view.View.GONE : android.view.View.VISIBLE);
-            btnExportUsb.setOnClickListener(
-                    v -> Toast.makeText(activity, R.string.settings_usb_export_todo, Toast.LENGTH_LONG).show());
-        }
     }
 
     private void bindFields(SharedPreferences prefs, EditText etRecordingFps, EditText etSignature) {
@@ -157,6 +145,23 @@ public final class DashcamSettingsController {
         return prefs.getBoolean(KEY_SHOW_SPEED, true);
     }
 
+    public static String getConfiguredRecordsPath(SharedPreferences prefs) {
+        return normalizeRecordsPath(prefs.getString(KEY_RECORDS_PATH, ""));
+    }
+
+    public static void setConfiguredRecordsPath(SharedPreferences prefs, String recordsPath) {
+        prefs.edit().putString(KEY_RECORDS_PATH, normalizeRecordsPath(recordsPath)).apply();
+    }
+
+    public static File getRecordsBaseDir(Context context) {
+        SharedPreferences prefs = UiPrefs.getPrefs(context);
+        String customPath = getConfiguredRecordsPath(prefs);
+        File dir = customPath.isEmpty() ? getDefaultRecordsBaseDir() : new File(customPath);
+        // noinspection ResultOfMethodCallIgnored
+        dir.mkdirs();
+        return dir;
+    }
+
     private static int clampRecordingFps(int fps) {
         return Math.max(MIN_RECORDING_FPS, Math.min(MAX_RECORDING_FPS, fps));
     }
@@ -205,31 +210,25 @@ public final class DashcamSettingsController {
         return trimmed.substring(0, MAX_SIGNATURE_LENGTH);
     }
 
+    private static String normalizeRecordsPath(String value) {
+        if (value == null)
+            return "";
+        String trimmed = value.trim();
+        if (trimmed.isEmpty())
+            return "";
+        while (trimmed.endsWith("/") && trimmed.length() > 1) {
+            trimmed = trimmed.substring(0, trimmed.length() - 1);
+        }
+        return trimmed;
+    }
+
     private boolean hasStoragePermission() {
         return ContextCompat.checkSelfPermission(activity,
                 Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED;
     }
 
-    public static File getRecordsBaseDir() {
-        File downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
-        File dir = new File(downloads, RECORDS_DIR_NAME);
-        // noinspection ResultOfMethodCallIgnored
-        dir.mkdirs();
-        return dir;
-    }
-
-    private File findMountedUsbRoot() {
-        File storageDir = new File("/storage");
-        if (!storageDir.exists())
-            return null;
-        File[] roots = storageDir.listFiles();
-        if (roots == null)
-            return null;
-        for (File root : roots) {
-            if (root.isDirectory() && root.canRead() && root.canWrite()) {
-                return root;
-            }
-        }
-        return null;
+    private static File getDefaultRecordsBaseDir() {
+        return new File(android.os.Environment.getExternalStoragePublicDirectory(
+                android.os.Environment.DIRECTORY_DOWNLOADS), RECORDS_DIR_NAME);
     }
 }
