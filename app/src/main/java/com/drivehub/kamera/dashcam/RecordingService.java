@@ -417,43 +417,58 @@ public class RecordingService extends Service {
     }
 
     private void onSegmentCompleted(File baseDir, String baseName, long startMs, long endMs, int keepSegments) {
-        List<EventCopyJob> completedJobs;
+        List<EventCopyJob> copyJobs;
         synchronized (eventLock) {
             long segmentOrdinal = ++completedSegmentCount;
             recentSegments.add(new SegmentInfo(segmentOrdinal, baseName, startMs, endMs));
             while (recentSegments.size() > keepSegments + 6) {
                 recentSegments.remove(0);
             }
-            completedJobs = finalizeReadyEventRequestsLocked(segmentOrdinal);
+            copyJobs = collectEventCopyJobsLocked(segmentOrdinal);
             Set<String> protectedBases = collectProtectedBasesLocked();
             cleanupOldSegments(baseDir, keepSegments, protectedBases);
         }
-        for (EventCopyJob job : completedJobs) {
+        for (EventCopyJob job : copyJobs) {
             copyEventSegments(job);
         }
     }
 
     private void armEventCapture() {
         long now = System.currentTimeMillis();
+        String eventBaseName = "event_" + makeTimestampBase(now, "yyMMddHHmmssSSS");
+        File eventDir = new File(getEventsBaseDir(), eventBaseName);
+        // noinspection ResultOfMethodCallIgnored
+        eventDir.mkdirs();
         synchronized (eventLock) {
             long currentSegmentOrdinal = completedSegmentCount + 1L;
             pendingEventRequests.add(new EventCaptureRequest(
-                    "event_" + makeTimestampBase(now, "yyMMddHHmmssSSS"),
+                    eventBaseName,
                     Math.max(1L, currentSegmentOrdinal - EVENT_SEGMENTS_BEFORE_CURRENT),
                     currentSegmentOrdinal + EVENT_SEGMENTS_AFTER_CURRENT
             ));
         }
     }
 
-    private List<EventCopyJob> finalizeReadyEventRequestsLocked(long completedThroughOrdinal) {
-        List<EventCaptureRequest> completed = new ArrayList<>();
+    private List<EventCopyJob> collectEventCopyJobsLocked(long completedThroughOrdinal) {
         List<EventCopyJob> jobs = new ArrayList<>();
+        List<EventCaptureRequest> completed = new ArrayList<>();
         for (EventCaptureRequest request : pendingEventRequests) {
-            if (completedThroughOrdinal < request.lastSegmentOrdinal) {
-                continue;
+            List<String> baseNames = new ArrayList<>();
+            for (SegmentInfo segment : recentSegments) {
+                if (segment.ordinal < request.firstSegmentOrdinal
+                        || segment.ordinal > request.lastSegmentOrdinal) {
+                    continue;
+                }
+                if (request.copiedBaseNames.add(segment.baseName)) {
+                    baseNames.add(segment.baseName);
+                }
             }
-            jobs.add(buildEventCopyJobLocked(request));
-            completed.add(request);
+            if (!baseNames.isEmpty()) {
+                jobs.add(new EventCopyJob(request.eventBaseName, baseNames));
+            }
+            if (completedThroughOrdinal >= request.lastSegmentOrdinal) {
+                completed.add(request);
+            }
         }
         pendingEventRequests.removeAll(completed);
         return jobs;
@@ -470,21 +485,6 @@ public class RecordingService extends Service {
             }
         }
         return protectedBases;
-    }
-
-    private EventCopyJob buildEventCopyJobLocked(EventCaptureRequest request) {
-        List<String> baseNames = new ArrayList<>();
-        Set<String> copiedBases = new HashSet<>();
-        for (SegmentInfo segment : recentSegments) {
-            if (segment.ordinal < request.firstSegmentOrdinal
-                    || segment.ordinal > request.lastSegmentOrdinal) {
-                continue;
-            }
-            if (copiedBases.add(segment.baseName)) {
-                baseNames.add(segment.baseName);
-            }
-        }
-        return new EventCopyJob(request.eventBaseName, baseNames);
     }
 
     private void copyEventSegments(EventCopyJob job) {
@@ -862,6 +862,7 @@ public class RecordingService extends Service {
         final String eventBaseName;
         final long firstSegmentOrdinal;
         final long lastSegmentOrdinal;
+        final Set<String> copiedBaseNames = new HashSet<>();
 
         EventCaptureRequest(String eventBaseName, long firstSegmentOrdinal, long lastSegmentOrdinal) {
             this.eventBaseName = eventBaseName;
