@@ -110,6 +110,7 @@ final class SettingsDialogController {
         wireSubControllers(prefs);
         wireAppearance(prefs);
         wireTestBannerButton();
+        wireDevLogControls();
         wireTabs();
         wireDevUnlock();
         wireOta();
@@ -200,6 +201,7 @@ final class SettingsDialogController {
         v.accentPreview = dialog.findViewById(R.id.viewAccentPreview);
         v.etAccentColor = dialog.findViewById(R.id.etAccentColor);
         v.btnDevTestDashcamBanner = dialog.findViewById(R.id.btnDevTestDashcamBanner);
+        v.btnDevStatusLogClear = dialog.findViewById(R.id.btnDevStatusLogClear);
         v.tvVersion = dialog.findViewById(R.id.tvDialogVersion);
         v.tvBeta = dialog.findViewById(R.id.tvDialogVersionBeta);
         v.tvDevStatusSignalService = dialog.findViewById(R.id.tvDevStatusSignalService);
@@ -213,6 +215,7 @@ final class SettingsDialogController {
         v.tvDevStatusCameraProbe = dialog.findViewById(R.id.tvDevStatusCameraProbe);
         v.tvDevStatusStorageWritable = dialog.findViewById(R.id.tvDevStatusStorageWritable);
         v.tvDevStatusRecordsPath = dialog.findViewById(R.id.tvDevStatusRecordsPath);
+        v.tvDevStatusEventLog = dialog.findViewById(R.id.tvDevStatusEventLog);
 
         v.swSafetyWarning.setChecked(UiPrefs.isSafetyWarningEnabled(prefs));
         v.swSafetyWarning.setOnCheckedChangeListener((btn, checked) -> {
@@ -283,6 +286,17 @@ final class SettingsDialogController {
         if (views.btnDevTestDashcamBanner == null) return;
         views.btnDevTestDashcamBanner.setOnClickListener(v ->
                 DashcamEventOverlayService.showConfirmation(activity));
+    }
+
+    private void wireDevLogControls() {
+        if (views.btnDevStatusLogClear == null) return;
+        views.btnDevStatusLogClear.setOnClickListener(v -> {
+            DevRuntimeLog.clear();
+            DevRuntimeLog.add("UI", "Dev runtime log cleared");
+            if (views.tvDevStatusEventLog != null) {
+                views.tvDevStatusEventLog.setText(DevRuntimeLog.snapshot());
+            }
+        });
     }
 
     private void wireTabs() {
@@ -366,7 +380,8 @@ final class SettingsDialogController {
                 || views.tvDevStatusAvailableCameras == null
                 || views.tvDevStatusCameraProbe == null
                 || views.tvDevStatusStorageWritable == null
-                || views.tvDevStatusRecordsPath == null) {
+                || views.tvDevStatusRecordsPath == null
+                || views.tvDevStatusEventLog == null) {
             return;
         }
 
@@ -397,6 +412,7 @@ final class SettingsDialogController {
                         ? R.string.settings_status_active
                         : R.string.settings_status_inactive));
         views.tvDevStatusRecordsPath.setText(recordsDir.getAbsolutePath());
+        views.tvDevStatusEventLog.setText(DevRuntimeLog.snapshot());
     }
 
     private String readCameraProbeSummary() {
@@ -471,6 +487,7 @@ final class SettingsDialogController {
         View accentPreview;
         EditText etAccentColor;
         Button btnDevTestDashcamBanner;
+        Button btnDevStatusLogClear;
         TextView tvVersion;
         TextView tvBeta;
         TextView tvDevStatusSignalService;
@@ -484,5 +501,6 @@ final class SettingsDialogController {
         TextView tvDevStatusCameraProbe;
         TextView tvDevStatusStorageWritable;
         TextView tvDevStatusRecordsPath;
+        TextView tvDevStatusEventLog;
     }
 }

@@ -60,6 +60,8 @@
     <string name="settings_dev_status_camera_probe">Kamera-Probe</string>
     <string name="settings_dev_status_storage_writable">Speicher beschreibbar</string>
     <string name="settings_dev_status_records_path">Aufnahmepfad</string>
+    <string name="settings_dev_status_event_log">Event-Log</string>
+    <string name="settings_dev_status_event_log_clear">Log leeren</string>
     <string name="settings_status_active">Aktiv</string>
     <string name="settings_status_inactive">Inaktiv</string>
     <string name="settings_status_enabled">Aktiviert</string>

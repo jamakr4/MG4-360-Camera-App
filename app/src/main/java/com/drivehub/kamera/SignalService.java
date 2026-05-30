@@ -6,6 +6,7 @@ import android.app.NotificationManager;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.app.ActivityManager;
 import android.os.Build;
@@ -44,6 +45,10 @@ public class SignalService extends Service {
     private static final int HAZARD_LIGHTS_SWITCH_PROP_ID = 0x11400e13;
     private static final int REVERSE_GEAR_VALUE = 2;
     private static final String OEM_AVM_PACKAGE = "com.saicmotor.hmi.aroundview";
+    private static final String ACTION_CAMERA_SHOW = "com.saicmotor.360camera.show";
+    private static final String ACTION_CAMERA_CLOSE = "com.saicmotor.360camera.close";
+    private static final String ACTION_OEM_STOP = "com.saicmotor.hmi.aroundview.mod.ACTION_STOP";
+    private static final String ACTION_OEM_START = "com.saicmotor.hmi.aroundview.mod.startAVMActivity";
     public static final String ACTION_ROUTE_CAMERA = "com.drivehub.kamera.ACTION_ROUTE_CAMERA";
     public static final String EXTRA_CAMERA_INDEX = "camera_index";
 
@@ -52,6 +57,7 @@ public class SignalService extends Service {
     private Object car;
     private Object lampManager;
     private Object lampCallbackProxy;
+    private android.content.BroadcastReceiver debugBroadcastReceiver;
 
     private HandlerThread pollThread;
     private Handler pollHandler;
@@ -85,6 +91,7 @@ public class SignalService extends Service {
     public static void setOemAvmActive(Context context, boolean active) {
         SharedPreferences prefs = UiPrefs.getPrefs(context);
         UiPrefs.setOemAvmActive(prefs, active);
+        DevRuntimeLog.add("SignalService", "OEM latch=" + active);
         SignalService inst = sInstance;
         if (inst == null) {
             if (active) {
@@ -145,6 +152,7 @@ public class SignalService extends Service {
         super.onCreate();
         sInstance = this;
         createNotificationChannel();
+        registerDebugBroadcastSniffer();
     }
 
     @Override
@@ -502,6 +510,13 @@ public class SignalService extends Service {
     @Override
     public void onDestroy() {
         super.onDestroy();
+        if (debugBroadcastReceiver != null) {
+            try {
+                unregisterReceiver(debugBroadcastReceiver);
+            } catch (Throwable ignored) {
+            }
+            debugBroadcastReceiver = null;
+        }
         try {
             if (lampManager != null && lampCallbackProxy != null) {
                 Method unregister = lampManager.getClass()
@@ -546,5 +561,41 @@ public class SignalService extends Service {
         );
         NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         if (nm != null) nm.createNotificationChannel(ch);
+    }
+
+    private void registerDebugBroadcastSniffer() {
+        if (debugBroadcastReceiver != null) return;
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(ACTION_CAMERA_SHOW);
+        filter.addAction(ACTION_CAMERA_CLOSE);
+        filter.addAction(ACTION_OEM_STOP);
+        filter.addAction(ACTION_OEM_START);
+        debugBroadcastReceiver = new android.content.BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                if (intent == null || intent.getAction() == null) return;
+                DevRuntimeLog.add("Broadcast", intent.getAction() + formatIntentDebug(intent));
+            }
+        };
+        try {
+            registerReceiver(debugBroadcastReceiver, filter);
+            DevRuntimeLog.add("SignalService", "debug sniffer registered for OEM actions");
+        } catch (Throwable t) {
+            DevRuntimeLog.add("SignalService", "debug sniffer failed: " + t.getClass().getSimpleName());
+        }
+    }
+
+    private static String formatIntentDebug(Intent intent) {
+        StringBuilder sb = new StringBuilder();
+        if (intent.getPackage() != null) {
+            sb.append(" pkg=").append(intent.getPackage());
+        }
+        if (intent.getComponent() != null) {
+            sb.append(" cmp=").append(intent.getComponent().flattenToShortString());
+        }
+        if (intent.getExtras() != null && !intent.getExtras().isEmpty()) {
+            sb.append(" extras=").append(intent.getExtras().keySet());
+        }
+        return sb.toString();
     }
 }

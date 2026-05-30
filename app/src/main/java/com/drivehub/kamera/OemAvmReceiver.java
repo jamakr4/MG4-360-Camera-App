@@ -21,6 +21,7 @@ public class OemAvmReceiver extends BroadcastReceiver {
         if (action == null) {
             return;
         }
+        DevRuntimeLog.add("OemAvmReceiver", "received " + action);
         if (ACTION_CAMERA_SHOW.equals(action)) {
             Log.i(TAG, "OEM AVM show request received");
             SignalService.setOemAvmActive(context, true);

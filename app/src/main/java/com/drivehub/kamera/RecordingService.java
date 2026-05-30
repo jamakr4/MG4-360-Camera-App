@@ -149,6 +149,7 @@ public class RecordingService extends Service {
         String action = intent.getAction();
 
         if (ACTION_STOP.equals(action)) {
+            DevRuntimeLog.add("RecordingService", "ACTION_STOP");
             stopRequested = true;
             segmentStopRequested = true;
             oemPauseRequested = false;
@@ -176,6 +177,7 @@ public class RecordingService extends Service {
         }
 
         if (ACTION_PAUSE_FOR_OEM_REQUEST.equals(action)) {
+            DevRuntimeLog.add("RecordingService", "ACTION_PAUSE_FOR_OEM_REQUEST");
             boolean enabled = prefs().getBoolean(DashcamSettingsController.KEY_ENABLED, false);
             boolean changed = !oemPauseRequested;
             oemPauseRequested = true;
@@ -194,6 +196,7 @@ public class RecordingService extends Service {
         }
 
         if (ACTION_RESUME_AFTER_OEM_REQUEST.equals(action)) {
+            DevRuntimeLog.add("RecordingService", "ACTION_RESUME_AFTER_OEM_REQUEST");
             boolean wasPaused = STATUS_PAUSED_OEM.equals(prefs().getString(KEY_STATUS, STATUS_OFF));
             oemPauseRequested = false;
             segmentStopRequested = false;
@@ -226,6 +229,7 @@ public class RecordingService extends Service {
         }
 
         if (ACTION_TRIGGER_EVENT_SAVE.equals(action)) {
+            DevRuntimeLog.add("RecordingService", "ACTION_TRIGGER_EVENT_SAVE");
             if (worker == null || !prefs().getBoolean(DashcamSettingsController.KEY_ENABLED, false)) {
                 return START_STICKY;
             }
@@ -241,6 +245,7 @@ public class RecordingService extends Service {
         }
 
         stopRequested = false;
+        DevRuntimeLog.add("RecordingService", action == null ? "ACTION_START(null)" : action);
         startForeground(NOTIF_ID, buildNotification(getString(R.string.notification_recording_starting)));
         publishStatus(STATUS_STARTING, 0, TOTAL_CAMERAS, "");
         if (ACTION_RECORD_TEST_30S.equals(action)) {

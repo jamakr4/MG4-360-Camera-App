@@ -60,6 +60,8 @@
     <string name="settings_dev_status_camera_probe">Camera probe</string>
     <string name="settings_dev_status_storage_writable">Storage writable</string>
     <string name="settings_dev_status_records_path">Records path</string>
+    <string name="settings_dev_status_event_log">Event log</string>
+    <string name="settings_dev_status_event_log_clear">Clear log</string>
     <string name="settings_status_active">Active</string>
     <string name="settings_status_inactive">Inactive</string>
     <string name="settings_status_enabled">Enabled</string>
