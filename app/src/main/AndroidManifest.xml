@@ -42,30 +42,30 @@
         </activity>
 
         <activity
-            android:name=".TileViewActivity"
+            android:name=".camera.TileViewActivity"
             android:exported="false" />
 
         <service
-            android:name=".RecordingService"
+            android:name=".dashcam.RecordingService"
             android:exported="false"
             android:foregroundServiceType="camera" />
 
         <service
-            android:name=".OverlayService"
+            android:name=".camera.OverlayService"
             android:exported="false"
             android:foregroundServiceType="camera" />
 
         <service
-            android:name=".DashcamEventOverlayService"
+            android:name=".dashcam.DashcamEventOverlayService"
             android:exported="false" />
 
         <service
-            android:name=".SignalService"
+            android:name=".signal.SignalService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 
         <receiver
-            android:name=".BootReceiver"
+            android:name=".boot.BootReceiver"
             android:enabled="true"
             android:exported="false">
             <intent-filter>
@@ -74,7 +74,7 @@
         </receiver>
 
         <receiver
-            android:name=".OemAvmReceiver"
+            android:name=".dashcam.OemAvmReceiver"
             android:enabled="true"
             android:exported="true">
             <intent-filter>

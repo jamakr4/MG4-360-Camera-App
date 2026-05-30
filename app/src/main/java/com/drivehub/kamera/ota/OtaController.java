@@ -1,4 +1,8 @@
-package com.drivehub.kamera;
+package com.drivehub.kamera.ota;
+
+import com.drivehub.kamera.R;
+
+import com.drivehub.kamera.settings.UiPrefs;
 
 import android.app.Dialog;
 import android.app.DownloadManager;
@@ -19,7 +23,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 import java.util.Locale;
 
-final class OtaController {
+public final class OtaController {
 
     private final AppCompatActivity activity;
 
@@ -40,11 +44,11 @@ final class OtaController {
     private Switch betaSwitch;
     private boolean suppressBetaToggleCallback = false;
 
-    OtaController(AppCompatActivity activity) {
+    public OtaController(AppCompatActivity activity) {
         this.activity = activity;
     }
 
-    void setup(
+    public void setup(
             Dialog settingsDialog,
             TextView updateTag,
             Switch allowBetaSwitch,
@@ -92,7 +96,7 @@ final class OtaController {
         triggerCheck(settingsDialog, updateTag, false);
     }
 
-    void stop() {
+    public void stop() {
         stopProgressWatcher();
     }
 

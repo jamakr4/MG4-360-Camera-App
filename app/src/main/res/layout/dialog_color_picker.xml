@@ -30,13 +30,13 @@
         android:layout_marginTop="14dp"
         android:background="@drawable/bg_accent_color_preview" />
 
-    <com.drivehub.kamera.ColorSaturationValueView
+    <com.drivehub.kamera.ui.ColorSaturationValueView
         android:id="@+id/viewColorSaturationValue"
         android:layout_width="match_parent"
         android:layout_height="220dp"
         android:layout_marginTop="18dp" />
 
-    <com.drivehub.kamera.ColorHueStripView
+    <com.drivehub.kamera.ui.ColorHueStripView
         android:id="@+id/viewColorHue"
         android:layout_width="match_parent"
         android:layout_height="28dp"

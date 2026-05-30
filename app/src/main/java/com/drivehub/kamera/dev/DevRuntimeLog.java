@@ -1,4 +1,4 @@
-package com.drivehub.kamera;
+package com.drivehub.kamera.dev;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayDeque;
@@ -6,7 +6,7 @@ import java.util.Date;
 import java.util.Deque;
 import java.util.Locale;
 
-final class DevRuntimeLog {
+public final class DevRuntimeLog {
     private static final int MAX_LINES = 120;
     private static final Object LOCK = new Object();
     private static final Deque<String> LINES = new ArrayDeque<>();
@@ -15,7 +15,7 @@ final class DevRuntimeLog {
     private DevRuntimeLog() {
     }
 
-    static void add(String source, String message) {
+    public static void add(String source, String message) {
         String line = TIME_FORMAT.format(new Date()) + "  [" + source + "] " + message;
         synchronized (LOCK) {
             LINES.addLast(line);
@@ -25,7 +25,7 @@ final class DevRuntimeLog {
         }
     }
 
-    static String snapshot() {
+    public static String snapshot() {
         synchronized (LOCK) {
             if (LINES.isEmpty()) {
                 return "No events yet";
@@ -39,7 +39,7 @@ final class DevRuntimeLog {
         }
     }
 
-    static void clear() {
+    public static void clear() {
         synchronized (LOCK) {
             LINES.clear();
         }

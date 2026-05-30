@@ -1,4 +1,6 @@
-package com.drivehub.kamera;
+package com.drivehub.kamera.dashcam;
+
+import com.drivehub.kamera.R;
 
 import android.app.Notification;
 import android.app.NotificationChannel;

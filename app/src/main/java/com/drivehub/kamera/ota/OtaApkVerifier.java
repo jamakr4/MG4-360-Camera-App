@@ -1,4 +1,4 @@
-package com.drivehub.kamera;
+package com.drivehub.kamera.ota;
 
 import android.content.Context;
 import android.net.Uri;

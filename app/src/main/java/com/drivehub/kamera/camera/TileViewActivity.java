@@ -1,4 +1,9 @@
-package com.drivehub.kamera;
+package com.drivehub.kamera.camera;
+
+import com.drivehub.kamera.CameraProbe;
+import com.drivehub.kamera.R;
+
+import com.drivehub.kamera.settings.UiPrefs;
 
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;

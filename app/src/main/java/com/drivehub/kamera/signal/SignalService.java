@@ -1,4 +1,12 @@
-package com.drivehub.kamera;
+package com.drivehub.kamera.signal;
+
+import com.drivehub.kamera.R;
+
+import com.drivehub.kamera.MainActivity;
+import com.drivehub.kamera.camera.OverlayService;
+import com.drivehub.kamera.dashcam.RecordingService;
+import com.drivehub.kamera.dev.DevRuntimeLog;
+import com.drivehub.kamera.settings.UiPrefs;
 
 import android.app.Notification;
 import android.app.NotificationChannel;

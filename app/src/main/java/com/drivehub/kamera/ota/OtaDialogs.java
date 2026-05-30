@@ -1,4 +1,8 @@
-package com.drivehub.kamera;
+package com.drivehub.kamera.ota;
+
+import com.drivehub.kamera.R;
+
+import com.drivehub.kamera.settings.UiPrefs;
 
 import android.app.Dialog;
 import android.content.Context;

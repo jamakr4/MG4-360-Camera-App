@@ -1,4 +1,10 @@
-package com.drivehub.kamera;
+package com.drivehub.kamera.dev;
+
+import com.drivehub.kamera.R;
+
+import com.drivehub.kamera.settings.SimpleTextWatcher;
+import com.drivehub.kamera.settings.UiPrefs;
+import com.drivehub.kamera.signal.SignalService;
 
 import android.content.SharedPreferences;
 import android.text.Editable;
@@ -6,9 +12,12 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Toast;
 
-final class DevSettingsController {
+public final class DevSettingsController {
 
-    void bind(
+    public DevSettingsController() {
+    }
+
+    public void bind(
             SharedPreferences prefs,
             EditText etDefaultPollMs,
             EditText etSignalOffPollMs,

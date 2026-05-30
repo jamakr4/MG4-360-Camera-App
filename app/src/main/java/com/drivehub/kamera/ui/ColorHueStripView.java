@@ -1,4 +1,4 @@
-package com.drivehub.kamera;
+package com.drivehub.kamera.ui;
 
 import android.content.Context;
 import android.graphics.Canvas;
@@ -12,9 +12,9 @@ import android.view.View;
 
 import androidx.annotation.Nullable;
 
-final class ColorHueStripView extends View {
+public final class ColorHueStripView extends View {
 
-    interface OnHueChangedListener {
+    public interface OnHueChangedListener {
         void onHueChanged(float hue);
     }
 
@@ -60,12 +60,12 @@ final class ColorHueStripView extends View {
         markerOutlinePaint.setColor(0xCC000000);
     }
 
-    void setHue(float hue) {
+    public void setHue(float hue) {
         this.hue = clamp(hue, 0f, 360f);
         invalidate();
     }
 
-    void setOnHueChangedListener(@Nullable OnHueChangedListener listener) {
+    public void setOnHueChangedListener(@Nullable OnHueChangedListener listener) {
         this.listener = listener;
     }
 

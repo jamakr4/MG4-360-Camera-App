@@ -1,4 +1,9 @@
-package com.drivehub.kamera;
+package com.drivehub.kamera.settings;
+
+import com.drivehub.kamera.R;
+
+import com.drivehub.kamera.ui.ColorHueStripView;
+import com.drivehub.kamera.ui.ColorSaturationValueView;
 
 import android.app.Dialog;
 import android.content.SharedPreferences;
@@ -20,7 +25,7 @@ import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 
-final class SettingsAppearanceController {
+public final class SettingsAppearanceController {
 
     private final AppCompatActivity activity;
     private boolean isNormalizingAccentColor;
@@ -35,11 +40,11 @@ final class SettingsAppearanceController {
     private Switch[] tintedSwitches;
     private TextView[] tabs;
 
-    SettingsAppearanceController(AppCompatActivity activity) {
+    public SettingsAppearanceController(AppCompatActivity activity) {
         this.activity = activity;
     }
 
-    void applyMainUiIconColors() {
+    public void applyMainUiIconColors() {
         ImageButton btnSettings = activity.findViewById(R.id.btnSettings);
         if (btnSettings != null) {
             btnSettings.setColorFilter(Color.WHITE);

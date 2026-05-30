@@ -1,4 +1,18 @@
-package com.drivehub.kamera;
+package com.drivehub.kamera.settings;
+
+import com.drivehub.kamera.BuildConfig;
+import com.drivehub.kamera.R;
+
+import com.drivehub.kamera.MainActivity;
+import com.drivehub.kamera.CameraProbe;
+import com.drivehub.kamera.dashcam.DashcamEventOverlayService;
+import com.drivehub.kamera.dashcam.DashcamSettingsController;
+import com.drivehub.kamera.dashcam.RecordingService;
+import com.drivehub.kamera.dev.DevRuntimeLog;
+import com.drivehub.kamera.dev.DevSettingsController;
+import com.drivehub.kamera.ota.OtaController;
+import com.drivehub.kamera.signal.SignalCameraSettingsController;
+import com.drivehub.kamera.signal.SignalService;
 
 import android.app.Dialog;
 import android.content.SharedPreferences;
@@ -24,7 +38,7 @@ import java.io.File;
  * dashcam, dev, OTA, appearance), and reacts to recording-status updates while the
  * dialog is on screen. MainActivity only knows show() and onRecordingStatusChanged().
  */
-final class SettingsDialogController {
+public final class SettingsDialogController {
 
     private static final int DEFAULT_TAB_INDEX = 1; // Settings
     private static final int DEV_TAB_INDEX = 6;
@@ -58,7 +72,7 @@ final class SettingsDialogController {
     private Dialog dialog;
     private Views views;
 
-    SettingsDialogController(
+    public SettingsDialogController(
             MainActivity activity,
             SettingsAppearanceController appearance,
             OtaController ota,
@@ -73,14 +87,14 @@ final class SettingsDialogController {
         this.dashcam = new DashcamSettingsController(activity);
     }
 
-    boolean isOpen() {
+    public boolean isOpen() {
         return dialog != null;
     }
 
     /**
      * Forwards a fresh recording-status snapshot into the dialog. No-op when closed.
      */
-    void onRecordingStatusChanged(String status, int activeCameras, int totalCameras, String lastError) {
+    public void onRecordingStatusChanged(String status, int activeCameras, int totalCameras, String lastError) {
         if (views == null) return;
         String text = RecordingService.formatStatusText(activity, status, activeCameras, totalCameras, lastError);
         if (views.tvDashcamRecordingStatus != null) {
@@ -90,7 +104,7 @@ final class SettingsDialogController {
     }
 
     @SuppressWarnings("deprecation")
-    void show() {
+    public void show() {
         MainActivity.setSettingsDialogOpen(true);
         SignalService.requestRecheck();
 

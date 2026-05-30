@@ -1,4 +1,4 @@
-package com.drivehub.kamera;
+package com.drivehub.kamera.ui;
 
 import android.content.Context;
 import android.graphics.Canvas;
@@ -12,9 +12,9 @@ import android.view.View;
 
 import androidx.annotation.Nullable;
 
-final class ColorSaturationValueView extends View {
+public final class ColorSaturationValueView extends View {
 
-    interface OnColorPositionChangedListener {
+    public interface OnColorPositionChangedListener {
         void onColorPositionChanged(float saturation, float value);
     }
 
@@ -52,7 +52,7 @@ final class ColorSaturationValueView extends View {
         markerOutlinePaint.setColor(0xFFFFFFFF);
     }
 
-    void setColor(float hue, float saturation, float value) {
+    public void setColor(float hue, float saturation, float value) {
         this.hue = hue;
         this.saturation = clamp(saturation, 0f, 1f);
         this.value = clamp(value, 0f, 1f);
@@ -60,7 +60,7 @@ final class ColorSaturationValueView extends View {
         invalidate();
     }
 
-    void setOnColorPositionChangedListener(@Nullable OnColorPositionChangedListener listener) {
+    public void setOnColorPositionChangedListener(@Nullable OnColorPositionChangedListener listener) {
         this.listener = listener;
     }
 

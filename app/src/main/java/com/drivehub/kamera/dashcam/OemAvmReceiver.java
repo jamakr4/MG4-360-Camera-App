@@ -1,4 +1,7 @@
-package com.drivehub.kamera;
+package com.drivehub.kamera.dashcam;
+
+import com.drivehub.kamera.dev.DevRuntimeLog;
+import com.drivehub.kamera.signal.SignalService;
 
 import android.content.BroadcastReceiver;
 import android.content.Context;

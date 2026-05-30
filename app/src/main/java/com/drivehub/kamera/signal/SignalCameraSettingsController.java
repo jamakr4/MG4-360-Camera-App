@@ -1,4 +1,9 @@
-package com.drivehub.kamera;
+package com.drivehub.kamera.signal;
+
+import com.drivehub.kamera.MainActivity;
+import com.drivehub.kamera.camera.OverlayService;
+import com.drivehub.kamera.settings.SimpleTextWatcher;
+import com.drivehub.kamera.settings.UiPrefs;
 
 import android.content.SharedPreferences;
 import android.widget.EditText;
@@ -8,15 +13,15 @@ import android.widget.Switch;
 import java.util.function.IntUnaryOperator;
 import java.util.function.ToIntFunction;
 
-final class SignalCameraSettingsController {
+public final class SignalCameraSettingsController {
 
     private final MainActivity activity;
 
-    SignalCameraSettingsController(MainActivity activity) {
+    public SignalCameraSettingsController(MainActivity activity) {
         this.activity = activity;
     }
 
-    void bind(
+    public void bind(
             SharedPreferences prefs,
             Switch swOverlay,
             Switch swRotateToDrivingDirection,

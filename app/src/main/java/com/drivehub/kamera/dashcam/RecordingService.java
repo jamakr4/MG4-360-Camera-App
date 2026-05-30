@@ -1,4 +1,10 @@
-package com.drivehub.kamera;
+package com.drivehub.kamera.dashcam;
+
+import com.drivehub.kamera.R;
+
+import com.drivehub.kamera.CameraProbe;
+import com.drivehub.kamera.dev.DevRuntimeLog;
+import com.drivehub.kamera.settings.UiPrefs;
 
 import android.app.Notification;
 import android.app.NotificationChannel;
@@ -280,8 +286,12 @@ public class RecordingService extends Service {
         // NOTE: For now we only record MP4 clips, not speed or turn-signal data.
         SharedPreferences prefs = prefs();
         boolean enabled = prefs.getBoolean(DashcamSettingsController.KEY_ENABLED, false);
-        int segmentMin = prefs.getInt(DashcamSettingsController.KEY_SEGMENT_MIN, 3);
-        int totalMin = prefs.getInt(DashcamSettingsController.KEY_TOTAL_MIN, 30);
+        int segmentMin = prefs.getInt(
+                DashcamSettingsController.KEY_SEGMENT_MIN,
+                DashcamSettingsController.DEFAULT_SEGMENT_MIN);
+        int totalMin = prefs.getInt(
+                DashcamSettingsController.KEY_TOTAL_MIN,
+                DashcamSettingsController.DEFAULT_TOTAL_RETENTION_MIN);
 
         if (!enabled || segmentMin <= 0) {
             publishStatus(STATUS_OFF, 0, TOTAL_CAMERAS, "");
@@ -299,8 +309,8 @@ public class RecordingService extends Service {
 
         long segmentMs = segmentMin * 60L * 1000L;
 
-        // Convert total duration into a segment count: segmentMin=3, totalMin=30 =>
-        // keep 10 segments.
+        // Convert total duration into a segment count: segmentMin=3, totalMin=3
+        // => keep 1 segment.
         int keepSegments = Math.max(1, totalMin / segmentMin);
         boolean endedWithFatalError = false;
 

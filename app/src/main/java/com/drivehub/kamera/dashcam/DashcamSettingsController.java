@@ -1,4 +1,9 @@
-package com.drivehub.kamera;
+package com.drivehub.kamera.dashcam;
+
+import com.drivehub.kamera.R;
+
+import com.drivehub.kamera.MainActivity;
+import com.drivehub.kamera.settings.SimpleTextWatcher;
 
 import android.Manifest;
 import android.content.SharedPreferences;
@@ -16,11 +21,13 @@ import androidx.core.content.ContextCompat;
 
 import java.io.File;
 
-final class DashcamSettingsController {
+public final class DashcamSettingsController {
 
-    static final String KEY_ENABLED = "enabled";
+    public static final String KEY_ENABLED = "enabled";
     static final String KEY_SEGMENT_MIN = "segmentMin";
     static final String KEY_TOTAL_MIN = "totalMin";
+    public static final int DEFAULT_SEGMENT_MIN = 3;
+    public static final int DEFAULT_TOTAL_RETENTION_MIN = 5;
     private static final String KEY_RECORDING_FPS = "recordingFps";
     private static final String KEY_SIGNATURE = "recordingSignature";
     private static final String KEY_SHOW_SPEED = "recordingShowSpeed";
@@ -34,11 +41,11 @@ final class DashcamSettingsController {
     private final MainActivity activity;
     private boolean syncingEnabled;
 
-    DashcamSettingsController(MainActivity activity) {
+    public DashcamSettingsController(MainActivity activity) {
         this.activity = activity;
     }
 
-    void bind(
+    public void bind(
             SharedPreferences prefs,
             Switch swEnabled,
             EditText etSegmentMin,
@@ -48,8 +55,8 @@ final class DashcamSettingsController {
             Switch swShowSpeed,
             TextView tvRecordsPath,
             Button btnExportUsb) {
-        int segmentMin = prefs.getInt(KEY_SEGMENT_MIN, 3);
-        int totalMin = Math.max(segmentMin, prefs.getInt(KEY_TOTAL_MIN, 30));
+        int segmentMin = prefs.getInt(KEY_SEGMENT_MIN, DEFAULT_SEGMENT_MIN);
+        int totalMin = Math.max(segmentMin, prefs.getInt(KEY_TOTAL_MIN, DEFAULT_TOTAL_RETENTION_MIN));
         int recordingFps = getRecordingFps(prefs);
         String signature = getRecordingSignature(prefs);
 
@@ -139,8 +146,8 @@ final class DashcamSettingsController {
 
     private void saveFields(SharedPreferences prefs, EditText etSegmentMin, EditText etTotalMin,
             EditText etRecordingFps, EditText etSignature, boolean normalizeFields) {
-        int segmentMin = parsePositiveInt(textOf(etSegmentMin), 3);
-        int totalMin = parsePositiveInt(textOf(etTotalMin), 30);
+        int segmentMin = parsePositiveInt(textOf(etSegmentMin), DEFAULT_SEGMENT_MIN);
+        int totalMin = parsePositiveInt(textOf(etTotalMin), DEFAULT_TOTAL_RETENTION_MIN);
         int recordingFps = clampRecordingFps(parsePositiveInt(textOf(etRecordingFps), DEFAULT_RECORDING_FPS));
         String signature = normalizeSignature(textOf(etSignature));
         if (totalMin < segmentMin)
@@ -224,7 +231,7 @@ final class DashcamSettingsController {
                 Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED;
     }
 
-    static File getRecordsBaseDir() {
+    public static File getRecordsBaseDir() {
         File downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
         File dir = new File(downloads, RECORDS_DIR_NAME);
         // noinspection ResultOfMethodCallIgnored

@@ -1,5 +1,13 @@
 package com.drivehub.kamera;
 
+import com.drivehub.kamera.camera.OverlayService;
+import com.drivehub.kamera.dashcam.RecordingService;
+import com.drivehub.kamera.ota.OtaController;
+import com.drivehub.kamera.settings.SettingsAppearanceController;
+import com.drivehub.kamera.settings.SettingsDialogController;
+import com.drivehub.kamera.settings.UiPrefs;
+import com.drivehub.kamera.signal.SignalService;
+
 import android.annotation.SuppressLint;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -47,7 +55,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private final SettingsDialogController settingsDialog = new SettingsDialogController(
             this, appearanceController, otaController, this::applyWarningVisibility);
 
-    static void setSettingsDialogOpen(boolean open) {
+    public static void setSettingsDialogOpen(boolean open) {
         sSettingsDialogOpen = open;
     }
 

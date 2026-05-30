@@ -1,4 +1,7 @@
-package com.drivehub.kamera;
+package com.drivehub.kamera.boot;
+
+import com.drivehub.kamera.dashcam.RecordingService;
+import com.drivehub.kamera.signal.SignalService;
 
 import android.content.BroadcastReceiver;
 import android.content.Context;

@@ -1,4 +1,4 @@
-package com.drivehub.kamera;
+package com.drivehub.kamera.ota;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
