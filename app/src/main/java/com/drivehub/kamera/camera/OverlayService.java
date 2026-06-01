@@ -5,17 +5,20 @@ import com.drivehub.kamera.R;
 
 import com.drivehub.kamera.settings.UiPrefs;
 
+import android.app.ActivityManager;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.Service;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Rect;
 import android.graphics.SurfaceTexture;
 import android.graphics.PixelFormat;
-import android.os.Build;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
@@ -48,12 +51,21 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
     /** Min/max bounds for two-finger pinch resizing. */
     private static final int OVERLAY_MIN_WIDTH_PX = 240;
     private static final int OVERLAY_MAX_WIDTH_PX = 3840;
+    private static final int MG4_DISPLAY_WIDTH_PX = 1920;
+    private static final int MG4_DISPLAY_HEIGHT_PX = 720;
+    private static final int MG4_LAUNCHER_BAR_WIDTH_PX = 142;
+    private static final int OVERLAY_MODE_SAIC = 0;
+    private static final int OVERLAY_MODE_FULLSCREEN = 1;
+    private static final long FOREGROUND_MODE_POLL_MS = 1000L;
+    private static final String ANDROID_AUTO_PACKAGE = "com.allgo.app.androidauto";
+    private static final String CARPLAY_PACKAGE = "com.allgo.remoteui.mediabrowserservice";
 
     private static final String PREFS_NAME = "overlay_prefs";
     private static final String KEY_LAST_X = "last_x";
     private static final String KEY_LAST_Y = "last_y";
     private static final String KEY_OVERLAY_W = "overlay_w";
     private static final String KEY_OVERLAY_H = "overlay_h";
+    private static final String KEY_LAST_OVERLAY_MODE = "last_overlay_mode";
 
     private WindowManager windowManager;
     private View overlayView;
@@ -66,8 +78,19 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
     /** Current window size, updated via pinch gestures. */
     private int overlayWidthPx = DEFAULT_OVERLAY_WIDTH_PX;
     private int overlayHeightPx = DEFAULT_OVERLAY_HEIGHT_PX;
+    private int overlayMode = OVERLAY_MODE_SAIC;
 
     private ScaleGestureDetector scaleGestureDetector;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private final Runnable foregroundModePollRunnable = new Runnable() {
+        @Override
+        public void run() {
+            refreshOverlayMode(false);
+            if (overlayView != null) {
+                mainHandler.postDelayed(this, FOREGROUND_MODE_POLL_MS);
+            }
+        }
+    };
 
     private float initialX;
     private float initialY;
@@ -121,6 +144,7 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
         if (overlayView == null) {
             showFloatingWindow();
         } else {
+            refreshOverlayMode(false);
             applyOverlayCornerRadius();
             updateOverlayPresentation(false);
             // If the overlay is already open and only the camera index changed, switch the feed.
@@ -128,6 +152,7 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
                 startPreview();
             }
         }
+        restartForegroundModePolling();
         return START_STICKY;
     }
 
@@ -169,7 +194,16 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
                     getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
             defaultX = sp.getInt(KEY_LAST_X, defaultX);
             defaultY = sp.getInt(KEY_LAST_Y, defaultY);
+            int savedMode = sp.getInt(KEY_LAST_OVERLAY_MODE, OVERLAY_MODE_SAIC);
+            overlayMode = resolveOverlayMode();
+            Rect savedBounds = getBoundsForMode(savedMode);
+            Rect currentBounds = getBoundsForMode(overlayMode);
+            if (savedBounds != null && currentBounds != null) {
+                defaultX = translateCoordinate(defaultX, savedBounds.left, currentBounds.left);
+                defaultY = translateCoordinate(defaultY, savedBounds.top, currentBounds.top);
+            }
         } catch (Throwable ignored) {
+            overlayMode = resolveOverlayMode();
         }
         overlayParams.x = defaultX;
         overlayParams.y = defaultY;
@@ -316,10 +350,10 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
         float aspect = getActiveOverlayAspect();
         int maxW = OVERLAY_MAX_WIDTH_PX;
         int maxH = OVERLAY_MAX_WIDTH_PX;
-        int[] screenSize = getAvailableScreenSizePx();
-        if (screenSize != null) {
-            maxW = Math.min(maxW, screenSize[0]);
-            maxH = Math.min(maxH, screenSize[1]);
+        Rect bounds = getAvailableOverlayBoundsPx();
+        if (bounds != null) {
+            maxW = Math.min(maxW, bounds.width());
+            maxH = Math.min(maxH, bounds.height());
         }
         if (w < OVERLAY_MIN_WIDTH_PX) {
             w = OVERLAY_MIN_WIDTH_PX;
@@ -416,30 +450,92 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
     }
 
     private void clampOverlayPositionToScreen() {
+        clampOverlayPositionToBounds(getAvailableOverlayBoundsPx());
+    }
+
+    private void clampOverlayPositionToBounds(Rect bounds) {
         if (windowManager == null || overlayParams == null) return;
-        int[] screenSize = getAvailableScreenSizePx();
-        if (screenSize == null) return;
-        int maxX = Math.max(0, screenSize[0] - overlayParams.width);
-        int maxY = Math.max(0, screenSize[1] - overlayParams.height);
-        if (overlayParams.x < 0) overlayParams.x = 0;
-        if (overlayParams.y < 0) overlayParams.y = 0;
+        if (bounds == null) return;
+        int maxX = Math.max(bounds.left, bounds.right - overlayParams.width);
+        int maxY = Math.max(bounds.top, bounds.bottom - overlayParams.height);
+        if (overlayParams.x < bounds.left) overlayParams.x = bounds.left;
+        if (overlayParams.y < bounds.top) overlayParams.y = bounds.top;
         if (overlayParams.x > maxX) overlayParams.x = maxX;
         if (overlayParams.y > maxY) overlayParams.y = maxY;
     }
 
-    // Android Auto can expose a smaller "current" app viewport than the actual interactive
-    // overlay space. Maximum window metrics are a better fit for drag/resize bounds here.
-    private int[] getAvailableScreenSizePx() {
-        if (windowManager == null) return null;
+    private Rect getAvailableOverlayBoundsPx() {
+        return getBoundsForMode(overlayMode);
+    }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            Rect bounds = windowManager.getMaximumWindowMetrics().getBounds();
-            return new int[]{bounds.width(), bounds.height()};
+    private Rect getBoundsForMode(int mode) {
+        if (mode == OVERLAY_MODE_FULLSCREEN) {
+            return new Rect(0, 0, MG4_DISPLAY_WIDTH_PX, MG4_DISPLAY_HEIGHT_PX);
         }
+        return new Rect(
+                MG4_LAUNCHER_BAR_WIDTH_PX,
+                0,
+                MG4_DISPLAY_WIDTH_PX,
+                MG4_DISPLAY_HEIGHT_PX);
+    }
 
-        android.util.DisplayMetrics dm = new android.util.DisplayMetrics();
-        windowManager.getDefaultDisplay().getRealMetrics(dm);
-        return new int[]{dm.widthPixels, dm.heightPixels};
+    private int resolveOverlayMode() {
+        return isProjectionAppInForeground() ? OVERLAY_MODE_FULLSCREEN : OVERLAY_MODE_SAIC;
+    }
+
+    private void refreshOverlayMode(boolean persist) {
+        int newMode = resolveOverlayMode();
+        if (newMode == overlayMode) {
+            return;
+        }
+        Rect oldBounds = getBoundsForMode(overlayMode);
+        Rect newBounds = getBoundsForMode(newMode);
+        overlayMode = newMode;
+        if (overlayParams == null || oldBounds == null || newBounds == null) {
+            return;
+        }
+        overlayParams.x = translateCoordinate(overlayParams.x, oldBounds.left, newBounds.left);
+        overlayParams.y = translateCoordinate(overlayParams.y, oldBounds.top, newBounds.top);
+        int[] clampedSize = clampOverlaySize(overlayWidthPx);
+        overlayWidthPx = clampedSize[0];
+        overlayHeightPx = clampedSize[1];
+        overlayParams.width = overlayWidthPx;
+        overlayParams.height = overlayHeightPx;
+        clampOverlayPositionToBounds(newBounds);
+        if (windowManager != null && overlayView != null) {
+            windowManager.updateViewLayout(overlayView, overlayParams);
+            applyPreviewTransform();
+        }
+        if (persist) {
+            saveOverlayLayoutPrefs();
+        }
+    }
+
+    private int translateCoordinate(int value, int oldOrigin, int newOrigin) {
+        return newOrigin + (value - oldOrigin);
+    }
+
+    private boolean isProjectionAppInForeground() {
+        try {
+            ActivityManager am = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+            if (am == null) return false;
+            java.util.List<ActivityManager.RunningTaskInfo> tasks = am.getRunningTasks(1);
+            if (tasks == null || tasks.isEmpty()) return false;
+            ActivityManager.RunningTaskInfo task = tasks.get(0);
+            ComponentName topActivity = task.topActivity;
+            if (topActivity == null) return false;
+            String packageName = topActivity.getPackageName();
+            return ANDROID_AUTO_PACKAGE.equals(packageName) || CARPLAY_PACKAGE.equals(packageName);
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private void restartForegroundModePolling() {
+        mainHandler.removeCallbacks(foregroundModePollRunnable);
+        if (overlayView != null) {
+            mainHandler.postDelayed(foregroundModePollRunnable, FOREGROUND_MODE_POLL_MS);
+        }
     }
 
     private void saveOverlayLayoutPrefs() {
@@ -452,6 +548,7 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
                     .putInt(KEY_LAST_Y, overlayParams.y)
                     .putInt(KEY_OVERLAY_W, overlayWidthPx)
                     .putInt(KEY_OVERLAY_H, overlayHeightPx)
+                    .putInt(KEY_LAST_OVERLAY_MODE, overlayMode)
                     .apply();
         } catch (Throwable ignored) {
         }
@@ -463,6 +560,7 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
         if (uiPrefs != null) {
             uiPrefs.unregisterOnSharedPreferenceChangeListener(prefListener);
         }
+        mainHandler.removeCallbacks(foregroundModePollRunnable);
         stopPreview();
         if (textureSurface != null) {
             textureSurface.release();
