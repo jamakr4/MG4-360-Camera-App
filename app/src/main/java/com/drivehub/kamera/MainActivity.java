@@ -148,7 +148,6 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 return;
             }
             RecordingService.triggerEventSave(this);
-            Toast.makeText(this, R.string.main_event_save_armed, Toast.LENGTH_SHORT).show();
         });
 
         applyStoredRecordingStatus();

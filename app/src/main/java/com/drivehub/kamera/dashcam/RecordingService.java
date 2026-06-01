@@ -235,8 +235,9 @@ public class RecordingService extends Service {
             if (worker == null || !prefs().getBoolean(DashcamSettingsController.KEY_ENABLED, false)) {
                 return START_STICKY;
             }
-            armEventCapture();
-            DashcamEventOverlayService.showConfirmation(this);
+            if (armEventCapture()) {
+                DashcamEventOverlayService.showConfirmation(this);
+            }
             return START_STICKY;
         }
 
@@ -433,12 +434,21 @@ public class RecordingService extends Service {
         }
     }
 
-    private void armEventCapture() {
+    private boolean armEventCapture() {
         long now = System.currentTimeMillis();
         String eventBaseName = "event_" + makeTimestampBase(now, "yyMMddHHmmssSSS");
-        File eventDir = new File(getEventsBaseDir(), eventBaseName);
-        // noinspection ResultOfMethodCallIgnored
-        eventDir.mkdirs();
+        File eventsBaseDir = getEventsBaseDir();
+        if (eventsBaseDir == null) {
+            DevRuntimeLog.add("RecordingService", "Event capture failed: events base dir unavailable");
+            Log.e(TAG, "Failed to arm event capture because events base dir is unavailable");
+            return false;
+        }
+        File eventDir = new File(eventsBaseDir, eventBaseName);
+        if (!ensureDirectoryExists(eventDir, "event dir")) {
+            DevRuntimeLog.add("RecordingService", "Event capture failed: mkdir " + eventDir.getAbsolutePath());
+            Log.e(TAG, "Failed to create event dir " + eventDir.getAbsolutePath());
+            return false;
+        }
         synchronized (eventLock) {
             long currentSegmentOrdinal = completedSegmentCount + 1L;
             pendingEventRequests.add(new EventCaptureRequest(
@@ -446,7 +456,13 @@ public class RecordingService extends Service {
                     Math.max(1L, currentSegmentOrdinal - EVENT_SEGMENTS_BEFORE_CURRENT),
                     currentSegmentOrdinal + EVENT_SEGMENTS_AFTER_CURRENT
             ));
+            DevRuntimeLog.add(
+                    "RecordingService",
+                    "Event armed: " + eventBaseName
+                            + " ordinals " + Math.max(1L, currentSegmentOrdinal - EVENT_SEGMENTS_BEFORE_CURRENT)
+                            + "-" + (currentSegmentOrdinal + EVENT_SEGMENTS_AFTER_CURRENT));
         }
+        return true;
     }
 
     private List<EventCopyJob> collectEventCopyJobsLocked(long completedThroughOrdinal) {
@@ -492,9 +508,19 @@ public class RecordingService extends Service {
             Log.w(TAG, "Skipping empty event copy job for " + job.eventBaseName);
             return;
         }
-        File eventDir = new File(getEventsBaseDir(), job.eventBaseName);
-        // noinspection ResultOfMethodCallIgnored
-        eventDir.mkdirs();
+        File eventsBaseDir = getEventsBaseDir();
+        if (eventsBaseDir == null) {
+            DevRuntimeLog.add("RecordingService", "Event copy failed: events base dir unavailable");
+            Log.e(TAG, "Failed to copy event segments because events base dir is unavailable");
+            return;
+        }
+        File eventDir = new File(eventsBaseDir, job.eventBaseName);
+        if (!ensureDirectoryExists(eventDir, "event dir")) {
+            DevRuntimeLog.add("RecordingService", "Event copy failed: mkdir " + eventDir.getAbsolutePath());
+            Log.e(TAG, "Failed to create event dir " + eventDir.getAbsolutePath());
+            return;
+        }
+        DevRuntimeLog.add("RecordingService", "Event copy: " + job.eventBaseName + " files " + job.baseNames.size());
         for (String baseName : job.baseNames) {
             copySegmentGroup(DashcamSettingsController.getRecordsBaseDir(this), eventDir, baseName);
         }
@@ -603,20 +629,37 @@ public class RecordingService extends Service {
 
     private File getEventsBaseDir() {
         File dir = new File(DashcamSettingsController.getRecordsBaseDir(this), "events");
-        // noinspection ResultOfMethodCallIgnored
-        dir.mkdirs();
-        return dir;
+        return ensureDirectoryExists(dir, "events base dir") ? dir : null;
     }
 
     private File requireBaseDir() {
         File baseDir = DashcamSettingsController.getRecordsBaseDir(this);
-        // noinspection ResultOfMethodCallIgnored
-        baseDir.mkdirs();
-        if (baseDir.exists() && baseDir.canWrite()) {
+        if (ensureDirectoryExists(baseDir, "records base dir") && baseDir.canWrite()) {
             return baseDir;
         }
         publishStatus(STATUS_ERROR, 0, TOTAL_CAMERAS, "storage not writable");
         return null;
+    }
+
+    private boolean ensureDirectoryExists(File dir, String label) {
+        if (dir == null) {
+            return false;
+        }
+        if (dir.exists()) {
+            if (dir.isDirectory()) {
+                return true;
+            }
+            Log.e(TAG, label + " exists but is not a directory: " + dir.getAbsolutePath());
+            return false;
+        }
+        if (dir.mkdirs()) {
+            return true;
+        }
+        boolean created = dir.exists() && dir.isDirectory();
+        if (!created) {
+            Log.e(TAG, "Failed to create " + label + ": " + dir.getAbsolutePath());
+        }
+        return created;
     }
 
     private String makeTimestampBase(long epochMs, String pattern) {
