@@ -54,9 +54,9 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
     private static final int MG4_DISPLAY_WIDTH_PX = 1920;
     private static final int MG4_DISPLAY_HEIGHT_PX = 720;
     private static final int MG4_LAUNCHER_BAR_WIDTH_PX = 142;
+    private static final int MG4_SAIC_WORK_AREA_WIDTH_PX = MG4_DISPLAY_WIDTH_PX - MG4_LAUNCHER_BAR_WIDTH_PX;
     private static final int OVERLAY_MODE_SAIC = 0;
     private static final int OVERLAY_MODE_FULLSCREEN = 1;
-    private static final long FOREGROUND_MODE_POLL_MS = 1000L;
     private static final String ANDROID_AUTO_PACKAGE = "com.allgo.app.androidauto";
     private static final String CARPLAY_PACKAGE = "com.allgo.remoteui.mediabrowserservice";
 
@@ -87,7 +87,7 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
         public void run() {
             refreshOverlayMode(false);
             if (overlayView != null) {
-                mainHandler.postDelayed(this, FOREGROUND_MODE_POLL_MS);
+                mainHandler.postDelayed(this, getForegroundModePollMs());
             }
         }
     };
@@ -103,6 +103,10 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
                     applyOverlayCornerRadius();
                 } else if (UiPrefs.KEY_OVERLAY_ROTATE_TO_DRIVING_DIRECTION.equals(key)) {
                     updateOverlayPresentation(true);
+                } else if (UiPrefs.KEY_DEV_OVERLAY_TOP_INSET_PX.equals(key)) {
+                    updateOverlayPresentation(true);
+                } else if (UiPrefs.KEY_DEV_FOREGROUND_MODE_POLL_MS.equals(key)) {
+                    restartForegroundModePolling();
                 }
             };
 
@@ -196,12 +200,8 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
             defaultY = sp.getInt(KEY_LAST_Y, defaultY);
             int savedMode = sp.getInt(KEY_LAST_OVERLAY_MODE, OVERLAY_MODE_SAIC);
             overlayMode = resolveOverlayMode();
-            Rect savedBounds = getBoundsForMode(savedMode);
-            Rect currentBounds = getBoundsForMode(overlayMode);
-            if (savedBounds != null && currentBounds != null) {
-                defaultX = translateCoordinate(defaultX, savedBounds.left, currentBounds.left);
-                defaultY = translateCoordinate(defaultY, savedBounds.top, currentBounds.top);
-            }
+            defaultX = translateXBetweenModes(defaultX, savedMode, overlayMode);
+            defaultY = translateCoordinate(defaultY, 0, 0);
         } catch (Throwable ignored) {
             overlayMode = resolveOverlayMode();
         }
@@ -469,14 +469,12 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
     }
 
     private Rect getBoundsForMode(int mode) {
+        int topInsetPx = uiPrefs == null ? UiPrefs.DEFAULT_DEV_OVERLAY_TOP_INSET_PX
+                : UiPrefs.getDevOverlayTopInsetPx(uiPrefs);
         if (mode == OVERLAY_MODE_FULLSCREEN) {
-            return new Rect(0, 0, MG4_DISPLAY_WIDTH_PX, MG4_DISPLAY_HEIGHT_PX);
+            return new Rect(0, topInsetPx, MG4_DISPLAY_WIDTH_PX, MG4_DISPLAY_HEIGHT_PX);
         }
-        return new Rect(
-                MG4_LAUNCHER_BAR_WIDTH_PX,
-                0,
-                MG4_DISPLAY_WIDTH_PX,
-                MG4_DISPLAY_HEIGHT_PX);
+        return new Rect(0, topInsetPx, MG4_SAIC_WORK_AREA_WIDTH_PX, MG4_DISPLAY_HEIGHT_PX);
     }
 
     private int resolveOverlayMode() {
@@ -488,13 +486,14 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
         if (newMode == overlayMode) {
             return;
         }
+        int oldMode = overlayMode;
         Rect oldBounds = getBoundsForMode(overlayMode);
         Rect newBounds = getBoundsForMode(newMode);
         overlayMode = newMode;
         if (overlayParams == null || oldBounds == null || newBounds == null) {
             return;
         }
-        overlayParams.x = translateCoordinate(overlayParams.x, oldBounds.left, newBounds.left);
+        overlayParams.x = translateXBetweenModes(overlayParams.x, oldMode, newMode);
         overlayParams.y = translateCoordinate(overlayParams.y, oldBounds.top, newBounds.top);
         int[] clampedSize = clampOverlaySize(overlayWidthPx);
         overlayWidthPx = clampedSize[0];
@@ -513,6 +512,14 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
 
     private int translateCoordinate(int value, int oldOrigin, int newOrigin) {
         return newOrigin + (value - oldOrigin);
+    }
+
+    private int translateXBetweenModes(int value, int oldMode, int newMode) {
+        return value + getVisualLeftInsetForMode(oldMode) - getVisualLeftInsetForMode(newMode);
+    }
+
+    private int getVisualLeftInsetForMode(int mode) {
+        return mode == OVERLAY_MODE_FULLSCREEN ? 0 : MG4_LAUNCHER_BAR_WIDTH_PX;
     }
 
     private boolean isProjectionAppInForeground() {
@@ -534,8 +541,13 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
     private void restartForegroundModePolling() {
         mainHandler.removeCallbacks(foregroundModePollRunnable);
         if (overlayView != null) {
-            mainHandler.postDelayed(foregroundModePollRunnable, FOREGROUND_MODE_POLL_MS);
+            mainHandler.postDelayed(foregroundModePollRunnable, getForegroundModePollMs());
         }
+    }
+
+    private int getForegroundModePollMs() {
+        return uiPrefs == null ? UiPrefs.DEFAULT_DEV_FOREGROUND_MODE_POLL_MS
+                : UiPrefs.getDevForegroundModePollMs(uiPrefs);
     }
 
     private void saveOverlayLayoutPrefs() {

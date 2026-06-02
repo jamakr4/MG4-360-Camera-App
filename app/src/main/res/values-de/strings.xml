@@ -32,9 +32,13 @@
     <string name="settings_dev_polling_rates">Polling-Raten</string>
     <string name="settings_dev_default_poll">Default-Polling (ms)</string>
     <string name="settings_dev_signal_off_poll">Blinker-Aus-Erkennung (ms)</string>
+    <string name="settings_dev_foreground_mode_poll">AA/CP-Vordergrund-Polling (ms)</string>
     <string name="settings_dev_polling_rates_hint">Default-Polling läuft, solange kein Blinker aktiv ist. Die Blinker-Aus-Erkennung wird nur bei aktivem Blinker genutzt. Werte werden auf 20..5000 ms begrenzt.</string>
     <string name="settings_dev_reset_defaults">Dev-Defaults zurücksetzen</string>
     <string name="settings_dev_defaults_reset">Dev-Defaults zurückgesetzt</string>
+    <string name="settings_dev_overlay_safe_area">Overlay-Safe-Area</string>
+    <string name="settings_dev_overlay_top_inset">Oberer Inset (px)</string>
+    <string name="settings_dev_overlay_top_inset_hint">Reserviert permanent einen oberen Bereich für System-/Statusleiste. Das Tile-Overlay kann nicht in diese Zone geschoben werden</string>
     <string name="settings_section_update_channel">Update-Kanal</string>
     <string name="settings_section_update_status">Status</string>
     <string name="settings_section_latest_release">Letztes Release</string>

@@ -179,6 +179,9 @@ public final class SettingsDialogController {
         v.tvDashcamRecordingStatus = dialog.findViewById(R.id.tvDashcamRecordingStatus);
         v.etDevDefaultPollMs = dialog.findViewById(R.id.etDevDefaultPollMs);
         v.etDevSignalOffPollMs = dialog.findViewById(R.id.etDevSignalOffPollMs);
+        v.etDevForegroundModePollMs = dialog.findViewById(R.id.etDevForegroundModePollMs);
+        v.seekDevOverlayTopInsetPx = dialog.findViewById(R.id.seekDevOverlayTopInsetPx);
+        v.etDevOverlayTopInsetPx = dialog.findViewById(R.id.etDevOverlayTopInsetPx);
         v.etDevDashcamRecordsPath = dialog.findViewById(R.id.etDevDashcamRecordsPath);
         v.tvDevDashcamRecordsPath = dialog.findViewById(R.id.tvDevDashcamRecordsPath);
         v.btnDevDashcamBrowseFolder = dialog.findViewById(R.id.btnDevDashcamBrowseFolder);
@@ -255,6 +258,9 @@ public final class SettingsDialogController {
         );
         dev.bind(
                 prefs,
+                views.seekDevOverlayTopInsetPx,
+                views.etDevOverlayTopInsetPx,
+                views.etDevForegroundModePollMs,
                 views.etDevDefaultPollMs,
                 views.etDevSignalOffPollMs,
                 views.etDevDashcamRecordsPath,
@@ -466,6 +472,9 @@ public final class SettingsDialogController {
         TextView tvDashcamRecordingStatus;
         EditText etDevDefaultPollMs;
         EditText etDevSignalOffPollMs;
+        EditText etDevForegroundModePollMs;
+        SeekBar seekDevOverlayTopInsetPx;
+        EditText etDevOverlayTopInsetPx;
         EditText etDevDashcamRecordsPath;
         TextView tvDevDashcamRecordsPath;
         Button btnDevDashcamBrowseFolder;

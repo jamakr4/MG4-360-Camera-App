@@ -32,9 +32,13 @@
     <string name="settings_dev_polling_rates">Polling rates</string>
     <string name="settings_dev_default_poll">Default polling (ms)</string>
     <string name="settings_dev_signal_off_poll">Signal-off detection (ms)</string>
+    <string name="settings_dev_foreground_mode_poll">AA/CP foreground poll (ms)</string>
     <string name="settings_dev_polling_rates_hint">Default polling runs while no turn signal is active. Signal-off detection is used only while a turn signal is active. Values are clamped to 20..5000 ms.</string>
     <string name="settings_dev_reset_defaults">Reset dev defaults</string>
     <string name="settings_dev_defaults_reset">Dev defaults reset</string>
+    <string name="settings_dev_overlay_safe_area">Overlay safe area</string>
+    <string name="settings_dev_overlay_top_inset">Top inset (px)</string>
+    <string name="settings_dev_overlay_top_inset_hint">Reserves a permanent top area for the system/status bar. The tile overlay cannot be dragged into this zone</string>
     <string name="settings_section_update_channel">Update channel</string>
     <string name="settings_section_update_status">Status</string>
     <string name="settings_section_latest_release">Latest release</string>

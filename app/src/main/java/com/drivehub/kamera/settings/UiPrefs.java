@@ -16,6 +16,8 @@ public final class UiPrefs {
     public static final String KEY_OVERLAY_ROTATE_TO_DRIVING_DIRECTION = "overlayRotateToDrivingDirection";
     public static final String KEY_OVERLAY_HIDE_DELAY_MS = "overlayHideDelayMs";
     public static final String KEY_OVERLAY_MIN_SHOW_MS = "overlayMinShowMs";
+    public static final String KEY_DEV_OVERLAY_TOP_INSET_PX = "devOverlayTopInsetPx";
+    public static final String KEY_DEV_FOREGROUND_MODE_POLL_MS = "devForegroundModePollMs";
     public static final String KEY_DEV_DEFAULT_POLL_MS = "devDefaultPollMs";
     public static final String KEY_DEV_SIGNAL_OFF_POLL_MS = "devSignalOffPollMs";
     public static final String KEY_SAFETY_WARNING = "safetyWarning";
@@ -27,11 +29,14 @@ public final class UiPrefs {
     public static final int MAX_OVERLAY_MIN_SHOW_MS = 6000;
     public static final int MIN_DEV_POLLING_MS = 20;
     public static final int MAX_DEV_POLLING_MS = 5000;
+    public static final int MAX_DEV_OVERLAY_TOP_INSET_PX = 200;
     public static final int OVERLAY_HIDE_DELAY_STEP_MS = 100;
     public static final int OVERLAY_MIN_SHOW_STEP_MS = 100;
     private static final int DEFAULT_TILE_CORNER_RADIUS = 3;
     private static final int DEFAULT_OVERLAY_HIDE_DELAY_MS = 0;
     private static final int DEFAULT_OVERLAY_MIN_SHOW_MS = 3000;
+    public static final int DEFAULT_DEV_OVERLAY_TOP_INSET_PX = 80;
+    public static final int DEFAULT_DEV_FOREGROUND_MODE_POLL_MS = 1000;
     public static final int DEFAULT_DEV_DEFAULT_POLLING_MS = 100;
     public static final int DEFAULT_DEV_SIGNAL_OFF_POLLING_MS = 20;
     private static final String DEFAULT_ACCENT_COLOR = "#E7E7E7";
@@ -114,6 +119,16 @@ public final class UiPrefs {
         return clampDevPollingMs(prefs.getInt(KEY_DEV_SIGNAL_OFF_POLL_MS, DEFAULT_DEV_SIGNAL_OFF_POLLING_MS));
     }
 
+    public static int getDevOverlayTopInsetPx(SharedPreferences prefs) {
+        return clampDevOverlayTopInsetPx(
+                prefs.getInt(KEY_DEV_OVERLAY_TOP_INSET_PX, DEFAULT_DEV_OVERLAY_TOP_INSET_PX));
+    }
+
+    public static int getDevForegroundModePollMs(SharedPreferences prefs) {
+        return clampDevPollingMs(
+                prefs.getInt(KEY_DEV_FOREGROUND_MODE_POLL_MS, DEFAULT_DEV_FOREGROUND_MODE_POLL_MS));
+    }
+
     public static float getCornerRadiusFraction(SharedPreferences prefs) {
         return clampRadiusSetting(getTileCornerRadiusSetting(prefs)) / (float) MAX_TILE_CORNER_RADIUS;
     }
@@ -193,5 +208,9 @@ public final class UiPrefs {
 
     public static int clampDevPollingMs(int value) {
         return Math.max(MIN_DEV_POLLING_MS, Math.min(MAX_DEV_POLLING_MS, value));
+    }
+
+    public static int clampDevOverlayTopInsetPx(int value) {
+        return Math.max(0, Math.min(MAX_DEV_OVERLAY_TOP_INSET_PX, value));
     }
 }

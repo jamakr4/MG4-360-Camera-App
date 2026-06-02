@@ -12,8 +12,12 @@ import android.content.SharedPreferences;
 import android.text.Editable;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import java.util.function.IntUnaryOperator;
+import java.util.function.ToIntFunction;
 
 public final class DevSettingsController {
 
@@ -22,6 +26,9 @@ public final class DevSettingsController {
 
     public void bind(
             SharedPreferences prefs,
+            SeekBar seekOverlayTopInsetPx,
+            EditText etOverlayTopInsetPx,
+            EditText etForegroundModePollMs,
             EditText etDefaultPollMs,
             EditText etSignalOffPollMs,
             EditText etDashcamRecordsPath,
@@ -29,6 +36,22 @@ public final class DevSettingsController {
             Button btnBrowseFolder,
             Button btnResetDefaults
     ) {
+        bindIntSlider(
+                prefs,
+                seekOverlayTopInsetPx,
+                etOverlayTopInsetPx,
+                UiPrefs.KEY_DEV_OVERLAY_TOP_INSET_PX,
+                UiPrefs.MAX_DEV_OVERLAY_TOP_INSET_PX,
+                1,
+                UiPrefs::getDevOverlayTopInsetPx,
+                UiPrefs::clampDevOverlayTopInsetPx
+        );
+        bindPollingField(
+                prefs,
+                etForegroundModePollMs,
+                UiPrefs.KEY_DEV_FOREGROUND_MODE_POLL_MS,
+                UiPrefs.getDevForegroundModePollMs(prefs)
+        );
         bindPollingField(
                 prefs,
                 etDefaultPollMs,
@@ -42,7 +65,14 @@ public final class DevSettingsController {
                 UiPrefs.getDevSignalOffPollMs(prefs)
         );
         bindDashcamStorageOverride(prefs, etDashcamRecordsPath, tvDashcamRecordsPath, btnBrowseFolder);
-        bindResetDefaultsButton(prefs, etDefaultPollMs, etSignalOffPollMs, btnResetDefaults);
+        bindResetDefaultsButton(
+                prefs,
+                seekOverlayTopInsetPx,
+                etOverlayTopInsetPx,
+                etForegroundModePollMs,
+                etDefaultPollMs,
+                etSignalOffPollMs,
+                btnResetDefaults);
     }
 
     private void bindDashcamStorageOverride(
@@ -95,6 +125,9 @@ public final class DevSettingsController {
 
     private void bindResetDefaultsButton(
             SharedPreferences prefs,
+            SeekBar seekOverlayTopInsetPx,
+            EditText etOverlayTopInsetPx,
+            EditText etForegroundModePollMs,
             EditText etDefaultPollMs,
             EditText etSignalOffPollMs,
             Button btnResetDefaults
@@ -102,9 +135,16 @@ public final class DevSettingsController {
         if (btnResetDefaults == null) return;
         btnResetDefaults.setOnClickListener(v -> {
             prefs.edit()
+                    .putInt(UiPrefs.KEY_DEV_OVERLAY_TOP_INSET_PX, UiPrefs.DEFAULT_DEV_OVERLAY_TOP_INSET_PX)
+                    .putInt(UiPrefs.KEY_DEV_FOREGROUND_MODE_POLL_MS, UiPrefs.DEFAULT_DEV_FOREGROUND_MODE_POLL_MS)
                     .putInt(UiPrefs.KEY_DEV_DEFAULT_POLL_MS, UiPrefs.DEFAULT_DEV_DEFAULT_POLLING_MS)
                     .putInt(UiPrefs.KEY_DEV_SIGNAL_OFF_POLL_MS, UiPrefs.DEFAULT_DEV_SIGNAL_OFF_POLLING_MS)
                     .apply();
+            setIntFieldValue(etOverlayTopInsetPx, UiPrefs.DEFAULT_DEV_OVERLAY_TOP_INSET_PX);
+            if (seekOverlayTopInsetPx != null) {
+                seekOverlayTopInsetPx.setProgress(UiPrefs.DEFAULT_DEV_OVERLAY_TOP_INSET_PX);
+            }
+            setPollingFieldValue(etForegroundModePollMs, UiPrefs.DEFAULT_DEV_FOREGROUND_MODE_POLL_MS);
             setPollingFieldValue(etDefaultPollMs, UiPrefs.DEFAULT_DEV_DEFAULT_POLLING_MS);
             setPollingFieldValue(etSignalOffPollMs, UiPrefs.DEFAULT_DEV_SIGNAL_OFF_POLLING_MS);
             SignalService.requestRecheck();
@@ -112,10 +152,99 @@ public final class DevSettingsController {
         });
     }
 
+    private void setIntFieldValue(EditText editText, int value) {
+        if (editText == null) return;
+        editText.setText(String.valueOf(value));
+        editText.setSelection(editText.getText().length());
+    }
+
     private void setPollingFieldValue(EditText editText, int valueMs) {
         if (editText == null) return;
         editText.setText(String.valueOf(valueMs));
         editText.setSelection(editText.getText().length());
+    }
+
+    private void bindIntSlider(
+            SharedPreferences prefs,
+            SeekBar seek,
+            EditText edit,
+            String key,
+            int maxValue,
+            int step,
+            ToIntFunction<SharedPreferences> getter,
+            IntUnaryOperator clamp
+    ) {
+        if (seek == null) return;
+
+        final boolean[] syncing = {false};
+        int savedValue = getter.applyAsInt(prefs);
+        seek.setMax(maxValue / step);
+        seek.setProgress(savedValue / step);
+
+        if (edit != null) {
+            setIntFieldValue(edit, savedValue);
+            edit.addTextChangedListener(new SimpleTextWatcher() {
+                @Override
+                public void afterTextChanged(Editable s) {
+                    if (syncing[0] || s == null) return;
+                    String text = s.toString().trim();
+                    if (text.isEmpty()) return;
+                    try {
+                        int value = clamp.applyAsInt(Integer.parseInt(text));
+                        prefs.edit().putInt(key, value).apply();
+                        int progress = value / step;
+                        if (seek.getProgress() != progress) {
+                            seek.setProgress(progress);
+                        }
+                    } catch (NumberFormatException ignored) {
+                    }
+                }
+            });
+            edit.setOnFocusChangeListener((v, hasFocus) -> {
+                if (hasFocus) return;
+                String text = edit.getText() == null ? "" : edit.getText().toString().trim();
+                int value;
+                try {
+                    value = text.isEmpty() ? getter.applyAsInt(prefs) : Integer.parseInt(text);
+                } catch (NumberFormatException ignored) {
+                    value = getter.applyAsInt(prefs);
+                }
+                value = clamp.applyAsInt(value);
+                prefs.edit().putInt(key, value).apply();
+                syncing[0] = true;
+                setIntFieldValue(edit, value);
+                syncing[0] = false;
+                int progress = value / step;
+                if (seek.getProgress() != progress) {
+                    seek.setProgress(progress);
+                }
+            });
+        }
+
+        seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                if (!fromUser) return;
+                int value = clamp.applyAsInt(progress * step);
+                prefs.edit().putInt(key, value).apply();
+                if (edit == null) return;
+                String currentValue = edit.getText() == null ? "" : edit.getText().toString();
+                String nextValue = String.valueOf(value);
+                if (!nextValue.equals(currentValue)) {
+                    syncing[0] = true;
+                    setIntFieldValue(edit, value);
+                    syncing[0] = false;
+                }
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+            }
+        });
     }
 
     private void bindPollingField(
