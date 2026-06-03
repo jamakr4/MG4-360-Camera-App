@@ -35,6 +35,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Locale;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 public class RecordingService extends Service {
     private static final String TAG = "RecordingService";
@@ -61,6 +67,9 @@ public class RecordingService extends Service {
     private static final String KEY_ACTIVE_CAMERAS = "recordingActiveCameras";
     private static final String KEY_TOTAL_CAMERAS = "recordingTotalCameras";
     private static final String KEY_LAST_ERROR = "recordingLastError";
+    private static final String KEY_EVENT_COMPLETED_SEGMENT_COUNT = "eventCompletedSegmentCount";
+    private static final String KEY_EVENT_RECENT_SEGMENTS = "eventRecentSegments";
+    private static final String KEY_EVENT_PENDING_REQUESTS = "eventPendingRequests";
 
     private static final String CHANNEL_ID = "mg4_recording";
     private static final int NOTIF_ID = 42;
@@ -75,6 +84,7 @@ public class RecordingService extends Service {
     private final Object eventLock = new Object();
     private final Object stateLock = new Object();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private final ExecutorService eventCopyExecutor = Executors.newSingleThreadExecutor();
     private Thread worker;
     private volatile boolean stopRequested = false;
     private volatile boolean segmentStopRequested = false;
@@ -142,6 +152,7 @@ public class RecordingService extends Service {
         super.onCreate();
         sServiceRunning = true;
         createNotificationChannel();
+        restoreEventState();
     }
 
     @Override
@@ -428,10 +439,9 @@ public class RecordingService extends Service {
             copyJobs = collectEventCopyJobsLocked(segmentOrdinal);
             Set<String> protectedBases = collectProtectedBasesLocked();
             cleanupOldSegments(baseDir, keepSegments, protectedBases);
+            persistEventStateLocked();
         }
-        for (EventCopyJob job : copyJobs) {
-            copyEventSegments(job);
-        }
+        enqueueEventCopyJobs(copyJobs);
     }
 
     private boolean armEventCapture() {
@@ -449,6 +459,7 @@ public class RecordingService extends Service {
             Log.e(TAG, "Failed to create event dir " + eventDir.getAbsolutePath());
             return false;
         }
+        List<EventCopyJob> copyJobs;
         synchronized (eventLock) {
             long currentSegmentOrdinal = completedSegmentCount + 1L;
             pendingEventRequests.add(new EventCaptureRequest(
@@ -456,12 +467,15 @@ public class RecordingService extends Service {
                     Math.max(1L, currentSegmentOrdinal - EVENT_SEGMENTS_BEFORE_CURRENT),
                     currentSegmentOrdinal + EVENT_SEGMENTS_AFTER_CURRENT
             ));
+            copyJobs = collectEventCopyJobsLocked(completedSegmentCount);
+            persistEventStateLocked();
             DevRuntimeLog.add(
                     "RecordingService",
                     "Event armed: " + eventBaseName
                             + " ordinals " + Math.max(1L, currentSegmentOrdinal - EVENT_SEGMENTS_BEFORE_CURRENT)
                             + "-" + (currentSegmentOrdinal + EVENT_SEGMENTS_AFTER_CURRENT));
         }
+        enqueueEventCopyJobs(copyJobs);
         return true;
     }
 
@@ -475,14 +489,15 @@ public class RecordingService extends Service {
                         || segment.ordinal > request.lastSegmentOrdinal) {
                     continue;
                 }
-                if (request.copiedBaseNames.add(segment.baseName)) {
+                if (!request.copiedBaseNames.contains(segment.baseName)
+                        && request.inFlightBaseNames.add(segment.baseName)) {
                     baseNames.add(segment.baseName);
                 }
             }
             if (!baseNames.isEmpty()) {
                 jobs.add(new EventCopyJob(request.eventBaseName, baseNames));
             }
-            if (completedThroughOrdinal >= request.lastSegmentOrdinal) {
+            if (isRequestCompleteLocked(request, completedThroughOrdinal)) {
                 completed.add(request);
             }
         }
@@ -503,45 +518,100 @@ public class RecordingService extends Service {
         return protectedBases;
     }
 
+    private void enqueueEventCopyJobs(List<EventCopyJob> jobs) {
+        for (EventCopyJob job : jobs) {
+            eventCopyExecutor.execute(() -> copyEventSegments(job));
+        }
+    }
+
+    private boolean isRequestCompleteLocked(EventCaptureRequest request, long completedThroughOrdinal) {
+        if (completedThroughOrdinal < request.lastSegmentOrdinal) {
+            return false;
+        }
+        for (SegmentInfo segment : recentSegments) {
+            if (segment.ordinal < request.firstSegmentOrdinal
+                    || segment.ordinal > request.lastSegmentOrdinal) {
+                continue;
+            }
+            if (!request.copiedBaseNames.contains(segment.baseName)
+                    || request.inFlightBaseNames.contains(segment.baseName)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private void copyEventSegments(EventCopyJob job) {
         if (job.baseNames.isEmpty()) {
             Log.w(TAG, "Skipping empty event copy job for " + job.eventBaseName);
+            onEventCopyFinished(job, new ArrayList<>());
             return;
         }
         File eventsBaseDir = getEventsBaseDir();
         if (eventsBaseDir == null) {
             DevRuntimeLog.add("RecordingService", "Event copy failed: events base dir unavailable");
             Log.e(TAG, "Failed to copy event segments because events base dir is unavailable");
+            onEventCopyFinished(job, new ArrayList<>());
             return;
         }
         File eventDir = new File(eventsBaseDir, job.eventBaseName);
         if (!ensureDirectoryExists(eventDir, "event dir")) {
             DevRuntimeLog.add("RecordingService", "Event copy failed: mkdir " + eventDir.getAbsolutePath());
             Log.e(TAG, "Failed to create event dir " + eventDir.getAbsolutePath());
+            onEventCopyFinished(job, new ArrayList<>());
             return;
         }
         DevRuntimeLog.add("RecordingService", "Event copy: " + job.eventBaseName + " files " + job.baseNames.size());
+        List<String> copiedBaseNames = new ArrayList<>();
         for (String baseName : job.baseNames) {
-            copySegmentGroup(DashcamSettingsController.getRecordsBaseDir(this), eventDir, baseName);
+            if (copySegmentGroup(DashcamSettingsController.getRecordsBaseDir(this), eventDir, baseName)) {
+                copiedBaseNames.add(baseName);
+            }
+        }
+        onEventCopyFinished(job, copiedBaseNames);
+    }
+
+    private void onEventCopyFinished(EventCopyJob job, List<String> copiedBaseNames) {
+        synchronized (eventLock) {
+            EventCaptureRequest request = findPendingEventRequestLocked(job.eventBaseName);
+            if (request == null) {
+                return;
+            }
+            request.inFlightBaseNames.removeAll(job.baseNames);
+            request.copiedBaseNames.addAll(copiedBaseNames);
+            if (isRequestCompleteLocked(request, completedSegmentCount)) {
+                pendingEventRequests.remove(request);
+            }
+            persistEventStateLocked();
         }
     }
 
-    private void copySegmentGroup(File sourceDir, File targetDir, String baseName) {
+    private EventCaptureRequest findPendingEventRequestLocked(String eventBaseName) {
+        for (EventCaptureRequest request : pendingEventRequests) {
+            if (request.eventBaseName.equals(eventBaseName)) {
+                return request;
+            }
+        }
+        return null;
+    }
+
+    private boolean copySegmentGroup(File sourceDir, File targetDir, String baseName) {
         File combinedSource = new File(sourceDir, baseName + ".mp4");
         if (combinedSource.exists()) {
-            copyFile(combinedSource, new File(targetDir, combinedSource.getName()));
-            return;
+            return copyFile(combinedSource, new File(targetDir, combinedSource.getName()));
         }
 
         char[] suffixes = new char[] { 'F', 'R', 'X', 'Y' };
+        boolean copiedAny = false;
         for (char suffix : suffixes) {
             File source = new File(sourceDir, baseName + "_" + suffix + ".mp4");
             if (!source.exists()) {
                 continue;
             }
             File target = new File(targetDir, source.getName());
-            copyFile(source, target);
+            copiedAny |= copyFile(source, target);
         }
+        return copiedAny;
     }
 
     private boolean copyFile(File source, File target) {
@@ -853,6 +923,109 @@ public class RecordingService extends Service {
         return UiPrefs.getPrefs(this);
     }
 
+    private void restoreEventState() {
+        SharedPreferences prefs = prefs();
+        List<EventCopyJob> copyJobs;
+        synchronized (eventLock) {
+            completedSegmentCount = prefs.getLong(KEY_EVENT_COMPLETED_SEGMENT_COUNT, 0L);
+            recentSegments.clear();
+            pendingEventRequests.clear();
+
+            try {
+                JSONArray segmentsJson = new JSONArray(prefs.getString(KEY_EVENT_RECENT_SEGMENTS, "[]"));
+                for (int i = 0; i < segmentsJson.length(); i++) {
+                    JSONObject obj = segmentsJson.optJSONObject(i);
+                    if (obj == null) {
+                        continue;
+                    }
+                    String baseName = obj.optString("baseName", "");
+                    long ordinal = obj.optLong("ordinal", -1L);
+                    long startMs = obj.optLong("startMs", 0L);
+                    long endMs = obj.optLong("endMs", 0L);
+                    if (baseName.isEmpty() || ordinal <= 0L) {
+                        continue;
+                    }
+                    recentSegments.add(new SegmentInfo(ordinal, baseName, startMs, endMs));
+                }
+            } catch (Throwable t) {
+                Log.w(TAG, "Failed to restore recent segment state", t);
+                recentSegments.clear();
+            }
+
+            try {
+                JSONArray requestsJson = new JSONArray(prefs.getString(KEY_EVENT_PENDING_REQUESTS, "[]"));
+                for (int i = 0; i < requestsJson.length(); i++) {
+                    JSONObject obj = requestsJson.optJSONObject(i);
+                    if (obj == null) {
+                        continue;
+                    }
+                    String eventBaseName = obj.optString("eventBaseName", "");
+                    long firstSegmentOrdinal = obj.optLong("firstSegmentOrdinal", -1L);
+                    long lastSegmentOrdinal = obj.optLong("lastSegmentOrdinal", -1L);
+                    if (eventBaseName.isEmpty() || firstSegmentOrdinal <= 0L || lastSegmentOrdinal < firstSegmentOrdinal) {
+                        continue;
+                    }
+                    EventCaptureRequest request =
+                            new EventCaptureRequest(eventBaseName, firstSegmentOrdinal, lastSegmentOrdinal);
+                    JSONArray copiedJson = obj.optJSONArray("copiedBaseNames");
+                    if (copiedJson != null) {
+                        for (int j = 0; j < copiedJson.length(); j++) {
+                            String copiedBaseName = copiedJson.optString(j, "");
+                            if (!copiedBaseName.isEmpty()) {
+                                request.copiedBaseNames.add(copiedBaseName);
+                            }
+                        }
+                    }
+                    pendingEventRequests.add(request);
+                }
+            } catch (Throwable t) {
+                Log.w(TAG, "Failed to restore pending event requests", t);
+                pendingEventRequests.clear();
+            }
+            copyJobs = collectEventCopyJobsLocked(completedSegmentCount);
+            persistEventStateLocked();
+        }
+        enqueueEventCopyJobs(copyJobs);
+    }
+
+    private void persistEventStateLocked() {
+        JSONArray segmentsJson = new JSONArray();
+        for (SegmentInfo segment : recentSegments) {
+            JSONObject obj = new JSONObject();
+            try {
+                obj.put("ordinal", segment.ordinal);
+                obj.put("baseName", segment.baseName);
+                obj.put("startMs", segment.startMs);
+                obj.put("endMs", segment.endMs);
+                segmentsJson.put(obj);
+            } catch (Throwable ignored) {
+            }
+        }
+
+        JSONArray requestsJson = new JSONArray();
+        for (EventCaptureRequest request : pendingEventRequests) {
+            JSONObject obj = new JSONObject();
+            try {
+                obj.put("eventBaseName", request.eventBaseName);
+                obj.put("firstSegmentOrdinal", request.firstSegmentOrdinal);
+                obj.put("lastSegmentOrdinal", request.lastSegmentOrdinal);
+                JSONArray copiedJson = new JSONArray();
+                for (String copiedBaseName : request.copiedBaseNames) {
+                    copiedJson.put(copiedBaseName);
+                }
+                obj.put("copiedBaseNames", copiedJson);
+                requestsJson.put(obj);
+            } catch (Throwable ignored) {
+            }
+        }
+
+        prefs().edit()
+                .putLong(KEY_EVENT_COMPLETED_SEGMENT_COUNT, completedSegmentCount)
+                .putString(KEY_EVENT_RECENT_SEGMENTS, segmentsJson.toString())
+                .putString(KEY_EVENT_PENDING_REQUESTS, requestsJson.toString())
+                .apply();
+    }
+
     private void createNotificationChannel() {
         NotificationChannel ch = new NotificationChannel(
                 CHANNEL_ID,
@@ -874,12 +1047,17 @@ public class RecordingService extends Service {
         sServiceRunning = false;
         stopRequested = true;
         cancelPendingErrorOverlay();
+        eventCopyExecutor.shutdown();
         if (worker != null) {
             worker.interrupt();
             try {
                 worker.join(1000);
             } catch (InterruptedException ignored) {
             }
+        }
+        try {
+            eventCopyExecutor.awaitTermination(1000, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException ignored) {
         }
         super.onDestroy();
     }
@@ -906,6 +1084,7 @@ public class RecordingService extends Service {
         final long firstSegmentOrdinal;
         final long lastSegmentOrdinal;
         final Set<String> copiedBaseNames = new HashSet<>();
+        final Set<String> inFlightBaseNames = new HashSet<>();
 
         EventCaptureRequest(String eventBaseName, long firstSegmentOrdinal, long lastSegmentOrdinal) {
             this.eventBaseName = eventBaseName;
