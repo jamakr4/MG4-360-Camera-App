@@ -83,6 +83,15 @@
                 <action android:name="com.saicmotor.hmi.aroundview.mod.ACTION_STOP" />
             </intent-filter>
         </receiver>
+
+        <receiver
+            android:name=".dashcam.DashcamEventTriggerReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.drivehub.kamera.action.TRIGGER_DASHCAM_EVENT" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>
