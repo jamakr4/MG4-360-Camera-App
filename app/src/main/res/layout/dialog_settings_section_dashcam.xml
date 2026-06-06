@@ -142,24 +142,96 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="@drawable/bg_settings_inline_card"
-        android:gravity="center_vertical"
-        android:minHeight="56dp"
-        android:orientation="horizontal"
+        android:orientation="vertical"
         android:paddingStart="18dp"
         android:paddingTop="8dp"
         android:paddingEnd="18dp"
         android:paddingBottom="8dp">
 
-        <TextView
-            style="@style/DrivehubSettingsCardRowLabel"
-            android:layout_width="0dp"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="@string/settings_dashcam_show_speed" />
+            android:gravity="center_vertical"
+            android:minHeight="56dp"
+            android:orientation="horizontal">
 
-        <Switch
-            android:id="@+id/switchDashcamShowSpeed"
-            style="@style/DrivehubSettingsSwitch" />
+            <TextView
+                style="@style/DrivehubSettingsCardRowLabel"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/settings_dashcam_show_speed" />
+
+            <Switch
+                android:id="@+id/switchDashcamShowSpeed"
+                style="@style/DrivehubSettingsSwitch" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:minHeight="56dp"
+            android:orientation="horizontal">
+
+            <TextView
+                style="@style/DrivehubSettingsCardRowLabel"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/settings_dashcam_event_confirmation_tone" />
+
+            <Switch
+                android:id="@+id/switchDashcamEventConfirmationTone"
+                style="@style/DrivehubSettingsSwitch" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <SeekBar
+                android:id="@+id/seekDashcamEventConfirmationToneVolume"
+                style="@style/DrivehubSettingsSlider"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:max="100"
+                android:progress="80" />
+
+            <EditText
+                android:id="@+id/etDashcamEventConfirmationToneVolumeValue"
+                style="@style/DrivehubSettingsSliderValue"
+                android:maxLength="3"
+                android:text="@string/settings_dashcam_event_confirmation_tone_volume_default_input" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:orientation="horizontal">
+
+            <TextView
+                style="@style/DrivehubSettingsCaption"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/settings_dashcam_event_confirmation_tone_volume_min" />
+
+            <TextView
+                style="@style/DrivehubSettingsCaption"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="end"
+                android:text="@string/settings_dashcam_event_confirmation_tone_volume_max" />
+
+        </LinearLayout>
 
     </LinearLayout>
 

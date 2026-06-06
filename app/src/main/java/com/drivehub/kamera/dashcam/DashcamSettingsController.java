@@ -12,6 +12,7 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.text.Editable;
 import android.widget.EditText;
+import android.widget.SeekBar;
 import android.widget.Switch;
 import android.widget.Toast;
 
@@ -29,10 +30,13 @@ public final class DashcamSettingsController {
     private static final String KEY_RECORDING_FPS = "recordingFps";
     private static final String KEY_SIGNATURE = "recordingSignature";
     private static final String KEY_SHOW_SPEED = "recordingShowSpeed";
+    private static final String KEY_EVENT_CONFIRMATION_TONE = "eventConfirmationTone";
+    private static final String KEY_EVENT_CONFIRMATION_TONE_VOLUME = "eventConfirmationToneVolume";
     private static final int REQ_STORAGE = 1337;
     private static final int DEFAULT_RECORDING_FPS = 25;
     private static final int MIN_RECORDING_FPS = 1;
     private static final int MAX_RECORDING_FPS = 60;
+    private static final int DEFAULT_EVENT_CONFIRMATION_TONE_VOLUME = 80;
     private static final int MAX_SIGNATURE_LENGTH = 40;
     private static final String RECORDS_DIR_NAME = "dashcam";
 
@@ -48,9 +52,13 @@ public final class DashcamSettingsController {
             Switch swEnabled,
             EditText etRecordingFps,
             EditText etSignature,
-            Switch swShowSpeed) {
+            Switch swShowSpeed,
+            Switch swEventConfirmationTone,
+            SeekBar seekEventToneVolume,
+            EditText etEventToneVolumeValue) {
         int recordingFps = getRecordingFps(prefs);
         String signature = getRecordingSignature(prefs);
+        int eventToneVolume = getEventConfirmationToneVolume(prefs);
 
         if (swEnabled != null) {
             syncingEnabled = true;
@@ -90,7 +98,71 @@ public final class DashcamSettingsController {
             swShowSpeed.setOnCheckedChangeListener(
                     (buttonView, checked) -> prefs.edit().putBoolean(KEY_SHOW_SPEED, checked).apply());
         }
+        if (swEventConfirmationTone != null) {
+            swEventConfirmationTone.setChecked(shouldPlayEventConfirmationTone(prefs));
+            swEventConfirmationTone.setOnCheckedChangeListener(
+                    (buttonView, checked) -> prefs.edit().putBoolean(KEY_EVENT_CONFIRMATION_TONE, checked).apply());
+        }
+        bindEventToneVolume(prefs, seekEventToneVolume, etEventToneVolumeValue, eventToneVolume);
         bindFields(prefs, etRecordingFps, etSignature);
+    }
+
+    private void bindEventToneVolume(
+            SharedPreferences prefs,
+            SeekBar seekEventToneVolume,
+            EditText etEventToneVolumeValue,
+            int initialVolume) {
+        if (seekEventToneVolume != null) {
+            seekEventToneVolume.setMax(100);
+            seekEventToneVolume.setProgress(initialVolume);
+            seekEventToneVolume.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                @Override
+                public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                    if (!fromUser) {
+                        return;
+                    }
+                    int clamped = clampEventConfirmationToneVolume(progress);
+                    prefs.edit().putInt(KEY_EVENT_CONFIRMATION_TONE_VOLUME, clamped).apply();
+                    normalizeField(etEventToneVolumeValue, clamped);
+                }
+
+                @Override
+                public void onStartTrackingTouch(SeekBar seekBar) {
+                }
+
+                @Override
+                public void onStopTrackingTouch(SeekBar seekBar) {
+                }
+            });
+        }
+        if (etEventToneVolumeValue != null) {
+            normalizeField(etEventToneVolumeValue, initialVolume);
+            etEventToneVolumeValue.addTextChangedListener(new SimpleTextWatcher() {
+                @Override
+                public void afterTextChanged(Editable s) {
+                    if (s == null || s.length() == 0) {
+                        return;
+                    }
+                    int value = clampEventConfirmationToneVolume(
+                            parsePositiveInt(s.toString(), DEFAULT_EVENT_CONFIRMATION_TONE_VOLUME));
+                    prefs.edit().putInt(KEY_EVENT_CONFIRMATION_TONE_VOLUME, value).apply();
+                    if (seekEventToneVolume != null && seekEventToneVolume.getProgress() != value) {
+                        seekEventToneVolume.setProgress(value);
+                    }
+                }
+            });
+            etEventToneVolumeValue.setOnFocusChangeListener((v, hasFocus) -> {
+                if (!hasFocus) {
+                    int value = clampEventConfirmationToneVolume(
+                            parsePositiveInt(textOf(etEventToneVolumeValue), DEFAULT_EVENT_CONFIRMATION_TONE_VOLUME));
+                    prefs.edit().putInt(KEY_EVENT_CONFIRMATION_TONE_VOLUME, value).apply();
+                    normalizeField(etEventToneVolumeValue, value);
+                    if (seekEventToneVolume != null && seekEventToneVolume.getProgress() != value) {
+                        seekEventToneVolume.setProgress(value);
+                    }
+                }
+            });
+        }
     }
 
     private void bindFields(SharedPreferences prefs, EditText etRecordingFps, EditText etSignature) {
@@ -145,6 +217,15 @@ public final class DashcamSettingsController {
         return prefs.getBoolean(KEY_SHOW_SPEED, true);
     }
 
+    public static boolean shouldPlayEventConfirmationTone(SharedPreferences prefs) {
+        return prefs.getBoolean(KEY_EVENT_CONFIRMATION_TONE, true);
+    }
+
+    public static int getEventConfirmationToneVolume(SharedPreferences prefs) {
+        return clampEventConfirmationToneVolume(
+                prefs.getInt(KEY_EVENT_CONFIRMATION_TONE_VOLUME, DEFAULT_EVENT_CONFIRMATION_TONE_VOLUME));
+    }
+
     public static String getConfiguredRecordsPath(SharedPreferences prefs) {
         return normalizeRecordsPath(prefs.getString(KEY_RECORDS_PATH, ""));
     }
@@ -164,6 +245,10 @@ public final class DashcamSettingsController {
 
     private static int clampRecordingFps(int fps) {
         return Math.max(MIN_RECORDING_FPS, Math.min(MAX_RECORDING_FPS, fps));
+    }
+
+    private static int clampEventConfirmationToneVolume(int volume) {
+        return Math.max(0, Math.min(100, volume));
     }
 
     private void normalizeField(EditText editText, int value) {

@@ -17,6 +17,10 @@
     <string name="settings_dashcam_fps">Recording FPS</string>
     <string name="settings_dashcam_signature">Signature</string>
     <string name="settings_dashcam_show_speed">Show speed in video</string>
+    <string name="settings_dashcam_event_confirmation_tone">Play confirmation tone for saved events</string>
+    <string name="settings_dashcam_event_confirmation_tone_volume_default_input">80</string>
+    <string name="settings_dashcam_event_confirmation_tone_volume_min">0%</string>
+    <string name="settings_dashcam_event_confirmation_tone_volume_max">100%</string>
     <string name="settings_dashcam_signature_hint">Optional text shown in the bottom-left corner of every recorded frame.</string>
     <string name="settings_dashcam_status_off">Recording inactive</string>
     <string name="settings_dashcam_status_starting">Recording starting…</string>

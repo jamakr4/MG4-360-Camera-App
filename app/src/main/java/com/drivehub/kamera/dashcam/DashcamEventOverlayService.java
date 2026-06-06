@@ -1,10 +1,13 @@
 package com.drivehub.kamera.dashcam;
 
 import com.drivehub.kamera.R;
+import com.drivehub.kamera.settings.UiPrefs;
 
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
+import android.media.AudioManager;
+import android.media.ToneGenerator;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
@@ -28,6 +31,7 @@ public class DashcamEventOverlayService extends Service {
     private static final String EXTRA_TITLE_RES_ID = "title_res_id";
     private static final String EXTRA_SUBTITLE_RES_ID = "subtitle_res_id";
     private static final String EXTRA_NOTIFICATION_TEXT_RES_ID = "notification_text_res_id";
+    private static final String EXTRA_PLAY_CONFIRMATION_TONE = "play_confirmation_tone";
 
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final Runnable hideRunnable = this::stopSelf;
@@ -43,7 +47,8 @@ public class DashcamEventOverlayService extends Service {
                 context,
                 R.string.dashcam_event_overlay_title,
                 R.string.dashcam_event_overlay_subtitle,
-                R.string.notification_dashcam_event_overlay_text);
+                R.string.notification_dashcam_event_overlay_text,
+                true);
     }
 
     // Show the OEM pause banner when recording must pause while the OEM app is
@@ -53,7 +58,8 @@ public class DashcamEventOverlayService extends Service {
                 context,
                 R.string.dashcam_oem_pause_overlay_title,
                 R.string.dashcam_oem_pause_overlay_subtitle,
-                R.string.notification_dashcam_oem_pause_overlay_text);
+                R.string.notification_dashcam_oem_pause_overlay_text,
+                false);
     }
 
     public static void showOemResume(Context context) {
@@ -61,7 +67,8 @@ public class DashcamEventOverlayService extends Service {
                 context,
                 R.string.dashcam_oem_resume_overlay_title,
                 R.string.dashcam_oem_resume_overlay_subtitle,
-                R.string.notification_dashcam_oem_resume_overlay_text);
+                R.string.notification_dashcam_oem_resume_overlay_text,
+                false);
     }
 
     public static void showRecordingError(Context context, int subtitleResId, int notificationTextResId) {
@@ -69,7 +76,8 @@ public class DashcamEventOverlayService extends Service {
                 context,
                 R.string.dashcam_recording_error_overlay_title,
                 subtitleResId,
-                notificationTextResId);
+                notificationTextResId,
+                false);
     }
 
     public static void showRecordingRecovered(Context context) {
@@ -77,14 +85,21 @@ public class DashcamEventOverlayService extends Service {
                 context,
                 R.string.dashcam_recording_recovered_overlay_title,
                 R.string.dashcam_recording_recovered_overlay_subtitle,
-                R.string.notification_dashcam_recording_recovered_text);
+                R.string.notification_dashcam_recording_recovered_text,
+                false);
     }
 
-    private static void showBanner(Context context, int titleResId, int subtitleResId, int notificationTextResId) {
+    private static void showBanner(
+            Context context,
+            int titleResId,
+            int subtitleResId,
+            int notificationTextResId,
+            boolean playConfirmationTone) {
         Intent intent = new Intent(context, DashcamEventOverlayService.class);
         intent.putExtra(EXTRA_TITLE_RES_ID, titleResId);
         intent.putExtra(EXTRA_SUBTITLE_RES_ID, subtitleResId);
         intent.putExtra(EXTRA_NOTIFICATION_TEXT_RES_ID, notificationTextResId);
+        intent.putExtra(EXTRA_PLAY_CONFIRMATION_TONE, playConfirmationTone);
         context.startForegroundService(intent);
     }
 
@@ -106,6 +121,8 @@ public class DashcamEventOverlayService extends Service {
         int notificationTextResId = intent != null
                 ? intent.getIntExtra(EXTRA_NOTIFICATION_TEXT_RES_ID, R.string.notification_dashcam_event_overlay_text)
                 : R.string.notification_dashcam_event_overlay_text;
+        boolean playConfirmationTone = intent != null
+                && intent.getBooleanExtra(EXTRA_PLAY_CONFIRMATION_TONE, false);
         Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.ic_menu_camera)
                 .setContentTitle(getString(R.string.app_name))
@@ -119,9 +136,23 @@ public class DashcamEventOverlayService extends Service {
             showOverlayWindow();
         }
         bindText(titleResId, subtitleResId);
+        if (playConfirmationTone) {
+            playConfirmationTone();
+        }
         mainHandler.removeCallbacks(hideRunnable);
         mainHandler.postDelayed(hideRunnable, AUTO_HIDE_MS);
         return START_NOT_STICKY;
+    }
+
+    //When saving Event --> Audio indicator
+    private void playConfirmationTone() {
+        try {
+            int volume = DashcamSettingsController.getEventConfirmationToneVolume(UiPrefs.getPrefs(this));
+            ToneGenerator toneGenerator = new ToneGenerator(AudioManager.STREAM_NOTIFICATION, volume);
+            toneGenerator.startTone(ToneGenerator.TONE_PROP_ACK, 180);
+            mainHandler.postDelayed(toneGenerator::release, 300L);
+        } catch (Throwable ignored) {
+        }
     }
 
     private void showOverlayWindow() {

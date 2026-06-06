@@ -57,11 +57,13 @@ public final class SettingsAppearanceController {
             Switch swRotateToDrivingDirection,
             Switch swDashcamEnabled,
             Switch swDashcamShowSpeed,
+            Switch swDashcamEventConfirmationTone,
             Switch swSafetyWarning,
             Switch swAllowBetaUpdates,
             ImageButton dialogClose,
             SeekBar seekOverlayHideDelay,
             SeekBar seekOverlayMinShow,
+            SeekBar seekDashcamEventConfirmationToneVolume,
             SeekBar seekCorner,
             EditText etCorner,
             View accentRow,
@@ -82,12 +84,15 @@ public final class SettingsAppearanceController {
         this.accentPreview = accentPreview;
         this.etAccentColor = etAccentColor;
         this.activeTab = 1;
-        this.tintedSeekBars = new SeekBar[]{seekCorner, seekOverlayHideDelay, seekOverlayMinShow};
+        this.tintedSeekBars = new SeekBar[]{
+                seekCorner, seekOverlayHideDelay, seekOverlayMinShow, seekDashcamEventConfirmationToneVolume
+        };
         this.tintedSwitches = new Switch[]{
                 swOverlay,
                 swRotateToDrivingDirection,
                 swDashcamEnabled,
                 swDashcamShowSpeed,
+                swDashcamEventConfirmationTone,
                 swSafetyWarning,
                 swAllowBetaUpdates
         };

@@ -176,6 +176,10 @@ public final class SettingsDialogController {
         v.etDashcamFps = dialog.findViewById(R.id.etDashcamFps);
         v.etDashcamSignature = dialog.findViewById(R.id.etDashcamSignature);
         v.swDashcamShowSpeed = dialog.findViewById(R.id.switchDashcamShowSpeed);
+        v.swDashcamEventConfirmationTone = dialog.findViewById(R.id.switchDashcamEventConfirmationTone);
+        v.seekDashcamEventConfirmationToneVolume = dialog.findViewById(R.id.seekDashcamEventConfirmationToneVolume);
+        v.etDashcamEventConfirmationToneVolumeValue =
+                dialog.findViewById(R.id.etDashcamEventConfirmationToneVolumeValue);
         v.tvDashcamRecordingStatus = dialog.findViewById(R.id.tvDashcamRecordingStatus);
         v.etDevDefaultPollMs = dialog.findViewById(R.id.etDevDefaultPollMs);
         v.etDevSignalOffPollMs = dialog.findViewById(R.id.etDevSignalOffPollMs);
@@ -254,7 +258,10 @@ public final class SettingsDialogController {
                 views.swDashcamEnabled,
                 views.etDashcamFps,
                 views.etDashcamSignature,
-                views.swDashcamShowSpeed
+                views.swDashcamShowSpeed,
+                views.swDashcamEventConfirmationTone,
+                views.seekDashcamEventConfirmationToneVolume,
+                views.etDashcamEventConfirmationToneVolumeValue
         );
         dev.bind(
                 prefs,
@@ -277,11 +284,13 @@ public final class SettingsDialogController {
                 views.swRotateToDrivingDirection,
                 views.swDashcamEnabled,
                 views.swDashcamShowSpeed,
+                views.swDashcamEventConfirmationTone,
                 views.swSafetyWarning,
                 views.swAllowBetaUpdates,
                 views.dialogClose,
                 views.seekOverlayHideDelay,
                 views.seekOverlayMinShow,
+                views.seekDashcamEventConfirmationToneVolume,
                 views.seekCorner,
                 views.etCorner,
                 views.accentRow,
@@ -460,6 +469,7 @@ public final class SettingsDialogController {
         Switch swOverlay;
         Switch swRotateToDrivingDirection;
         Switch swDashcamEnabled;
+        Switch swDashcamEventConfirmationTone;
         Switch swSafetyWarning;
         Switch swAllowBetaUpdates;
         SeekBar seekOverlayHideDelay;
@@ -469,6 +479,8 @@ public final class SettingsDialogController {
         EditText etDashcamFps;
         EditText etDashcamSignature;
         Switch swDashcamShowSpeed;
+        SeekBar seekDashcamEventConfirmationToneVolume;
+        EditText etDashcamEventConfirmationToneVolumeValue;
         TextView tvDashcamRecordingStatus;
         EditText etDevDefaultPollMs;
         EditText etDevSignalOffPollMs;
