@@ -63,6 +63,10 @@ public class RecordingService extends Service {
     public static final String STATUS_PARTIAL = "partial";
     public static final String STATUS_ERROR = "error";
 
+    private static final String ERROR_STORAGE_NOT_WRITABLE = "storage not writable";
+    private static final String ERROR_GRID_START_FAILED = "grid start failed";
+    private static final String ERROR_GRID_STOP_TIMEOUT = "grid stop timeout";
+
     private static final String KEY_STATUS = "recordingStatus";
     private static final String KEY_ACTIVE_CAMERAS = "recordingActiveCameras";
     private static final String KEY_TOTAL_CAMERAS = "recordingTotalCameras";
@@ -85,7 +89,7 @@ public class RecordingService extends Service {
     private final Object stateLock = new Object();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final ExecutorService eventCopyExecutor = Executors.newSingleThreadExecutor();
-    private Thread worker;
+    private volatile Thread worker;
     private volatile boolean stopRequested = false;
     private volatile boolean segmentStopRequested = false;
     private volatile boolean oemPauseRequested = false;
@@ -129,7 +133,7 @@ public class RecordingService extends Service {
 
     public static void pauseForOemRequest(Context context) {
         SharedPreferences prefs = UiPrefs.getPrefs(context);
-        if (!prefs.getBoolean(DashcamSettingsController.KEY_ENABLED, false) && !isRunning()) {
+        if (!prefs.getBoolean(DashcamSettingsController.KEY_ENABLED, false) || !isRunning()) {
             return;
         }
         Intent i = new Intent(context, RecordingService.class);
@@ -139,7 +143,7 @@ public class RecordingService extends Service {
 
     public static void resumeAfterOemRequest(Context context) {
         SharedPreferences prefs = UiPrefs.getPrefs(context);
-        if (!prefs.getBoolean(DashcamSettingsController.KEY_ENABLED, false) && !isRunning()) {
+        if (!prefs.getBoolean(DashcamSettingsController.KEY_ENABLED, false) || !isRunning()) {
             return;
         }
         Intent i = new Intent(context, RecordingService.class);
@@ -312,9 +316,7 @@ public class RecordingService extends Service {
 
         long segmentMs = segmentSec * 1000L;
 
-        // Convert total retention into a segment count, e.g. segmentSec=30, retention=5 min => keep 10 segments.
-        int keepSegments = Math.max(1,
-                (int) ((DashcamSettingsController.DEFAULT_TOTAL_RETENTION_MIN * 60L) / segmentSec));
+        int keepSegments = Math.max(1, DashcamSettingsController.DEFAULT_RETENTION_CLIP_COUNT);
         boolean endedWithFatalError = false;
 
         while (!stopRequested) {
@@ -360,7 +362,7 @@ public class RecordingService extends Service {
                 showSpeed);
 
         if (!started) {
-            publishStatus(STATUS_ERROR, 0, TOTAL_CAMERAS, "grid start failed");
+            publishStatus(STATUS_ERROR, 0, TOTAL_CAMERAS, ERROR_GRID_START_FAILED);
             return false;
         }
 
@@ -380,7 +382,7 @@ public class RecordingService extends Service {
         }
 
         if (!CameraProbe.stopCombinedMp4Record()) {
-            publishStatus(STATUS_ERROR, 0, TOTAL_CAMERAS, "grid stop timeout");
+            publishStatus(STATUS_ERROR, 0, TOTAL_CAMERAS, ERROR_GRID_STOP_TIMEOUT);
             return false;
         }
 
@@ -448,15 +450,17 @@ public class RecordingService extends Service {
         long now = System.currentTimeMillis();
         String eventBaseName = "event_" + makeTimestampBase(now, "yyMMddHHmmssSSS");
         File eventsBaseDir = getEventsBaseDir();
-        if (eventsBaseDir == null) {
-            DevRuntimeLog.add("RecordingService", "Event capture failed: events base dir unavailable");
-            Log.e(TAG, "Failed to arm event capture because events base dir is unavailable");
+        if (eventsBaseDir == null || !eventsBaseDir.canWrite()) {
+            DevRuntimeLog.add("RecordingService", "Event capture failed: events base dir unavailable or not writable");
+            Log.e(TAG, "Failed to arm event capture because events base dir is unavailable or not writable");
+            notifyEventStorageFailure();
             return false;
         }
         File eventDir = new File(eventsBaseDir, eventBaseName);
         if (!ensureDirectoryExists(eventDir, "event dir")) {
             DevRuntimeLog.add("RecordingService", "Event capture failed: mkdir " + eventDir.getAbsolutePath());
             Log.e(TAG, "Failed to create event dir " + eventDir.getAbsolutePath());
+            notifyEventStorageFailure();
             return false;
         }
         List<EventCopyJob> copyJobs;
@@ -548,9 +552,10 @@ public class RecordingService extends Service {
             return;
         }
         File eventsBaseDir = getEventsBaseDir();
-        if (eventsBaseDir == null) {
-            DevRuntimeLog.add("RecordingService", "Event copy failed: events base dir unavailable");
-            Log.e(TAG, "Failed to copy event segments because events base dir is unavailable");
+        if (eventsBaseDir == null || !eventsBaseDir.canWrite()) {
+            DevRuntimeLog.add("RecordingService", "Event copy failed: events base dir unavailable or not writable");
+            Log.e(TAG, "Failed to copy event segments because events base dir is unavailable or not writable");
+            mainHandler.post(this::notifyEventStorageFailure);
             onEventCopyFinished(job, new ArrayList<>());
             return;
         }
@@ -558,6 +563,7 @@ public class RecordingService extends Service {
         if (!ensureDirectoryExists(eventDir, "event dir")) {
             DevRuntimeLog.add("RecordingService", "Event copy failed: mkdir " + eventDir.getAbsolutePath());
             Log.e(TAG, "Failed to create event dir " + eventDir.getAbsolutePath());
+            mainHandler.post(this::notifyEventStorageFailure);
             onEventCopyFinished(job, new ArrayList<>());
             return;
         }
@@ -702,12 +708,19 @@ public class RecordingService extends Service {
         return ensureDirectoryExists(dir, "events base dir") ? dir : null;
     }
 
+    private void notifyEventStorageFailure() {
+        DashcamEventOverlayService.showRecordingError(
+                this,
+                R.string.dashcam_recording_error_overlay_subtitle_storage,
+                R.string.notification_dashcam_recording_error_storage_text);
+    }
+
     private File requireBaseDir() {
         File baseDir = DashcamSettingsController.getRecordsBaseDir(this);
         if (ensureDirectoryExists(baseDir, "records base dir") && baseDir.canWrite()) {
             return baseDir;
         }
-        publishStatus(STATUS_ERROR, 0, TOTAL_CAMERAS, "storage not writable");
+        publishStatus(STATUS_ERROR, 0, TOTAL_CAMERAS, ERROR_STORAGE_NOT_WRITABLE);
         return null;
     }
 
@@ -899,17 +912,17 @@ public class RecordingService extends Service {
     }
 
     private OverlayMessageSpec mapRecordingError(String lastError) {
-        if ("storage not writable".equals(lastError)) {
+        if (ERROR_STORAGE_NOT_WRITABLE.equals(lastError)) {
             return new OverlayMessageSpec(
                     R.string.dashcam_recording_error_overlay_subtitle_storage,
                     R.string.notification_dashcam_recording_error_storage_text);
         }
-        if ("grid start failed".equals(lastError)) {
+        if (ERROR_GRID_START_FAILED.equals(lastError)) {
             return new OverlayMessageSpec(
                     R.string.dashcam_recording_error_overlay_subtitle_start_failed,
                     R.string.notification_dashcam_recording_error_start_failed_text);
         }
-        if ("grid stop timeout".equals(lastError)) {
+        if (ERROR_GRID_STOP_TIMEOUT.equals(lastError)) {
             return new OverlayMessageSpec(
                     R.string.dashcam_recording_error_overlay_subtitle_stop_failed,
                     R.string.notification_dashcam_recording_error_stop_failed_text);

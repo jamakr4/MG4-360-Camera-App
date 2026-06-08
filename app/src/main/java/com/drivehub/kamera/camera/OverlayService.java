@@ -19,6 +19,7 @@ import android.graphics.PixelFormat;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
@@ -175,7 +176,8 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
                 overlayWidthPx = w;
                 overlayHeightPx = h;
             }
-        } catch (Throwable ignored) {
+        } catch (Throwable e) {
+            Log.w("OverlayService", "Failed to read overlay size prefs", e);
         }
         normalizeOverlaySizeForCurrentMode();
 
@@ -202,7 +204,8 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
             overlayMode = resolveOverlayMode();
             defaultX = translateXBetweenModes(defaultX, savedMode, overlayMode);
             defaultY = translateCoordinate(defaultY, 0, 0);
-        } catch (Throwable ignored) {
+        } catch (Throwable e) {
+            Log.w("OverlayService", "Failed to read overlay position prefs", e);
             overlayMode = resolveOverlayMode();
         }
         overlayParams.x = defaultX;
@@ -425,9 +428,9 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
     }
 
     private void applyPreviewTransform() {
-        if (textureView == null) return;
-        textureView.post(() -> {
-            if (textureView == null) return;
+        final TextureView tv = textureView;
+        if (tv == null) return;
+        tv.post(() -> {
             FrameLayout.LayoutParams params;
             if (shouldRotatePreviewToDrivingDirection()) {
                 params = new FrameLayout.LayoutParams(
@@ -442,10 +445,10 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
                         Gravity.CENTER
                 );
             }
-            textureView.setLayoutParams(params);
-            textureView.setScaleX(1f);
-            textureView.setScaleY(1f);
-            textureView.setRotation(getPreviewRotationDegrees());
+            tv.setLayoutParams(params);
+            tv.setScaleX(1f);
+            tv.setScaleY(1f);
+            tv.setRotation(getPreviewRotationDegrees());
         });
     }
 
@@ -526,6 +529,9 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
         try {
             ActivityManager am = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
             if (am == null) return false;
+            // NOTE: getRunningTasks() returns foreign tasks only because this APK
+            // is signed with platform keys. Deprecated since API 21 but functional
+            // on privileged installs. Would break on a non-privileged install.
             java.util.List<ActivityManager.RunningTaskInfo> tasks = am.getRunningTasks(1);
             if (tasks == null || tasks.isEmpty()) return false;
             ActivityManager.RunningTaskInfo task = tasks.get(0);
@@ -562,7 +568,8 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
                     .putInt(KEY_OVERLAY_H, overlayHeightPx)
                     .putInt(KEY_LAST_OVERLAY_MODE, overlayMode)
                     .apply();
-        } catch (Throwable ignored) {
+        } catch (Throwable e) {
+            Log.w("OverlayService", "Failed to save overlay prefs", e);
         }
     }
 

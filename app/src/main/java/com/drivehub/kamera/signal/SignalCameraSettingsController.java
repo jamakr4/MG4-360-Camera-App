@@ -101,7 +101,7 @@ public final class SignalCameraSettingsController {
                     if (text.isEmpty()) return;
                     try {
                         int valueMs = clamp.applyAsInt(Integer.parseInt(text));
-                        prefs.edit().putLong(key, valueMs).apply();
+                        prefs.edit().putInt(key, valueMs).apply();
                         int progress = valueMs / stepMs;
                         if (seek.getProgress() != progress) {
                             seek.setProgress(progress);
@@ -120,7 +120,7 @@ public final class SignalCameraSettingsController {
                     valueMs = getter.applyAsInt(prefs);
                 }
                 valueMs = clamp.applyAsInt(valueMs);
-                prefs.edit().putLong(key, valueMs).apply();
+                prefs.edit().putInt(key, valueMs).apply();
                 syncing[0] = true;
                 edit.setText(String.valueOf(valueMs));
                 edit.setSelection(edit.getText().length());
@@ -137,7 +137,7 @@ public final class SignalCameraSettingsController {
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                 if (!fromUser) return;
                 int valueMs = clamp.applyAsInt(progress * stepMs);
-                prefs.edit().putLong(key, valueMs).apply();
+                prefs.edit().putInt(key, valueMs).apply();
                 if (edit == null) return;
                 String currentValue = edit.getText() == null ? "" : edit.getText().toString();
                 String nextValue = String.valueOf(valueMs);

@@ -38,5 +38,8 @@ Thumbs.db
 *.swp
 *.swo
 
+# Licensed third-party raw assets (CC-BY-NC, not redistributable — see README)
+app/src/main/res/raw/
+
 # Keep the Gradle wrapper executable jar tracked.
 !gradle/wrapper/gradle-wrapper.jar

@@ -57,13 +57,26 @@ public final class UiPrefs {
     }
 
     public static int getOverlayHideDelayMs(SharedPreferences prefs) {
-        long value = prefs.getLong(KEY_OVERLAY_HIDE_DELAY_MS, DEFAULT_OVERLAY_HIDE_DELAY_MS);
-        return clampOverlayHideDelayMs((int) value);
+        return clampOverlayHideDelayMs(
+                readIntMigratingLegacyLong(prefs, KEY_OVERLAY_HIDE_DELAY_MS, DEFAULT_OVERLAY_HIDE_DELAY_MS)
+        );
     }
 
     public static int getOverlayMinShowMs(SharedPreferences prefs) {
-        long value = prefs.getLong(KEY_OVERLAY_MIN_SHOW_MS, DEFAULT_OVERLAY_MIN_SHOW_MS);
-        return clampOverlayMinShowMs((int) value);
+        return clampOverlayMinShowMs(
+                readIntMigratingLegacyLong(prefs, KEY_OVERLAY_MIN_SHOW_MS, DEFAULT_OVERLAY_MIN_SHOW_MS)
+        );
+    }
+
+    // v0.7.1 wrote these keys as Long; later versions use Int. Rewrite on first read.
+    private static int readIntMigratingLegacyLong(SharedPreferences prefs, String key, int defaultValue) {
+        try {
+            return prefs.getInt(key, defaultValue);
+        } catch (ClassCastException legacy) {
+            int value = (int) prefs.getLong(key, defaultValue);
+            prefs.edit().putInt(key, value).apply();
+            return value;
+        }
     }
 
     public static boolean isOverlayOnSignalEnabled(SharedPreferences prefs) {

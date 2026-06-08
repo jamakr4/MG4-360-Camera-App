@@ -53,10 +53,11 @@ public class SignalService extends Service {
     private static final int HAZARD_LIGHTS_SWITCH_PROP_ID = 0x11400e13;
     private static final int REVERSE_GEAR_VALUE = 2;
     private static final String OEM_AVM_PACKAGE = "com.saicmotor.hmi.aroundview";
-    private static final String ACTION_CAMERA_SHOW = "com.saicmotor.360camera.show";
-    private static final String ACTION_CAMERA_CLOSE = "com.saicmotor.360camera.close";
-    private static final String ACTION_OEM_STOP = "com.saicmotor.hmi.aroundview.mod.ACTION_STOP";
-    private static final String ACTION_OEM_START = "com.saicmotor.hmi.aroundview.mod.startAVMActivity";
+    // Broadcasts emitted by AVMActivity in the OEM AVM app (verified via decompiled smali).
+    private static final String ACTION_AVM_START = "com.saicmotor.hmi.aroundview.ACTION_START";
+    private static final String ACTION_AVM_STOP = "com.saicmotor.hmi.aroundview.ACTION_STOP";
+    // Inbound launch trigger to the OEM AVM app — sniffed here only for debugging visibility.
+    private static final String ACTION_OEM_LAUNCH = "com.saicmotor.hmi.aroundview.startAVMActivity";
     public static final String ACTION_ROUTE_CAMERA = "com.drivehub.kamera.ACTION_ROUTE_CAMERA";
     public static final String EXTRA_CAMERA_INDEX = "camera_index";
 
@@ -229,7 +230,7 @@ public class SignalService extends Service {
             int lamp = (valueObj instanceof Integer) ? (Integer) valueObj : Integer.MIN_VALUE;
             currentLamp = lamp;
             // The Car API can be incomplete or fail, so read the gear from the current system property.
-            currentGear = readGearFromSystemProperty();
+            currentGear = readIntSystemProperty("arcsoft.avm.mCurCarGear");
             updateOverlayDecision();
             return null;
         }
@@ -245,31 +246,24 @@ public class SignalService extends Service {
             @Override
             public void run() {
                 if (!polling) return;
-                currentLamp = readTurnLampFromSystemProperty();
-                currentGear = readGearFromSystemProperty();
-                updateOverlayDecision();
-                pollHandler.postDelayed(this, readNextPollingDelayMs());
+                final int lamp = readIntSystemProperty("arcsoft.avm.mCurCarTurnLamp");
+                final int gear = readIntSystemProperty("arcsoft.avm.mCurCarGear");
+                mainHandler.post(() -> {
+                    if (!polling) return;
+                    currentLamp = lamp;
+                    currentGear = gear;
+                    updateOverlayDecision();
+                });
+                pollHandler.postDelayed(this, readNextPollingDelayMs(lamp));
             }
         });
     }
 
-    private int readTurnLampFromSystemProperty() {
+    private int readIntSystemProperty(String key) {
         try {
             Class<?> sp = Class.forName("android.os.SystemProperties");
             Method get = sp.getMethod("get", String.class, String.class);
-            String s = (String) get.invoke(null, "arcsoft.avm.mCurCarTurnLamp", "");
-            if (s == null || s.isEmpty()) return 0;
-            return Integer.parseInt(s);
-        } catch (Throwable t) {
-            return 0;
-        }
-    }
-
-    private int readGearFromSystemProperty() {
-        try {
-            Class<?> sp = Class.forName("android.os.SystemProperties");
-            Method get = sp.getMethod("get", String.class, String.class);
-            String s = (String) get.invoke(null, "arcsoft.avm.mCurCarGear", "");
+            String s = (String) get.invoke(null, key, "");
             if (s == null || s.isEmpty()) return 0;
             return Integer.parseInt(s);
         } catch (Throwable t) {
@@ -463,9 +457,9 @@ public class SignalService extends Service {
         return UiPrefs.getOverlayMinShowMs(sp);
     }
 
-    private int readNextPollingDelayMs() {
+    private int readNextPollingDelayMs(int lamp) {
         SharedPreferences sp = UiPrefs.getPrefs(this);
-        if (currentLamp == 1 || currentLamp == 2) {
+        if (lamp == 1 || lamp == 2) {
             return UiPrefs.getDevSignalOffPollMs(sp);
         }
         return UiPrefs.getDevDefaultPollMs(sp);
@@ -501,7 +495,8 @@ public class SignalService extends Service {
             ActivityManager.RunningTaskInfo t = tasks.get(0);
             if (t.topActivity == null) return false;
             return OEM_AVM_PACKAGE.equals(t.topActivity.getPackageName());
-        } catch (Throwable ignored) {
+        } catch (Throwable t) {
+            Log.w(TAG, "isOemAvmInForeground failed: " + t);
             return false;
         }
     }
@@ -574,10 +569,9 @@ public class SignalService extends Service {
     private void registerDebugBroadcastSniffer() {
         if (debugBroadcastReceiver != null) return;
         IntentFilter filter = new IntentFilter();
-        filter.addAction(ACTION_CAMERA_SHOW);
-        filter.addAction(ACTION_CAMERA_CLOSE);
-        filter.addAction(ACTION_OEM_STOP);
-        filter.addAction(ACTION_OEM_START);
+        filter.addAction(ACTION_AVM_START);
+        filter.addAction(ACTION_AVM_STOP);
+        filter.addAction(ACTION_OEM_LAUNCH);
         debugBroadcastReceiver = new android.content.BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {

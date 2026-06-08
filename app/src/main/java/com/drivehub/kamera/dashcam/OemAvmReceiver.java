@@ -11,9 +11,10 @@ import android.util.Log;
 public class OemAvmReceiver extends BroadcastReceiver {
     private static final String TAG = "OemAvmReceiver";
 
-    private static final String ACTION_CAMERA_SHOW = "com.saicmotor.360camera.show";
-    private static final String ACTION_CAMERA_CLOSE = "com.saicmotor.360camera.close";
-    private static final String ACTION_OEM_STOP = "com.saicmotor.hmi.aroundview.mod.ACTION_STOP";
+    // Action constants fired by the OEM AVM app (com.saicmotor.hmi.aroundview).
+    // Verified from decompiled smali of AVMActivity (ACTION_360_START / ACTION_360_STOP fields).
+    private static final String ACTION_AVM_START = "com.saicmotor.hmi.aroundview.ACTION_START";
+    private static final String ACTION_AVM_STOP = "com.saicmotor.hmi.aroundview.ACTION_STOP";
 
     @Override
     public void onReceive(Context context, Intent intent) {
@@ -25,14 +26,14 @@ public class OemAvmReceiver extends BroadcastReceiver {
             return;
         }
         DevRuntimeLog.add("OemAvmReceiver", "received " + action);
-        if (ACTION_CAMERA_SHOW.equals(action)) {
-            Log.i(TAG, "OEM AVM show request received");
+        if (ACTION_AVM_START.equals(action)) {
+            Log.i(TAG, "OEM AVM start received");
             SignalService.setOemAvmActive(context, true);
             RecordingService.pauseForOemRequest(context);
             return;
         }
-        if (ACTION_CAMERA_CLOSE.equals(action) || ACTION_OEM_STOP.equals(action)) {
-            Log.i(TAG, "OEM AVM close/stop received: " + action);
+        if (ACTION_AVM_STOP.equals(action)) {
+            Log.i(TAG, "OEM AVM stop received");
             SignalService.setOemAvmActive(context, false);
             RecordingService.resumeAfterOemRequest(context);
         }

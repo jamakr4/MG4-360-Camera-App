@@ -102,6 +102,11 @@
         <item name="android:lineSpacingExtra">5dp</item>
     </style>
 
+    <style name="DrivehubSettingsCreditsBody" parent="@style/DrivehubSettingsBody">
+        <item name="android:textSize">16sp</item>
+        <item name="android:lineSpacingExtra">5dp</item>
+    </style>
+
     <!-- Secondary explanatory text under controls or in status rows. -->
     <style name="DrivehubSettingsBodyMuted" parent="">
         <item name="android:textColor">@color/settings_text_secondary</item>

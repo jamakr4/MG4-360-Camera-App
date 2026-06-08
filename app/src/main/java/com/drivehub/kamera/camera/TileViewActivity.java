@@ -17,19 +17,19 @@ import com.google.android.material.card.MaterialCardView;
 
 public class TileViewActivity extends AppCompatActivity {
 
-    private static final int[] SURFACE_IDS   = {R.id.sfFront, R.id.sfRight, R.id.sfLeft, R.id.sfRear};
-    private static final int[] TILE_IDS      = {R.id.tileFront, R.id.tileRight, R.id.tileLeft, R.id.tileRear};
-    private static final int[] CAMERA_INDICES = {15, 14, 16, 17};
+    private static final int[] SURFACE_IDS = { R.id.sfFront, R.id.sfRight, R.id.sfLeft, R.id.sfRear };
+    private static final int[] TILE_IDS = { R.id.tileFront, R.id.tileRight, R.id.tileLeft, R.id.tileRear };
+    private static final int[] CAMERA_INDICES = { 15, 14, 16, 17 };
 
-    private final SurfaceHolder[]          holders   = new SurfaceHolder[4];
+    private final SurfaceHolder[] holders = new SurfaceHolder[4];
     private final SurfaceHolder.Callback[] callbacks = new SurfaceHolder.Callback[4];
     private android.content.SharedPreferences prefs;
-    private final android.content.SharedPreferences.OnSharedPreferenceChangeListener prefListener =
-            (sharedPreferences, key) -> {
-                if (UiPrefs.KEY_TILE_CORNER_RADIUS.equals(key)) {
-                    applyCornerRadius();
-                }
-            };
+    private final android.content.SharedPreferences.OnSharedPreferenceChangeListener prefListener = (sharedPreferences,
+            key) -> {
+        if (UiPrefs.KEY_TILE_CORNER_RADIUS.equals(key)) {
+            applyCornerRadius();
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -52,7 +52,8 @@ public class TileViewActivity extends AppCompatActivity {
                 }
 
                 @Override
-                public void surfaceChanged(SurfaceHolder h, int format, int w, int h2) {}
+                public void surfaceChanged(SurfaceHolder h, int format, int w, int h2) {
+                }
 
                 @Override
                 public void surfaceDestroyed(SurfaceHolder h) {
@@ -98,13 +99,11 @@ public class TileViewActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        for (int cameraIndex : CAMERA_INDICES) {
-            CameraProbe.detachPreview(cameraIndex);
-        }
         for (int i = 0; i < holders.length; i++) {
             if (holders[i] != null && callbacks[i] != null) {
                 holders[i].removeCallback(callbacks[i]);
             }
         }
+        CameraProbe.detachAllPreviews();
     }
 }

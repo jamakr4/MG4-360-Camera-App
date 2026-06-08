@@ -11,6 +11,7 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.text.Editable;
+import android.util.Log;
 import android.widget.EditText;
 import android.widget.SeekBar;
 import android.widget.Switch;
@@ -23,9 +24,10 @@ import java.io.File;
 
 public final class DashcamSettingsController {
 
+    private static final String TAG = "DashcamSettings";
     public static final String KEY_ENABLED = "enabled";
     public static final int DEFAULT_SEGMENT_SEC = 30;
-    public static final int DEFAULT_TOTAL_RETENTION_MIN = 5;
+    public static final int DEFAULT_RETENTION_CLIP_COUNT = 10;
     private static final String KEY_RECORDS_PATH = "recordsPath";
     private static final String KEY_RECORDING_FPS = "recordingFps";
     private static final String KEY_SIGNATURE = "recordingSignature";
@@ -238,8 +240,9 @@ public final class DashcamSettingsController {
         SharedPreferences prefs = UiPrefs.getPrefs(context);
         String customPath = getConfiguredRecordsPath(prefs);
         File dir = customPath.isEmpty() ? getDefaultRecordsBaseDir() : new File(customPath);
-        // noinspection ResultOfMethodCallIgnored
-        dir.mkdirs();
+        if (!dir.mkdirs() && !dir.exists()) {
+            Log.w(TAG, "Failed to create records dir: " + dir.getAbsolutePath());
+        }
         return dir;
     }
 

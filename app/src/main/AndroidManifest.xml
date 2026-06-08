@@ -78,9 +78,8 @@
             android:enabled="true"
             android:exported="true">
             <intent-filter>
-                <action android:name="com.saicmotor.360camera.show" />
-                <action android:name="com.saicmotor.360camera.close" />
-                <action android:name="com.saicmotor.hmi.aroundview.mod.ACTION_STOP" />
+                <action android:name="com.saicmotor.hmi.aroundview.ACTION_START" />
+                <action android:name="com.saicmotor.hmi.aroundview.ACTION_STOP" />
             </intent-filter>
         </receiver>
 

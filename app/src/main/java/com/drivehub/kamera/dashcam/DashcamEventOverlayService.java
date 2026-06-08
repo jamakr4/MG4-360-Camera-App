@@ -6,12 +6,15 @@ import com.drivehub.kamera.settings.UiPrefs;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
-import android.media.AudioManager;
-import android.media.ToneGenerator;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.content.res.AssetFileDescriptor;
 import android.graphics.PixelFormat;
+import android.media.AudioAttributes;
+import android.media.AudioFocusRequest;
+import android.media.AudioManager;
+import android.media.MediaPlayer;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
@@ -31,7 +34,6 @@ public class DashcamEventOverlayService extends Service {
     private static final String EXTRA_TITLE_RES_ID = "title_res_id";
     private static final String EXTRA_SUBTITLE_RES_ID = "subtitle_res_id";
     private static final String EXTRA_NOTIFICATION_TEXT_RES_ID = "notification_text_res_id";
-    private static final String EXTRA_PLAY_CONFIRMATION_TONE = "play_confirmation_tone";
 
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final Runnable hideRunnable = this::stopSelf;
@@ -40,6 +42,12 @@ public class DashcamEventOverlayService extends Service {
     private View overlayView;
     private android.widget.TextView titleView;
     private android.widget.TextView subtitleView;
+    private MediaPlayer bannerTonePlayer;
+    private AudioManager audioManager;
+    private AudioFocusRequest bannerToneFocusRequest;
+    private final AudioManager.OnAudioFocusChangeListener bannerToneFocusListener = focusChange -> {
+        // Transient ducking — nothing to react to here.
+    };
 
     // Show the standard dashcam event confirmation banner using string resources.
     public static void showConfirmation(Context context) {
@@ -47,8 +55,7 @@ public class DashcamEventOverlayService extends Service {
                 context,
                 R.string.dashcam_event_overlay_title,
                 R.string.dashcam_event_overlay_subtitle,
-                R.string.notification_dashcam_event_overlay_text,
-                true);
+                R.string.notification_dashcam_event_overlay_text);
     }
 
     // Show the OEM pause banner when recording must pause while the OEM app is
@@ -58,8 +65,7 @@ public class DashcamEventOverlayService extends Service {
                 context,
                 R.string.dashcam_oem_pause_overlay_title,
                 R.string.dashcam_oem_pause_overlay_subtitle,
-                R.string.notification_dashcam_oem_pause_overlay_text,
-                false);
+                R.string.notification_dashcam_oem_pause_overlay_text);
     }
 
     public static void showOemResume(Context context) {
@@ -67,8 +73,7 @@ public class DashcamEventOverlayService extends Service {
                 context,
                 R.string.dashcam_oem_resume_overlay_title,
                 R.string.dashcam_oem_resume_overlay_subtitle,
-                R.string.notification_dashcam_oem_resume_overlay_text,
-                false);
+                R.string.notification_dashcam_oem_resume_overlay_text);
     }
 
     public static void showRecordingError(Context context, int subtitleResId, int notificationTextResId) {
@@ -76,8 +81,7 @@ public class DashcamEventOverlayService extends Service {
                 context,
                 R.string.dashcam_recording_error_overlay_title,
                 subtitleResId,
-                notificationTextResId,
-                false);
+                notificationTextResId);
     }
 
     public static void showRecordingRecovered(Context context) {
@@ -85,21 +89,18 @@ public class DashcamEventOverlayService extends Service {
                 context,
                 R.string.dashcam_recording_recovered_overlay_title,
                 R.string.dashcam_recording_recovered_overlay_subtitle,
-                R.string.notification_dashcam_recording_recovered_text,
-                false);
+                R.string.notification_dashcam_recording_recovered_text);
     }
 
     private static void showBanner(
             Context context,
             int titleResId,
             int subtitleResId,
-            int notificationTextResId,
-            boolean playConfirmationTone) {
+            int notificationTextResId) {
         Intent intent = new Intent(context, DashcamEventOverlayService.class);
         intent.putExtra(EXTRA_TITLE_RES_ID, titleResId);
         intent.putExtra(EXTRA_SUBTITLE_RES_ID, subtitleResId);
         intent.putExtra(EXTRA_NOTIFICATION_TEXT_RES_ID, notificationTextResId);
-        intent.putExtra(EXTRA_PLAY_CONFIRMATION_TONE, playConfirmationTone);
         context.startForegroundService(intent);
     }
 
@@ -121,8 +122,6 @@ public class DashcamEventOverlayService extends Service {
         int notificationTextResId = intent != null
                 ? intent.getIntExtra(EXTRA_NOTIFICATION_TEXT_RES_ID, R.string.notification_dashcam_event_overlay_text)
                 : R.string.notification_dashcam_event_overlay_text;
-        boolean playConfirmationTone = intent != null
-                && intent.getBooleanExtra(EXTRA_PLAY_CONFIRMATION_TONE, false);
         Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.ic_menu_camera)
                 .setContentTitle(getString(R.string.app_name))
@@ -136,23 +135,97 @@ public class DashcamEventOverlayService extends Service {
             showOverlayWindow();
         }
         bindText(titleResId, subtitleResId);
-        if (playConfirmationTone) {
-            playConfirmationTone();
-        }
+        playBannerToneIfEnabled();
         mainHandler.removeCallbacks(hideRunnable);
         mainHandler.postDelayed(hideRunnable, AUTO_HIDE_MS);
         return START_NOT_STICKY;
     }
 
-    //When saving Event --> Audio indicator
-    private void playConfirmationTone() {
-        try {
-            int volume = DashcamSettingsController.getEventConfirmationToneVolume(UiPrefs.getPrefs(this));
-            ToneGenerator toneGenerator = new ToneGenerator(AudioManager.STREAM_NOTIFICATION, volume);
-            toneGenerator.startTone(ToneGenerator.TONE_PROP_ACK, 180);
-            mainHandler.postDelayed(toneGenerator::release, 300L);
-        } catch (Throwable ignored) {
+    private void playBannerToneIfEnabled() {
+        if (!DashcamSettingsController.shouldPlayEventConfirmationTone(UiPrefs.getPrefs(this))) {
+            return;
         }
+        releaseBannerTone();
+
+        AudioAttributes attributes = new AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build();
+
+        if (audioManager == null) {
+            audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+        }
+        if (audioManager == null) {
+            return;
+        }
+        if (!requestBannerToneFocus(attributes)) {
+            return;
+        }
+
+        MediaPlayer player = new MediaPlayer();
+        try (AssetFileDescriptor afd =
+                     getResources().openRawResourceFd(R.raw.notification_sound_7062_henrycena82595)) {
+            if (afd == null) {
+                player.release();
+                abandonBannerToneFocus();
+                return;
+            }
+            player.setAudioAttributes(attributes);
+            player.setDataSource(afd.getFileDescriptor(), afd.getStartOffset(), afd.getLength());
+            float volume =
+                    DashcamSettingsController.getEventConfirmationToneVolume(UiPrefs.getPrefs(this)) / 100f;
+            player.setVolume(volume, volume);
+            player.setOnCompletionListener(mp -> releaseBannerTone());
+            player.setOnErrorListener((mp, what, extra) -> {
+                releaseBannerTone();
+                return true;
+            });
+            player.prepare();
+            player.start();
+            bannerTonePlayer = player;
+        } catch (Throwable t) {
+            try {
+                player.release();
+            } catch (Throwable ignored) {
+            }
+            abandonBannerToneFocus();
+        }
+    }
+
+    private boolean requestBannerToneFocus(AudioAttributes attributes) {
+        bannerToneFocusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
+                .setAudioAttributes(attributes)
+                .setOnAudioFocusChangeListener(bannerToneFocusListener)
+                .setWillPauseWhenDucked(false)
+                .build();
+        int result = audioManager.requestAudioFocus(bannerToneFocusRequest);
+        if (result != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
+            bannerToneFocusRequest = null;
+            return false;
+        }
+        return true;
+    }
+
+    private void abandonBannerToneFocus() {
+        if (audioManager != null && bannerToneFocusRequest != null) {
+            audioManager.abandonAudioFocusRequest(bannerToneFocusRequest);
+        }
+        bannerToneFocusRequest = null;
+    }
+
+    private void releaseBannerTone() {
+        if (bannerTonePlayer != null) {
+            try {
+                bannerTonePlayer.reset();
+            } catch (Throwable ignored) {
+            }
+            try {
+                bannerTonePlayer.release();
+            } catch (Throwable ignored) {
+            }
+            bannerTonePlayer = null;
+        }
+        abandonBannerToneFocus();
     }
 
     private void showOverlayWindow() {
@@ -191,7 +264,9 @@ public class DashcamEventOverlayService extends Service {
 
     @Override
     public void onDestroy() {
+        super.onDestroy();
         mainHandler.removeCallbacks(hideRunnable);
+        releaseBannerTone();
         if (windowManager != null && overlayView != null) {
             windowManager.removeView(overlayView);
         }
@@ -199,7 +274,6 @@ public class DashcamEventOverlayService extends Service {
         titleView = null;
         subtitleView = null;
         stopForeground(true);
-        super.onDestroy();
     }
 
     private void createNotificationChannel() {

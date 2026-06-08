@@ -9,6 +9,8 @@ import android.content.Intent;
 import android.util.Log;
 
 public class BootReceiver extends BroadcastReceiver {
+    private static final String TAG = "BootReceiver";
+
     @Override
     public void onReceive(Context context, Intent intent) {
         if (intent == null || intent.getAction() == null)
@@ -16,14 +18,16 @@ public class BootReceiver extends BroadcastReceiver {
         if (!Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction()))
             return;
 
-        RecordingService.startIfDashcamEnabled(context);
+        try {
+            RecordingService.startIfDashcamEnabled(context);
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to start RecordingService on boot", e);
+        }
 
-        // SignalService startup binds the Car API and may fall back to polling — guard
-        // so a binding failure surfaces in logcat instead of crashing the boot receiver.
         try {
             SignalService.start(context);
         } catch (Exception e) {
-            Log.w("BootReceiver", "Failed to start SignalService on boot", e);
+            Log.w(TAG, "Failed to start SignalService on boot", e);
         }
     }
 }

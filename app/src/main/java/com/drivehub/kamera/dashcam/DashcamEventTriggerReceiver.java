@@ -1,5 +1,6 @@
 package com.drivehub.kamera.dashcam;
 
+import com.drivehub.kamera.R;
 import com.drivehub.kamera.dev.DevRuntimeLog;
 import com.drivehub.kamera.settings.UiPrefs;
 
@@ -27,7 +28,7 @@ public class DashcamEventTriggerReceiver extends BroadcastReceiver {
             DevRuntimeLog.add(
                     "DashcamEventTriggerReceiver",
                     "external trigger ignored: dashcam disabled or not running");
-            Toast.makeText(context, "Dashcam ist nicht aktiv", Toast.LENGTH_SHORT).show();
+            Toast.makeText(context, R.string.dashcam_external_trigger_inactive, Toast.LENGTH_SHORT).show();
             return;
         }
 

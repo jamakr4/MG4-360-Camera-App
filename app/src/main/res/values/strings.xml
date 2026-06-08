@@ -17,7 +17,7 @@
     <string name="settings_dashcam_fps">Recording FPS</string>
     <string name="settings_dashcam_signature">Signature</string>
     <string name="settings_dashcam_show_speed">Show speed in video</string>
-    <string name="settings_dashcam_event_confirmation_tone">Play confirmation tone for saved events</string>
+    <string name="settings_dashcam_event_confirmation_tone">Play notification sound for dashcam notifications</string>
     <string name="settings_dashcam_event_confirmation_tone_volume_default_input">80</string>
     <string name="settings_dashcam_event_confirmation_tone_volume_min">0%</string>
     <string name="settings_dashcam_event_confirmation_tone_volume_max">100%</string>
@@ -33,6 +33,9 @@
     <string name="show_safety_warning">Show safety warning</string>
     <string name="settings_section_open_source_credits">Open source</string>
     <string name="settings_section_additional_credits">Additional credits</string>
+    <string name="settings_credits_open_source_body">- OpenCV 4.9.0 (opencv.org) - Apache License 2.0&#10;- AndroidX AppCompat 1.7.1 - Apache License 2.0&#10;- AndroidX Activity 1.12.4 - Apache License 2.0&#10;- AndroidX ConstraintLayout 2.2.1 - Apache License 2.0&#10;- Material Components for Android 1.13.0 - Apache License 2.0&#10;- Icons based on Google Material Symbols - Apache License 2.0</string>
+    <string name="settings_credits_additional_body">- Thanks to the community from XDA Forums - MG4 Electric AAOS 9&#10;- Thanks to merth4n for providing the base application</string>
+    <string name="settings_credits_sound_body">Sound attribution&#10;notification-sound-7062 by HenryCena82595&#10;https://freesound.org/s/731783/&#10;License: Attribution NonCommercial 4.0</string>
     <string name="settings_dev_polling_rates">Polling rates</string>
     <string name="settings_dev_default_poll">Default polling (ms)</string>
     <string name="settings_dev_signal_off_poll">Signal-off detection (ms)</string>
@@ -116,6 +119,7 @@
     <string name="main_button_record_test_30s">Record 30s Test</string>
     <string name="main_button_record_test_running">Recording 30s…</string>
     <string name="main_event_save_requires_dashcam">Enable dashcam recording first</string>
+    <string name="dashcam_external_trigger_inactive">Dashcam is not active</string>
     <string name="main_recording_indicator">%1$d/%2$d</string>
     <string name="main_recording_starting">REC starting</string>
     <string name="main_recording_paused_oem">REC paused (OEM launch)</string>
