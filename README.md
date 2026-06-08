@@ -9,6 +9,9 @@ Community mod for the MG4 EV (AAOS 9, pre-2026 facelift) that improves the 360°
 
 > **Work in progress.** Check the [Wiki](https://github.com/jamakr4/MG4-360-Camera-App/wiki) for technical details and the [Project Board](https://github.com/users/jamakr4/projects/4) for current progress.
 
+
+![MG4 360 Camera App](images/PXL_20260603_192645923.jpg)
+
 ## Setup OEM SAIC 360Cam App
 
 To avoid conflicts with the modified turn signal camera behavior in this app, it is recommended to disable the original turn signal camera popups inside the OEM SAIC 360 camera app.
