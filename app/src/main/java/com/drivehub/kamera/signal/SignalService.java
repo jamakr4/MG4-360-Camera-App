@@ -58,6 +58,12 @@ public class SignalService extends Service {
     private static final String ACTION_AVM_STOP = "com.saicmotor.hmi.aroundview.ACTION_STOP";
     // Inbound launch trigger to the OEM AVM app — sniffed here only for debugging visibility.
     private static final String ACTION_OEM_LAUNCH = "com.saicmotor.hmi.aroundview.startAVMActivity";
+    // AVMActivity writes its lifecycle to this sysprop. "Start" is set in onCreate BEFORE
+    // V4l2_Init claims the cameras — our earliest reliable warning that we must release them.
+    private static final String OEM_LIFECYCLE_PROP = "arcsoft.avm.ActivityLifecycle";
+    private static final String OEM_LIFECYCLE_START = "Start";
+    private static final String OEM_LIFECYCLE_DESTROYED = "DestroyEnd";
+    private static final long OEM_LIFECYCLE_POLL_MS = 75L;
     public static final String ACTION_ROUTE_CAMERA = "com.drivehub.kamera.ACTION_ROUTE_CAMERA";
     public static final String EXTRA_CAMERA_INDEX = "camera_index";
 
@@ -71,10 +77,15 @@ public class SignalService extends Service {
     private HandlerThread pollThread;
     private Handler pollHandler;
     private volatile boolean polling;
+    private HandlerThread oemLifecycleThread;
+    private Handler oemLifecycleHandler;
+    private volatile boolean oemLifecycleMonitoring;
+    private volatile String lastOemLifecycle = "";
     private int lastLamp = Integer.MIN_VALUE;
     private int currentLamp = 0;
     private int currentGear = 0;
     private int currentMode = -1; // -1:init, 0:none, 1:left, 2:right, 3:reverse
+    private boolean lastObservedOemForeground = false;
     private volatile long overlayShownAtMs = 0L;
     private volatile long lastHazardTriggerAtMs = 0L;
 
@@ -180,6 +191,7 @@ public class SignalService extends Service {
             Log.w(TAG, "Car API listener acilamadi, system property polling fallback.");
             startPropertyPollingFallback();
         }
+        startOemLifecycleMonitor();
         return START_STICKY;
     }
 
@@ -231,6 +243,7 @@ public class SignalService extends Service {
             currentLamp = lamp;
             // The Car API can be incomplete or fail, so read the gear from the current system property.
             currentGear = readIntSystemProperty("arcsoft.avm.mCurCarGear");
+            reconcileOemAvmState();
             updateOverlayDecision();
             return null;
         }
@@ -252,6 +265,7 @@ public class SignalService extends Service {
                     if (!polling) return;
                     currentLamp = lamp;
                     currentGear = gear;
+                    reconcileOemAvmState();
                     updateOverlayDecision();
                 });
                 pollHandler.postDelayed(this, readNextPollingDelayMs(lamp));
@@ -268,6 +282,50 @@ public class SignalService extends Service {
             return Integer.parseInt(s);
         } catch (Throwable t) {
             return 0;
+        }
+    }
+
+    private String readStringSystemProperty(String key) {
+        try {
+            Class<?> sp = Class.forName("android.os.SystemProperties");
+            Method get = sp.getMethod("get", String.class, String.class);
+            String s = (String) get.invoke(null, key, "");
+            return s == null ? "" : s;
+        } catch (Throwable t) {
+            return "";
+        }
+    }
+
+    private void startOemLifecycleMonitor() {
+        if (oemLifecycleThread != null) return;
+        oemLifecycleThread = new HandlerThread("OemAvmLifecycleMonitor");
+        oemLifecycleThread.start();
+        oemLifecycleHandler = new Handler(oemLifecycleThread.getLooper());
+        oemLifecycleMonitoring = true;
+        lastOemLifecycle = readStringSystemProperty(OEM_LIFECYCLE_PROP);
+        oemLifecycleHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                if (!oemLifecycleMonitoring) return;
+                String state = readStringSystemProperty(OEM_LIFECYCLE_PROP);
+                if (!state.equals(lastOemLifecycle)) {
+                    String prev = lastOemLifecycle;
+                    lastOemLifecycle = state;
+                    mainHandler.post(() -> onOemLifecycleChanged(prev, state));
+                }
+                oemLifecycleHandler.postDelayed(this, OEM_LIFECYCLE_POLL_MS);
+            }
+        });
+    }
+
+    private void onOemLifecycleChanged(String prev, String next) {
+        DevRuntimeLog.add("SignalService", "OEM lifecycle: '" + prev + "' => '" + next + "'");
+        if (OEM_LIFECYCLE_START.equals(next)) {
+            setOemAvmActive(this, true);
+            RecordingService.pauseForOemRequest(this);
+        } else if (OEM_LIFECYCLE_DESTROYED.equals(next)) {
+            setOemAvmActive(this, false);
+            RecordingService.resumeAfterOemRequest(this);
         }
     }
 
@@ -509,6 +567,28 @@ public class SignalService extends Service {
         }
     }
 
+    private void reconcileOemAvmState() {
+        boolean foreground = isOemAvmInForeground();
+        boolean latched = isOemAvmLatchedActive();
+
+        if (foreground) {
+            lastObservedOemForeground = true;
+            if (!latched) {
+                DevRuntimeLog.add("SignalService", "OEM foreground fallback => pause");
+                setOemAvmActive(this, true);
+                RecordingService.pauseForOemRequest(this);
+            }
+            return;
+        }
+
+        if (lastObservedOemForeground && latched) {
+            DevRuntimeLog.add("SignalService", "OEM foreground fallback => resume");
+            setOemAvmActive(this, false);
+            RecordingService.resumeAfterOemRequest(this);
+        }
+        lastObservedOemForeground = false;
+    }
+
 
     @Override
     public void onDestroy() {
@@ -544,6 +624,14 @@ public class SignalService extends Service {
         if (pollThread != null) {
             pollThread.quitSafely();
             pollThread = null;
+        }
+        oemLifecycleMonitoring = false;
+        if (oemLifecycleHandler != null) {
+            oemLifecycleHandler.removeCallbacksAndMessages(null);
+        }
+        if (oemLifecycleThread != null) {
+            oemLifecycleThread.quitSafely();
+            oemLifecycleThread = null;
         }
         mainHandler.removeCallbacks(hideRunnable);
         OverlayService.hideOverlay(this);

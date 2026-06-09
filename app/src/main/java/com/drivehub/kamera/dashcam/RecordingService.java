@@ -199,6 +199,14 @@ public class RecordingService extends Service {
             boolean changed = !oemPauseRequested;
             oemPauseRequested = true;
             segmentStopRequested = true;
+            // The worker sleeps in 200 ms ticks inside recordClip; interrupt wakes it instantly
+            // so stopCombinedMp4Record runs before AVM's V4l2_Init hits "Device or resource busy".
+            synchronized (stateLock) {
+                stateLock.notifyAll();
+            }
+            if (worker != null) {
+                worker.interrupt();
+            }
             if (enabled) {
                 if (worker == null) {
                     stopRequested = false;

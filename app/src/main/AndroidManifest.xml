@@ -78,6 +78,7 @@
             android:enabled="true"
             android:exported="true">
             <intent-filter>
+                <action android:name="com.saicmotor.hmi.aroundview.startAVMActivity" />
                 <action android:name="com.saicmotor.hmi.aroundview.ACTION_START" />
                 <action android:name="com.saicmotor.hmi.aroundview.ACTION_STOP" />
             </intent-filter>

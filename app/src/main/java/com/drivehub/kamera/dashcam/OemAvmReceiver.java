@@ -10,9 +10,12 @@ import android.util.Log;
 
 public class OemAvmReceiver extends BroadcastReceiver {
     private static final String TAG = "OemAvmReceiver";
+    private static final String EXTRA_START_MESSAGE = "com.saicmotor.hmi.aroundview.startAVMActivityMsg";
 
     // Action constants fired by the OEM AVM app (com.saicmotor.hmi.aroundview).
     // Verified from decompiled smali of AVMActivity (ACTION_360_START / ACTION_360_STOP fields).
+    // Some variants also use the exported pre-launch broadcast below before AVMActivity becomes visible.
+    private static final String ACTION_OEM_LAUNCH = "com.saicmotor.hmi.aroundview.startAVMActivity";
     private static final String ACTION_AVM_START = "com.saicmotor.hmi.aroundview.ACTION_START";
     private static final String ACTION_AVM_STOP = "com.saicmotor.hmi.aroundview.ACTION_STOP";
 
@@ -25,9 +28,11 @@ public class OemAvmReceiver extends BroadcastReceiver {
         if (action == null) {
             return;
         }
-        DevRuntimeLog.add("OemAvmReceiver", "received " + action);
-        if (ACTION_AVM_START.equals(action)) {
-            Log.i(TAG, "OEM AVM start received");
+        int startMessage = intent.getIntExtra(EXTRA_START_MESSAGE, Integer.MIN_VALUE);
+        DevRuntimeLog.add("OemAvmReceiver", "received " + action
+                + (startMessage == Integer.MIN_VALUE ? "" : " msg=" + startMessage));
+        if (ACTION_OEM_LAUNCH.equals(action) || ACTION_AVM_START.equals(action)) {
+            Log.i(TAG, "OEM AVM start/launch received: " + action);
             SignalService.setOemAvmActive(context, true);
             RecordingService.pauseForOemRequest(context);
             return;
