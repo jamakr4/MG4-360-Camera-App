@@ -68,6 +68,13 @@
         <item name="android:focusable">false</item>
     </style>
 
+    <style name="DrivehubSettingsBannerSlider" parent="@style/DrivehubSettingsSlider">
+        <item name="android:paddingLeft">0dp</item>
+        <item name="android:paddingRight">0dp</item>
+        <item name="android:paddingStart">0dp</item>
+        <item name="android:paddingEnd">0dp</item>
+    </style>
+
     <!-- Shared compact numeric value next to sliders in settings. -->
     <style name="DrivehubSettingsSliderValue" parent="">
         <item name="android:layout_width">72dp</item>
@@ -135,6 +142,21 @@
         <item name="android:textSize">18sp</item>
     </style>
 
+    <style name="DrivehubSettingsBannerTitle" parent="">
+        <item name="android:textColor">@color/settings_text_highlight</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="DrivehubSettingsBannerValue" parent="">
+        <item name="android:layout_width">44dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:gravity">end|center_vertical</item>
+        <item name="android:textColor">@color/settings_text_secondary</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
     <!-- Version label shown at the bottom of the dialog. -->
     <style name="DrivehubSettingsFooterVersion" parent="">
         <item name="android:textColor">@color/settings_text_muted</item>
@@ -196,5 +218,43 @@
         <item name="android:textColor">@color/settings_text_secondary</item>
         <item name="android:textSize">16sp</item>
         <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="DrivehubSettingsSegmentGroup" parent="">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">38dp</item>
+        <item name="android:layout_marginStart">4dp</item>
+        <item name="android:background">@drawable/bg_settings_segment_group</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:orientation">horizontal</item>
+        <item name="android:padding">2dp</item>
+    </style>
+
+    <style name="DrivehubSettingsSegmentItem" parent="">
+        <item name="android:layout_width">40dp</item>
+        <item name="android:layout_height">34dp</item>
+        <item name="android:gravity">center</item>
+        <item name="android:textColor">@color/settings_segment_text</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+    </style>
+
+    <style name="DrivehubSettingsBannerTestButton" parent="@style/DrivehubDialogButtonSecondary">
+        <item name="android:background">@drawable/bg_settings_banner_test_button</item>
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:minHeight">0dp</item>
+        <item name="android:paddingLeft">12dp</item>
+        <item name="android:paddingTop">4dp</item>
+        <item name="android:paddingRight">12dp</item>
+        <item name="android:paddingBottom">4dp</item>
+        <item name="android:textColor">@color/settings_text_primary</item>
+        <item name="android:textSize">11sp</item>
+        <item name="android:textStyle">normal</item>
+        <item name="android:textFontWeight">500</item>
+        <item name="android:textAllCaps">false</item>
     </style>
 </resources>

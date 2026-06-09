@@ -3,6 +3,7 @@ package com.drivehub.kamera.dashcam;
 import com.drivehub.kamera.R;
 
 import com.drivehub.kamera.MainActivity;
+import com.drivehub.kamera.settings.SegmentedControl;
 import com.drivehub.kamera.settings.SimpleTextWatcher;
 import com.drivehub.kamera.settings.UiPrefs;
 
@@ -10,11 +11,15 @@ import android.Manifest;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.Editable;
 import android.util.Log;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.SeekBar;
 import android.widget.Switch;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.core.app.ActivityCompat;
@@ -32,17 +37,68 @@ public final class DashcamSettingsController {
     private static final String KEY_RECORDING_FPS = "recordingFps";
     private static final String KEY_SIGNATURE = "recordingSignature";
     private static final String KEY_SHOW_SPEED = "recordingShowSpeed";
-    private static final String KEY_EVENT_CONFIRMATION_TONE = "eventConfirmationTone";
-    private static final String KEY_EVENT_CONFIRMATION_TONE_VOLUME = "eventConfirmationToneVolume";
     private static final int REQ_STORAGE = 1337;
     private static final int DEFAULT_RECORDING_FPS = 25;
     private static final int MIN_RECORDING_FPS = 1;
     private static final int MAX_RECORDING_FPS = 60;
-    private static final int DEFAULT_EVENT_CONFIRMATION_TONE_VOLUME = 80;
     private static final int MAX_SIGNATURE_LENGTH = 40;
     private static final String RECORDS_DIR_NAME = "dashcam";
 
+    // ---------- Banner group settings ----------
+    public static final int BANNER_SIZE_SMALL = 0;
+    public static final int BANNER_SIZE_MEDIUM = 1;
+    public static final int BANNER_SIZE_LARGE = 2;
+    private static final int DEFAULT_BANNER_SIZE = BANNER_SIZE_SMALL;
+    private static final int DEFAULT_BANNER_VOLUME = 80;
+    // Delay between the two banners when testing a paired group (Pause→Resume, Error→Recovered).
+    private static final long PAIRED_TEST_DELAY_MS = 2_000L;
+
+    public enum BannerGroup {
+        EVENT("banner_event"),
+        PAUSE_RESUME("banner_pause_resume"),
+        ERROR_RECOVERED("banner_error_recovered");
+
+        final String prefix;
+
+        BannerGroup(String prefix) {
+            this.prefix = prefix;
+        }
+
+        String enabledKey() {
+            return prefix + "_enabled";
+        }
+
+        String sizeKey() {
+            return prefix + "_size";
+        }
+
+        String volumeKey() {
+            return prefix + "_volume";
+        }
+    }
+
+    // Bundle of UI views per banner group (toggle, S/M/L segmented control, volume slider, test
+    // button). The segmented control's children must be ordered S, M, L — the child index maps
+    // directly to BANNER_SIZE_SMALL/MEDIUM/LARGE.
+    public static final class BannerGroupViews {
+        public final Switch toggle;
+        public final SegmentedControl sizeGroup;
+        public final SeekBar volumeSeek;
+        public final TextView volumeValue;
+        public final Button testButton;
+
+        public BannerGroupViews(Switch toggle, SegmentedControl sizeGroup,
+                SeekBar volumeSeek, TextView volumeValue, Button testButton) {
+            this.toggle = toggle;
+            this.sizeGroup = sizeGroup;
+            this.volumeSeek = volumeSeek;
+            this.volumeValue = volumeValue;
+            this.testButton = testButton;
+        }
+    }
+
     private final MainActivity activity;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private boolean syncingEnabled;
 
     public DashcamSettingsController(MainActivity activity) {
@@ -55,12 +111,11 @@ public final class DashcamSettingsController {
             EditText etRecordingFps,
             EditText etSignature,
             Switch swShowSpeed,
-            Switch swEventConfirmationTone,
-            SeekBar seekEventToneVolume,
-            EditText etEventToneVolumeValue) {
+            BannerGroupViews eventBanner,
+            BannerGroupViews pauseResumeBanner,
+            BannerGroupViews errorRecoveredBanner) {
         int recordingFps = getRecordingFps(prefs);
         String signature = getRecordingSignature(prefs);
-        int eventToneVolume = getEventConfirmationToneVolume(prefs);
 
         if (swEnabled != null) {
             syncingEnabled = true;
@@ -100,32 +155,47 @@ public final class DashcamSettingsController {
             swShowSpeed.setOnCheckedChangeListener(
                     (buttonView, checked) -> prefs.edit().putBoolean(KEY_SHOW_SPEED, checked).apply());
         }
-        if (swEventConfirmationTone != null) {
-            swEventConfirmationTone.setChecked(shouldPlayEventConfirmationTone(prefs));
-            swEventConfirmationTone.setOnCheckedChangeListener(
-                    (buttonView, checked) -> prefs.edit().putBoolean(KEY_EVENT_CONFIRMATION_TONE, checked).apply());
-        }
-        bindEventToneVolume(prefs, seekEventToneVolume, etEventToneVolumeValue, eventToneVolume);
+
+        bindBannerGroup(prefs, BannerGroup.EVENT, eventBanner);
+        bindBannerGroup(prefs, BannerGroup.PAUSE_RESUME, pauseResumeBanner);
+        bindBannerGroup(prefs, BannerGroup.ERROR_RECOVERED, errorRecoveredBanner);
+
         bindFields(prefs, etRecordingFps, etSignature);
     }
 
-    private void bindEventToneVolume(
-            SharedPreferences prefs,
-            SeekBar seekEventToneVolume,
-            EditText etEventToneVolumeValue,
-            int initialVolume) {
-        if (seekEventToneVolume != null) {
-            seekEventToneVolume.setMax(100);
-            seekEventToneVolume.setProgress(initialVolume);
-            seekEventToneVolume.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+    private void bindBannerGroup(SharedPreferences prefs, BannerGroup group, BannerGroupViews views) {
+        if (views == null) {
+            return;
+        }
+        if (views.toggle != null) {
+            views.toggle.setChecked(isBannerEnabled(prefs, group));
+            views.toggle.setOnCheckedChangeListener(
+                    (buttonView, checked) -> prefs.edit().putBoolean(group.enabledKey(), checked).apply());
+        }
+        if (views.sizeGroup != null && views.sizeGroup.getChildCount() >= 3) {
+            int initialSize = getBannerSize(prefs, group);
+            views.sizeGroup.check(views.sizeGroup.getChildAt(initialSize).getId());
+            views.sizeGroup.addOnButtonCheckedListener((g, checkedId, isChecked) -> {
+                if (!isChecked) return;
+                for (int i = 0; i < g.getChildCount(); i++) {
+                    if (g.getChildAt(i).getId() == checkedId) {
+                        prefs.edit().putInt(group.sizeKey(), clampBannerSize(i)).apply();
+                        break;
+                    }
+                }
+            });
+        }
+        if (views.volumeSeek != null) {
+            views.volumeSeek.setMax(100);
+            int initialVolume = getBannerVolume(prefs, group);
+            views.volumeSeek.setProgress(initialVolume);
+            updateBannerVolumeValue(views.volumeValue, initialVolume);
+            views.volumeSeek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
                 @Override
                 public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                    if (!fromUser) {
-                        return;
-                    }
-                    int clamped = clampEventConfirmationToneVolume(progress);
-                    prefs.edit().putInt(KEY_EVENT_CONFIRMATION_TONE_VOLUME, clamped).apply();
-                    normalizeField(etEventToneVolumeValue, clamped);
+                    updateBannerVolumeValue(views.volumeValue, progress);
+                    if (!fromUser) return;
+                    prefs.edit().putInt(group.volumeKey(), clampVolume(progress)).apply();
                 }
 
                 @Override
@@ -137,33 +207,38 @@ public final class DashcamSettingsController {
                 }
             });
         }
-        if (etEventToneVolumeValue != null) {
-            normalizeField(etEventToneVolumeValue, initialVolume);
-            etEventToneVolumeValue.addTextChangedListener(new SimpleTextWatcher() {
-                @Override
-                public void afterTextChanged(Editable s) {
-                    if (s == null || s.length() == 0) {
-                        return;
-                    }
-                    int value = clampEventConfirmationToneVolume(
-                            parsePositiveInt(s.toString(), DEFAULT_EVENT_CONFIRMATION_TONE_VOLUME));
-                    prefs.edit().putInt(KEY_EVENT_CONFIRMATION_TONE_VOLUME, value).apply();
-                    if (seekEventToneVolume != null && seekEventToneVolume.getProgress() != value) {
-                        seekEventToneVolume.setProgress(value);
-                    }
-                }
-            });
-            etEventToneVolumeValue.setOnFocusChangeListener((v, hasFocus) -> {
-                if (!hasFocus) {
-                    int value = clampEventConfirmationToneVolume(
-                            parsePositiveInt(textOf(etEventToneVolumeValue), DEFAULT_EVENT_CONFIRMATION_TONE_VOLUME));
-                    prefs.edit().putInt(KEY_EVENT_CONFIRMATION_TONE_VOLUME, value).apply();
-                    normalizeField(etEventToneVolumeValue, value);
-                    if (seekEventToneVolume != null && seekEventToneVolume.getProgress() != value) {
-                        seekEventToneVolume.setProgress(value);
-                    }
-                }
-            });
+        if (views.testButton != null) {
+            views.testButton.setOnClickListener(v -> triggerTestBanner(group));
+        }
+    }
+
+    private void updateBannerVolumeValue(TextView view, int progress) {
+        if (view != null) {
+            view.setText(progress + "%");
+        }
+    }
+
+    private void triggerTestBanner(BannerGroup group) {
+        Context ctx = activity;
+        switch (group) {
+            case EVENT:
+                DashcamEventOverlayService.showConfirmationForced(ctx);
+                break;
+            case PAUSE_RESUME:
+                DashcamEventOverlayService.showOemPauseForced(ctx);
+                mainHandler.postDelayed(
+                        () -> DashcamEventOverlayService.showOemResumeForced(ctx),
+                        PAIRED_TEST_DELAY_MS);
+                break;
+            case ERROR_RECOVERED:
+                DashcamEventOverlayService.showRecordingErrorForced(
+                        ctx,
+                        R.string.dashcam_recording_error_overlay_subtitle_generic,
+                        R.string.notification_dashcam_recording_error_text);
+                mainHandler.postDelayed(
+                        () -> DashcamEventOverlayService.showRecordingRecoveredForced(ctx),
+                        PAIRED_TEST_DELAY_MS);
+                break;
         }
     }
 
@@ -219,13 +294,16 @@ public final class DashcamSettingsController {
         return prefs.getBoolean(KEY_SHOW_SPEED, true);
     }
 
-    public static boolean shouldPlayEventConfirmationTone(SharedPreferences prefs) {
-        return prefs.getBoolean(KEY_EVENT_CONFIRMATION_TONE, true);
+    public static boolean isBannerEnabled(SharedPreferences prefs, BannerGroup group) {
+        return prefs.getBoolean(group.enabledKey(), true);
     }
 
-    public static int getEventConfirmationToneVolume(SharedPreferences prefs) {
-        return clampEventConfirmationToneVolume(
-                prefs.getInt(KEY_EVENT_CONFIRMATION_TONE_VOLUME, DEFAULT_EVENT_CONFIRMATION_TONE_VOLUME));
+    public static int getBannerSize(SharedPreferences prefs, BannerGroup group) {
+        return clampBannerSize(prefs.getInt(group.sizeKey(), DEFAULT_BANNER_SIZE));
+    }
+
+    public static int getBannerVolume(SharedPreferences prefs, BannerGroup group) {
+        return clampVolume(prefs.getInt(group.volumeKey(), DEFAULT_BANNER_VOLUME));
     }
 
     public static String getConfiguredRecordsPath(SharedPreferences prefs) {
@@ -250,8 +328,12 @@ public final class DashcamSettingsController {
         return Math.max(MIN_RECORDING_FPS, Math.min(MAX_RECORDING_FPS, fps));
     }
 
-    private static int clampEventConfirmationToneVolume(int volume) {
+    private static int clampVolume(int volume) {
         return Math.max(0, Math.min(100, volume));
+    }
+
+    private static int clampBannerSize(int size) {
+        return Math.max(BANNER_SIZE_SMALL, Math.min(BANNER_SIZE_LARGE, size));
     }
 
     private void normalizeField(EditText editText, int value) {

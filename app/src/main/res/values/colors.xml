@@ -21,6 +21,7 @@
     <color name="settings_button_surface">#26E7E7E7</color>
     <color name="settings_button_surface_pressed">#3DE7E7E7</color>
     <color name="settings_button_stroke">#52E7E7E7</color>
+    <color name="settings_control_border">#33FFFFFF</color>
     <color name="settings_slider_track_bg">#383838</color>
     <color name="settings_slider_thumb_stroke">#909090</color>
     <color name="settings_toggle_thumb_fill">#D5D5D5</color>

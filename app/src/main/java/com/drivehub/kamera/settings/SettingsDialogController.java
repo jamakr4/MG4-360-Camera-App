@@ -5,7 +5,6 @@ import com.drivehub.kamera.R;
 
 import com.drivehub.kamera.MainActivity;
 import com.drivehub.kamera.CameraProbe;
-import com.drivehub.kamera.dashcam.DashcamEventOverlayService;
 import com.drivehub.kamera.dashcam.DashcamSettingsController;
 import com.drivehub.kamera.dashcam.RecordingService;
 import com.drivehub.kamera.dev.DevRuntimeLog;
@@ -13,6 +12,7 @@ import com.drivehub.kamera.dev.DevSettingsController;
 import com.drivehub.kamera.ota.OtaController;
 import com.drivehub.kamera.signal.SignalCameraSettingsController;
 import com.drivehub.kamera.signal.SignalService;
+import com.drivehub.kamera.settings.SegmentedControl;
 
 import android.app.Dialog;
 import android.content.SharedPreferences;
@@ -123,7 +123,6 @@ public final class SettingsDialogController {
         views = bindViews(prefs);
         wireSubControllers(prefs);
         wireAppearance(prefs);
-        wireTestBannerButton();
         wireDevLogControls();
         wireTabs();
         wireDevUnlock();
@@ -176,10 +175,21 @@ public final class SettingsDialogController {
         v.etDashcamFps = dialog.findViewById(R.id.etDashcamFps);
         v.etDashcamSignature = dialog.findViewById(R.id.etDashcamSignature);
         v.swDashcamShowSpeed = dialog.findViewById(R.id.switchDashcamShowSpeed);
-        v.swDashcamEventConfirmationTone = dialog.findViewById(R.id.switchDashcamEventConfirmationTone);
-        v.seekDashcamEventConfirmationToneVolume = dialog.findViewById(R.id.seekDashcamEventConfirmationToneVolume);
-        v.etDashcamEventConfirmationToneVolumeValue =
-                dialog.findViewById(R.id.etDashcamEventConfirmationToneVolumeValue);
+        v.swBannerEvent = dialog.findViewById(R.id.switchBannerEvent);
+        v.segBannerEventSize = dialog.findViewById(R.id.segBannerEventSize);
+        v.seekBannerEventVolume = dialog.findViewById(R.id.seekBannerEventVolume);
+        v.tvBannerEventVolumeValue = dialog.findViewById(R.id.tvBannerEventVolumeValue);
+        v.btnBannerEventTest = dialog.findViewById(R.id.btnBannerEventTest);
+        v.swBannerPauseResume = dialog.findViewById(R.id.switchBannerPauseResume);
+        v.segBannerPauseResumeSize = dialog.findViewById(R.id.segBannerPauseResumeSize);
+        v.seekBannerPauseResumeVolume = dialog.findViewById(R.id.seekBannerPauseResumeVolume);
+        v.tvBannerPauseResumeVolumeValue = dialog.findViewById(R.id.tvBannerPauseResumeVolumeValue);
+        v.btnBannerPauseResumeTest = dialog.findViewById(R.id.btnBannerPauseResumeTest);
+        v.swBannerErrorRecovered = dialog.findViewById(R.id.switchBannerErrorRecovered);
+        v.segBannerErrorRecoveredSize = dialog.findViewById(R.id.segBannerErrorRecoveredSize);
+        v.seekBannerErrorRecoveredVolume = dialog.findViewById(R.id.seekBannerErrorRecoveredVolume);
+        v.tvBannerErrorRecoveredVolumeValue = dialog.findViewById(R.id.tvBannerErrorRecoveredVolumeValue);
+        v.btnBannerErrorRecoveredTest = dialog.findViewById(R.id.btnBannerErrorRecoveredTest);
         v.tvDashcamRecordingStatus = dialog.findViewById(R.id.tvDashcamRecordingStatus);
         v.etDevDefaultPollMs = dialog.findViewById(R.id.etDevDefaultPollMs);
         v.etDevSignalOffPollMs = dialog.findViewById(R.id.etDevSignalOffPollMs);
@@ -218,7 +228,6 @@ public final class SettingsDialogController {
         v.accentRow = dialog.findViewById(R.id.rowAccentColor);
         v.accentPreview = dialog.findViewById(R.id.viewAccentPreview);
         v.etAccentColor = dialog.findViewById(R.id.etAccentColor);
-        v.btnDevTestDashcamBanner = dialog.findViewById(R.id.btnDevTestDashcamBanner);
         v.btnDevStatusLogClear = dialog.findViewById(R.id.btnDevStatusLogClear);
         v.tvVersion = dialog.findViewById(R.id.tvDialogVersion);
         v.tvBeta = dialog.findViewById(R.id.tvDialogVersionBeta);
@@ -259,9 +268,24 @@ public final class SettingsDialogController {
                 views.etDashcamFps,
                 views.etDashcamSignature,
                 views.swDashcamShowSpeed,
-                views.swDashcamEventConfirmationTone,
-                views.seekDashcamEventConfirmationToneVolume,
-                views.etDashcamEventConfirmationToneVolumeValue
+                new DashcamSettingsController.BannerGroupViews(
+                        views.swBannerEvent,
+                        views.segBannerEventSize,
+                        views.seekBannerEventVolume,
+                        views.tvBannerEventVolumeValue,
+                        views.btnBannerEventTest),
+                new DashcamSettingsController.BannerGroupViews(
+                        views.swBannerPauseResume,
+                        views.segBannerPauseResumeSize,
+                        views.seekBannerPauseResumeVolume,
+                        views.tvBannerPauseResumeVolumeValue,
+                        views.btnBannerPauseResumeTest),
+                new DashcamSettingsController.BannerGroupViews(
+                        views.swBannerErrorRecovered,
+                        views.segBannerErrorRecoveredSize,
+                        views.seekBannerErrorRecoveredVolume,
+                        views.tvBannerErrorRecoveredVolumeValue,
+                        views.btnBannerErrorRecoveredTest)
         );
         dev.bind(
                 prefs,
@@ -280,17 +304,26 @@ public final class SettingsDialogController {
     private void wireAppearance(SharedPreferences prefs) {
         appearance.bindSettingsAppearance(
                 prefs,
-                views.swOverlay,
-                views.swRotateToDrivingDirection,
-                views.swDashcamEnabled,
-                views.swDashcamShowSpeed,
-                views.swDashcamEventConfirmationTone,
-                views.swSafetyWarning,
-                views.swAllowBetaUpdates,
+                new Switch[]{
+                        views.swOverlay,
+                        views.swRotateToDrivingDirection,
+                        views.swDashcamEnabled,
+                        views.swDashcamShowSpeed,
+                        views.swBannerEvent,
+                        views.swBannerPauseResume,
+                        views.swBannerErrorRecovered,
+                        views.swSafetyWarning,
+                        views.swAllowBetaUpdates
+                },
                 views.dialogClose,
-                views.seekOverlayHideDelay,
-                views.seekOverlayMinShow,
-                views.seekDashcamEventConfirmationToneVolume,
+                new SeekBar[]{
+                        views.seekCorner,
+                        views.seekOverlayHideDelay,
+                        views.seekOverlayMinShow,
+                        views.seekBannerEventVolume,
+                        views.seekBannerPauseResumeVolume,
+                        views.seekBannerErrorRecoveredVolume
+                },
                 views.seekCorner,
                 views.etCorner,
                 views.accentRow,
@@ -304,12 +337,6 @@ public final class SettingsDialogController {
                 views.tabDev,
                 views.tabDevStatus
         );
-    }
-
-    private void wireTestBannerButton() {
-        if (views.btnDevTestDashcamBanner == null) return;
-        views.btnDevTestDashcamBanner.setOnClickListener(v ->
-                DashcamEventOverlayService.showConfirmation(activity));
     }
 
     private void wireDevLogControls() {
@@ -469,7 +496,6 @@ public final class SettingsDialogController {
         Switch swOverlay;
         Switch swRotateToDrivingDirection;
         Switch swDashcamEnabled;
-        Switch swDashcamEventConfirmationTone;
         Switch swSafetyWarning;
         Switch swAllowBetaUpdates;
         SeekBar seekOverlayHideDelay;
@@ -479,8 +505,21 @@ public final class SettingsDialogController {
         EditText etDashcamFps;
         EditText etDashcamSignature;
         Switch swDashcamShowSpeed;
-        SeekBar seekDashcamEventConfirmationToneVolume;
-        EditText etDashcamEventConfirmationToneVolumeValue;
+        Switch swBannerEvent;
+        SegmentedControl segBannerEventSize;
+        SeekBar seekBannerEventVolume;
+        TextView tvBannerEventVolumeValue;
+        Button btnBannerEventTest;
+        Switch swBannerPauseResume;
+        SegmentedControl segBannerPauseResumeSize;
+        SeekBar seekBannerPauseResumeVolume;
+        TextView tvBannerPauseResumeVolumeValue;
+        Button btnBannerPauseResumeTest;
+        Switch swBannerErrorRecovered;
+        SegmentedControl segBannerErrorRecoveredSize;
+        SeekBar seekBannerErrorRecoveredVolume;
+        TextView tvBannerErrorRecoveredVolumeValue;
+        Button btnBannerErrorRecoveredTest;
         TextView tvDashcamRecordingStatus;
         EditText etDevDefaultPollMs;
         EditText etDevSignalOffPollMs;
@@ -513,7 +552,6 @@ public final class SettingsDialogController {
         View accentRow;
         View accentPreview;
         EditText etAccentColor;
-        Button btnDevTestDashcamBanner;
         Button btnDevStatusLogClear;
         TextView tvVersion;
         TextView tvBeta;

@@ -23,6 +23,7 @@ Before building:
 
 The notification sound file is licensed under CC-BY-NC-4.0 and therefore not tracked in this repository. To build, download it manually:
 - Get the source from [Freesound — notification-sound-7062 by HenryCena82595](https://freesound.org/s/731783/)
+- Convert to `.ogg` (Vorbis) if Freesound serves another format — the app loads the resource via `R.raw.notification_sound_7062_henrycena82595` and expects an `.ogg` extension
 - Place it at `app/src/main/res/raw/notification_sound_7062_henrycena82595.ogg`
 
 ## ⚠️ Disclaimer

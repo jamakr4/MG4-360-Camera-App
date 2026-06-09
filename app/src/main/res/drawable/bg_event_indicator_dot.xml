@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- White base so backgroundTintList from code cleanly replaces it with the per-banner color. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="oval">
     <size
         android:width="12dp"
         android:height="12dp" />
-    <solid android:color="#FF453A" />
+    <solid android:color="@android:color/white" />
 </shape>
