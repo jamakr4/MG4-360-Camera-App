@@ -197,6 +197,8 @@ public final class SettingsDialogController {
         v.etDevForegroundModePollMs = dialog.findViewById(R.id.etDevForegroundModePollMs);
         v.seekDevOverlayTopInsetPx = dialog.findViewById(R.id.seekDevOverlayTopInsetPx);
         v.etDevOverlayTopInsetPx = dialog.findViewById(R.id.etDevOverlayTopInsetPx);
+        v.etDevDashcamRetentionClipCount = dialog.findViewById(R.id.etDevDashcamRetentionClipCount);
+        v.etDevDashcamMaxEventDirs = dialog.findViewById(R.id.etDevDashcamMaxEventDirs);
         v.etDevDashcamRecordsPath = dialog.findViewById(R.id.etDevDashcamRecordsPath);
         v.tvDevDashcamRecordsPath = dialog.findViewById(R.id.tvDevDashcamRecordsPath);
         v.btnDevDashcamBrowseFolder = dialog.findViewById(R.id.btnDevDashcamBrowseFolder);
@@ -296,6 +298,8 @@ public final class SettingsDialogController {
                 views.etDevForegroundModePollMs,
                 views.etDevDefaultPollMs,
                 views.etDevSignalOffPollMs,
+                views.etDevDashcamRetentionClipCount,
+                views.etDevDashcamMaxEventDirs,
                 views.etDevDashcamRecordsPath,
                 views.tvDevDashcamRecordsPath,
                 views.btnDevDashcamBrowseFolder,
@@ -530,6 +534,8 @@ public final class SettingsDialogController {
         EditText etDevForegroundModePollMs;
         SeekBar seekDevOverlayTopInsetPx;
         EditText etDevOverlayTopInsetPx;
+        EditText etDevDashcamRetentionClipCount;
+        EditText etDevDashcamMaxEventDirs;
         EditText etDevDashcamRecordsPath;
         TextView tvDevDashcamRecordsPath;
         Button btnDevDashcamBrowseFolder;

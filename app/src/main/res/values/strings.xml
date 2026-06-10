@@ -45,6 +45,10 @@
     <string name="settings_credits_open_source_body">- OpenCV 4.9.0 (opencv.org) - Apache License 2.0&#10;- AndroidX AppCompat 1.7.1 - Apache License 2.0&#10;- AndroidX Activity 1.12.4 - Apache License 2.0&#10;- AndroidX ConstraintLayout 2.2.1 - Apache License 2.0&#10;- Material Components for Android 1.13.0 - Apache License 2.0&#10;- Icons based on Google Material Symbols - Apache License 2.0</string>
     <string name="settings_credits_additional_body">- Thanks to the community from XDA Forums - MG4 Electric AAOS 9&#10;- Thanks to merth4n for providing the base application</string>
     <string name="settings_credits_sound_body">Sound attribution&#10;notification-sound-7062 by HenryCena82595&#10;https://freesound.org/s/731783/&#10;License: Attribution NonCommercial 4.0</string>
+    <string name="settings_dev_dashcam_capacity">Dashcam capacity</string>
+    <string name="settings_dev_dashcam_retention_clip_count">Rolling clips kept</string>
+    <string name="settings_dev_dashcam_max_event_dirs">Saved events kept</string>
+    <string name="settings_dev_dashcam_capacity_warning">⚠ Raising these values can fill storage quickly. Each 30 s clip is ~33 MB; each saved event keeps ~5 clips. The app does not check free space — too-high values can lead to storage overflow or other unpredictable issues.</string>
     <string name="settings_dev_polling_rates">Polling rates</string>
     <string name="settings_dev_default_poll">Default polling (ms)</string>
     <string name="settings_dev_signal_off_poll">Signal-off detection (ms)</string>

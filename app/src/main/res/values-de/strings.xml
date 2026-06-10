@@ -45,6 +45,10 @@
     <string name="settings_credits_open_source_body">- OpenCV 4.9.0 (opencv.org) - Apache License 2.0&#10;- AndroidX AppCompat 1.7.1 - Apache License 2.0&#10;- AndroidX Activity 1.12.4 - Apache License 2.0&#10;- AndroidX ConstraintLayout 2.2.1 - Apache License 2.0&#10;- Material Components for Android 1.13.0 - Apache License 2.0&#10;- Icons basierend auf Google Material Symbols - Apache License 2.0</string>
     <string name="settings_credits_additional_body">- Danke an die Community aus den XDA Forums - MG4 Electric AAOS 9&#10;- Danke an merth4n für die Bereitstellung der Basisanwendung</string>
     <string name="settings_credits_sound_body">Sound-Attribution&#10;notification-sound-7062 von HenryCena82595&#10;https://freesound.org/s/731783/&#10;Lizenz: Attribution NonCommercial 4.0</string>
+    <string name="settings_dev_dashcam_capacity">Dashcam-Kapazität</string>
+    <string name="settings_dev_dashcam_retention_clip_count">Ringpuffer-Clips</string>
+    <string name="settings_dev_dashcam_max_event_dirs">Gespeicherte Ereignisse</string>
+    <string name="settings_dev_dashcam_capacity_warning">⚠ Höhere Werte können den Speicher schnell volllaufen lassen. Ein 30-s-Clip ist ca. 33 MB, ein Ereignis behält ca. 5 Clips. Die App prüft den freien Speicher nicht — zu hohe Werte können zu Speicherüberlauf oder anderen unvorhersehbaren Problemen führen.</string>
     <string name="settings_dev_polling_rates">Polling-Raten</string>
     <string name="settings_dev_default_poll">Default-Polling (ms)</string>
     <string name="settings_dev_signal_off_poll">Blinker-Aus-Erkennung (ms)</string>

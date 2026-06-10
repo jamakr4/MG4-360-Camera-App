@@ -31,6 +31,8 @@ public final class DevSettingsController {
             EditText etForegroundModePollMs,
             EditText etDefaultPollMs,
             EditText etSignalOffPollMs,
+            EditText etDashcamRetentionClipCount,
+            EditText etDashcamMaxEventDirs,
             EditText etDashcamRecordsPath,
             TextView tvDashcamRecordsPath,
             Button btnBrowseFolder,
@@ -64,6 +66,20 @@ public final class DevSettingsController {
                 UiPrefs.KEY_DEV_SIGNAL_OFF_POLL_MS,
                 UiPrefs.getDevSignalOffPollMs(prefs)
         );
+        bindCapacityField(
+                prefs,
+                etDashcamRetentionClipCount,
+                DashcamSettingsController.getRetentionClipCount(prefs),
+                DashcamSettingsController::clampRetentionClipCount,
+                DashcamSettingsController::setRetentionClipCount
+        );
+        bindCapacityField(
+                prefs,
+                etDashcamMaxEventDirs,
+                DashcamSettingsController.getMaxRetainedEventDirs(prefs),
+                DashcamSettingsController::clampMaxRetainedEventDirs,
+                DashcamSettingsController::setMaxRetainedEventDirs
+        );
         bindDashcamStorageOverride(prefs, etDashcamRecordsPath, tvDashcamRecordsPath, btnBrowseFolder);
         bindResetDefaultsButton(
                 prefs,
@@ -72,7 +88,53 @@ public final class DevSettingsController {
                 etForegroundModePollMs,
                 etDefaultPollMs,
                 etSignalOffPollMs,
+                etDashcamRetentionClipCount,
+                etDashcamMaxEventDirs,
                 btnResetDefaults);
+    }
+
+    private interface CapacityWriter {
+        void write(SharedPreferences prefs, int value);
+    }
+
+    private void bindCapacityField(
+            SharedPreferences prefs,
+            EditText editText,
+            int initialValue,
+            IntUnaryOperator clamp,
+            CapacityWriter writer
+    ) {
+        if (editText == null) return;
+        setIntFieldValue(editText, initialValue);
+        editText.addTextChangedListener(new SimpleTextWatcher() {
+            @Override
+            public void afterTextChanged(Editable s) {
+                if (s == null) return;
+                String text = s.toString().trim();
+                if (text.isEmpty()) return;
+                try {
+                    int value = clamp.applyAsInt(Integer.parseInt(text));
+                    writer.write(prefs, value);
+                } catch (NumberFormatException ignored) {
+                }
+            }
+        });
+        editText.setOnFocusChangeListener((v, hasFocus) -> {
+            if (hasFocus) return;
+            String text = editText.getText() == null ? "" : editText.getText().toString().trim();
+            int value;
+            try {
+                value = text.isEmpty() ? initialValue : clamp.applyAsInt(Integer.parseInt(text));
+            } catch (NumberFormatException ignored) {
+                value = initialValue;
+            }
+            writer.write(prefs, value);
+            String normalized = String.valueOf(value);
+            if (!normalized.contentEquals(editText.getText())) {
+                editText.setText(normalized);
+                editText.setSelection(editText.getText().length());
+            }
+        });
     }
 
     private void bindDashcamStorageOverride(
@@ -130,6 +192,8 @@ public final class DevSettingsController {
             EditText etForegroundModePollMs,
             EditText etDefaultPollMs,
             EditText etSignalOffPollMs,
+            EditText etDashcamRetentionClipCount,
+            EditText etDashcamMaxEventDirs,
             Button btnResetDefaults
     ) {
         if (btnResetDefaults == null) return;
@@ -140,6 +204,10 @@ public final class DevSettingsController {
                     .putInt(UiPrefs.KEY_DEV_DEFAULT_POLL_MS, UiPrefs.DEFAULT_DEV_DEFAULT_POLLING_MS)
                     .putInt(UiPrefs.KEY_DEV_SIGNAL_OFF_POLL_MS, UiPrefs.DEFAULT_DEV_SIGNAL_OFF_POLLING_MS)
                     .apply();
+            DashcamSettingsController.setRetentionClipCount(prefs,
+                    DashcamSettingsController.DEFAULT_RETENTION_CLIP_COUNT);
+            DashcamSettingsController.setMaxRetainedEventDirs(prefs,
+                    DashcamSettingsController.DEFAULT_MAX_RETAINED_EVENT_DIRS);
             setIntFieldValue(etOverlayTopInsetPx, UiPrefs.DEFAULT_DEV_OVERLAY_TOP_INSET_PX);
             if (seekOverlayTopInsetPx != null) {
                 seekOverlayTopInsetPx.setProgress(UiPrefs.DEFAULT_DEV_OVERLAY_TOP_INSET_PX);
@@ -147,6 +215,8 @@ public final class DevSettingsController {
             setPollingFieldValue(etForegroundModePollMs, UiPrefs.DEFAULT_DEV_FOREGROUND_MODE_POLL_MS);
             setPollingFieldValue(etDefaultPollMs, UiPrefs.DEFAULT_DEV_DEFAULT_POLLING_MS);
             setPollingFieldValue(etSignalOffPollMs, UiPrefs.DEFAULT_DEV_SIGNAL_OFF_POLLING_MS);
+            setIntFieldValue(etDashcamRetentionClipCount, DashcamSettingsController.DEFAULT_RETENTION_CLIP_COUNT);
+            setIntFieldValue(etDashcamMaxEventDirs, DashcamSettingsController.DEFAULT_MAX_RETAINED_EVENT_DIRS);
             SignalService.requestRecheck();
             Toast.makeText(v.getContext(), R.string.settings_dev_defaults_reset, Toast.LENGTH_SHORT).show();
         });

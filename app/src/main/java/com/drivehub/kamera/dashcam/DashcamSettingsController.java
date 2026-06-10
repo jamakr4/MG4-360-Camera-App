@@ -34,10 +34,17 @@ public final class DashcamSettingsController {
     public static final String KEY_OEM_COEXIST = "oemCoexist";
     public static final int DEFAULT_SEGMENT_SEC = 30;
     public static final int DEFAULT_RETENTION_CLIP_COUNT = 10;
+    public static final int DEFAULT_MAX_RETAINED_EVENT_DIRS = 5;
+    public static final int MIN_RETENTION_CLIP_COUNT = 1;
+    public static final int MAX_RETENTION_CLIP_COUNT = 500;
+    public static final int MIN_MAX_RETAINED_EVENT_DIRS = 1;
+    public static final int MAX_MAX_RETAINED_EVENT_DIRS = 50;
     private static final String KEY_RECORDS_PATH = "recordsPath";
     private static final String KEY_RECORDING_FPS = "recordingFps";
     private static final String KEY_SIGNATURE = "recordingSignature";
     private static final String KEY_SHOW_SPEED = "recordingShowSpeed";
+    private static final String KEY_RETENTION_CLIP_COUNT = "devRetentionClipCount";
+    private static final String KEY_MAX_RETAINED_EVENT_DIRS = "devMaxRetainedEventDirs";
     private static final int REQ_STORAGE = 1337;
     private static final int DEFAULT_RECORDING_FPS = 25;
     private static final int MIN_RECORDING_FPS = 1;
@@ -303,6 +310,31 @@ public final class DashcamSettingsController {
 
     public static boolean isOemCoexistEnabled(SharedPreferences prefs) {
         return prefs.getBoolean(KEY_OEM_COEXIST, true);
+    }
+
+    public static int getRetentionClipCount(SharedPreferences prefs) {
+        return clampRetentionClipCount(prefs.getInt(KEY_RETENTION_CLIP_COUNT, DEFAULT_RETENTION_CLIP_COUNT));
+    }
+
+    public static void setRetentionClipCount(SharedPreferences prefs, int count) {
+        prefs.edit().putInt(KEY_RETENTION_CLIP_COUNT, clampRetentionClipCount(count)).apply();
+    }
+
+    public static int getMaxRetainedEventDirs(SharedPreferences prefs) {
+        return clampMaxRetainedEventDirs(
+                prefs.getInt(KEY_MAX_RETAINED_EVENT_DIRS, DEFAULT_MAX_RETAINED_EVENT_DIRS));
+    }
+
+    public static void setMaxRetainedEventDirs(SharedPreferences prefs, int count) {
+        prefs.edit().putInt(KEY_MAX_RETAINED_EVENT_DIRS, clampMaxRetainedEventDirs(count)).apply();
+    }
+
+    public static int clampRetentionClipCount(int count) {
+        return Math.max(MIN_RETENTION_CLIP_COUNT, Math.min(MAX_RETENTION_CLIP_COUNT, count));
+    }
+
+    public static int clampMaxRetainedEventDirs(int count) {
+        return Math.max(MIN_MAX_RETAINED_EVENT_DIRS, Math.min(MAX_MAX_RETAINED_EVENT_DIRS, count));
     }
 
     /**

@@ -324,13 +324,14 @@ public class RecordingService extends Service {
 
         long segmentMs = segmentSec * 1000L;
 
-        int keepSegments = Math.max(1, DashcamSettingsController.DEFAULT_RETENTION_CLIP_COUNT);
         boolean endedWithFatalError = false;
 
         while (!stopRequested) {
             if (!waitForOemPauseToClear(prefs)) {
                 break;
             }
+            // Read every iteration so the dev-mode editor takes effect between segments.
+            int keepSegments = DashcamSettingsController.getRetentionClipCount(prefs);
             long segmentStartWallMs = System.currentTimeMillis();
             String baseName = makeTimestampBase(segmentStartWallMs, "yyMMddHHmmss");
             boolean startedAnyCamera = recordClip(baseDir, segmentMs, baseName, keepSegments);
@@ -479,6 +480,7 @@ public class RecordingService extends Service {
                     Math.max(1L, currentSegmentOrdinal - EVENT_SEGMENTS_BEFORE_CURRENT),
                     currentSegmentOrdinal + EVENT_SEGMENTS_AFTER_CURRENT
             ));
+            trimOldEventDirsLocked(eventsBaseDir);
             copyJobs = collectEventCopyJobsLocked(completedSegmentCount);
             persistEventStateLocked();
             DevRuntimeLog.add(
@@ -709,6 +711,52 @@ public class RecordingService extends Service {
             }
             deleted++;
         }
+    }
+
+    private void trimOldEventDirsLocked(File eventsBaseDir) {
+        if (eventsBaseDir == null) return;
+        File[] files = eventsBaseDir.listFiles();
+        if (files == null) return;
+        List<File> eventDirs = new ArrayList<>();
+        for (File f : files) {
+            if (f.isDirectory() && f.getName().startsWith("event_")) {
+                eventDirs.add(f);
+            }
+        }
+        int maxRetained = DashcamSettingsController.getMaxRetainedEventDirs(prefs());
+        if (eventDirs.size() <= maxRetained) return;
+        // event_<yyMMddHHmmssSSS> sorts chronologically by name.
+        eventDirs.sort(Comparator.comparing(File::getName));
+        Set<String> pendingNames = new HashSet<>();
+        for (EventCaptureRequest req : pendingEventRequests) {
+            pendingNames.add(req.eventBaseName);
+        }
+        int toDelete = eventDirs.size() - maxRetained;
+        int deleted = 0;
+        for (File dir : eventDirs) {
+            if (deleted >= toDelete) break;
+            // Never delete a dir whose copy jobs may still write into it.
+            if (pendingNames.contains(dir.getName())) continue;
+            if (deleteDirRecursive(dir)) {
+                DevRuntimeLog.add("RecordingService", "Event cap: deleted " + dir.getName());
+                deleted++;
+            } else {
+                Log.w(TAG, "Failed to delete old event dir " + dir.getAbsolutePath());
+            }
+        }
+    }
+
+    private boolean deleteDirRecursive(File f) {
+        if (f == null) return false;
+        if (f.isDirectory()) {
+            File[] children = f.listFiles();
+            if (children != null) {
+                for (File c : children) {
+                    deleteDirRecursive(c);
+                }
+            }
+        }
+        return f.delete();
     }
 
     private File getEventsBaseDir() {
