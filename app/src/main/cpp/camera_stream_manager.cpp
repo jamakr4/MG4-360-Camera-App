@@ -1198,6 +1198,25 @@ namespace camera_stream_manager
                     if (started)
                     {
                         configurePreviewWindowLocked();
+                        // Pre-warm the BufferQueue: the first ANativeWindow_lock calls would
+                        // otherwise block while the consumer-side buffer pool is allocated lazily,
+                        // stealing budget from the capture thread (which is already saturated by
+                        // cvtColor + recording encoder). Three empty posts are enough to settle
+                        // the typical pool size on this device.
+                        for (int i = 0; i < 3; i++)
+                        {
+                            ANativeWindow_Buffer warmBuffer{};
+                            if (ANativeWindow_lock(previewWindow_, &warmBuffer, nullptr) == 0)
+                            {
+                                if (warmBuffer.bits != nullptr && warmBuffer.height > 0 && warmBuffer.stride > 0)
+                                {
+                                    std::memset(warmBuffer.bits, 0,
+                                                static_cast<size_t>(warmBuffer.stride) *
+                                                    static_cast<size_t>(warmBuffer.height) * 4U);
+                                }
+                                ANativeWindow_unlockAndPost(previewWindow_);
+                            }
+                        }
                     }
                 }
 
