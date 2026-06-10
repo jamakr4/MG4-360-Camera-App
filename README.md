@@ -2,15 +2,40 @@
 
 Community mod for the MG4 EV (AAOS 9, pre-2026 facelift) that improves the 360° turn signal camera behavior — removing the launcher overlay in favor of a Tesla-style tile view and raising the auto-close speed threshold.
 
-# Features for v0.8 
+# Features for v0.8.4 
 - **Turn Signal Overlay** — automatic camera popup when indicator is activated (no matter the speed of the vehicle)
-- **Dashcam Recording** - using the 4 natives cameras
+- **Dashcam Recording** — uses all four native cameras, merged into a single 720×240 grid clip
+  - Rolling 30 s segments with a configurable ring buffer (default 10 clips)
+  - Event capture saves a window of pre/post segments to a separate `events/` folder, with a configurable cap (default 5 events)
+  - Optional speed and signature burned into the video
+  - Pause/resume/error banners with per-group size and volume controls
+  - **OEM 360° AVM coexistence** — the dashcam briefly yields the cameras so the factory reverse/360° view can still open. Can be disabled in settings if you'd rather keep recording uninterrupted.
+- **External Trigger** — broadcast `com.drivehub.kamera.action.TRIGGER_DASHCAM_EVENT` from any app or ADB to save an event clip. Companion app: [MG4-Dashcam-Trigger](https://github.com/jamakr4/MG4-Dashcam-Trigger).
 - **Full Access to Camera System**
-- **Language support for Englisch and German with auto select based on vehicles language**
+- **Language support for English and German with auto select based on the vehicle's language**
 
 > **Work in progress.** Check the [Wiki](https://github.com/jamakr4/MG4-360-Camera-App/wiki) for technical details and the [Project Board](https://github.com/users/jamakr4/projects/4) for current progress.
 
+
 ![MG4 360 Camera App](images/PXL_20260603_192645923.jpg)
+
+## Dev Mode
+
+A hidden Dev tab exposes low-level knobs. To unlock it, open Settings and tap the version label at the bottom **5 times**
+
+What's behind it:
+- **Polling rates** — default poll, turn-signal poll, Android Auto / CarPlay foreground poll (ms).
+- **Overlay safe area** — top inset (px) that the tile overlay cannot be dragged into.
+- **Dashcam capacity** — number of rolling clips kept in the ring buffer, and number of saved events retained before the oldest is deleted.
+- **Storage override** — pick a custom folder for dashcam recordings instead of `Downloads/dashcam/`.
+- **Reset defaults** — restores every dev value to its built-in default.
+
+> [!CAUTION]
+> **Dev Mode can break things. Use at your own risk.**
+>
+> These values are **not** validated against the realities of your install — storage size, system load, camera bandwidth, signal latency. Raising the ring buffer or event cap can fill storage in minutes; cranking polling rates down can lock the UI or miss turn-signal events; combinations may have effects nobody has ever tested. The app **does not check free space** before writing.
+>
+> If something starts misbehaving after a Dev tweak, hit **Reset defaults** first. If that doesn't help, clear the app's data.
 
 ## Build Setup
 
