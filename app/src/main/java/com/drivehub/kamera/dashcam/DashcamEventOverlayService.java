@@ -14,8 +14,6 @@ import android.content.res.AssetFileDescriptor;
 import android.content.res.ColorStateList;
 import android.graphics.PixelFormat;
 import android.media.AudioAttributes;
-import android.media.AudioFocusRequest;
-import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.os.Handler;
 import android.os.IBinder;
@@ -108,11 +106,6 @@ public class DashcamEventOverlayService extends Service {
     private TextView titleView;
     private TextView subtitleView;
     private MediaPlayer bannerTonePlayer;
-    private AudioManager audioManager;
-    private AudioFocusRequest bannerToneFocusRequest;
-    private final AudioManager.OnAudioFocusChangeListener bannerToneFocusListener = focusChange -> {
-        // Transient ducking — nothing to react to here.
-    };
 
     // ---------- Public API: respects per-group enabled toggle ----------
 
@@ -233,27 +226,20 @@ public class DashcamEventOverlayService extends Service {
         }
         releaseBannerTone();
 
+        // No audio focus request: requesting AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK reliably ducks
+        // Android Auto, but its volume sometimes doesn't recover when we abandon focus until the
+        // user pauses + resumes playback. For a sub-second notification tone, mixing over music is
+        // good enough — user can compensate via the per-group banner volume.
         AudioAttributes attributes = new AudioAttributes.Builder()
                 .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                 .build();
-
-        if (audioManager == null) {
-            audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
-        }
-        if (audioManager == null) {
-            return;
-        }
-        if (!requestBannerToneFocus(attributes)) {
-            return;
-        }
 
         MediaPlayer player = new MediaPlayer();
         try (AssetFileDescriptor afd =
                      getResources().openRawResourceFd(R.raw.notification_sound_7062_henrycena82595)) {
             if (afd == null) {
                 player.release();
-                abandonBannerToneFocus();
                 return;
             }
             player.setAudioAttributes(attributes);
@@ -273,29 +259,7 @@ public class DashcamEventOverlayService extends Service {
                 player.release();
             } catch (Throwable ignored) {
             }
-            abandonBannerToneFocus();
         }
-    }
-
-    private boolean requestBannerToneFocus(AudioAttributes attributes) {
-        bannerToneFocusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
-                .setAudioAttributes(attributes)
-                .setOnAudioFocusChangeListener(bannerToneFocusListener)
-                .setWillPauseWhenDucked(false)
-                .build();
-        int result = audioManager.requestAudioFocus(bannerToneFocusRequest);
-        if (result != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
-            bannerToneFocusRequest = null;
-            return false;
-        }
-        return true;
-    }
-
-    private void abandonBannerToneFocus() {
-        if (audioManager != null && bannerToneFocusRequest != null) {
-            audioManager.abandonAudioFocusRequest(bannerToneFocusRequest);
-        }
-        bannerToneFocusRequest = null;
     }
 
     private void releaseBannerTone() {
@@ -310,7 +274,6 @@ public class DashcamEventOverlayService extends Service {
             }
             bannerTonePlayer = null;
         }
-        abandonBannerToneFocus();
     }
 
     private void showOverlayWindow() {
