@@ -4,6 +4,7 @@ import com.drivehub.kamera.R;
 
 import com.drivehub.kamera.MainActivity;
 import com.drivehub.kamera.camera.OverlayService;
+import com.drivehub.kamera.dashcam.DashcamSettingsController;
 import com.drivehub.kamera.dashcam.RecordingService;
 import com.drivehub.kamera.dev.DevRuntimeLog;
 import com.drivehub.kamera.settings.UiPrefs;
@@ -81,6 +82,7 @@ public class SignalService extends Service {
     private Handler oemLifecycleHandler;
     private volatile boolean oemLifecycleMonitoring;
     private volatile String lastOemLifecycle = "";
+    private SharedPreferences.OnSharedPreferenceChangeListener oemCoexistPrefListener;
     private int lastLamp = Integer.MIN_VALUE;
     private int currentLamp = 0;
     private int currentGear = 0;
@@ -191,7 +193,8 @@ public class SignalService extends Service {
             Log.w(TAG, "Car API listener acilamadi, system property polling fallback.");
             startPropertyPollingFallback();
         }
-        startOemLifecycleMonitor();
+        registerOemCoexistListener();
+        applyOemCoexistState();
         return START_STICKY;
     }
 
@@ -296,6 +299,49 @@ public class SignalService extends Service {
         }
     }
 
+    private boolean isOemCoexistActive() {
+        try {
+            return DashcamSettingsController.isOemCoexistActive(UiPrefs.getPrefs(this));
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private void registerOemCoexistListener() {
+        if (oemCoexistPrefListener != null) return;
+        SharedPreferences prefs = UiPrefs.getPrefs(this);
+        oemCoexistPrefListener = (sp, key) -> {
+            if (DashcamSettingsController.KEY_ENABLED.equals(key)
+                    || DashcamSettingsController.KEY_OEM_COEXIST.equals(key)) {
+                mainHandler.post(this::applyOemCoexistState);
+            }
+        };
+        prefs.registerOnSharedPreferenceChangeListener(oemCoexistPrefListener);
+    }
+
+    private void unregisterOemCoexistListener() {
+        if (oemCoexistPrefListener == null) return;
+        try {
+            UiPrefs.getPrefs(this).unregisterOnSharedPreferenceChangeListener(oemCoexistPrefListener);
+        } catch (Throwable ignored) {
+        }
+        oemCoexistPrefListener = null;
+    }
+
+    private void applyOemCoexistState() {
+        if (isOemCoexistActive()) {
+            startOemLifecycleMonitor();
+        } else {
+            stopOemLifecycleMonitor();
+            // If we were latched, AVM coexistence is now off — release the latch and resume
+            // recording so the state doesn't get stuck.
+            if (isOemAvmLatchedActive()) {
+                setOemAvmActive(this, false);
+                RecordingService.resumeAfterOemRequest(this);
+            }
+        }
+    }
+
     private void startOemLifecycleMonitor() {
         if (oemLifecycleThread != null) return;
         oemLifecycleThread = new HandlerThread("OemAvmLifecycleMonitor");
@@ -303,6 +349,7 @@ public class SignalService extends Service {
         oemLifecycleHandler = new Handler(oemLifecycleThread.getLooper());
         oemLifecycleMonitoring = true;
         lastOemLifecycle = readStringSystemProperty(OEM_LIFECYCLE_PROP);
+        DevRuntimeLog.add("SignalService", "OEM lifecycle monitor started");
         oemLifecycleHandler.post(new Runnable() {
             @Override
             public void run() {
@@ -316,6 +363,19 @@ public class SignalService extends Service {
                 oemLifecycleHandler.postDelayed(this, OEM_LIFECYCLE_POLL_MS);
             }
         });
+    }
+
+    private void stopOemLifecycleMonitor() {
+        if (oemLifecycleThread == null) return;
+        DevRuntimeLog.add("SignalService", "OEM lifecycle monitor stopped");
+        oemLifecycleMonitoring = false;
+        if (oemLifecycleHandler != null) {
+            oemLifecycleHandler.removeCallbacksAndMessages(null);
+        }
+        oemLifecycleThread.quitSafely();
+        oemLifecycleThread = null;
+        oemLifecycleHandler = null;
+        lastObservedOemForeground = false;
     }
 
     private void onOemLifecycleChanged(String prev, String next) {
@@ -568,6 +628,10 @@ public class SignalService extends Service {
     }
 
     private void reconcileOemAvmState() {
+        if (!isOemCoexistActive()) {
+            lastObservedOemForeground = false;
+            return;
+        }
         boolean foreground = isOemAvmInForeground();
         boolean latched = isOemAvmLatchedActive();
 
@@ -625,14 +689,8 @@ public class SignalService extends Service {
             pollThread.quitSafely();
             pollThread = null;
         }
-        oemLifecycleMonitoring = false;
-        if (oemLifecycleHandler != null) {
-            oemLifecycleHandler.removeCallbacksAndMessages(null);
-        }
-        if (oemLifecycleThread != null) {
-            oemLifecycleThread.quitSafely();
-            oemLifecycleThread = null;
-        }
+        stopOemLifecycleMonitor();
+        unregisterOemCoexistListener();
         mainHandler.removeCallbacks(hideRunnable);
         OverlayService.hideOverlay(this);
         sInstance = null;

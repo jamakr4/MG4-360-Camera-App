@@ -17,6 +17,9 @@
     <string name="settings_dashcam_fps">Recording FPS</string>
     <string name="settings_dashcam_signature">Signature</string>
     <string name="settings_dashcam_show_speed">Show speed in video</string>
+    <string name="settings_section_dashcam_oem_coexist">OEM 360° AVM</string>
+    <string name="settings_dashcam_oem_coexist">Yield to OEM 360° camera</string>
+    <string name="settings_dashcam_oem_coexist_hint">When enabled, the dashcam briefly pauses so the stock 360° view can open. When disabled, recording keeps running but the OEM 360° view will not launch while the dashcam holds the cameras.</string>
     <string name="settings_dashcam_banners_section">Notification banners</string>
     <string name="settings_dashcam_banner_group_event">Event saved</string>
     <string name="settings_dashcam_banner_group_pause_resume">Recording paused / resumed</string>

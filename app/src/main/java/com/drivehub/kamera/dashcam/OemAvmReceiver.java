@@ -1,6 +1,7 @@
 package com.drivehub.kamera.dashcam;
 
 import com.drivehub.kamera.dev.DevRuntimeLog;
+import com.drivehub.kamera.settings.UiPrefs;
 import com.drivehub.kamera.signal.SignalService;
 
 import android.content.BroadcastReceiver;
@@ -26,6 +27,9 @@ public class OemAvmReceiver extends BroadcastReceiver {
         }
         String action = intent.getAction();
         if (action == null) {
+            return;
+        }
+        if (!DashcamSettingsController.isOemCoexistActive(UiPrefs.getPrefs(context))) {
             return;
         }
         int startMessage = intent.getIntExtra(EXTRA_START_MESSAGE, Integer.MIN_VALUE);

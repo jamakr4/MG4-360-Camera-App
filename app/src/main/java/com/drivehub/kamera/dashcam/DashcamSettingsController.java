@@ -31,6 +31,7 @@ public final class DashcamSettingsController {
 
     private static final String TAG = "DashcamSettings";
     public static final String KEY_ENABLED = "enabled";
+    public static final String KEY_OEM_COEXIST = "oemCoexist";
     public static final int DEFAULT_SEGMENT_SEC = 30;
     public static final int DEFAULT_RETENTION_CLIP_COUNT = 10;
     private static final String KEY_RECORDS_PATH = "recordsPath";
@@ -111,6 +112,7 @@ public final class DashcamSettingsController {
             EditText etRecordingFps,
             EditText etSignature,
             Switch swShowSpeed,
+            Switch swOemCoexist,
             BannerGroupViews eventBanner,
             BannerGroupViews pauseResumeBanner,
             BannerGroupViews errorRecoveredBanner) {
@@ -154,6 +156,11 @@ public final class DashcamSettingsController {
             swShowSpeed.setChecked(shouldShowSpeed(prefs));
             swShowSpeed.setOnCheckedChangeListener(
                     (buttonView, checked) -> prefs.edit().putBoolean(KEY_SHOW_SPEED, checked).apply());
+        }
+        if (swOemCoexist != null) {
+            swOemCoexist.setChecked(isOemCoexistEnabled(prefs));
+            swOemCoexist.setOnCheckedChangeListener(
+                    (buttonView, checked) -> prefs.edit().putBoolean(KEY_OEM_COEXIST, checked).apply());
         }
 
         bindBannerGroup(prefs, BannerGroup.EVENT, eventBanner);
@@ -292,6 +299,19 @@ public final class DashcamSettingsController {
 
     static boolean shouldShowSpeed(SharedPreferences prefs) {
         return prefs.getBoolean(KEY_SHOW_SPEED, true);
+    }
+
+    public static boolean isOemCoexistEnabled(SharedPreferences prefs) {
+        return prefs.getBoolean(KEY_OEM_COEXIST, true);
+    }
+
+    /**
+     * True when the dashcam is on AND the user wants us to yield the cameras to the OEM AVM app.
+     * This is the single gate every OEM-coexistence path (receiver, lifecycle monitor, foreground
+     * fallback) checks before doing anything.
+     */
+    public static boolean isOemCoexistActive(SharedPreferences prefs) {
+        return prefs.getBoolean(KEY_ENABLED, false) && isOemCoexistEnabled(prefs);
     }
 
     public static boolean isBannerEnabled(SharedPreferences prefs, BannerGroup group) {

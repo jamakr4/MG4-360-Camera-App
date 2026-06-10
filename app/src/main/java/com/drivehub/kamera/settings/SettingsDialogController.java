@@ -175,6 +175,7 @@ public final class SettingsDialogController {
         v.etDashcamFps = dialog.findViewById(R.id.etDashcamFps);
         v.etDashcamSignature = dialog.findViewById(R.id.etDashcamSignature);
         v.swDashcamShowSpeed = dialog.findViewById(R.id.switchDashcamShowSpeed);
+        v.swDashcamOemCoexist = dialog.findViewById(R.id.switchDashcamOemCoexist);
         v.swBannerEvent = dialog.findViewById(R.id.switchBannerEvent);
         v.segBannerEventSize = dialog.findViewById(R.id.segBannerEventSize);
         v.seekBannerEventVolume = dialog.findViewById(R.id.seekBannerEventVolume);
@@ -268,6 +269,7 @@ public final class SettingsDialogController {
                 views.etDashcamFps,
                 views.etDashcamSignature,
                 views.swDashcamShowSpeed,
+                views.swDashcamOemCoexist,
                 new DashcamSettingsController.BannerGroupViews(
                         views.swBannerEvent,
                         views.segBannerEventSize,
@@ -309,6 +311,7 @@ public final class SettingsDialogController {
                         views.swRotateToDrivingDirection,
                         views.swDashcamEnabled,
                         views.swDashcamShowSpeed,
+                        views.swDashcamOemCoexist,
                         views.swBannerEvent,
                         views.swBannerPauseResume,
                         views.swBannerErrorRecovered,
@@ -505,6 +508,7 @@ public final class SettingsDialogController {
         EditText etDashcamFps;
         EditText etDashcamSignature;
         Switch swDashcamShowSpeed;
+        Switch swDashcamOemCoexist;
         Switch swBannerEvent;
         SegmentedControl segBannerEventSize;
         SeekBar seekBannerEventVolume;

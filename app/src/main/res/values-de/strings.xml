@@ -17,6 +17,9 @@
     <string name="settings_dashcam_fps">Aufnahme-FPS</string>
     <string name="settings_dashcam_signature">Signatur</string>
     <string name="settings_dashcam_show_speed">Geschwindigkeit im Video anzeigen</string>
+    <string name="settings_section_dashcam_oem_coexist">OEM 360°-Kamera</string>
+    <string name="settings_dashcam_oem_coexist">OEM-360°-App weiter nutzen</string>
+    <string name="settings_dashcam_oem_coexist_hint">Wenn aktiv, pausiert die Dashcam kurz, damit die werkseitige 360°-Ansicht starten kann. Wenn deaktiviert, läuft die Aufnahme durch — die OEM-360°-Ansicht startet aber nicht, solange die Dashcam die Kameras belegt.</string>
     <string name="settings_dashcam_banners_section">Benachrichtigungs-Banner</string>
     <string name="settings_dashcam_banner_group_event">Ereignis gespeichert</string>
     <string name="settings_dashcam_banner_group_pause_resume">Aufnahme pausiert / fortgesetzt</string>
