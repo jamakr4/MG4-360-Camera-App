@@ -47,7 +47,7 @@ public class RecordingService extends Service {
 
     public static final String ACTION_START = "start_recording";
     public static final String ACTION_STOP = "stop_recording";
-    public static final String ACTION_RECORD_TEST_30S = "record_test_30s";
+    public static final String ACTION_RECORD_TEST = "record_test";
     public static final String ACTION_TRIGGER_EVENT_SAVE = "trigger_event_save";
     public static final String ACTION_PAUSE_FOR_OEM_REQUEST = "pause_for_oem_request";
     public static final String ACTION_RESUME_AFTER_OEM_REQUEST = "resume_after_oem_request";
@@ -56,6 +56,7 @@ public class RecordingService extends Service {
     public static final String EXTRA_ACTIVE_CAMERAS = "active_cameras";
     public static final String EXTRA_TOTAL_CAMERAS = "total_cameras";
     public static final String EXTRA_LAST_ERROR = "last_error";
+    public static final String EXTRA_TEST_RECORD_DURATION_SEC = "test_record_duration_sec";
     public static final String STATUS_OFF = "off";
     public static final String STATUS_STARTING = "starting";
     public static final String STATUS_RECORDING = "recording";
@@ -78,7 +79,6 @@ public class RecordingService extends Service {
     private static final String CHANNEL_ID = "mg4_recording";
     private static final int NOTIF_ID = 42;
     private static final int TOTAL_CAMERAS = 4;
-    private static final long TEST_RECORDING_MS = 10_000L;
     private static final int EVENT_SEGMENTS_BEFORE_CURRENT = 2;
     private static final int EVENT_SEGMENTS_AFTER_CURRENT = 2;
     private static final long ERROR_OVERLAY_DELAY_MS = 5_000L;
@@ -119,9 +119,10 @@ public class RecordingService extends Service {
         context.startService(i);
     }
 
-    public static void startTestClip(Context context) {
+    public static void startTestClip(Context context, int durationSec) {
         Intent i = new Intent(context, RecordingService.class);
-        i.setAction(ACTION_RECORD_TEST_30S);
+        i.setAction(ACTION_RECORD_TEST);
+        i.putExtra(EXTRA_TEST_RECORD_DURATION_SEC, durationSec);
         context.startForegroundService(i);
     }
 
@@ -274,8 +275,12 @@ public class RecordingService extends Service {
         DevRuntimeLog.add("RecordingService", action == null ? "ACTION_START(null)" : action);
         startForeground(NOTIF_ID, buildNotification(getString(R.string.notification_recording_starting)));
         publishStatus(STATUS_STARTING, 0, TOTAL_CAMERAS, "");
-        if (ACTION_RECORD_TEST_30S.equals(action)) {
-            worker = new Thread(this::recordTestClip, "RecordingServiceTestWorker");
+        if (ACTION_RECORD_TEST.equals(action)) {
+            int durationSec = intent.getIntExtra(
+                    EXTRA_TEST_RECORD_DURATION_SEC,
+                    DashcamSettingsController.getTestRecordDurationSec(prefs()));
+            long durationMs = Math.max(0L, durationSec * 1000L);
+            worker = new Thread(() -> recordTestClip(durationMs), "RecordingServiceTestWorker");
         } else {
             worker = new Thread(this::recordLoop, "RecordingServiceWorker");
         }
@@ -283,7 +288,7 @@ public class RecordingService extends Service {
         return START_STICKY;
     }
 
-    private void recordTestClip() {
+    private void recordTestClip(long durationMs) {
         File baseDir = requireBaseDir();
         if (baseDir == null) {
             worker = null;
@@ -291,8 +296,7 @@ public class RecordingService extends Service {
             stopSelf();
             return;
         }
-
-        boolean startedAnyCamera = recordClip(baseDir, TEST_RECORDING_MS,
+        boolean startedAnyCamera = recordClip(baseDir, durationMs,
                 "test_" + makeTimestampBase(System.currentTimeMillis(), "yyMMddHHmmss"), -1);
         worker = null;
         if (startedAnyCamera) {

@@ -16,6 +16,7 @@ import android.graphics.drawable.GradientDrawable;
 import android.text.Editable;
 import android.view.View;
 import android.view.Window;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.SeekBar;
@@ -49,6 +50,9 @@ public final class SettingsAppearanceController {
         if (btnSettings != null) {
             btnSettings.setColorFilter(Color.WHITE);
         }
+        int accentColor = UiPrefs.getAccentColorInt(UiPrefs.getPrefs(activity));
+        styleMainActionButton(activity.findViewById(R.id.btnTriggerEventSave), accentColor);
+        styleMainActionButton(activity.findViewById(R.id.btnRecordTestClip), accentColor);
     }
 
     void bindSettingsAppearance(
@@ -312,6 +316,46 @@ public final class SettingsAppearanceController {
                         ContextCompat.getColor(activity, R.color.settings_slider_track_bg)
                 }
         );
+    }
+
+    private void styleMainActionButton(Button button, int accentColor) {
+        if (button == null) {
+            return;
+        }
+        int pressedColor = blendWithBlack(accentColor, 0.16f);
+        int textColor = UiPrefs.isLightColor(accentColor) ? 0xFF111111 : Color.WHITE;
+        ColorStateList tint = new ColorStateList(
+                new int[][]{
+                        new int[]{-android.R.attr.state_enabled},
+                        new int[]{android.R.attr.state_pressed},
+                        new int[]{}
+                },
+                new int[]{
+                        blendWithBlack(accentColor, 0.35f),
+                        pressedColor,
+                        accentColor
+                }
+        );
+        ColorStateList textTint = new ColorStateList(
+                new int[][]{
+                        new int[]{-android.R.attr.state_enabled},
+                        new int[]{}
+                },
+                new int[]{
+                        textColor,
+                        textColor
+                }
+        );
+        button.setBackgroundTintList(tint);
+        button.setTextColor(textTint);
+    }
+
+    private int blendWithBlack(int color, float amount) {
+        amount = Math.max(0f, Math.min(1f, amount));
+        int r = Math.round(Color.red(color) * (1f - amount));
+        int g = Math.round(Color.green(color) * (1f - amount));
+        int b = Math.round(Color.blue(color) * (1f - amount));
+        return Color.rgb(r, g, b);
     }
 
     private float dp(float value) {

@@ -1,6 +1,7 @@
 package com.drivehub.kamera;
 
 import com.drivehub.kamera.camera.OverlayService;
+import com.drivehub.kamera.dashcam.DashcamSettingsController;
 import com.drivehub.kamera.dashcam.RecordingService;
 import com.drivehub.kamera.ota.OtaController;
 import com.drivehub.kamera.settings.SettingsAppearanceController;
@@ -129,13 +130,18 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
         btnRecordTestClip = findViewById(R.id.btnRecordTestClip);
         btnRecordTestClip.setOnClickListener(v -> {
+            SharedPreferences prefs = UiPrefs.getPrefs(this);
+            if (!DashcamSettingsController.isTestRecordEnabled(prefs)) {
+                return;
+            }
+            int testDurationSec = DashcamSettingsController.getTestRecordDurationSec(prefs);
             renderRecordingStatus(RecordingService.STATUS_STARTING, 0, 4, "");
             btnRecordTestClip.setEnabled(false);
-            btnRecordTestClip.setText(R.string.main_button_record_test_running);
+            btnRecordTestClip.setText(getString(R.string.main_button_record_test_running, testDurationSec));
             previewPausedForTestClip = true;
             stopPreview();
             try {
-                RecordingService.startTestClip(this);
+                RecordingService.startTestClip(this, testDurationSec);
             } catch (Throwable t) {
                 renderRecordingStatus(RecordingService.STATUS_ERROR, 0, 4, t.getClass().getSimpleName());
             }
@@ -151,6 +157,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         });
 
         applyStoredRecordingStatus();
+        refreshTestRecordButtonState();
 
         appearanceController.applyMainUiIconColors();
         applyWarningVisibility();
@@ -211,6 +218,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         OverlayService.hideOverlay(this);
         applyWarningVisibility();
         applyStoredRecordingStatus();
+        refreshTestRecordButtonState();
     }
 
     @Override
@@ -286,8 +294,31 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
     private void resetTestClipButton() {
         if (btnRecordTestClip == null) return;
-        btnRecordTestClip.setEnabled(true);
-        btnRecordTestClip.setText(R.string.main_button_record_test_30s);
+        SharedPreferences prefs = UiPrefs.getPrefs(this);
+        boolean enabled = DashcamSettingsController.isTestRecordEnabled(prefs);
+        int durationSec = DashcamSettingsController.getTestRecordDurationSec(prefs);
+        btnRecordTestClip.setVisibility(enabled ? View.VISIBLE : View.GONE);
+        btnRecordTestClip.setEnabled(enabled);
+        btnRecordTestClip.setText(getString(R.string.main_button_record_test_30s, durationSec));
+    }
+
+    public void refreshTestRecordButtonState() {
+        if (btnRecordTestClip == null) return;
+        SharedPreferences prefs = UiPrefs.getPrefs(this);
+        boolean settingEnabled = DashcamSettingsController.isTestRecordEnabled(prefs);
+        int durationSec = DashcamSettingsController.getTestRecordDurationSec(prefs);
+        btnRecordTestClip.setVisibility(settingEnabled ? View.VISIBLE : View.GONE);
+        // A running test clip owns the button's enabled state and label — set by the click
+        // handler, cleared via renderRecordingStatus(STATUS_OFF) → resetTestClipButton().
+        if (previewPausedForTestClip) {
+            return;
+        }
+        String status = RecordingService.readPersistedStatus(prefs).status;
+        boolean recordingInProgress = RecordingService.STATUS_RECORDING.equals(status)
+                || RecordingService.STATUS_STARTING.equals(status)
+                || RecordingService.STATUS_PAUSED_OEM.equals(status);
+        btnRecordTestClip.setText(getString(R.string.main_button_record_test_30s, durationSec));
+        btnRecordTestClip.setEnabled(settingEnabled && !recordingInProgress);
     }
 
     private void restartPreviewAfterTestClipIfNeeded() {

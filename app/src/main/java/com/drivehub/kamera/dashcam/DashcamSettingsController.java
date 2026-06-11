@@ -43,12 +43,17 @@ public final class DashcamSettingsController {
     private static final String KEY_RECORDING_FPS = "recordingFps";
     private static final String KEY_SIGNATURE = "recordingSignature";
     private static final String KEY_SHOW_SPEED = "recordingShowSpeed";
+    private static final String KEY_TEST_RECORD_ENABLED = "testRecordEnabled";
+    private static final String KEY_TEST_RECORD_DURATION_SEC = "testRecordDurationSec";
     private static final String KEY_RETENTION_CLIP_COUNT = "devRetentionClipCount";
     private static final String KEY_MAX_RETAINED_EVENT_DIRS = "devMaxRetainedEventDirs";
     private static final int REQ_STORAGE = 1337;
     private static final int DEFAULT_RECORDING_FPS = 25;
     private static final int MIN_RECORDING_FPS = 1;
     private static final int MAX_RECORDING_FPS = 60;
+    private static final int DEFAULT_TEST_RECORD_DURATION_SEC = 30;
+    private static final int MIN_TEST_RECORD_DURATION_SEC = 0;
+    private static final int MAX_TEST_RECORD_DURATION_SEC = 120;
     private static final int MAX_SIGNATURE_LENGTH = 40;
     private static final String RECORDS_DIR_NAME = "dashcam";
 
@@ -119,12 +124,15 @@ public final class DashcamSettingsController {
             EditText etRecordingFps,
             EditText etSignature,
             Switch swShowSpeed,
+            Switch swTestRecordEnabled,
+            EditText etTestRecordDuration,
             Switch swOemCoexist,
             BannerGroupViews eventBanner,
             BannerGroupViews pauseResumeBanner,
             BannerGroupViews errorRecoveredBanner) {
         int recordingFps = getRecordingFps(prefs);
         String signature = getRecordingSignature(prefs);
+        int testRecordDurationSec = getTestRecordDurationSec(prefs);
 
         if (swEnabled != null) {
             syncingEnabled = true;
@@ -143,7 +151,7 @@ public final class DashcamSettingsController {
                         Toast.makeText(activity, R.string.settings_storage_permission_required, Toast.LENGTH_SHORT)
                                 .show();
                     }
-                    saveFields(prefs, etRecordingFps, etSignature, false);
+                    saveFields(prefs, etRecordingFps, etSignature, etTestRecordDuration, false);
                     RecordingService.startIfDashcamEnabled(activity);
                 } else {
                     RecordingService.stopIfRunning(activity);
@@ -164,6 +172,17 @@ public final class DashcamSettingsController {
             swShowSpeed.setOnCheckedChangeListener(
                     (buttonView, checked) -> prefs.edit().putBoolean(KEY_SHOW_SPEED, checked).apply());
         }
+        if (swTestRecordEnabled != null) {
+            swTestRecordEnabled.setChecked(isTestRecordEnabled(prefs));
+            swTestRecordEnabled.setOnCheckedChangeListener((buttonView, checked) -> {
+                prefs.edit().putBoolean(KEY_TEST_RECORD_ENABLED, checked).apply();
+                activity.refreshTestRecordButtonState();
+            });
+        }
+        if (etTestRecordDuration != null) {
+            etTestRecordDuration.setText(String.valueOf(testRecordDurationSec));
+            etTestRecordDuration.setSelection(etTestRecordDuration.getText().length());
+        }
         if (swOemCoexist != null) {
             swOemCoexist.setChecked(isOemCoexistEnabled(prefs));
             swOemCoexist.setOnCheckedChangeListener(
@@ -174,7 +193,7 @@ public final class DashcamSettingsController {
         bindBannerGroup(prefs, BannerGroup.PAUSE_RESUME, pauseResumeBanner);
         bindBannerGroup(prefs, BannerGroup.ERROR_RECOVERED, errorRecoveredBanner);
 
-        bindFields(prefs, etRecordingFps, etSignature);
+        bindFields(prefs, etRecordingFps, etSignature, etTestRecordDuration);
     }
 
     private void bindBannerGroup(SharedPreferences prefs, BannerGroup group, BannerGroupViews views) {
@@ -256,16 +275,18 @@ public final class DashcamSettingsController {
         }
     }
 
-    private void bindFields(SharedPreferences prefs, EditText etRecordingFps, EditText etSignature) {
+    private void bindFields(SharedPreferences prefs, EditText etRecordingFps, EditText etSignature,
+            EditText etTestRecordDuration) {
         android.text.TextWatcher watcher = new SimpleTextWatcher() {
             @Override
             public void afterTextChanged(Editable s) {
-                saveFields(prefs, etRecordingFps, etSignature, false);
+                saveFields(prefs, etRecordingFps, etSignature, etTestRecordDuration, false);
             }
         };
-        Runnable normalize = () -> saveFields(prefs, etRecordingFps, etSignature, true);
+        Runnable normalize = () -> saveFields(prefs, etRecordingFps, etSignature, etTestRecordDuration, true);
         bindEditText(etRecordingFps, watcher, normalize);
         bindEditText(etSignature, watcher, normalize);
+        bindEditText(etTestRecordDuration, watcher, normalize);
     }
 
     private void bindEditText(EditText editText, android.text.TextWatcher watcher, Runnable onBlur) {
@@ -279,17 +300,22 @@ public final class DashcamSettingsController {
     }
 
     private void saveFields(SharedPreferences prefs, EditText etRecordingFps, EditText etSignature,
-            boolean normalizeFields) {
+            EditText etTestRecordDuration, boolean normalizeFields) {
         int recordingFps = clampRecordingFps(parsePositiveInt(textOf(etRecordingFps), DEFAULT_RECORDING_FPS));
         String signature = normalizeSignature(textOf(etSignature));
+        int testRecordDurationSec = clampTestRecordDurationSec(
+                parseBoundedInt(textOf(etTestRecordDuration), DEFAULT_TEST_RECORD_DURATION_SEC));
         prefs.edit()
                 .putInt(KEY_RECORDING_FPS, recordingFps)
                 .putString(KEY_SIGNATURE, signature)
+                .putInt(KEY_TEST_RECORD_DURATION_SEC, testRecordDurationSec)
                 .apply();
+        activity.refreshTestRecordButtonState();
         if (!normalizeFields)
             return;
         normalizeField(etRecordingFps, recordingFps);
         normalizeField(etSignature, signature);
+        normalizeField(etTestRecordDuration, testRecordDurationSec);
     }
 
     static int getSegmentDurationSec() {
@@ -306,6 +332,15 @@ public final class DashcamSettingsController {
 
     static boolean shouldShowSpeed(SharedPreferences prefs) {
         return prefs.getBoolean(KEY_SHOW_SPEED, true);
+    }
+
+    public static boolean isTestRecordEnabled(SharedPreferences prefs) {
+        return prefs.getBoolean(KEY_TEST_RECORD_ENABLED, true);
+    }
+
+    public static int getTestRecordDurationSec(SharedPreferences prefs) {
+        return clampTestRecordDurationSec(
+                prefs.getInt(KEY_TEST_RECORD_DURATION_SEC, DEFAULT_TEST_RECORD_DURATION_SEC));
     }
 
     public static boolean isOemCoexistEnabled(SharedPreferences prefs) {
@@ -380,6 +415,10 @@ public final class DashcamSettingsController {
         return Math.max(MIN_RECORDING_FPS, Math.min(MAX_RECORDING_FPS, fps));
     }
 
+    private static int clampTestRecordDurationSec(int durationSec) {
+        return Math.max(MIN_TEST_RECORD_DURATION_SEC, Math.min(MAX_TEST_RECORD_DURATION_SEC, durationSec));
+    }
+
     private static int clampVolume(int volume) {
         return Math.max(0, Math.min(100, volume));
     }
@@ -417,6 +456,14 @@ public final class DashcamSettingsController {
         try {
             int value = Integer.parseInt(s.trim());
             return Math.max(1, value);
+        } catch (Throwable ignored) {
+            return def;
+        }
+    }
+
+    private int parseBoundedInt(String s, int def) {
+        try {
+            return Integer.parseInt(s.trim());
         } catch (Throwable ignored) {
             return def;
         }

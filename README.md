@@ -1,6 +1,6 @@
 # MG4-Camera-Mod
 
-Community mod for the MG4 EV (AAOS 9, pre-2026 facelift) that improves the 360° turn signal camera behavior — removing the launcher overlay in favor of a Tesla-style tile view and raising the auto-close speed threshold.
+Community mod for the MG4 EV (AAOS 9, pre-2026 facelift) that improves the 360° turn signal camera behavior — removing the launcher overlay in favor of a Tesla-style tile view and eliminating the auto-close speed threshold.
 
 # Features for v0.8.4 
 - **Turn Signal Overlay** — automatic camera popup when indicator is activated (no matter the speed of the vehicle)
@@ -21,6 +21,14 @@ Community mod for the MG4 EV (AAOS 9, pre-2026 facelift) that improves the 360°
 
 [![Dashcam Demo Video](https://img.youtube.com/vi/Rzb_Owc_RT0/maxresdefault.jpg)](https://youtu.be/Rzb_Owc_RT0)
 > Click video for a YouTube redirect 
+
+## ⚠️ Disclaimer
+
+**Use at your own risk.**
+
+This project involves modifying system APKs on a production vehicle. The author(s) take **no responsibility** for any damage, malfunction, data loss, voided warranty, or any other consequences resulting from the use of these modifications. Modifying vehicle software may affect safety systems — always test in a safe environment.
+
+This is an independent community project and is **not affiliated with SAIC, MG Motor, or any of their subsidiaries**.
 
 ## Dev Mode
 
@@ -53,14 +61,6 @@ The notification sound file is licensed under CC-BY-NC-4.0 and therefore not tra
 - Get the source from [Freesound — notification-sound-7062 by HenryCena82595](https://freesound.org/s/731783/)
 - Convert to `.ogg` (Vorbis) if Freesound serves another format — the app loads the resource via `R.raw.notification_sound_7062_henrycena82595` and expects an `.ogg` extension
 - Place it at `app/src/main/res/raw/notification_sound_7062_henrycena82595.ogg`
-
-## ⚠️ Disclaimer
-
-**Use at your own risk.**
-
-This project involves modifying system APKs on a production vehicle. The author(s) take **no responsibility** for any damage, malfunction, data loss, voided warranty, or any other consequences resulting from the use of these modifications. Modifying vehicle software may affect safety systems — always test in a safe environment.
-
-This is an independent community project and is **not affiliated with SAIC, MG Motor, or any of their subsidiaries**.
 
 ## Credits
 

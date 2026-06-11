@@ -128,6 +128,57 @@
             android:layout_height="wrap_content"
             android:text="@string/settings_dashcam_signature_hint" />
 
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:gravity="center_vertical"
+            android:minHeight="44dp"
+            android:orientation="horizontal">
+
+            <TextView
+                style="@style/DrivehubSettingsCardRowLabel"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/settings_dashcam_test_record_button" />
+
+            <Switch
+                android:id="@+id/switchDashcamTestRecordEnabled"
+                style="@style/DrivehubSettingsSwitch" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:gravity="center_vertical"
+            android:minHeight="44dp"
+            android:orientation="horizontal">
+
+            <TextView
+                style="@style/DrivehubSettingsCardRowLabel"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/settings_dashcam_test_record_duration" />
+
+            <EditText
+                android:id="@+id/etDashcamTestRecordDuration"
+                style="@style/DrivehubSettingsSliderValue"
+                android:inputType="number"
+                android:maxLength="3" />
+
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tvDashcamTestRecordHint"
+            style="@style/DrivehubSettingsCaption"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/settings_dashcam_test_record_hint" />
+
     </LinearLayout>
 
     <!-- ============ RECORDING OVERLAY ============ -->
