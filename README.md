@@ -20,6 +20,7 @@ Community mod for the MG4 EV (AAOS 9, pre-2026 facelift) that improves the 360°
 ![MG4 360 Camera App](images/PXL_20260603_192645923.jpg)
 
 [![Dashcam Demo Video](https://img.youtube.com/vi/Rzb_Owc_RT0/maxresdefault.jpg)](https://youtu.be/Rzb_Owc_RT0)
+> Click video for a YouTube redirect 
 
 ## Dev Mode
 
