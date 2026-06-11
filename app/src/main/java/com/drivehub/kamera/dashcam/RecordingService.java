@@ -48,15 +48,19 @@ public class RecordingService extends Service {
     public static final String ACTION_START = "start_recording";
     public static final String ACTION_STOP = "stop_recording";
     public static final String ACTION_RECORD_TEST = "record_test";
+    public static final String ACTION_EJECT_USB = "eject_usb";
     public static final String ACTION_TRIGGER_EVENT_SAVE = "trigger_event_save";
     public static final String ACTION_PAUSE_FOR_OEM_REQUEST = "pause_for_oem_request";
     public static final String ACTION_RESUME_AFTER_OEM_REQUEST = "resume_after_oem_request";
     public static final String ACTION_STATUS_CHANGED = "com.drivehub.kamera.ACTION_RECORDING_STATUS_CHANGED";
+    public static final String ACTION_USB_EJECT_READY = "com.drivehub.kamera.ACTION_USB_EJECT_READY";
     public static final String EXTRA_STATUS = "status";
     public static final String EXTRA_ACTIVE_CAMERAS = "active_cameras";
     public static final String EXTRA_TOTAL_CAMERAS = "total_cameras";
     public static final String EXTRA_LAST_ERROR = "last_error";
     public static final String EXTRA_TEST_RECORD_DURATION_SEC = "test_record_duration_sec";
+    public static final String EXTRA_USB_EJECT_SAFE_TO_REMOVE = "usb_eject_safe_to_remove";
+    public static final String EXTRA_USB_EJECT_MESSAGE_RES = "usb_eject_message_res";
     public static final String STATUS_OFF = "off";
     public static final String STATUS_STARTING = "starting";
     public static final String STATUS_RECORDING = "recording";
@@ -67,6 +71,7 @@ public class RecordingService extends Service {
     private static final String ERROR_STORAGE_NOT_WRITABLE = "storage not writable";
     private static final String ERROR_GRID_START_FAILED = "grid start failed";
     private static final String ERROR_GRID_STOP_TIMEOUT = "grid stop timeout";
+    private static final String ERROR_USB_STORAGE = "usb storage unavailable";
 
     private static final String KEY_STATUS = "recordingStatus";
     private static final String KEY_ACTIVE_CAMERAS = "recordingActiveCameras";
@@ -97,6 +102,9 @@ public class RecordingService extends Service {
     private volatile int pendingErrorNotificationResId = 0;
     private volatile int pendingErrorGeneration = 0;
     private volatile boolean errorOverlayShown = false;
+    private volatile File activeBaseDir;
+    private volatile boolean activeBaseIsUsb;
+    private volatile boolean usbEjectInProgress = false;
     private long completedSegmentCount = 0L;
 
     public static boolean isRunning() {
@@ -129,6 +137,12 @@ public class RecordingService extends Service {
     public static void triggerEventSave(Context context) {
         Intent i = new Intent(context, RecordingService.class);
         i.setAction(ACTION_TRIGGER_EVENT_SAVE);
+        context.startService(i);
+    }
+
+    public static void requestUsbEject(Context context) {
+        Intent i = new Intent(context, RecordingService.class);
+        i.setAction(ACTION_EJECT_USB);
         context.startService(i);
     }
 
@@ -168,29 +182,34 @@ public class RecordingService extends Service {
 
         if (ACTION_STOP.equals(action)) {
             DevRuntimeLog.add("RecordingService", "ACTION_STOP");
-            stopRequested = true;
-            segmentStopRequested = true;
-            oemPauseRequested = false;
-            synchronized (stateLock) {
-                stateLock.notifyAll();
+            usbEjectInProgress = false;
+            shutdownRecordingService();
+            return START_NOT_STICKY;
+        }
+
+        if (ACTION_EJECT_USB.equals(action)) {
+            DevRuntimeLog.add("RecordingService", "ACTION_EJECT_USB");
+            boolean usingUsb = activeBaseIsUsb;
+            if (!usingUsb) {
+                DashcamStorageManager.Resolution res = DashcamStorageManager.resolve(this);
+                usingUsb = res.usingUsb;
             }
-            publishStatus(STATUS_OFF, 0, TOTAL_CAMERAS, "");
-            // If recording is still running, stop the native side immediately too.
-            // The 4 slots are fixed: 0=F (15), 1=R (17), 2=X (16), 3=Y (14)
-            try {
-                for (int s = 0; s < 4; s++) {
-                    CameraProbe.stopMp4Record(s);
-                }
-                CameraProbe.stopCombinedMp4Record();
-            } catch (Throwable ignored) {
-                // Even if the native layer fails, still continue shutting down the service.
+            if (!usingUsb) {
+                broadcastUsbEjectReady(false, R.string.settings_dashcam_storage_eject_unavailable_message);
+                return START_NOT_STICKY;
             }
-            // Interrupt the worker thread in case it is sleeping.
-            if (worker != null) {
-                worker.interrupt();
-            }
-            stopForeground(true);
-            stopSelf();
+            usbEjectInProgress = true;
+            shutdownRecordingServiceWithoutStopSelf();
+            new Thread(() -> {
+                boolean safeToRemove = awaitShutdownQuiescence();
+                broadcastUsbEjectReady(
+                        safeToRemove,
+                        safeToRemove
+                                ? R.string.settings_dashcam_storage_eject_ready_message
+                                : R.string.settings_dashcam_storage_eject_unavailable_message);
+                stopForeground(true);
+                stopSelf();
+            }, "RecordingServiceUsbEject").start();
             return START_NOT_STICKY;
         }
 
@@ -289,7 +308,7 @@ public class RecordingService extends Service {
     }
 
     private void recordTestClip(long durationMs) {
-        File baseDir = requireBaseDir();
+        File baseDir = resolveActiveBaseDir(true);
         if (baseDir == null) {
             worker = null;
             stopForeground(true);
@@ -302,8 +321,7 @@ public class RecordingService extends Service {
         if (startedAnyCamera) {
             publishStatus(STATUS_OFF, 0, TOTAL_CAMERAS, "");
         }
-        stopForeground(true);
-        stopSelf();
+        stopServiceIfNotEjecting();
     }
 
     private void recordLoop() {
@@ -319,7 +337,7 @@ public class RecordingService extends Service {
             return;
         }
 
-        File baseDir = requireBaseDir();
+        File baseDir = resolveActiveBaseDir(true);
         if (baseDir == null) {
             worker = null;
             stopSelf();
@@ -334,12 +352,28 @@ public class RecordingService extends Service {
             if (!waitForOemPauseToClear(prefs)) {
                 break;
             }
-            // Read every iteration so the dev-mode editor takes effect between segments.
-            int keepSegments = DashcamSettingsController.getRetentionClipCount(prefs);
+            // Re-resolve between segments so USB hot-plug/unplug and settings changes are
+            // picked up. AUTO mode switches targets with a banner; USB_ONLY mode turns a
+            // missing medium into a fatal error.
+            File resolved = resolveActiveBaseDir(false);
+            if (resolved == null) {
+                endedWithFatalError = true;
+                break;
+            }
+            baseDir = resolved;
+
+            // Read every iteration so settings edits take effect between segments. USB and
+            // internal storage carry separate retention limits.
+            int keepSegments = DashcamStorageManager.getActiveRetentionClipCount(prefs, activeBaseIsUsb);
             long segmentStartWallMs = System.currentTimeMillis();
             String baseName = makeTimestampBase(segmentStartWallMs, "yyMMddHHmmss");
             boolean startedAnyCamera = recordClip(baseDir, segmentMs, baseName, keepSegments);
             if (!startedAnyCamera) {
+                if (isRecoverableUsbFailure()) {
+                    // AUTO mode: the segment failed because USB died. The next loop pass
+                    // re-resolves to internal storage and shows the fallback banner.
+                    continue;
+                }
                 endedWithFatalError = true;
                 break;
             }
@@ -355,8 +389,7 @@ public class RecordingService extends Service {
         if (!endedWithFatalError) {
             publishStatus(STATUS_OFF, 0, TOTAL_CAMERAS, "");
         }
-        stopForeground(true);
-        stopSelf();
+        stopServiceIfNotEjecting();
     }
 
     private boolean recordClip(File baseDir, long durationMs, String baseName, int keepSegments) {
@@ -447,7 +480,8 @@ public class RecordingService extends Service {
         List<EventCopyJob> copyJobs;
         synchronized (eventLock) {
             long segmentOrdinal = ++completedSegmentCount;
-            recentSegments.add(new SegmentInfo(segmentOrdinal, baseName, startMs, endMs));
+            recentSegments.add(new SegmentInfo(segmentOrdinal, baseName, startMs, endMs,
+                    baseDir.getAbsolutePath()));
             while (recentSegments.size() > keepSegments + 6) {
                 recentSegments.remove(0);
             }
@@ -501,7 +535,7 @@ public class RecordingService extends Service {
         List<EventCopyJob> jobs = new ArrayList<>();
         List<EventCaptureRequest> completed = new ArrayList<>();
         for (EventCaptureRequest request : pendingEventRequests) {
-            List<String> baseNames = new ArrayList<>();
+            List<SegmentCopyRef> segments = new ArrayList<>();
             for (SegmentInfo segment : recentSegments) {
                 if (segment.ordinal < request.firstSegmentOrdinal
                         || segment.ordinal > request.lastSegmentOrdinal) {
@@ -509,11 +543,11 @@ public class RecordingService extends Service {
                 }
                 if (!request.copiedBaseNames.contains(segment.baseName)
                         && request.inFlightBaseNames.add(segment.baseName)) {
-                    baseNames.add(segment.baseName);
+                    segments.add(new SegmentCopyRef(segment.baseName, segment.sourceDirPath));
                 }
             }
-            if (!baseNames.isEmpty()) {
-                jobs.add(new EventCopyJob(request.eventBaseName, baseNames));
+            if (!segments.isEmpty()) {
+                jobs.add(new EventCopyJob(request.eventBaseName, segments));
             }
             if (isRequestCompleteLocked(request, completedThroughOrdinal)) {
                 completed.add(request);
@@ -560,7 +594,7 @@ public class RecordingService extends Service {
     }
 
     private void copyEventSegments(EventCopyJob job) {
-        if (job.baseNames.isEmpty()) {
+        if (job.segments.isEmpty()) {
             Log.w(TAG, "Skipping empty event copy job for " + job.eventBaseName);
             onEventCopyFinished(job, new ArrayList<>());
             return;
@@ -581,11 +615,17 @@ public class RecordingService extends Service {
             onEventCopyFinished(job, new ArrayList<>());
             return;
         }
-        DevRuntimeLog.add("RecordingService", "Event copy: " + job.eventBaseName + " files " + job.baseNames.size());
+        DevRuntimeLog.add("RecordingService", "Event copy: " + job.eventBaseName + " files " + job.segments.size());
         List<String> copiedBaseNames = new ArrayList<>();
-        for (String baseName : job.baseNames) {
-            if (copySegmentGroup(DashcamSettingsController.getRecordsBaseDir(this), eventDir, baseName)) {
-                copiedBaseNames.add(baseName);
+        for (SegmentCopyRef ref : job.segments) {
+            // Read each segment from the root it was recorded into — after a USB→internal
+            // fallback an event can span both roots. Legacy persisted entries without a
+            // source path fall back to the currently active root.
+            File sourceDir = ref.sourceDirPath.isEmpty()
+                    ? getActiveRecordsBaseDir()
+                    : new File(ref.sourceDirPath);
+            if (copySegmentGroup(sourceDir, eventDir, ref.baseName)) {
+                copiedBaseNames.add(ref.baseName);
             }
         }
         onEventCopyFinished(job, copiedBaseNames);
@@ -597,7 +637,7 @@ public class RecordingService extends Service {
             if (request == null) {
                 return;
             }
-            request.inFlightBaseNames.removeAll(job.baseNames);
+            request.inFlightBaseNames.removeAll(job.baseNames());
             request.copiedBaseNames.addAll(copiedBaseNames);
             if (isRequestCompleteLocked(request, completedSegmentCount)) {
                 pendingEventRequests.remove(request);
@@ -727,7 +767,7 @@ public class RecordingService extends Service {
                 eventDirs.add(f);
             }
         }
-        int maxRetained = DashcamSettingsController.getMaxRetainedEventDirs(prefs());
+        int maxRetained = DashcamStorageManager.getActiveMaxRetainedEventDirs(prefs(), activeBaseIsUsb);
         if (eventDirs.size() <= maxRetained) return;
         // event_<yyMMddHHmmssSSS> sorts chronologically by name.
         eventDirs.sort(Comparator.comparing(File::getName));
@@ -764,7 +804,7 @@ public class RecordingService extends Service {
     }
 
     private File getEventsBaseDir() {
-        File dir = new File(DashcamSettingsController.getRecordsBaseDir(this), "events");
+        File dir = new File(getActiveRecordsBaseDir(), "events");
         return ensureDirectoryExists(dir, "events base dir") ? dir : null;
     }
 
@@ -775,13 +815,70 @@ public class RecordingService extends Service {
                 R.string.notification_dashcam_recording_error_storage_text);
     }
 
-    private File requireBaseDir() {
-        File baseDir = DashcamSettingsController.getRecordsBaseDir(this);
-        if (ensureDirectoryExists(baseDir, "records base dir") && baseDir.canWrite()) {
-            return baseDir;
+    /**
+     * Resolves the recording target via {@link DashcamStorageManager} and updates the
+     * service-wide active dir. Returns null when no usable target exists (which also
+     * publishes the matching error status).
+     *
+     * @param initial true on the first resolution of a recording session — suppresses
+     *                the USB↔internal transition banner that only makes sense mid-session.
+     */
+    private File resolveActiveBaseDir(boolean initial) {
+        DashcamStorageManager.Resolution res = DashcamStorageManager.resolve(this);
+        if (res.baseDir == null) {
+            DevRuntimeLog.add("RecordingService", "Storage resolve failed: " + res.usbState);
+            publishStatus(STATUS_ERROR, 0, TOTAL_CAMERAS, ERROR_USB_STORAGE);
+            return null;
         }
-        publishStatus(STATUS_ERROR, 0, TOTAL_CAMERAS, ERROR_STORAGE_NOT_WRITABLE);
-        return null;
+        if (!ensureDirectoryExists(res.baseDir, "records base dir") || !res.baseDir.canWrite()) {
+            publishStatus(STATUS_ERROR, 0, TOTAL_CAMERAS, ERROR_STORAGE_NOT_WRITABLE);
+            return null;
+        }
+        boolean wasUsb = activeBaseIsUsb;
+        boolean hadPrevious = activeBaseDir != null;
+        activeBaseDir = res.baseDir;
+        activeBaseIsUsb = res.usingUsb;
+        if (!initial && hadPrevious) {
+            if (wasUsb && !res.usingUsb) {
+                DevRuntimeLog.add("RecordingService",
+                        "USB storage lost (" + res.usbState + ") => falling back to internal");
+                DashcamEventOverlayService.showRecordingError(
+                        this,
+                        R.string.dashcam_recording_error_overlay_subtitle_usb_fallback,
+                        R.string.notification_dashcam_recording_error_usb_fallback_text);
+            } else if (!wasUsb && res.usingUsb) {
+                DevRuntimeLog.add("RecordingService", "USB storage available again => switching back to USB");
+            }
+        }
+        return res.baseDir;
+    }
+
+    /**
+     * Called after a failed segment. Decides whether the failure was caused by the USB medium
+     * (as opposed to the camera pipeline) and whether the configured mode allows recovering
+     * from it by falling back to internal storage.
+     */
+    private boolean isRecoverableUsbFailure() {
+        if (!activeBaseIsUsb) {
+            return false;
+        }
+        if (DashcamStorageManager.isUsbStillWritable(activeBaseDir)) {
+            // Storage is fine — this is a genuine camera/encoder failure.
+            return false;
+        }
+        int target = DashcamStorageManager.getStorageTarget(prefs());
+        if (target == DashcamStorageManager.TARGET_USB_ONLY) {
+            DevRuntimeLog.add("RecordingService", "USB storage failed in USB-only mode => stopping");
+            publishStatus(STATUS_ERROR, 0, TOTAL_CAMERAS, ERROR_USB_STORAGE);
+            return false;
+        }
+        DevRuntimeLog.add("RecordingService", "USB storage failed in auto mode => retry on internal");
+        return true;
+    }
+
+    private File getActiveRecordsBaseDir() {
+        File dir = activeBaseDir;
+        return dir != null ? dir : DashcamSettingsController.getRecordsBaseDir(this);
     }
 
     private boolean ensureDirectoryExists(File dir, String label) {
@@ -807,6 +904,66 @@ public class RecordingService extends Service {
 
     private String makeTimestampBase(long epochMs, String pattern) {
         return new SimpleDateFormat(pattern, Locale.US).format(epochMs);
+    }
+
+    private void shutdownRecordingService() {
+        shutdownRecordingServiceWithoutStopSelf();
+        stopForeground(true);
+        stopSelf();
+    }
+
+    private void shutdownRecordingServiceWithoutStopSelf() {
+        stopRequested = true;
+        segmentStopRequested = true;
+        oemPauseRequested = false;
+        synchronized (stateLock) {
+            stateLock.notifyAll();
+        }
+        publishStatus(STATUS_OFF, 0, TOTAL_CAMERAS, "");
+        try {
+            for (int s = 0; s < 4; s++) {
+                CameraProbe.stopMp4Record(s);
+            }
+            CameraProbe.stopCombinedMp4Record();
+        } catch (Throwable ignored) {
+        }
+        if (worker != null) {
+            worker.interrupt();
+        }
+    }
+
+    private boolean awaitShutdownQuiescence() {
+        Thread workerThread = worker;
+        if (workerThread != null) {
+            try {
+                workerThread.join(2000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return false;
+            }
+        }
+        eventCopyExecutor.shutdown();
+        try {
+            return eventCopyExecutor.awaitTermination(5000, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
+    }
+
+    private void stopServiceIfNotEjecting() {
+        if (usbEjectInProgress) {
+            return;
+        }
+        stopForeground(true);
+        stopSelf();
+    }
+
+    private void broadcastUsbEjectReady(boolean safeToRemove, int messageRes) {
+        Intent intent = new Intent(ACTION_USB_EJECT_READY);
+        intent.putExtra(EXTRA_USB_EJECT_SAFE_TO_REMOVE, safeToRemove);
+        intent.putExtra(EXTRA_USB_EJECT_MESSAGE_RES, messageRes);
+        sendBroadcast(intent);
     }
 
     private Notification buildNotification(String text) {
@@ -987,6 +1144,11 @@ public class RecordingService extends Service {
                     R.string.dashcam_recording_error_overlay_subtitle_stop_failed,
                     R.string.notification_dashcam_recording_error_stop_failed_text);
         }
+        if (ERROR_USB_STORAGE.equals(lastError)) {
+            return new OverlayMessageSpec(
+                    R.string.dashcam_recording_error_overlay_subtitle_usb_unavailable,
+                    R.string.notification_dashcam_recording_error_usb_unavailable_text);
+        }
         return new OverlayMessageSpec(
                 R.string.dashcam_recording_error_overlay_subtitle_generic,
                 R.string.notification_dashcam_recording_error_text);
@@ -1015,10 +1177,11 @@ public class RecordingService extends Service {
                     long ordinal = obj.optLong("ordinal", -1L);
                     long startMs = obj.optLong("startMs", 0L);
                     long endMs = obj.optLong("endMs", 0L);
+                    String sourceDir = obj.optString("sourceDir", "");
                     if (baseName.isEmpty() || ordinal <= 0L) {
                         continue;
                     }
-                    recentSegments.add(new SegmentInfo(ordinal, baseName, startMs, endMs));
+                    recentSegments.add(new SegmentInfo(ordinal, baseName, startMs, endMs, sourceDir));
                 }
             } catch (Throwable t) {
                 Log.w(TAG, "Failed to restore recent segment state", t);
@@ -1070,6 +1233,7 @@ public class RecordingService extends Service {
                 obj.put("baseName", segment.baseName);
                 obj.put("startMs", segment.startMs);
                 obj.put("endMs", segment.endMs);
+                obj.put("sourceDir", segment.sourceDirPath);
                 segmentsJson.put(obj);
             } catch (Throwable ignored) {
             }
@@ -1143,12 +1307,27 @@ public class RecordingService extends Service {
         final String baseName;
         final long startMs;
         final long endMs;
+        // Absolute path of the records root this segment was written into. Segments recorded
+        // before a USB→internal fallback live in a different root than the currently active
+        // one, so event copies must read from here, not from the active dir.
+        final String sourceDirPath;
 
-        SegmentInfo(long ordinal, String baseName, long startMs, long endMs) {
+        SegmentInfo(long ordinal, String baseName, long startMs, long endMs, String sourceDirPath) {
             this.ordinal = ordinal;
             this.baseName = baseName;
             this.startMs = startMs;
             this.endMs = endMs;
+            this.sourceDirPath = sourceDirPath == null ? "" : sourceDirPath;
+        }
+    }
+
+    private static final class SegmentCopyRef {
+        final String baseName;
+        final String sourceDirPath;
+
+        SegmentCopyRef(String baseName, String sourceDirPath) {
+            this.baseName = baseName;
+            this.sourceDirPath = sourceDirPath == null ? "" : sourceDirPath;
         }
     }
 
@@ -1168,11 +1347,19 @@ public class RecordingService extends Service {
 
     private static final class EventCopyJob {
         final String eventBaseName;
-        final List<String> baseNames;
+        final List<SegmentCopyRef> segments;
 
-        EventCopyJob(String eventBaseName, List<String> baseNames) {
+        EventCopyJob(String eventBaseName, List<SegmentCopyRef> segments) {
             this.eventBaseName = eventBaseName;
-            this.baseNames = baseNames;
+            this.segments = segments;
+        }
+
+        List<String> baseNames() {
+            List<String> names = new ArrayList<>(segments.size());
+            for (SegmentCopyRef ref : segments) {
+                names.add(ref.baseName);
+            }
+            return names;
         }
     }
 

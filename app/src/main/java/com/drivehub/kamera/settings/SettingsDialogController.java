@@ -142,6 +142,7 @@ public final class SettingsDialogController {
     private void handleDismiss() {
         MainActivity.setSettingsDialogOpen(false);
         devStatusHandler.removeCallbacks(devStatusRefreshRunnable);
+        dashcam.onDismiss();
         views = null;
         dialog = null;
         appearance.applyMainUiIconColors();
@@ -178,6 +179,13 @@ public final class SettingsDialogController {
         v.swDashcamTestRecordEnabled = dialog.findViewById(R.id.switchDashcamTestRecordEnabled);
         v.etDashcamTestRecordDuration = dialog.findViewById(R.id.etDashcamTestRecordDuration);
         v.swDashcamOemCoexist = dialog.findViewById(R.id.switchDashcamOemCoexist);
+        v.segDashcamStorageTarget = dialog.findViewById(R.id.segDashcamStorageTarget);
+        v.tvDashcamStorageStatus = dialog.findViewById(R.id.tvDashcamStorageStatus);
+        v.tvDashcamStorageActivePath = dialog.findViewById(R.id.tvDashcamStorageActivePath);
+        v.btnDashcamStorageEjectUsb = dialog.findViewById(R.id.btnDashcamStorageEjectUsb);
+        v.tvDashcamStorageInternalWarning = dialog.findViewById(R.id.tvDashcamStorageInternalWarning);
+        v.etDashcamUsbClipCount = dialog.findViewById(R.id.etDashcamUsbClipCount);
+        v.etDashcamUsbEventDirs = dialog.findViewById(R.id.etDashcamUsbEventDirs);
         v.swBannerEvent = dialog.findViewById(R.id.switchBannerEvent);
         v.segBannerEventSize = dialog.findViewById(R.id.segBannerEventSize);
         v.seekBannerEventVolume = dialog.findViewById(R.id.seekBannerEventVolume);
@@ -276,6 +284,14 @@ public final class SettingsDialogController {
                 views.swDashcamTestRecordEnabled,
                 views.etDashcamTestRecordDuration,
                 views.swDashcamOemCoexist,
+                new DashcamSettingsController.StorageViews(
+                        views.segDashcamStorageTarget,
+                        views.tvDashcamStorageStatus,
+                        views.tvDashcamStorageActivePath,
+                        views.btnDashcamStorageEjectUsb,
+                        views.tvDashcamStorageInternalWarning,
+                        views.etDashcamUsbClipCount,
+                        views.etDashcamUsbEventDirs),
                 new DashcamSettingsController.BannerGroupViews(
                         views.swBannerEvent,
                         views.segBannerEventSize,
@@ -520,6 +536,13 @@ public final class SettingsDialogController {
         Switch swDashcamTestRecordEnabled;
         EditText etDashcamTestRecordDuration;
         Switch swDashcamOemCoexist;
+        SegmentedControl segDashcamStorageTarget;
+        TextView tvDashcamStorageStatus;
+        TextView tvDashcamStorageActivePath;
+        Button btnDashcamStorageEjectUsb;
+        TextView tvDashcamStorageInternalWarning;
+        EditText etDashcamUsbClipCount;
+        EditText etDashcamUsbEventDirs;
         Switch swBannerEvent;
         SegmentedControl segBannerEventSize;
         SeekBar seekBannerEventVolume;

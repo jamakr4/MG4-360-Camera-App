@@ -17,6 +17,8 @@
     <color name="settings_update_available_text">#FFD786</color>
     <color name="settings_update_error_bg">#26A0A0A0</color>
     <color name="settings_update_error_text">#D1D1D1</color>
+    <color name="settings_status_ok_icon">#6FCF5B</color>
+    <color name="settings_status_error_icon">#FF6B5A</color>
     <color name="settings_divider">#2D2D2D</color>
     <color name="settings_button_surface">#26E7E7E7</color>
     <color name="settings_button_surface_pressed">#3DE7E7E7</color>

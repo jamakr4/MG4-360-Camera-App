@@ -8,13 +8,24 @@ import com.drivehub.kamera.settings.SimpleTextWatcher;
 import com.drivehub.kamera.settings.UiPrefs;
 
 import android.Manifest;
+import android.app.Dialog;
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.content.res.ColorStateList;
+import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
+import android.graphics.drawable.GradientDrawable;
 import android.content.pm.PackageManager;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.Editable;
 import android.util.Log;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.Window;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.SeekBar;
@@ -90,6 +101,31 @@ public final class DashcamSettingsController {
         }
     }
 
+    // Bundle of UI views for the storage target group. The segmented control's children must be
+    // ordered Auto, USB, Internal — the child index maps directly to
+    // DashcamStorageManager.TARGET_AUTO/USB_ONLY/INTERNAL_ONLY.
+    public static final class StorageViews {
+        public final SegmentedControl targetGroup;
+        public final TextView statusText;
+        public final TextView activePathText;
+        public final Button ejectButton;
+        public final TextView internalWarningText;
+        public final EditText usbClipCount;
+        public final EditText usbEventDirs;
+
+        public StorageViews(SegmentedControl targetGroup, TextView statusText,
+                TextView activePathText, Button ejectButton, TextView internalWarningText,
+                EditText usbClipCount, EditText usbEventDirs) {
+            this.targetGroup = targetGroup;
+            this.statusText = statusText;
+            this.activePathText = activePathText;
+            this.ejectButton = ejectButton;
+            this.internalWarningText = internalWarningText;
+            this.usbClipCount = usbClipCount;
+            this.usbEventDirs = usbEventDirs;
+        }
+    }
+
     // Bundle of UI views per banner group (toggle, S/M/L segmented control, volume slider, test
     // button). The segmented control's children must be ordered S, M, L — the child index maps
     // directly to BANNER_SIZE_SMALL/MEDIUM/LARGE.
@@ -113,6 +149,7 @@ public final class DashcamSettingsController {
     private final MainActivity activity;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private boolean syncingEnabled;
+    private BroadcastReceiver usbEjectReceiver;
 
     public DashcamSettingsController(MainActivity activity) {
         this.activity = activity;
@@ -127,6 +164,7 @@ public final class DashcamSettingsController {
             Switch swTestRecordEnabled,
             EditText etTestRecordDuration,
             Switch swOemCoexist,
+            StorageViews storageViews,
             BannerGroupViews eventBanner,
             BannerGroupViews pauseResumeBanner,
             BannerGroupViews errorRecoveredBanner) {
@@ -189,11 +227,301 @@ public final class DashcamSettingsController {
                     (buttonView, checked) -> prefs.edit().putBoolean(KEY_OEM_COEXIST, checked).apply());
         }
 
+        bindStorageGroup(prefs, storageViews);
+
         bindBannerGroup(prefs, BannerGroup.EVENT, eventBanner);
         bindBannerGroup(prefs, BannerGroup.PAUSE_RESUME, pauseResumeBanner);
         bindBannerGroup(prefs, BannerGroup.ERROR_RECOVERED, errorRecoveredBanner);
 
         bindFields(prefs, etRecordingFps, etSignature, etTestRecordDuration);
+    }
+
+    private void bindStorageGroup(SharedPreferences prefs, StorageViews views) {
+        if (views == null) {
+            return;
+        }
+        if (views.targetGroup != null && views.targetGroup.getChildCount() >= 3) {
+            int initialTarget = DashcamStorageManager.getStorageTarget(prefs);
+            views.targetGroup.check(views.targetGroup.getChildAt(initialTarget).getId());
+            views.targetGroup.addOnButtonCheckedListener((g, checkedId, isChecked) -> {
+                if (!isChecked) return;
+                for (int i = 0; i < g.getChildCount(); i++) {
+                    if (g.getChildAt(i).getId() == checkedId) {
+                        DashcamStorageManager.setStorageTarget(prefs, i);
+                        refreshStorageStatus(prefs, views);
+                        break;
+                    }
+                }
+            });
+        }
+        if (views.usbClipCount != null) {
+            views.usbClipCount.setText(String.valueOf(DashcamStorageManager.getUsbRetentionClipCount(prefs)));
+            views.usbClipCount.setSelection(views.usbClipCount.getText().length());
+            bindEditText(views.usbClipCount, new SimpleTextWatcher() {
+                @Override
+                public void afterTextChanged(Editable s) {
+                    Integer value = parseIntOrNull(s);
+                    if (value != null) {
+                        DashcamStorageManager.setUsbRetentionClipCount(prefs, value);
+                    }
+                }
+            }, () -> normalizeField(views.usbClipCount, DashcamStorageManager.getUsbRetentionClipCount(prefs)));
+        }
+        if (views.usbEventDirs != null) {
+            views.usbEventDirs.setText(String.valueOf(DashcamStorageManager.getUsbMaxRetainedEventDirs(prefs)));
+            views.usbEventDirs.setSelection(views.usbEventDirs.getText().length());
+            bindEditText(views.usbEventDirs, new SimpleTextWatcher() {
+                @Override
+                public void afterTextChanged(Editable s) {
+                    Integer value = parseIntOrNull(s);
+                    if (value != null) {
+                        DashcamStorageManager.setUsbMaxRetainedEventDirs(prefs, value);
+                    }
+                }
+            }, () -> normalizeField(views.usbEventDirs, DashcamStorageManager.getUsbMaxRetainedEventDirs(prefs)));
+        }
+        if (views.ejectButton != null) {
+            views.ejectButton.setOnClickListener(v -> showUsbEjectConfirmDialog());
+        }
+        refreshStorageStatus(prefs, views);
+    }
+
+    /**
+     * Recomputes the storage resolution (incl. real USB write test) on a worker thread and
+     * publishes the result to the status views — same pattern as the OTA source status rows.
+     */
+    private void refreshStorageStatus(SharedPreferences prefs, StorageViews views) {
+        if (views == null || views.statusText == null) {
+            return;
+        }
+        int target = DashcamStorageManager.getStorageTarget(prefs);
+        if (views.internalWarningText != null) {
+            views.internalWarningText.setVisibility(
+                    target == DashcamStorageManager.TARGET_INTERNAL_ONLY ? android.view.View.VISIBLE
+                            : android.view.View.GONE);
+        }
+        views.statusText.setText(R.string.settings_dashcam_storage_status_checking);
+        if (views.activePathText != null) {
+            views.activePathText.setText("");
+        }
+        final Context appContext = activity.getApplicationContext();
+        new Thread(() -> {
+            DashcamStorageManager.Resolution res = DashcamStorageManager.resolve(appContext);
+            mainHandler.post(() -> applyStorageStatus(views, res));
+        }, "DashcamStorageStatusProbe").start();
+    }
+
+    private void applyStorageStatus(StorageViews views, DashcamStorageManager.Resolution res) {
+        if (views.statusText == null) {
+            return;
+        }
+        int statusRes;
+        if (res.usingUsb) {
+            statusRes = R.string.settings_dashcam_storage_status_usb_active;
+        } else if (res.usbState == DashcamStorageManager.UsbState.MULTIPLE_MEDIA) {
+            // Applies to AUTO (falls back to internal) and USB_ONLY (no recording) alike —
+            // the ambiguity itself is the message.
+            statusRes = R.string.settings_dashcam_storage_status_multiple_media;
+        } else if (res.target == DashcamStorageManager.TARGET_INTERNAL_ONLY) {
+            statusRes = R.string.settings_dashcam_storage_status_internal_active;
+        } else if (res.target == DashcamStorageManager.TARGET_USB_ONLY) {
+            statusRes = R.string.settings_dashcam_storage_status_usb_required_missing;
+        } else {
+            // AUTO with unusable USB — explain why we are on internal.
+            switch (res.usbState) {
+                case NOT_WRITABLE:
+                    statusRes = R.string.settings_dashcam_storage_status_usb_not_writable;
+                    break;
+                case WRITE_TEST_FAILED:
+                    statusRes = R.string.settings_dashcam_storage_status_usb_write_test_failed;
+                    break;
+                default:
+                    statusRes = R.string.settings_dashcam_storage_status_no_medium;
+                    break;
+            }
+        }
+        views.statusText.setText(colorizeStatusIcon(activity.getString(statusRes)));
+        if (views.activePathText != null) {
+            views.activePathText.setText(res.baseDir == null
+                    ? ""
+                    : activity.getString(R.string.settings_dashcam_storage_active_path,
+                            res.baseDir.getAbsolutePath()));
+        }
+        if (views.ejectButton != null) {
+            views.ejectButton.setVisibility(res.usingUsb ? View.VISIBLE : View.GONE);
+        }
+    }
+
+    private void showUsbEjectConfirmDialog() {
+        showConfirmDialog(
+                activity.getString(R.string.settings_dashcam_storage_eject_title),
+                activity.getString(R.string.settings_dashcam_storage_eject_confirm_message),
+                activity.getString(R.string.settings_dashcam_storage_eject_confirm_action),
+                this::requestUsbEject);
+    }
+
+    private void requestUsbEject() {
+        unregisterUsbEjectReceiver();
+        usbEjectReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                if (intent == null
+                        || !RecordingService.ACTION_USB_EJECT_READY.equals(intent.getAction())) {
+                    return;
+                }
+                unregisterUsbEjectReceiver();
+                boolean safeToRemove = intent.getBooleanExtra(RecordingService.EXTRA_USB_EJECT_SAFE_TO_REMOVE, false);
+                int messageRes = intent.getIntExtra(
+                        RecordingService.EXTRA_USB_EJECT_MESSAGE_RES,
+                        safeToRemove
+                                ? R.string.settings_dashcam_storage_eject_ready_message
+                                : R.string.settings_dashcam_storage_eject_unavailable_message);
+                showMessageDialog(
+                        activity.getString(R.string.settings_dashcam_storage_eject_title),
+                        activity.getString(messageRes));
+            }
+        };
+        ContextCompat.registerReceiver(
+                activity,
+                usbEjectReceiver,
+                new IntentFilter(RecordingService.ACTION_USB_EJECT_READY),
+                ContextCompat.RECEIVER_NOT_EXPORTED
+        );
+        RecordingService.requestUsbEject(activity);
+    }
+
+    public void onDismiss() {
+        unregisterUsbEjectReceiver();
+    }
+
+    private void unregisterUsbEjectReceiver() {
+        if (usbEjectReceiver == null) {
+            return;
+        }
+        try {
+            activity.unregisterReceiver(usbEjectReceiver);
+        } catch (Throwable ignored) {
+        }
+        usbEjectReceiver = null;
+    }
+
+    private void showConfirmDialog(String title, String message, String confirmText, Runnable onConfirm) {
+        Dialog dialog = createBaseDialog();
+        TextView titleView = dialog.findViewById(R.id.tvOtaRefreshTitle);
+        TextView messageView = dialog.findViewById(R.id.tvOtaRefreshMessage);
+        TextView confirmButton = dialog.findViewById(R.id.btnOtaRefresh);
+        TextView closeButton = dialog.findViewById(R.id.btnOtaClose);
+        if (titleView != null) {
+            titleView.setText(title);
+        }
+        if (messageView != null) {
+            messageView.setText(message);
+        }
+        if (confirmButton != null) {
+            confirmButton.setText(confirmText);
+            stylePrimaryButton(confirmButton);
+            confirmButton.setOnClickListener(v -> {
+                dialog.dismiss();
+                if (onConfirm != null) {
+                    onConfirm.run();
+                }
+            });
+        }
+        if (closeButton != null) {
+            closeButton.setOnClickListener(v -> dialog.dismiss());
+        }
+        showCentered(dialog, 540);
+    }
+
+    private void showMessageDialog(String title, String message) {
+        Dialog dialog = createBaseDialog();
+        TextView titleView = dialog.findViewById(R.id.tvOtaRefreshTitle);
+        TextView messageView = dialog.findViewById(R.id.tvOtaRefreshMessage);
+        View confirmButton = dialog.findViewById(R.id.btnOtaRefresh);
+        TextView closeButton = dialog.findViewById(R.id.btnOtaClose);
+        if (titleView != null) {
+            titleView.setText(title);
+        }
+        if (messageView != null) {
+            messageView.setText(message);
+        }
+        if (confirmButton != null) {
+            confirmButton.setVisibility(View.GONE);
+        }
+        if (closeButton != null) {
+            closeButton.setOnClickListener(v -> dialog.dismiss());
+        }
+        showCentered(dialog, 540);
+    }
+
+    private Dialog createBaseDialog() {
+        Dialog dialog = new Dialog(activity);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        dialog.setContentView(R.layout.dialog_ota_refresh);
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+        }
+        return dialog;
+    }
+
+    private void showCentered(Dialog dialog, int widthDp) {
+        dialog.show();
+        Window window = dialog.getWindow();
+        if (window == null) return;
+        float density = activity.getResources().getDisplayMetrics().density;
+        window.setLayout((int) (widthDp * density), ViewGroup.LayoutParams.WRAP_CONTENT);
+    }
+
+    private void stylePrimaryButton(TextView button) {
+        int accentColor = UiPrefs.getAccentColorInt(UiPrefs.getPrefs(activity));
+        GradientDrawable background = new GradientDrawable();
+        background.setCornerRadius(dp(14f));
+        background.setColor(accentColor);
+        if (UiPrefs.isLightColor(accentColor)) {
+            background.setStroke((int) dp(1f), 0x33000000);
+            button.setTextColor(0xFF111111);
+        } else {
+            background.setStroke(0, Color.TRANSPARENT);
+            button.setTextColor(Color.WHITE);
+        }
+        button.setBackground(background);
+    }
+
+    private float dp(float value) {
+        return value * activity.getResources().getDisplayMetrics().density;
+    }
+
+    /** Tints a leading ✓ green / ✗ red while keeping the rest of the text untouched. */
+    private CharSequence colorizeStatusIcon(String text) {
+        if (text == null || text.isEmpty()) {
+            return text;
+        }
+        char first = text.charAt(0);
+        int colorRes;
+        if (first == '✓') {
+            colorRes = R.color.settings_status_ok_icon;
+        } else if (first == '✗') {
+            colorRes = R.color.settings_status_error_icon;
+        } else {
+            return text;
+        }
+        android.text.SpannableString spannable = new android.text.SpannableString(text);
+        spannable.setSpan(
+                new android.text.style.ForegroundColorSpan(ContextCompat.getColor(activity, colorRes)),
+                0, 1, android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+        return spannable;
+    }
+
+    private Integer parseIntOrNull(Editable s) {
+        if (s == null) return null;
+        String text = s.toString().trim();
+        if (text.isEmpty()) return null;
+        try {
+            return Integer.parseInt(text);
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
     }
 
     private void bindBannerGroup(SharedPreferences prefs, BannerGroup group, BannerGroupViews views) {

@@ -177,9 +177,17 @@ public final class SettingsAppearanceController {
     void styleSettingsTab(TextView tab, boolean active) {
         int activeColor = UiPrefs.getAccentColorInt(prefs);
         int inactiveColor = ContextCompat.getColor(activity, R.color.settings_tab_inactive);
-        tab.setTextColor(active ? activeColor : inactiveColor);
+        tab.setTextColor(active ? Color.WHITE : inactiveColor);
         tab.setTypeface(tab.getTypeface(), Typeface.BOLD);
-        tab.setBackgroundResource(active ? R.drawable.bg_settings_tab_active : 0);
+        if (active) {
+            tab.setBackgroundResource(R.drawable.bg_settings_tab_active);
+            Drawable background = tab.getBackground();
+            if (background instanceof GradientDrawable) {
+                ((GradientDrawable) background.mutate()).setColor(applyAlpha(activeColor, 0.22f));
+            }
+        } else {
+            tab.setBackgroundResource(0);
+        }
     }
 
     private void showAccentColorPicker() {
@@ -299,7 +307,7 @@ public final class SettingsAppearanceController {
         if (tabs != null) {
             for (int i = 0; i < tabs.length; i++) {
                 if (tabs[i] != null) {
-                    tabs[i].setTextColor(i == activeTab ? accentColor : inactiveColor);
+                    tabs[i].setTextColor(i == activeTab ? Color.WHITE : inactiveColor);
                 }
             }
         }
@@ -356,6 +364,11 @@ public final class SettingsAppearanceController {
         int g = Math.round(Color.green(color) * (1f - amount));
         int b = Math.round(Color.blue(color) * (1f - amount));
         return Color.rgb(r, g, b);
+    }
+
+    private int applyAlpha(int color, float alphaFraction) {
+        int alpha = Math.round(Math.max(0f, Math.min(1f, alphaFraction)) * 255f);
+        return Color.argb(alpha, Color.red(color), Color.green(color), Color.blue(color));
     }
 
     private float dp(float value) {
