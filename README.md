@@ -1,6 +1,6 @@
 # MG4-Camera-Mod
 
-Community mod for the MG4 EV (AAOS 9, pre-2026 facelift) that improves the 360° turn signal camera behavior — removing the launcher overlay in favor of a Tesla-style tile view and eliminating the auto-close speed threshold.
+Community mod for the MG4 EV (AAOS 9, pre-2026 facelift) that improves the 360° turn signal camera behavior — removing the launcher overlay in favor of a Tesla-style tile view - eliminating the auto-close speed threshold & a dashcam mode.
 
 # Features for v0.8.4 
 - **Turn Signal Overlay** — automatic camera popup when indicator is activated (no matter the speed of the vehicle)
@@ -11,7 +11,6 @@ Community mod for the MG4 EV (AAOS 9, pre-2026 facelift) that improves the 360°
   - Pause/resume/error banners with per-group size and volume controls
   - **OEM 360° AVM coexistence** — the dashcam briefly yields the cameras so the factory reverse/360° view can still open. Can be disabled in settings if you'd rather keep recording uninterrupted.
 - **External Trigger** — broadcast `com.drivehub.kamera.action.TRIGGER_DASHCAM_EVENT` from any app or ADB to save an event clip. Companion app: [MG4-Dashcam-Trigger](https://github.com/jamakr4/MG4-Dashcam-Trigger).
-- **Full Access to Camera System**
 - **Language support for English and German with auto select based on the vehicle's language**
 
 > **Work in progress.** Check the [Wiki](https://github.com/jamakr4/MG4-360-Camera-App/wiki) for technical details and the [Project Board](https://github.com/users/jamakr4/projects/4) for current progress.
@@ -21,6 +20,16 @@ Community mod for the MG4 EV (AAOS 9, pre-2026 facelift) that improves the 360°
 
 [![Dashcam Demo Video](https://img.youtube.com/vi/Rzb_Owc_RT0/maxresdefault.jpg)](https://youtu.be/Rzb_Owc_RT0)
 > Click video for a YouTube redirect 
+
+## Setup OEM SAIC 360Cam App
+
+To avoid conflicts with the modified turn signal camera behavior in this app, it is recommended to disable the original turn signal camera popups inside the OEM SAIC 360 camera app.
+
+If the OEM turn signal camera feature remains enabled, both systems may try to react to the same indicator event at the same time. This can lead to unexpected behavior, inconsistent switching, or the OEM app taking over when you want the custom camera flow from `MG4-360-Camera-App`.
+
+![OEM SAIC 360 camera settings step 1](images/setting%231.jpg)
+
+![OEM SAIC 360 camera settings step 2](images/setting%232.jpg)
 
 ## ⚠️ Disclaimer
 
