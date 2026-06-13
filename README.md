@@ -1,21 +1,26 @@
-# MG4-Camera-Mod
-
 <img src="images/app-icon/ic_launcher_512.png" alt="MG4 Camera Mod app icon" width="140" align="left" hspace="20" vspace="6">
 
 **Tesla-style turn signal camera overlay and native 4-camera dashcam for the MG4 EV.**
 
 Community mod for the MG4 EV (AAOS 9, pre-2026 facelift) that replaces the stock launcher overlay with a cleaner tile view, removes the auto-close speed threshold, and adds a proper native-camera dashcam mode.
 
-<br clear="left">
+<br clear="left"><br>
 
 <p align="center">
-  <img alt="Latest release" 
-  src="https://img.shields.io/github/v/release/jamakr4/MG4-360-Camera-App?label=release&color=1f6feb">
+  <img alt="Latest release" src="https://img.shields.io/github/v/release/jamakr4/MG4-360-Camera-App?label=release&color=1f6feb">
   <img alt="Platform" src="https://img.shields.io/badge/platform-MG4%20AAOS%209-0a7f5a">
-   <img alt="Downloads" src="https://img.shields.io/github/downloads/jamakr4/MG4-360-Camera-App/total?color=5e9f3a">
+  <img alt="Downloads" src="https://img.shields.io/github/downloads/jamakr4/MG4-360-Camera-App/total?color=5e9f3a">
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-GPL--3.0-bd2c00"></a>
   <img alt="Languages" src="https://img.shields.io/badge/languages-EN%20%7C%20DE-4c566a">
-  <img alt="Stars" src="https://img.shields.io/github/stars/jamakr4/MG4-360-Camera-App?">
+  <img alt="Stars" src="https://img.shields.io/github/stars/jamakr4/MG4-360-Camera-App">
+</p>
+
+<p align="center">
+  <img alt="Android" src="https://img.shields.io/badge/Android-3DDC84?logo=android&logoColor=white">
+  <img alt="Java" src="https://img.shields.io/badge/Java-ED8B00?logo=openjdk&logoColor=white">
+  <img alt="C++" src="https://img.shields.io/badge/C%2B%2B-00599C?logo=cplusplus&logoColor=white">
+  <img alt="OpenCV" src="https://img.shields.io/badge/OpenCV-5C3EE8?logo=opencv&logoColor=white">
+  <img alt="Gradle" src="https://img.shields.io/badge/Gradle-02303A?logo=gradle&logoColor=white">
 </p>
 
 <p align="center">
@@ -23,13 +28,18 @@ Community mod for the MG4 EV (AAOS 9, pre-2026 facelift) that replaces the stock
   &nbsp;·&nbsp;
   <a href="https://github.com/users/jamakr4/projects/4"><strong>Project Board</strong></a>
   &nbsp;·&nbsp;
-  <a href="https://github.com/jamakr4/MG4-Dashcam-Trigger"><strong>Companion  App</strong></a>
+  <a href="https://github.com/jamakr4/MG4-Dashcam-Trigger"><strong>Companion App</strong></a>
   &nbsp;·&nbsp;
   <a href="https://youtu.be/Rzb_Owc_RT0"><strong>Demo Video</strong></a>
 </p>
 
 > [!IMPORTANT]
-> This is a work in progress for the MG4 EV platform. Test carefully and expect rough edges while features and OEM interoperability keep evolving.
+> **Work in progress.** Check the [Wiki](https://github.com/jamakr4/MG4-360-Camera-App/wiki) for technical details and the [Project Board](https://github.com/users/jamakr4/projects/4) for current progress.
+
+<p align="center">
+  <a href="https://github.com/jamakr4/MG4-360-Camera-App/releases/latest"><img alt="Download latest APK" src="https://img.shields.io/badge/Download%20Latest%20APK-1F6FEB?style=for-the-badge&logo=android&logoColor=white&logoWidth=24"></a>
+</p>
+
 
 ## Feature Highlights
 
@@ -109,13 +119,15 @@ What you can tweak:
   </picture>
 </a>
 
+
+
 **Support the project** — the most helpful things you can do:
 
 - Star the repository on GitHub.
 - Share feedback, ideas, and bug reports through Issues or discussions.
 - Tell other MG4 tinkerers about it.
 
-Financial support sounds nice in theory, but German tax/admin overhead makes donation platforms impractical for this hobby project right now.
+Financial support sounds nice in theory, but German tax overhead makes donation platforms impractical for this hobby project right now. 
 
 <br clear="left">
 
