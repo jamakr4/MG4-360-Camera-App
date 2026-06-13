@@ -4,7 +4,7 @@
 
 Community mod for the MG4 EV (AAOS 9, pre-2026 facelift) that replaces the stock launcher overlay with a cleaner tile view, removes the auto-close speed threshold, and adds a proper native-camera dashcam mode.
 
-<br clear="left"><br>
+<br clear="left">
 
 <p align="center">
   <img alt="Latest release" src="https://img.shields.io/github/v/release/jamakr4/MG4-360-Camera-App?label=release&color=1f6feb">
