@@ -9,7 +9,6 @@ Community mod for the MG4 EV (AAOS 9, pre-2026 facelift) that replaces the stock
 <br clear="left">
 
 <p align="center">
-  
   <img alt="Latest release" 
   src="https://img.shields.io/github/v/release/jamakr4/MG4-360-Camera-App?label=release&color=1f6feb">
   <img alt="Platform" src="https://img.shields.io/badge/platform-MG4%20AAOS%209-0a7f5a">
@@ -102,16 +101,23 @@ What you can tweak:
 
 ## Insights
 
-<p align="center">
-  <a href="https://www.star-history.com/#jamakr4/MG4-360-Camera-App&Date">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=jamakr4/MG4-360-Camera-App&type=Date&theme=dark">
-      <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=jamakr4/MG4-360-Camera-App&type=Date">
-      <img src="https://api.star-history.com/svg?repos=jamakr4/MG4-360-Camera-App&type=Date" alt="Star History Chart" width="640">
-    </picture>
-  </a>
-</p>
-<p align="center"><sub>Star history of the project — click for the interactive view.</sub></p>
+<a href="https://www.star-history.com/#jamakr4/MG4-360-Camera-App&Date">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=jamakr4/MG4-360-Camera-App&type=Date&theme=dark">
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=jamakr4/MG4-360-Camera-App&type=Date">
+    <img src="https://api.star-history.com/svg?repos=jamakr4/MG4-360-Camera-App&type=Date" alt="Star History Chart" width="65%" align="left" hspace="12">
+  </picture>
+</a>
+
+**Support the project** — the most helpful things you can do:
+
+- Star the repository on GitHub.
+- Share feedback, ideas, and bug reports through Issues or discussions.
+- Tell other MG4 tinkerers about it.
+
+Financial support sounds nice in theory, but German tax/admin overhead makes donation platforms impractical for this hobby project right now.
+
+<br clear="left">
 
 
 ## Safety and Disclaimer
@@ -135,19 +141,6 @@ This is an independent community project and is **not affiliated with SAIC, MG M
 - Material Components for Android 1.13.0 - Apache License 2.0
 - Icons based on [Google Material Symbols](https://developers.google.com/fonts/docs/material_symbols) - Apache License 2.0
 - `notification-sound-7062` by `HenryCena82595` - [Freesound](https://freesound.org/s/731783/) - Attribution NonCommercial 4.0
-
-</details>
-
-<details>
-  <summary><strong>Support the Project</strong></summary>
-
-If you want to support the project, the most helpful options are:
-
-- Star the repository on GitHub.
-- Share feedback, ideas, and bug reports through Issues or discussions.
-- Tell other MG4 tinkerers about it.
-
-Financial support sounds nice in theory, but German tax/admin overhead makes donation platforms impractical for this hobby project right now.
 
 </details>
 
