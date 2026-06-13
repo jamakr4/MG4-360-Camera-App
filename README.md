@@ -1,29 +1,28 @@
 # MG4-Camera-Mod
 
-<table>
-  <tr>
-    <td width="160" valign="middle">
-      <img src="images/app-icon/ic_launcher_512.png" alt="MG4 Camera Mod app icon" width="140">
-    </td>
-    <td valign="middle">
-      <strong>Tesla-style turn signal camera overlay and native 4-camera dashcam for the MG4 EV.</strong>
-      <p>Community mod for the MG4 EV (AAOS 9, pre-2026 facelift) that replaces the stock launcher overlay with a cleaner tile view, removes the auto-close speed threshold, and adds a proper native-camera dashcam mode.</p>
-    </td>
-  </tr>
-</table>
+<img src="images/app-icon/ic_launcher_512.png" alt="MG4 Camera Mod app icon" width="140" align="left" hspace="20" vspace="6">
 
-<p>
+**Tesla-style turn signal camera overlay and native 4-camera dashcam for the MG4 EV.**
+
+Community mod for the MG4 EV (AAOS 9, pre-2026 facelift) that replaces the stock launcher overlay with a cleaner tile view, removes the auto-close speed threshold, and adds a proper native-camera dashcam mode.
+
+<br clear="left">
+
+<p align="center">
   <a href="https://github.com/jamakr4/MG4-360-Camera-App/releases"><img alt="Version" src="https://img.shields.io/badge/version-v0.8.4-1f6feb"></a>
   <img alt="Platform" src="https://img.shields.io/badge/platform-MG4%20AAOS%209-0a7f5a">
   <img alt="Languages" src="https://img.shields.io/badge/languages-EN%20%7C%20DE-4c566a">
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-GPL--3.0-bd2c00"></a>
 </p>
 
-<p>
-  <a href="https://github.com/jamakr4/MG4-360-Camera-App/wiki">Wiki</a> |
-  <a href="https://github.com/users/jamakr4/projects/4">Project Board</a> |
-  <a href="https://github.com/jamakr4/MG4-Dashcam-Trigger">Companion Trigger App</a> |
-  <a href="https://youtu.be/Rzb_Owc_RT0">Dashcam Demo Video</a>
+<p align="center">
+  <a href="https://github.com/jamakr4/MG4-360-Camera-App/wiki"><strong>Wiki</strong></a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/users/jamakr4/projects/4"><strong>Project Board</strong></a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/jamakr4/MG4-Dashcam-Trigger"><strong>Companion  App</strong></a>
+  &nbsp;·&nbsp;
+  <a href="https://youtu.be/Rzb_Owc_RT0"><strong>Demo Video</strong></a>
 </p>
 
 > [!IMPORTANT]
@@ -42,19 +41,13 @@
 
 ## Preview
 
-<table>
-  <tr>
-    <td width="62%">
-      <img src="images/PXL_20260603_192645923.jpg" alt="MG4 360 Camera App screenshot">
-    </td>
-    <td valign="top">
-      <a href="https://youtu.be/Rzb_Owc_RT0">
-        <img src="https://img.youtube.com/vi/Rzb_Owc_RT0/maxresdefault.jpg" alt="Dashcam demo video">
-      </a>
-      <p><strong>Video demo:</strong> click the thumbnail for the YouTube redirect.</p>
-    </td>
-  </tr>
-</table>
+<p align="center">
+  <img src="images/PXL_20260603_192645923.jpg" alt="MG4 360 Camera App screenshot" width="62%">
+  &nbsp;
+  <a href="https://youtu.be/Rzb_Owc_RT0"><img src="https://img.youtube.com/vi/Rzb_Owc_RT0/maxresdefault.jpg" alt="Dashcam demo video" width="36%"></a>
+</p>
+
+<sub><strong>Video demo:</strong> click the thumbnail for the YouTube redirect.</sub>
 
 ## OEM SAIC 360Cam Setup
 
@@ -62,12 +55,11 @@ To avoid conflicts with the modified turn signal camera behavior in this app, di
 
 If the OEM feature stays enabled, both systems may respond to the same indicator event. That can cause overlapping behavior, inconsistent switching, or the OEM app taking over when you want the custom flow from `MG4-Camera-Mod`.
 
-<table>
-  <tr>
-    <td><img src="images/setting%231.jpg" alt="OEM SAIC 360 camera settings step 1"></td>
-    <td><img src="images/setting%232.jpg" alt="OEM SAIC 360 camera settings step 2"></td>
-  </tr>
-</table>
+<p align="center">
+  <img src="images/setting%231.jpg" alt="OEM SAIC 360 camera settings step 1" width="48%">
+  &nbsp;
+  <img src="images/setting%232.jpg" alt="OEM SAIC 360 camera settings step 2" width="48%">
+</p>
 
 ## Build Setup
 
