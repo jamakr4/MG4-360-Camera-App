@@ -9,10 +9,14 @@ Community mod for the MG4 EV (AAOS 9, pre-2026 facelift) that replaces the stock
 <br clear="left">
 
 <p align="center">
-  <a href="https://github.com/jamakr4/MG4-360-Camera-App/releases"><img alt="Version" src="https://img.shields.io/badge/version-v0.8.4-1f6feb"></a>
+  
+  <img alt="Latest release" 
+  src="https://img.shields.io/github/v/release/jamakr4/MG4-360-Camera-App?label=release&color=1f6feb">
   <img alt="Platform" src="https://img.shields.io/badge/platform-MG4%20AAOS%209-0a7f5a">
-  <img alt="Languages" src="https://img.shields.io/badge/languages-EN%20%7C%20DE-4c566a">
+   <img alt="Downloads" src="https://img.shields.io/github/downloads/jamakr4/MG4-360-Camera-App/total?color=5e9f3a">
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-GPL--3.0-bd2c00"></a>
+  <img alt="Languages" src="https://img.shields.io/badge/languages-EN%20%7C%20DE-4c566a">
+  <img alt="Stars" src="https://img.shields.io/github/stars/jamakr4/MG4-360-Camera-App?">
 </p>
 
 <p align="center">
@@ -95,6 +99,20 @@ What you can tweak:
 > Values are not validated against your storage size, system load, camera bandwidth, or signal timing realities. Aggressive polling can hurt responsiveness, large buffers can eat storage quickly, and bad combinations may produce behavior nobody has tested yet.
 >
 > If something gets weird after tuning, use **Reset defaults** first. If that does not help, clear the app data.
+
+## Insights
+
+<p align="center">
+  <a href="https://www.star-history.com/#jamakr4/MG4-360-Camera-App&Date">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=jamakr4/MG4-360-Camera-App&type=Date&theme=dark">
+      <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=jamakr4/MG4-360-Camera-App&type=Date">
+      <img src="https://api.star-history.com/svg?repos=jamakr4/MG4-360-Camera-App&type=Date" alt="Star History Chart" width="640">
+    </picture>
+  </a>
+</p>
+<p align="center"><sub>Star history of the project — click for the interactive view.</sub></p>
+
 
 ## Safety and Disclaimer
 
