@@ -32,9 +32,9 @@
 ## Feature Highlights
 
 - **Turn signal overlay**: opens automatically when the indicator is activated, without the original speed-based auto-close behavior.
-- **Tesla-style tile view**: replaces the launcher-like OEM overlay with a cleaner multi-camera presentation.
-- **Native 4-camera dashcam**: records all four factory cameras into a single `720x240` grid clip.
-- **Event capture**: saves a pre/post recording window into a separate `events/` folder with a configurable retention cap.
+- **Tesla-style tile view**: replaces the launcher-like OEM overlay, also known as the fullscreen takeover, with a cleaner presentation.
+- **Native 4-camera dashcam**: records all four factory cameras into a single 720x240 grid clip with a footer including time, speed, and a custom signature.
+- **Event capture**: saves a pre/post recording window into a separate `events/` folder
 - **Flexible overlay feedback**: pause, resume, event, and error banners with adjustable size and volume.
 - **OEM 360 AVM coexistence**: can briefly yield camera access so the stock reverse/360 view still opens when needed.
 - **External trigger support**: send `com.drivehub.kamera.action.TRIGGER_DASHCAM_EVENT` from ADB or another app to save an event clip.
