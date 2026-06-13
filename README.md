@@ -1,99 +1,146 @@
 # MG4-Camera-Mod
 
-Community mod for the MG4 EV (AAOS 9, pre-2026 facelift) that improves the 360° turn signal camera behavior — removing the launcher overlay in favor of a Tesla-style tile view - eliminating the auto-close speed threshold & a dashcam mode.
+<table>
+  <tr>
+    <td width="160" valign="middle">
+      <img src="images/app-icon/ic_launcher_512.png" alt="MG4 Camera Mod app icon" width="140">
+    </td>
+    <td valign="middle">
+      <strong>Tesla-style turn signal camera overlay and native 4-camera dashcam for the MG4 EV.</strong>
+      <p>Community mod for the MG4 EV (AAOS 9, pre-2026 facelift) that replaces the stock launcher overlay with a cleaner tile view, removes the auto-close speed threshold, and adds a proper native-camera dashcam mode.</p>
+    </td>
+  </tr>
+</table>
 
-# Features for v0.8.4 
-- **Turn Signal Overlay** — automatic camera popup when indicator is activated (no matter the speed of the vehicle)
-- **Dashcam Recording** — uses all four native cameras, merged into a single 720×240 grid clip
-  - Rolling 30 s segments with a configurable ring buffer (default 10 clips)
-  - Event capture saves a window of pre/post segments to a separate `events/` folder, with a configurable cap (default 5 events)
-  - Optional speed and signature burned into the video
-  - Pause/resume/error banners with per-group size and volume controls
-  - **OEM 360° AVM coexistence** — the dashcam briefly yields the cameras so the factory reverse/360° view can still open. Can be disabled in settings if you'd rather keep recording uninterrupted.
-- **External Trigger** — broadcast `com.drivehub.kamera.action.TRIGGER_DASHCAM_EVENT` from any app or ADB to save an event clip. Companion app: [MG4-Dashcam-Trigger](https://github.com/jamakr4/MG4-Dashcam-Trigger).
-- **Language support for English and German with auto select based on the vehicle's language**
+<p>
+  <a href="https://github.com/jamakr4/MG4-360-Camera-App/releases"><img alt="Version" src="https://img.shields.io/badge/version-v0.8.4-1f6feb"></a>
+  <img alt="Platform" src="https://img.shields.io/badge/platform-MG4%20AAOS%209-0a7f5a">
+  <img alt="Languages" src="https://img.shields.io/badge/languages-EN%20%7C%20DE-4c566a">
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-GPL--3.0-bd2c00"></a>
+</p>
 
-> **Work in progress.** Check the [Wiki](https://github.com/jamakr4/MG4-360-Camera-App/wiki) for technical details and the [Project Board](https://github.com/users/jamakr4/projects/4) for current progress.
+<p>
+  <a href="https://github.com/jamakr4/MG4-360-Camera-App/wiki">Wiki</a> |
+  <a href="https://github.com/users/jamakr4/projects/4">Project Board</a> |
+  <a href="https://github.com/jamakr4/MG4-Dashcam-Trigger">Companion Trigger App</a> |
+  <a href="https://youtu.be/Rzb_Owc_RT0">Dashcam Demo Video</a>
+</p>
 
+> [!IMPORTANT]
+> This is a work in progress for the MG4 EV platform. Test carefully and expect rough edges while features and OEM interoperability keep evolving.
 
-![MG4 360 Camera App](images/PXL_20260603_192645923.jpg)
+## Feature Highlights
 
-[![Dashcam Demo Video](https://img.youtube.com/vi/Rzb_Owc_RT0/maxresdefault.jpg)](https://youtu.be/Rzb_Owc_RT0)
-> Click video for a YouTube redirect 
+- **Turn signal overlay**: opens automatically when the indicator is activated, without the original speed-based auto-close behavior.
+- **Tesla-style tile view**: replaces the launcher-like OEM overlay with a cleaner multi-camera presentation.
+- **Native 4-camera dashcam**: records all four factory cameras into a single `720x240` grid clip.
+- **Event capture**: saves a pre/post recording window into a separate `events/` folder with a configurable retention cap.
+- **Flexible overlay feedback**: pause, resume, event, and error banners with adjustable size and volume.
+- **OEM 360 AVM coexistence**: can briefly yield camera access so the stock reverse/360 view still opens when needed.
+- **External trigger support**: send `com.drivehub.kamera.action.TRIGGER_DASHCAM_EVENT` from ADB or another app to save an event clip.
+- **Auto language selection**: English and German are selected automatically from the vehicle language.
 
-## Setup OEM SAIC 360Cam App
+## Preview
 
-To avoid conflicts with the modified turn signal camera behavior in this app, it is recommended to disable the original turn signal camera popups inside the OEM SAIC 360 camera app.
+<table>
+  <tr>
+    <td width="62%">
+      <img src="images/PXL_20260603_192645923.jpg" alt="MG4 360 Camera App screenshot">
+    </td>
+    <td valign="top">
+      <a href="https://youtu.be/Rzb_Owc_RT0">
+        <img src="https://img.youtube.com/vi/Rzb_Owc_RT0/maxresdefault.jpg" alt="Dashcam demo video">
+      </a>
+      <p><strong>Video demo:</strong> click the thumbnail for the YouTube redirect.</p>
+    </td>
+  </tr>
+</table>
 
-If the OEM turn signal camera feature remains enabled, both systems may try to react to the same indicator event at the same time. This can lead to unexpected behavior, inconsistent switching, or the OEM app taking over when you want the custom camera flow from `MG4-360-Camera-App`.
+## OEM SAIC 360Cam Setup
 
-![OEM SAIC 360 camera settings step 1](images/setting%231.jpg)
+To avoid conflicts with the modified turn signal camera behavior in this app, disable the original turn signal camera popup inside the OEM SAIC 360 camera app.
 
-![OEM SAIC 360 camera settings step 2](images/setting%232.jpg)
+If the OEM feature stays enabled, both systems may respond to the same indicator event. That can cause overlapping behavior, inconsistent switching, or the OEM app taking over when you want the custom flow from `MG4-Camera-Mod`.
 
-## ⚠️ Disclaimer
-
-**Use at your own risk.**
-
-This project involves modifying system APKs on a production vehicle. The author(s) take **no responsibility** for any damage, malfunction, data loss, voided warranty, or any other consequences resulting from the use of these modifications. Modifying vehicle software may affect safety systems — always test in a safe environment.
-
-This is an independent community project and is **not affiliated with SAIC, MG Motor, or any of their subsidiaries**.
-
-## Dev Mode
-
-A hidden Dev tab exposes low-level knobs. To unlock it, open Settings and tap the version label at the bottom **5 times**
-
-What's behind it:
-- **Polling rates** — default poll, turn-signal poll, Android Auto / CarPlay foreground poll (ms).
-- **Overlay safe area** — top inset (px) that the tile overlay cannot be dragged into.
-- **Dashcam capacity** — number of rolling clips kept in the ring buffer, and number of saved events retained before the oldest is deleted.
-- **Storage override** — pick a custom folder for dashcam recordings instead of `Downloads/dashcam/`.
-- **Reset defaults** — restores every dev value to its built-in default.
-
-> [!CAUTION]
-> **Dev Mode can break things. Use at your own risk.**
->
-> These values are **not** validated against the realities of your install — storage size, system load, camera bandwidth, signal latency. Raising the ring buffer or event cap can fill storage in minutes; cranking polling rates down can lock the UI or miss turn-signal events; combinations may have effects nobody has ever tested. The app **does not check free space** before writing.
->
-> If something starts misbehaving after a Dev tweak, hit **Reset defaults** first. If that doesn't help, clear the app's data.
+<table>
+  <tr>
+    <td><img src="images/setting%231.jpg" alt="OEM SAIC 360 camera settings step 1"></td>
+    <td><img src="images/setting%232.jpg" alt="OEM SAIC 360 camera settings step 2"></td>
+  </tr>
+</table>
 
 ## Build Setup
 
 OpenCV is referenced from a local path, so Android builds can fail if `OpenCV_DIR` is not set correctly.
 
 Before building:
-- Download the OpenCV Android SDK from [opencv/opencv releases](https://github.com/opencv/opencv/releases)
-- Use `opencv-android-sdk.zip` and not the Windows or macOS packages
-- Update `OpenCV_DIR` in [app/src/main/cpp/CMakeLists.txt](/Users/jan/Projekts/MG4-360-Camera-App/app/src/main/cpp/CMakeLists.txt:1) so it matches your local OpenCV Android SDK path
 
-The notification sound file is licensed under CC-BY-NC-4.0 and therefore not tracked in this repository. To build, download it manually:
-- Get the source from [Freesound — notification-sound-7062 by HenryCena82595](https://freesound.org/s/731783/)
-- Convert to `.ogg` (Vorbis) if Freesound serves another format — the app loads the resource via `R.raw.notification_sound_7062_henrycena82595` and expects an `.ogg` extension
-- Place it at `app/src/main/res/raw/notification_sound_7062_henrycena82595.ogg`
+1. Download the Android SDK package from [opencv/opencv releases](https://github.com/opencv/opencv/releases).
+2. Use `opencv-android-sdk.zip`, not the Windows or macOS packages.
+3. Update `OpenCV_DIR` in [`app/src/main/cpp/CMakeLists.txt`](app/src/main/cpp/CMakeLists.txt) so it matches your local OpenCV Android SDK path.
 
-## Credits
+The notification sound is licensed under CC-BY-NC-4.0 and is therefore not tracked in this repository.
 
-- Analysis based on community research from [XDA Forums — MG4 Electric AAOS 9](https://xdaforums.com/t/mg4-electric-aaos-9-playing-and-possibly-other-mg-models.4697712/)
-- Tile View based on: [merth4n](https://xdaforums.com/m/merth4n.13350648/)
-- OpenCV 4.9.0 — Apache License 2.0
-- AndroidX AppCompat 1.7.1 — Apache License 2.0
-- AndroidX Activity 1.12.4 — Apache License 2.0
-- AndroidX ConstraintLayout 2.2.1 — Apache License 2.0
-- Material Components for Android 1.13.0 — Apache License 2.0
-- Icons based on [Google Material Symbols](https://developers.google.com/fonts/docs/material_symbols) — Apache License 2.0
-- `notification-sound-7062` by `HenryCena82595` — [Freesound](https://freesound.org/s/731783/) — License: `Attribution NonCommercial 4.0`
+1. Download the source from [Freesound: notification-sound-7062 by HenryCena82595](https://freesound.org/s/731783/).
+2. Convert it to `.ogg` (Vorbis) if Freesound serves another format.
+3. Place it at `app/src/main/res/raw/notification_sound_7062_henrycena82595.ogg`.
 
-## Support the Project
+## Dev Mode
 
-If you'd like to support this project financially — thank you for the thought! Unfortunately, due to German tax regulations, setting up donation platforms like Buy Me a Coffee creates more bureaucratic overhead than it's worth for a hobby project like this.
+A hidden Dev tab exposes lower-level tuning knobs. To unlock it, open Settings and tap the version label at the bottom **5 times**.
 
-If you want to show your appreciation, the best ways to help are:
-- **Star the repository** on GitHub
-- **Contribute ideas**, feedback, or feature requests via Issues or in discussions
-- **Share the project** with others who might find it useful
+What you can tweak:
 
-That means a lot and keeps the project going!
+- **Polling rates** for idle, turn-signal-active, and Android Auto / CarPlay foreground scenarios.
+- **Overlay safe area** so the tile overlay cannot be dragged into the top system region.
+- **Dashcam retention** for rolling clips and saved event counts.
+- **Storage override** to record somewhere other than `Downloads/dashcam/`.
+- **Reset defaults** to go back to the built-in baseline.
+
+> [!CAUTION]
+> Dev Mode is intentionally powerful and only lightly guarded.
+>
+> Values are not validated against your storage size, system load, camera bandwidth, or signal timing realities. Aggressive polling can hurt responsiveness, large buffers can eat storage quickly, and bad combinations may produce behavior nobody has tested yet.
+>
+> If something gets weird after tuning, use **Reset defaults** first. If that does not help, clear the app data.
+
+## Safety and Disclaimer
+
+> [!WARNING]
+> Use at your own risk.
+>
+> This project modifies behavior around production-vehicle system apps. The author(s) take no responsibility for damage, malfunction, data loss, voided warranty, or any other consequences. Test carefully and only in safe conditions.
+
+This is an independent community project and is **not affiliated with SAIC, MG Motor, or any of their subsidiaries**.
+
+<details>
+  <summary><strong>Credits</strong></summary>
+
+- Analysis based on community research from [XDA Forums: MG4 Electric AAOS 9](https://xdaforums.com/t/mg4-electric-aaos-9-playing-and-possibly-other-mg-models.4697712/)
+- Tile view inspiration from [merth4n](https://xdaforums.com/m/merth4n.13350648/)
+- OpenCV 4.9.0 - Apache License 2.0
+- AndroidX AppCompat 1.7.1 - Apache License 2.0
+- AndroidX Activity 1.12.4 - Apache License 2.0
+- AndroidX ConstraintLayout 2.2.1 - Apache License 2.0
+- Material Components for Android 1.13.0 - Apache License 2.0
+- Icons based on [Google Material Symbols](https://developers.google.com/fonts/docs/material_symbols) - Apache License 2.0
+- `notification-sound-7062` by `HenryCena82595` - [Freesound](https://freesound.org/s/731783/) - Attribution NonCommercial 4.0
+
+</details>
+
+<details>
+  <summary><strong>Support the Project</strong></summary>
+
+If you want to support the project, the most helpful options are:
+
+- Star the repository on GitHub.
+- Share feedback, ideas, and bug reports through Issues or discussions.
+- Tell other MG4 tinkerers about it.
+
+Financial support sounds nice in theory, but German tax/admin overhead makes donation platforms impractical for this hobby project right now.
+
+</details>
 
 ## License
 
-GPL-3.0 — see [LICENSE](LICENSE) for details.
+GPL-3.0 - see [LICENSE](LICENSE) for details.
