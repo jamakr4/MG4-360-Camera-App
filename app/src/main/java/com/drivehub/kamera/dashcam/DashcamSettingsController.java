@@ -249,6 +249,13 @@ public final class DashcamSettingsController {
                     if (g.getChildAt(i).getId() == checkedId) {
                         DashcamStorageManager.setStorageTarget(prefs, i);
                         refreshStorageStatus(prefs, views);
+                        // USB-only without USB makes the recording loop end with a fatal error
+                        // and stopSelf(); the service is then gone until the user toggles the
+                        // dashcam off+on. Switching the target should be enough — kick the
+                        // service back up if it's idle while the dashcam is enabled.
+                        if (prefs.getBoolean(KEY_ENABLED, false) && !RecordingService.isRunning()) {
+                            RecordingService.startIfDashcamEnabled(activity);
+                        }
                         break;
                     }
                 }

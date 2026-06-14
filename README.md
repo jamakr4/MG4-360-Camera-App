@@ -60,11 +60,11 @@ Community mod for the MG4 EV (AAOS 9, pre-2026 facelift) that replaces the stock
 
 <p align="center">
   <img src="images/blinker_cam_v2.gif" alt="Turn signal overlay" width="48%">
-  &nbsp;
   <img src="images/dashcam_demo_v3.gif" alt="Dashcam mode" width="48%">
+
 </p>
 
-<p align="right">
+<p align="center">
   <a href="https://youtu.be/Rzb_Owc_RT0">▶ Full demo on YouTube</a>
 </p>
 

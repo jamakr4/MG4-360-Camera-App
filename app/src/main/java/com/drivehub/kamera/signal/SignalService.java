@@ -348,8 +348,20 @@ public class SignalService extends Service {
         oemLifecycleThread.start();
         oemLifecycleHandler = new Handler(oemLifecycleThread.getLooper());
         oemLifecycleMonitoring = true;
-        lastOemLifecycle = readStringSystemProperty(OEM_LIFECYCLE_PROP);
-        DevRuntimeLog.add("SignalService", "OEM lifecycle monitor started");
+        // The AVM sysprop is sticky across reboots — if the previous session ended with "Start"
+        // (crash, force-kill) and AVM is no longer actually in the foreground, treating that
+        // stale value as the baseline causes the next genuine open→close cycle to fire a
+        // "resume" without a preceding "pause". Reset stale Starts to DestroyEnd so the next
+        // real Start triggers the pause path correctly.
+        String initialState = readStringSystemProperty(OEM_LIFECYCLE_PROP);
+        if (OEM_LIFECYCLE_START.equals(initialState) && !isOemAvmInForeground()) {
+            DevRuntimeLog.add("SignalService",
+                    "OEM lifecycle: stale 'Start' on monitor start — resetting baseline");
+            initialState = OEM_LIFECYCLE_DESTROYED;
+        }
+        lastOemLifecycle = initialState;
+        DevRuntimeLog.add("SignalService",
+                "OEM lifecycle monitor started, initial='" + initialState + "'");
         oemLifecycleHandler.post(new Runnable() {
             @Override
             public void run() {

@@ -47,6 +47,7 @@ public final class DashcamStorageManager {
 
     private static final String USB_RECORDS_DIR_NAME = "dashcam";
     private static final String WRITE_PROBE_FILE_NAME = ".dashcam_write_probe";
+    private static final File LEGACY_STORAGE_ROOT = new File("/storage");
 
     public enum UsbState {
         NOT_CHECKED,        // INTERNAL_ONLY mode: USB is deliberately ignored
@@ -193,6 +194,18 @@ public final class DashcamStorageManager {
     private static UsbProbe probeUsb(Context context) {
         List<UsbCandidate> candidates = findUsbCandidates(context);
         if (candidates.isEmpty()) {
+            // AAOS 9 head units typically don't surface OTG/USB volumes via StorageManager:
+            // the OS mounts them under /mnt/media_rw/... without registering them with the
+            // MediaProvider, so getExternalFilesDirs() returns nothing usable. Fall back to a
+            // direct /storage scan, which is how every dashcam-style automotive app has to
+            // handle this in practice.
+            candidates = findLegacyStorageCandidates();
+            if (!candidates.isEmpty()) {
+                Log.i(TAG, "StorageManager exposed no removable volumes; using /storage scan ("
+                        + candidates.size() + " candidate(s))");
+            }
+        }
+        if (candidates.isEmpty()) {
             return new UsbProbe(UsbState.NO_MEDIUM, null);
         }
         List<UsbCandidate> prioritized = prioritizeUsbCandidates(candidates);
@@ -254,6 +267,27 @@ public final class DashcamStorageManager {
             deduped.put(key, new UsbCandidate(rootDir, description, looksLikeUsb(rootDir, description)));
         }
         return new ArrayList<>(deduped.values());
+    }
+
+    /**
+     * Last-resort enumeration: list every directory under /storage that isn't the emulated
+     * primary volume or the "self" symlink. No StorageManager metadata, no isRemovable hints,
+     * just whatever the user can mount and read. Suitability is decided by the write probe.
+     */
+    private static List<UsbCandidate> findLegacyStorageCandidates() {
+        List<UsbCandidate> candidates = new ArrayList<>();
+        File[] children = LEGACY_STORAGE_ROOT.listFiles();
+        if (children == null) {
+            return candidates;
+        }
+        for (File child : children) {
+            if (child == null || !child.isDirectory()) continue;
+            String name = child.getName();
+            if (name.isEmpty() || "emulated".equals(name) || "self".equals(name)) continue;
+            if (!child.canRead()) continue;
+            candidates.add(new UsbCandidate(child, name, looksLikeUsb(child, name)));
+        }
+        return candidates;
     }
 
     private static List<UsbCandidate> prioritizeUsbCandidates(List<UsbCandidate> candidates) {
