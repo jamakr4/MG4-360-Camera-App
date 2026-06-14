@@ -55,12 +55,19 @@ Community mod for the MG4 EV (AAOS 9, pre-2026 facelift) that replaces the stock
 ## Preview
 
 <p align="center">
-  <img src="images/PXL_20260603_192645923.jpg" alt="MG4 360 Camera App screenshot" width="62%">
-  &nbsp;
-  <a href="https://youtu.be/Rzb_Owc_RT0"><img src="https://img.youtube.com/vi/Rzb_Owc_RT0/maxresdefault.jpg" alt="Dashcam demo video" width="36%"></a>
+  <img src="images/PXL_20260603_192645923.jpg" alt="Turn signal tile overlay" width="96%">
 </p>
 
-<sub><strong>Video demo:</strong> click the thumbnail for the YouTube redirect.</sub>
+<p align="center">
+  <img src="images/blinker_cam_v2.gif" alt="Turn signal overlay" width="48%">
+  &nbsp;
+  <img src="images/dashcam_demo_v3.gif" alt="Dashcam mode" width="48%">
+</p>
+
+<p align="right">
+  <a href="https://youtu.be/Rzb_Owc_RT0">▶ Full demo on YouTube</a>
+</p>
+
 
 ## OEM SAIC 360Cam Setup
 
