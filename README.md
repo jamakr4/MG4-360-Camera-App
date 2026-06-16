@@ -82,8 +82,9 @@ If the OEM feature stays enabled, both systems may respond to the same indicator
 </p>
 
 ## Build Setup
-
+<details>
 OpenCV is referenced from a local path, so Android builds can fail if `OpenCV_DIR` is not set correctly.
+
 
 Before building:
 
@@ -96,6 +97,8 @@ The notification sound is licensed under CC-BY-NC-4.0 and is therefore not track
 1. Download the source from [Freesound: notification-sound-7062 by HenryCena82595](https://freesound.org/s/731783/).
 2. Convert it to `.ogg` (Vorbis) if Freesound serves another format.
 3. Place it at `app/src/main/res/raw/notification_sound_7062_henrycena82595.ogg`.
+
+</details>
 
 ## Dev Mode
 
@@ -148,8 +151,8 @@ Financial support sounds nice in theory, but German tax overhead makes donation 
 
 This is an independent community project and is **not affiliated with SAIC, MG Motor, or any of their subsidiaries**.
 
-<details>
-  <summary><strong>Credits</strong></summary>
+
+## Credits
 
 - Analysis based on community research from [XDA Forums: MG4 Electric AAOS 9](https://xdaforums.com/t/mg4-electric-aaos-9-playing-and-possibly-other-mg-models.4697712/)
 - Tile view inspiration from [merth4n](https://xdaforums.com/m/merth4n.13350648/)
@@ -161,7 +164,6 @@ This is an independent community project and is **not affiliated with SAIC, MG M
 - Icons based on [Google Material Symbols](https://developers.google.com/fonts/docs/material_symbols) - Apache License 2.0
 - `notification-sound-7062` by `HenryCena82595` - [Freesound](https://freesound.org/s/731783/) - Attribution NonCommercial 4.0
 
-</details>
 
 ## License
 
