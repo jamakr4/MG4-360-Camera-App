@@ -25,6 +25,9 @@ import java.util.Map;
  *  - USB_ONLY:      USB or nothing (resolution.baseDir == null when no usable medium).
  *  - INTERNAL_ONLY: internal storage, USB is never probed.
  *
+ * The current app build temporarily forces INTERNAL_ONLY from prefs/UI so storage switching can
+ * stay dormant until the target-selection flow is revisited.
+ *
  * "Internal" is whatever {@link DashcamSettingsController#getRecordsBaseDir} resolves to
  * (default Downloads/dashcam or the dev-mode override path).
  */
@@ -80,11 +83,17 @@ public final class DashcamStorageManager {
     // ---------- Preferences ----------
 
     public static int getStorageTarget(SharedPreferences prefs) {
-        return clampTarget(prefs.getInt(KEY_STORAGE_TARGET, TARGET_AUTO));
+        if (prefs != null) {
+            int stored = clampTarget(prefs.getInt(KEY_STORAGE_TARGET, TARGET_INTERNAL_ONLY));
+            if (stored != TARGET_INTERNAL_ONLY) {
+                prefs.edit().putInt(KEY_STORAGE_TARGET, TARGET_INTERNAL_ONLY).apply();
+            }
+        }
+        return TARGET_INTERNAL_ONLY;
     }
 
     public static void setStorageTarget(SharedPreferences prefs, int target) {
-        prefs.edit().putInt(KEY_STORAGE_TARGET, clampTarget(target)).apply();
+        prefs.edit().putInt(KEY_STORAGE_TARGET, TARGET_INTERNAL_ONLY).apply();
     }
 
     public static int clampTarget(int target) {

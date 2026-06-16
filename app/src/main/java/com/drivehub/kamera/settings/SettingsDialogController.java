@@ -179,13 +179,21 @@ public final class SettingsDialogController {
         v.swDashcamTestRecordEnabled = dialog.findViewById(R.id.switchDashcamTestRecordEnabled);
         v.etDashcamTestRecordDuration = dialog.findViewById(R.id.etDashcamTestRecordDuration);
         v.swDashcamOemCoexist = dialog.findViewById(R.id.switchDashcamOemCoexist);
-        v.segDashcamStorageTarget = dialog.findViewById(R.id.segDashcamStorageTarget);
-        v.tvDashcamStorageStatus = dialog.findViewById(R.id.tvDashcamStorageStatus);
-        v.tvDashcamStorageActivePath = dialog.findViewById(R.id.tvDashcamStorageActivePath);
-        v.btnDashcamStorageEjectUsb = dialog.findViewById(R.id.btnDashcamStorageEjectUsb);
-        v.tvDashcamStorageInternalWarning = dialog.findViewById(R.id.tvDashcamStorageInternalWarning);
-        v.etDashcamUsbClipCount = dialog.findViewById(R.id.etDashcamUsbClipCount);
-        v.etDashcamUsbEventDirs = dialog.findViewById(R.id.etDashcamUsbEventDirs);
+        // Temporarily disabled storage UI:
+        // v.segDashcamStorageTarget = dialog.findViewById(R.id.segDashcamStorageTarget);
+        // v.tvDashcamStorageStatus = dialog.findViewById(R.id.tvDashcamStorageStatus);
+        // v.tvDashcamStorageActivePath = dialog.findViewById(R.id.tvDashcamStorageActivePath);
+        // v.btnDashcamStorageEjectUsb = dialog.findViewById(R.id.btnDashcamStorageEjectUsb);
+        // v.tvDashcamStorageInternalWarning = dialog.findViewById(R.id.tvDashcamStorageInternalWarning);
+        // v.etDashcamUsbClipCount = dialog.findViewById(R.id.etDashcamUsbClipCount);
+        // v.etDashcamUsbEventDirs = dialog.findViewById(R.id.etDashcamUsbEventDirs);
+        v.segDashcamStorageTarget = null;
+        v.tvDashcamStorageStatus = null;
+        v.tvDashcamStorageActivePath = null;
+        v.btnDashcamStorageEjectUsb = null;
+        v.tvDashcamStorageInternalWarning = null;
+        v.etDashcamUsbClipCount = null;
+        v.etDashcamUsbEventDirs = null;
         v.swBannerEvent = dialog.findViewById(R.id.switchBannerEvent);
         v.segBannerEventSize = dialog.findViewById(R.id.segBannerEventSize);
         v.seekBannerEventVolume = dialog.findViewById(R.id.seekBannerEventVolume);
@@ -284,14 +292,16 @@ public final class SettingsDialogController {
                 views.swDashcamTestRecordEnabled,
                 views.etDashcamTestRecordDuration,
                 views.swDashcamOemCoexist,
-                new DashcamSettingsController.StorageViews(
-                        views.segDashcamStorageTarget,
-                        views.tvDashcamStorageStatus,
-                        views.tvDashcamStorageActivePath,
-                        views.btnDashcamStorageEjectUsb,
-                        views.tvDashcamStorageInternalWarning,
-                        views.etDashcamUsbClipCount,
-                        views.etDashcamUsbEventDirs),
+                // Re-enable this block when the storage section comes back:
+                // new DashcamSettingsController.StorageViews(
+                //         views.segDashcamStorageTarget,
+                //         views.tvDashcamStorageStatus,
+                //         views.tvDashcamStorageActivePath,
+                //         views.btnDashcamStorageEjectUsb,
+                //         views.tvDashcamStorageInternalWarning,
+                //         views.etDashcamUsbClipCount,
+                //         views.etDashcamUsbEventDirs),
+                null,
                 new DashcamSettingsController.BannerGroupViews(
                         views.swBannerEvent,
                         views.segBannerEventSize,
