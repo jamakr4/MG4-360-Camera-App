@@ -44,6 +44,7 @@ Community mod for the MG4 EV (AAOS 9, pre-2026 facelift) that replaces the stock
 ## Feature Highlights
 
 - **Turn signal overlay**: opens automatically when the indicator is activated, without the original speed-based auto-close behavior.
+- **Maneuver Mode / digital rearview mirror**: keeps the factory rear camera visible as a persistent floating mirror for situations where the rear window is blocked by cargo, while still yielding to turn-signal cameras and then restoring the rear view afterwards.
 - **Tesla-style tile view**: replaces the launcher-like OEM overlay, also known as the fullscreen takeover, with a cleaner presentation.
 - **Native 4-camera dashcam**: records all four factory cameras into a single 720x240 grid clip with a footer including time, speed, and a custom signature.
 - **Event capture**: saves a pre/post recording window into a separate `events/` folder

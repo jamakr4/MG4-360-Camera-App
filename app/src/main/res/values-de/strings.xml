@@ -3,12 +3,14 @@
     <string name="settings_tab_update">Update</string>
     <string name="settings_tab_settings">Einstellungen</string>
     <string name="settings_tab_signal_camera">Blinker-Kamera</string>
+    <string name="settings_tab_maneuver_mode">Manövriermodus</string>
     <string name="settings_tab_dashcam">Dashcam</string>
     <string name="settings_tab_credits">Credits</string>
     <string name="settings_tab_dev">Dev</string>
     <string name="settings_tab_dev_status">Dev Status</string>
     <string name="settings_section_display">Anzeige</string>
     <string name="settings_section_signal_camera">Blinker-Kamera</string>
+    <string name="settings_section_maneuver_mode">Manövriermodus</string>
     <string name="settings_section_dashcam_status">Status</string>
     <string name="settings_section_dashcam_loop">Aufnahme</string>
     <string name="settings_section_dashcam_overlay">Aufnahme-Overlay</string>
@@ -63,6 +65,11 @@
     <string name="settings_dashcam_status_paused_oem">Aufnahme pausiert, damit die OEM-Kamera geoeffnet werden kann</string>
     <string name="settings_dashcam_status_error">Aufnahmefehler: %1$s</string>
     <string name="settings_overlay_on_signal">Kamera beim Blinken anzeigen</string>
+    <string name="settings_digital_rearview_enabled">Digitalen Rueckspiegel aktivieren</string>
+    <string name="settings_digital_rearview_hint">Zeigt die Heckkamera dauerhaft, bis du sie wieder ausschaltest. Blinker-Kameras haben Vorrang, danach kehrt die Heckansicht zurueck.</string>
+    <string name="settings_rearview_tap_to_hide">Tippen zum kurzzeitigen Ausblenden</string>
+    <string name="settings_rearview_tap_to_hide_duration">Automatisch einblenden nach (Sek.)</string>
+    <string name="settings_rearview_tap_to_hide_hint">Tippe auf das Overlay, um es kurzzeitig auszublenden. Es erscheint nach der eingestellten Zeit wieder. Das × schliesst es dauerhaft.</string>
     <string name="settings_overlay_rotate_to_driving_direction">Blinker-Kamera in Fahrtrichtung drehen</string>
     <string name="safety_warning_text">Bitte achte auf die Umgebung!</string>
     <string name="show_safety_warning">Sicherheitswarnung anzeigen</string>
@@ -226,6 +233,7 @@
     <string name="ota_update_changelog_error">Der Changelog konnte nicht geladen werden.</string>
     <string name="notification_signal_text">Blinker-Listener aktiv</string>
     <string name="notification_overlay_text">Signal-Kamera-Overlay aktiv</string>
+    <string name="notification_digital_rearview_text">Digitaler Rueckspiegel aktiv</string>
     <string name="notification_dashcam_event_overlay_text">Dashcam-Ereignis wird gesichert</string>
     <string name="notification_dashcam_event_overlay_future_only_text">Dashcam-Ereignis wird gesichert (nur kommende Clips)</string>
     <string name="notification_dashcam_oem_pause_overlay_text">Dashcam pausiert, damit die OEM-Kamera geoeffnet werden kann</string>

@@ -3,12 +3,14 @@
     <string name="settings_tab_update">Update</string>
     <string name="settings_tab_settings">Settings</string>
     <string name="settings_tab_signal_camera">Signal Cam</string>
+    <string name="settings_tab_maneuver_mode">Maneuver Mode</string>
     <string name="settings_tab_dashcam">Dashcam</string>
     <string name="settings_tab_credits">Credits</string>
     <string name="settings_tab_dev">Dev</string>
     <string name="settings_tab_dev_status">Dev Status</string>
     <string name="settings_section_display">Display</string>
     <string name="settings_section_signal_camera">Signal camera</string>
+    <string name="settings_section_maneuver_mode">Maneuver Mode</string>
     <string name="settings_section_dashcam_status">Status</string>
     <string name="settings_section_dashcam_loop">Recording</string>
     <string name="settings_section_dashcam_overlay">Recording overlay</string>
@@ -63,6 +65,11 @@
     <string name="settings_dashcam_status_paused_oem">Recording paused while OEM camera is being opened</string>
     <string name="settings_dashcam_status_error">Recording error: %1$s</string>
     <string name="settings_overlay_on_signal">Show Signal Camera on turn signal</string>
+    <string name="settings_digital_rearview_enabled">Enable Digital Rearview Mirror</string>
+    <string name="settings_digital_rearview_hint">Shows the rear camera continuously until you switch it off. Turn-signal cameras take priority and the rear view returns afterwards.</string>
+    <string name="settings_rearview_tap_to_hide">Tap to temporarily hide</string>
+    <string name="settings_rearview_tap_to_hide_duration">Auto-restore after (sec)</string>
+    <string name="settings_rearview_tap_to_hide_hint">Tap the overlay to hide it temporarily. It reappears after the set duration. The × closes it permanently.</string>
     <string name="settings_overlay_rotate_to_driving_direction">Rotate side cameras to driving direction</string>
     <string name="safety_warning_text">Please pay attention to the surrounding environment!</string>
     <string name="show_safety_warning">Show safety warning</string>
@@ -226,6 +233,7 @@
     <string name="ota_update_changelog_error">The changelog could not be loaded.</string>
     <string name="notification_signal_text">Turn signal listener active</string>
     <string name="notification_overlay_text">Signal camera overlay active</string>
+    <string name="notification_digital_rearview_text">Digital rearview mirror active</string>
     <string name="notification_dashcam_event_overlay_text">Dashcam event is being secured</string>
     <string name="notification_dashcam_event_overlay_future_only_text">Dashcam event is being secured (future clips only)</string>
     <string name="notification_dashcam_oem_pause_overlay_text">Dashcam paused so the OEM camera can open</string>

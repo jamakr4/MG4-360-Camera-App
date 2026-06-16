@@ -7,6 +7,7 @@ import com.drivehub.kamera.signal.SignalService;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.util.Log;
 
 public class OemAvmReceiver extends BroadcastReceiver {
@@ -29,7 +30,10 @@ public class OemAvmReceiver extends BroadcastReceiver {
         if (action == null) {
             return;
         }
-        if (!DashcamSettingsController.isOemCoexistActive(UiPrefs.getPrefs(context))) {
+        SharedPreferences prefs = UiPrefs.getPrefs(context);
+        boolean coexistActive = DashcamSettingsController.isOemCoexistActive(prefs);
+        boolean rearviewActive = UiPrefs.isDigitalRearviewEnabled(prefs);
+        if (!coexistActive && !rearviewActive) {
             return;
         }
         int startMessage = intent.getIntExtra(EXTRA_START_MESSAGE, Integer.MIN_VALUE);
@@ -38,13 +42,13 @@ public class OemAvmReceiver extends BroadcastReceiver {
         if (ACTION_OEM_LAUNCH.equals(action) || ACTION_AVM_START.equals(action)) {
             Log.i(TAG, "OEM AVM start/launch received: " + action);
             SignalService.setOemAvmActive(context, true);
-            RecordingService.pauseForOemRequest(context);
+            if (coexistActive) RecordingService.pauseForOemRequest(context);
             return;
         }
         if (ACTION_AVM_STOP.equals(action)) {
             Log.i(TAG, "OEM AVM stop received");
             SignalService.setOemAvmActive(context, false);
-            RecordingService.resumeAfterOemRequest(context);
+            if (coexistActive) RecordingService.resumeAfterOemRequest(context);
         }
     }
 }
