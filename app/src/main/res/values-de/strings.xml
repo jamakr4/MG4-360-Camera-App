@@ -227,6 +227,7 @@
     <string name="notification_signal_text">Blinker-Listener aktiv</string>
     <string name="notification_overlay_text">Signal-Kamera-Overlay aktiv</string>
     <string name="notification_dashcam_event_overlay_text">Dashcam-Ereignis wird gesichert</string>
+    <string name="notification_dashcam_event_overlay_future_only_text">Dashcam-Ereignis wird gesichert (nur kommende Clips)</string>
     <string name="notification_dashcam_oem_pause_overlay_text">Dashcam pausiert, damit die OEM-Kamera geoeffnet werden kann</string>
     <string name="notification_dashcam_oem_resume_overlay_text">Dashcam-Aufnahme wird nach dem Schliessen der OEM-Kamera fortgesetzt</string>
     <string name="notification_dashcam_recording_error_text">Dashcam-Aufnahme braucht Aufmerksamkeit</string>
@@ -246,6 +247,7 @@
     <string name="notification_channel_dashcam_event_overlay">360 Cam Ereignis-Banner</string>
     <string name="dashcam_event_overlay_title">Event gespeichert</string>
     <string name="dashcam_event_overlay_subtitle">Die letzte und die nächste Minute werden gesichert.</string>
+    <string name="dashcam_event_overlay_subtitle_future_only">Nur die naechsten drei Clips werden gesichert.</string>
     <string name="dashcam_oem_pause_overlay_title">Dashcam pausiert</string>
     <string name="dashcam_oem_pause_overlay_subtitle">Die OEM-Kamera wird geoeffnet. Danach startet die Aufnahme automatisch weiter.</string>
     <string name="dashcam_oem_resume_overlay_title">Dashcam startet wieder</string>

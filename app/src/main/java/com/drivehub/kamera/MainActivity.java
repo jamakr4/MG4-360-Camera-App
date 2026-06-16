@@ -23,7 +23,6 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
@@ -148,13 +147,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         });
 
         Button btnTriggerEventSave = findViewById(R.id.btnTriggerEventSave);
-        btnTriggerEventSave.setOnClickListener(v -> {
-            if (!UiPrefs.isDashcamEnabled(UiPrefs.getPrefs(this)) || !RecordingService.isRunning()) {
-                Toast.makeText(this, R.string.main_event_save_requires_dashcam, Toast.LENGTH_SHORT).show();
-                return;
-            }
-            RecordingService.triggerEventSave(this);
-        });
+        btnTriggerEventSave.setOnClickListener(v -> RecordingService.triggerEventSaveOrFutureOnly(this));
 
         applyStoredRecordingStatus();
         refreshTestRecordButtonState();

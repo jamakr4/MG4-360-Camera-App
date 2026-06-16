@@ -1,14 +1,11 @@
 package com.drivehub.kamera.dashcam;
 
-import com.drivehub.kamera.R;
 import com.drivehub.kamera.dev.DevRuntimeLog;
 import com.drivehub.kamera.settings.UiPrefs;
 
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
-import android.widget.Toast;
-
 //External trigger via the trigger app see: https://github.com/jamakr4/MG4-Dashcam-Trigger
 
 public class DashcamEventTriggerReceiver extends BroadcastReceiver {
@@ -23,16 +20,13 @@ public class DashcamEventTriggerReceiver extends BroadcastReceiver {
             return;
         }
 
-        boolean dashcamEnabled = UiPrefs.getPrefs(context).getBoolean(DashcamSettingsController.KEY_ENABLED, false);
-        if (!dashcamEnabled || !RecordingService.isRunning()) {
-            DevRuntimeLog.add(
-                    "DashcamEventTriggerReceiver",
-                    "external trigger ignored: dashcam disabled or not running");
-            Toast.makeText(context, R.string.dashcam_external_trigger_inactive, Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        DevRuntimeLog.add("DashcamEventTriggerReceiver", "external trigger accepted");
-        RecordingService.triggerEventSave(context);
+        boolean dashcamRunning = UiPrefs.getPrefs(context).getBoolean(DashcamSettingsController.KEY_ENABLED, false)
+                && RecordingService.isRunning();
+        DevRuntimeLog.add(
+                "DashcamEventTriggerReceiver",
+                dashcamRunning
+                        ? "external trigger accepted: rolling event save"
+                        : "external trigger accepted: future-only event save");
+        RecordingService.triggerEventSaveOrFutureOnly(context);
     }
 }

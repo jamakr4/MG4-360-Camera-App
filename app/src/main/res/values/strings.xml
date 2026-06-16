@@ -227,6 +227,7 @@
     <string name="notification_signal_text">Turn signal listener active</string>
     <string name="notification_overlay_text">Signal camera overlay active</string>
     <string name="notification_dashcam_event_overlay_text">Dashcam event is being secured</string>
+    <string name="notification_dashcam_event_overlay_future_only_text">Dashcam event is being secured (future clips only)</string>
     <string name="notification_dashcam_oem_pause_overlay_text">Dashcam paused so the OEM camera can open</string>
     <string name="notification_dashcam_oem_resume_overlay_text">Dashcam recording is resuming after the OEM camera closed</string>
     <string name="notification_dashcam_recording_error_text">Dashcam recording needs attention</string>
@@ -246,6 +247,7 @@
     <string name="notification_channel_dashcam_event_overlay">360 Cam Event Banner</string>
     <string name="dashcam_event_overlay_title">Event saved</string>
     <string name="dashcam_event_overlay_subtitle">The last and next minute are being secured.</string>
+    <string name="dashcam_event_overlay_subtitle_future_only">Only the next three clips are being secured.</string>
     <string name="dashcam_oem_pause_overlay_title">Dashcam paused</string>
     <string name="dashcam_oem_pause_overlay_subtitle">The OEM camera is being opened. Recording resumes automatically afterwards.</string>
     <string name="dashcam_oem_resume_overlay_title">Dashcam resuming</string>

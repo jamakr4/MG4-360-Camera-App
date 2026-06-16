@@ -113,6 +113,15 @@ public class DashcamEventOverlayService extends Service {
         show(context, BannerType.EVENT, BannerType.EVENT.subtitleRes, BannerType.EVENT.notificationRes, false);
     }
 
+    public static void showFutureOnlyConfirmation(Context context) {
+        show(
+                context,
+                BannerType.EVENT,
+                R.string.dashcam_event_overlay_subtitle_future_only,
+                R.string.notification_dashcam_event_overlay_future_only_text,
+                false);
+    }
+
     public static void showOemPause(Context context) {
         show(context, BannerType.OEM_PAUSE, BannerType.OEM_PAUSE.subtitleRes, BannerType.OEM_PAUSE.notificationRes, false);
     }
@@ -134,6 +143,15 @@ public class DashcamEventOverlayService extends Service {
 
     public static void showConfirmationForced(Context context) {
         show(context, BannerType.EVENT, BannerType.EVENT.subtitleRes, BannerType.EVENT.notificationRes, true);
+    }
+
+    public static void showFutureOnlyConfirmationForced(Context context) {
+        show(
+                context,
+                BannerType.EVENT,
+                R.string.dashcam_event_overlay_subtitle_future_only,
+                R.string.notification_dashcam_event_overlay_future_only_text,
+                true);
     }
 
     public static void showOemPauseForced(Context context) {

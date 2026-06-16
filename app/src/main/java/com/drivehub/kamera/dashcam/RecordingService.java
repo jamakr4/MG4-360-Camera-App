@@ -61,6 +61,7 @@ public class RecordingService extends Service {
     public static final String EXTRA_TEST_RECORD_DURATION_SEC = "test_record_duration_sec";
     public static final String EXTRA_USB_EJECT_SAFE_TO_REMOVE = "usb_eject_safe_to_remove";
     public static final String EXTRA_USB_EJECT_MESSAGE_RES = "usb_eject_message_res";
+    public static final String EXTRA_EVENT_ALLOW_FUTURE_ONLY = "event_allow_future_only";
     public static final String STATUS_OFF = "off";
     public static final String STATUS_STARTING = "starting";
     public static final String STATUS_RECORDING = "recording";
@@ -86,6 +87,7 @@ public class RecordingService extends Service {
     private static final int TOTAL_CAMERAS = 4;
     private static final int EVENT_SEGMENTS_BEFORE_CURRENT = 2;
     private static final int EVENT_SEGMENTS_AFTER_CURRENT = 2;
+    private static final int FUTURE_ONLY_EVENT_SEGMENTS = 3;
     private static final long ERROR_OVERLAY_DELAY_MS = 5_000L;
 
     private static volatile boolean sServiceRunning = false;
@@ -105,6 +107,7 @@ public class RecordingService extends Service {
     private volatile File activeBaseDir;
     private volatile boolean activeBaseIsUsb;
     private volatile boolean usbEjectInProgress = false;
+    private volatile boolean futureOnlyEventSession = false;
     private long completedSegmentCount = 0L;
 
     public static boolean isRunning() {
@@ -138,6 +141,13 @@ public class RecordingService extends Service {
         Intent i = new Intent(context, RecordingService.class);
         i.setAction(ACTION_TRIGGER_EVENT_SAVE);
         context.startService(i);
+    }
+
+    public static void triggerEventSaveOrFutureOnly(Context context) {
+        Intent i = new Intent(context, RecordingService.class);
+        i.setAction(ACTION_TRIGGER_EVENT_SAVE);
+        i.putExtra(EXTRA_EVENT_ALLOW_FUTURE_ONLY, true);
+        context.startForegroundService(i);
     }
 
     public static void requestUsbEject(Context context) {
@@ -275,10 +285,25 @@ public class RecordingService extends Service {
 
         if (ACTION_TRIGGER_EVENT_SAVE.equals(action)) {
             DevRuntimeLog.add("RecordingService", "ACTION_TRIGGER_EVENT_SAVE");
-            if (worker == null || !prefs().getBoolean(DashcamSettingsController.KEY_ENABLED, false)) {
+            boolean allowFutureOnly = intent.getBooleanExtra(EXTRA_EVENT_ALLOW_FUTURE_ONLY, false);
+            if (worker == null) {
+                if (allowFutureOnly && startFutureOnlyEventSession()) {
+                    DashcamEventOverlayService.showFutureOnlyConfirmation(this);
+                } else if (allowFutureOnly) {
+                    startForeground(NOTIF_ID, buildNotification(""));
+                    stopForeground(true);
+                    stopSelf();
+                }
+                return allowFutureOnly ? START_NOT_STICKY : START_STICKY;
+            }
+            if (futureOnlyEventSession) {
+                DashcamEventOverlayService.showFutureOnlyConfirmation(this);
                 return START_STICKY;
             }
-            if (armEventCapture()) {
+            if (!prefs().getBoolean(DashcamSettingsController.KEY_ENABLED, false)) {
+                return START_STICKY;
+            }
+            if (armEventCapture(EVENT_SEGMENTS_BEFORE_CURRENT, EVENT_SEGMENTS_AFTER_CURRENT)) {
                 DashcamEventOverlayService.showConfirmation(this);
             }
             return START_STICKY;
@@ -392,6 +417,59 @@ public class RecordingService extends Service {
         stopServiceIfNotEjecting();
     }
 
+    private void recordFutureOnlyEventLoop() {
+        int segmentSec = DashcamSettingsController.getSegmentDurationSec();
+        if (segmentSec <= 0) {
+            publishStatus(STATUS_OFF, 0, TOTAL_CAMERAS, "");
+            futureOnlyEventSession = false;
+            worker = null;
+            stopSelf();
+            return;
+        }
+
+        File baseDir = resolveActiveBaseDir(true);
+        if (baseDir == null) {
+            futureOnlyEventSession = false;
+            worker = null;
+            stopSelf();
+            return;
+        }
+
+        long segmentMs = segmentSec * 1000L;
+        boolean endedWithFatalError = false;
+        int remainingSegments = FUTURE_ONLY_EVENT_SEGMENTS;
+
+        while (!stopRequested && remainingSegments > 0) {
+            File resolved = resolveActiveBaseDir(false);
+            if (resolved == null) {
+                endedWithFatalError = true;
+                break;
+            }
+            baseDir = resolved;
+
+            int keepSegments = DashcamStorageManager.getActiveRetentionClipCount(prefs(), activeBaseIsUsb);
+            long segmentStartWallMs = System.currentTimeMillis();
+            String baseName = makeTimestampBase(segmentStartWallMs, "yyMMddHHmmss");
+            boolean startedAnyCamera = recordClip(baseDir, segmentMs, baseName, keepSegments);
+            if (!startedAnyCamera) {
+                if (isRecoverableUsbFailure()) {
+                    continue;
+                }
+                endedWithFatalError = true;
+                break;
+            }
+            onSegmentCompleted(baseDir, baseName, segmentStartWallMs, System.currentTimeMillis(), keepSegments);
+            remainingSegments--;
+        }
+
+        futureOnlyEventSession = false;
+        worker = null;
+        if (!endedWithFatalError) {
+            publishStatus(STATUS_OFF, 0, TOTAL_CAMERAS, "");
+        }
+        stopServiceIfNotEjecting();
+    }
+
     private boolean recordClip(File baseDir, long durationMs, String baseName, int keepSegments) {
         SharedPreferences prefs = prefs();
         int recordingFps = DashcamSettingsController.getRecordingFps(prefs);
@@ -493,7 +571,25 @@ public class RecordingService extends Service {
         enqueueEventCopyJobs(copyJobs);
     }
 
-    private boolean armEventCapture() {
+    private boolean startFutureOnlyEventSession() {
+        if (resolveActiveBaseDir(true) == null) {
+            return false;
+        }
+        if (!armEventCapture(0, FUTURE_ONLY_EVENT_SEGMENTS - 1)) {
+            return false;
+        }
+        futureOnlyEventSession = true;
+        stopRequested = false;
+        segmentStopRequested = false;
+        oemPauseRequested = false;
+        startForeground(NOTIF_ID, buildNotification(getString(R.string.notification_recording_starting)));
+        publishStatus(STATUS_STARTING, 0, TOTAL_CAMERAS, "");
+        worker = new Thread(this::recordFutureOnlyEventLoop, "RecordingServiceFutureEventWorker");
+        worker.start();
+        return true;
+    }
+
+    private boolean armEventCapture(int segmentsBeforeCurrent, int segmentsAfterCurrent) {
         long now = System.currentTimeMillis();
         String eventBaseName = "event_" + makeTimestampBase(now, "yyMMddHHmmssSSS");
         File eventsBaseDir = getEventsBaseDir();
@@ -513,10 +609,12 @@ public class RecordingService extends Service {
         List<EventCopyJob> copyJobs;
         synchronized (eventLock) {
             long currentSegmentOrdinal = completedSegmentCount + 1L;
+            long firstSegmentOrdinal = Math.max(1L, currentSegmentOrdinal - Math.max(0, segmentsBeforeCurrent));
+            long lastSegmentOrdinal = currentSegmentOrdinal + Math.max(0, segmentsAfterCurrent);
             pendingEventRequests.add(new EventCaptureRequest(
                     eventBaseName,
-                    Math.max(1L, currentSegmentOrdinal - EVENT_SEGMENTS_BEFORE_CURRENT),
-                    currentSegmentOrdinal + EVENT_SEGMENTS_AFTER_CURRENT
+                    firstSegmentOrdinal,
+                    lastSegmentOrdinal
             ));
             trimOldEventDirsLocked(eventsBaseDir);
             copyJobs = collectEventCopyJobsLocked(completedSegmentCount);
@@ -524,8 +622,8 @@ public class RecordingService extends Service {
             DevRuntimeLog.add(
                     "RecordingService",
                     "Event armed: " + eventBaseName
-                            + " ordinals " + Math.max(1L, currentSegmentOrdinal - EVENT_SEGMENTS_BEFORE_CURRENT)
-                            + "-" + (currentSegmentOrdinal + EVENT_SEGMENTS_AFTER_CURRENT));
+                            + " ordinals " + firstSegmentOrdinal
+                            + "-" + lastSegmentOrdinal);
         }
         enqueueEventCopyJobs(copyJobs);
         return true;
