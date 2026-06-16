@@ -28,7 +28,9 @@ Community mod for the MG4 EV (AAOS 9, pre-2026 facelift) that replaces the stock
   &nbsp;·&nbsp;
   <a href="https://github.com/users/jamakr4/projects/4"><strong>Project Board</strong></a>
   &nbsp;·&nbsp;
-  <a href="https://github.com/jamakr4/MG4-Dashcam-Trigger"><strong>Companion App</strong></a>
+  <a href="https://github.com/jamakr4/MG4-Dashcam-Trigger"><strong>Dashcam Companion App</strong></a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/jamakr4/MG4-Digital-Rearview-Trigger"><strong>Digital Mirror Companion App</strong></a>
   &nbsp;·&nbsp;
   <a href="https://youtu.be/Rzb_Owc_RT0"><strong>Demo Video</strong></a>
 </p>
