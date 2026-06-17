@@ -3,14 +3,16 @@ package com.drivehub.kamera.signal;
 import com.drivehub.kamera.R;
 
 import com.drivehub.kamera.MainActivity;
+import com.drivehub.kamera.camera.CameraIndex;
 import com.drivehub.kamera.camera.OverlayService;
 import com.drivehub.kamera.dashcam.DashcamSettingsController;
 import com.drivehub.kamera.dashcam.RecordingService;
 import com.drivehub.kamera.dev.DevRuntimeLog;
+import com.drivehub.kamera.helper.app.NotificationChannelHelper;
+import com.drivehub.kamera.helper.vehiclesensors.SystemPropertiesHelper;
 import com.drivehub.kamera.settings.UiPrefs;
 
 import android.app.Notification;
-import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.Service;
 import android.content.Context;
@@ -34,8 +36,8 @@ import java.lang.reflect.Proxy;
 
 /**
  * Listens only for turn-signal state:
- * - left signal  -> left camera overlay (v16)
- * - right signal -> right camera overlay (v14)
+ * - left signal  -> left camera overlay
+ * - right signal -> right camera overlay
  * - no signal    -> hide overlay
  *
  * Priority: Car API via reflection.
@@ -46,12 +48,12 @@ public class SignalService extends Service {
     private static final String TAG = "SignalService";
     private static final String CHANNEL_ID = "mg4_signal";
     private static final int NOTIF_ID = 100;
-    private static final int HAZARD_LAMP_VALUE = 3;
     private static final long HAZARD_TRIGGER_COOLDOWN_MS = 30_000L;
 
     private static final int TURN_PROP_ID = 0x21409326;
     private static final int HAZARD_LIGHTS_STATE_PROP_ID = 0x11400e03;
     private static final int HAZARD_LIGHTS_SWITCH_PROP_ID = 0x11400e13;
+    /** Gear value reported by {@code arcsoft.avm.mCurCarGear} when reverse is engaged. */
     private static final int REVERSE_GEAR_VALUE = 2;
     private static final String OEM_AVM_PACKAGE = "com.saicmotor.hmi.aroundview";
     // Broadcasts emitted by AVMActivity in the OEM AVM app (verified via decompiled smali).
@@ -90,6 +92,7 @@ public class SignalService extends Service {
     private boolean lastObservedOemForeground = false;
     private volatile long overlayShownAtMs = 0L;
     private volatile long lastHazardTriggerAtMs = 0L;
+    private volatile long rearviewTempHiddenUntilMs = 0L;
 
     private final Handler mainHandler = new Handler();
     private final Runnable hideRunnable = new Runnable() {
@@ -99,6 +102,14 @@ public class SignalService extends Service {
             OverlayService.hideOverlay(SignalService.this);
             Log.i(TAG, "Signal off (delayed) => overlay hide");
         }
+    };
+
+    private final Runnable rearviewRestoreRunnable = () -> {
+        rearviewTempHiddenUntilMs = 0L;
+        lastLamp = Integer.MIN_VALUE;
+        lastGear = Integer.MIN_VALUE;
+        currentMode = -1;
+        updateOverlayDecision();
     };
 
     public static void start(Context context) {
@@ -150,14 +161,8 @@ public class SignalService extends Service {
         if (inst != null) {
             return String.valueOf(inst.currentLamp);
         }
-        try {
-            Class<?> sp = Class.forName("android.os.SystemProperties");
-            Method get = sp.getMethod("get", String.class, String.class);
-            String value = (String) get.invoke(null, "arcsoft.avm.mCurCarTurnLamp", "");
-            return value == null || value.isEmpty() ? "null" : value;
-        } catch (Throwable ignored) {
-            return "null";
-        }
+        String value = SystemPropertiesHelper.getString("arcsoft.avm.mCurCarTurnLamp");
+        return value.isEmpty() ? "null" : value;
     }
 
     public static String getCurrentHazardDebugText(Context context) {
@@ -173,7 +178,7 @@ public class SignalService extends Service {
     public void onCreate() {
         super.onCreate();
         sInstance = this;
-        createNotificationChannel();
+        NotificationChannelHelper.ensureChannel(this, CHANNEL_ID, "MG4 Signal");
         registerDebugBroadcastSniffer();
     }
 
@@ -190,7 +195,7 @@ public class SignalService extends Service {
 
         boolean carOk = tryStartCarApiListener();
         if (!carOk) {
-            Log.w(TAG, "Car API listener acilamadi, system property polling fallback.");
+            Log.w(TAG, "Car API listener unavailable, falling back to system property polling.");
             startPropertyPollingFallback();
         }
         registerOemCoexistListener();
@@ -245,7 +250,7 @@ public class SignalService extends Service {
             int lamp = (valueObj instanceof Integer) ? (Integer) valueObj : Integer.MIN_VALUE;
             currentLamp = lamp;
             // The Car API can be incomplete or fail, so read the gear from the current system property.
-            currentGear = readIntSystemProperty("arcsoft.avm.mCurCarGear");
+            currentGear = SystemPropertiesHelper.getInt("arcsoft.avm.mCurCarGear", 0);
             reconcileOemAvmState();
             updateOverlayDecision();
             return null;
@@ -262,8 +267,8 @@ public class SignalService extends Service {
             @Override
             public void run() {
                 if (!polling) return;
-                final int lamp = readIntSystemProperty("arcsoft.avm.mCurCarTurnLamp");
-                final int gear = readIntSystemProperty("arcsoft.avm.mCurCarGear");
+                final int lamp = SystemPropertiesHelper.getInt("arcsoft.avm.mCurCarTurnLamp", 0);
+                final int gear = SystemPropertiesHelper.getInt("arcsoft.avm.mCurCarGear", 0);
                 mainHandler.post(() -> {
                     if (!polling) return;
                     currentLamp = lamp;
@@ -276,32 +281,17 @@ public class SignalService extends Service {
         });
     }
 
-    private int readIntSystemProperty(String key) {
-        try {
-            Class<?> sp = Class.forName("android.os.SystemProperties");
-            Method get = sp.getMethod("get", String.class, String.class);
-            String s = (String) get.invoke(null, key, "");
-            if (s == null || s.isEmpty()) return 0;
-            return Integer.parseInt(s);
-        } catch (Throwable t) {
-            return 0;
-        }
-    }
-
-    private String readStringSystemProperty(String key) {
-        try {
-            Class<?> sp = Class.forName("android.os.SystemProperties");
-            Method get = sp.getMethod("get", String.class, String.class);
-            String s = (String) get.invoke(null, key, "");
-            return s == null ? "" : s;
-        } catch (Throwable t) {
-            return "";
-        }
-    }
-
     private boolean isOemCoexistActive() {
         try {
             return DashcamSettingsController.isOemCoexistActive(UiPrefs.getPrefs(this));
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private boolean isDigitalRearviewEnabled() {
+        try {
+            return UiPrefs.isDigitalRearviewEnabled(UiPrefs.getPrefs(this));
         } catch (Throwable ignored) {
             return false;
         }
@@ -314,6 +304,12 @@ public class SignalService extends Service {
             if (DashcamSettingsController.KEY_ENABLED.equals(key)
                     || DashcamSettingsController.KEY_OEM_COEXIST.equals(key)) {
                 mainHandler.post(this::applyOemCoexistState);
+            } else if (UiPrefs.KEY_DIGITAL_REARVIEW_ENABLED.equals(key)) {
+                mainHandler.post(() -> {
+                    mainHandler.removeCallbacks(rearviewRestoreRunnable);
+                    rearviewTempHiddenUntilMs = 0L;
+                    applyOemCoexistState();
+                });
             }
         };
         prefs.registerOnSharedPreferenceChangeListener(oemCoexistPrefListener);
@@ -329,12 +325,11 @@ public class SignalService extends Service {
     }
 
     private void applyOemCoexistState() {
-        if (isOemCoexistActive()) {
+        if (isOemCoexistActive() || isDigitalRearviewEnabled()) {
             startOemLifecycleMonitor();
         } else {
             stopOemLifecycleMonitor();
-            // If we were latched, AVM coexistence is now off — release the latch and resume
-            // recording so the state doesn't get stuck.
+            // Both coexist and rearview are off — release any stuck latch and resume recording.
             if (isOemAvmLatchedActive()) {
                 setOemAvmActive(this, false);
                 RecordingService.resumeAfterOemRequest(this);
@@ -353,7 +348,7 @@ public class SignalService extends Service {
         // stale value as the baseline causes the next genuine open→close cycle to fire a
         // "resume" without a preceding "pause". Reset stale Starts to DestroyEnd so the next
         // real Start triggers the pause path correctly.
-        String initialState = readStringSystemProperty(OEM_LIFECYCLE_PROP);
+        String initialState = SystemPropertiesHelper.getString(OEM_LIFECYCLE_PROP);
         if (OEM_LIFECYCLE_START.equals(initialState) && !isOemAvmInForeground()) {
             DevRuntimeLog.add("SignalService",
                     "OEM lifecycle: stale 'Start' on monitor start — resetting baseline");
@@ -366,7 +361,7 @@ public class SignalService extends Service {
             @Override
             public void run() {
                 if (!oemLifecycleMonitoring) return;
-                String state = readStringSystemProperty(OEM_LIFECYCLE_PROP);
+                String state = SystemPropertiesHelper.getString(OEM_LIFECYCLE_PROP);
                 if (!state.equals(lastOemLifecycle)) {
                     String prev = lastOemLifecycle;
                     lastOemLifecycle = state;
@@ -394,10 +389,10 @@ public class SignalService extends Service {
         DevRuntimeLog.add("SignalService", "OEM lifecycle: '" + prev + "' => '" + next + "'");
         if (OEM_LIFECYCLE_START.equals(next)) {
             setOemAvmActive(this, true);
-            RecordingService.pauseForOemRequest(this);
+            if (isOemCoexistActive()) RecordingService.pauseForOemRequest(this);
         } else if (OEM_LIFECYCLE_DESTROYED.equals(next)) {
             setOemAvmActive(this, false);
-            RecordingService.resumeAfterOemRequest(this);
+            if (isOemCoexistActive()) RecordingService.resumeAfterOemRequest(this);
         }
     }
 
@@ -470,12 +465,13 @@ public class SignalService extends Service {
         lastLamp = currentLamp;
         maybeTriggerDashcamEventForHazards(previousLamp);
 
+        final TurnSignal signal = TurnSignal.fromValue(currentLamp);
         int nextMode;
         if (currentGear == REVERSE_GEAR_VALUE) {
             nextMode = 3;
-        } else if (currentLamp == 1) {
+        } else if (signal == TurnSignal.LEFT) {
             nextMode = 1;
-        } else if (currentLamp == 2) {
+        } else if (signal == TurnSignal.RIGHT) {
             nextMode = 2;
         } else {
             nextMode = 0;
@@ -489,12 +485,15 @@ public class SignalService extends Service {
             mainHandler.removeCallbacks(hideRunnable);
             clearOverlayShownTimestamp();
             OverlayService.hideOverlay(this);
-            int targetCamera = (nextMode == 3) ? 17 : (nextMode == 1) ? 16 : (nextMode == 2) ? 14 : 15;
+            CameraIndex targetCamera = (nextMode == 3) ? CameraIndex.REAR
+                    : (nextMode == 1) ? CameraIndex.LEFT
+                    : (nextMode == 2) ? CameraIndex.RIGHT
+                    : CameraIndex.FRONT;
             Intent i = new Intent(ACTION_ROUTE_CAMERA);
             i.setPackage(getPackageName());
-            i.putExtra(EXTRA_CAMERA_INDEX, targetCamera);
+            i.putExtra(EXTRA_CAMERA_INDEX, targetCamera.getVideoIndex());
             sendBroadcast(i);
-            Log.i(TAG, "Main visible => route camera to main preview: v" + targetCamera);
+            Log.i(TAG, "Main visible => route camera to main preview: " + targetCamera);
             return;
         }
 
@@ -530,12 +529,12 @@ public class SignalService extends Service {
         mainHandler.removeCallbacks(hideRunnable);
         if (nextMode == 1) {
             markOverlayShownNow();
-            OverlayService.showOverlay(this, 16);
-            Log.i(TAG, "Left signal => overlay v16");
+            OverlayService.showOverlay(this, CameraIndex.LEFT.getVideoIndex());
+            Log.i(TAG, "Left signal => overlay " + CameraIndex.LEFT);
         } else if (nextMode == 2) {
             markOverlayShownNow();
-            OverlayService.showOverlay(this, 14);
-            Log.i(TAG, "Right signal => overlay v14");
+            OverlayService.showOverlay(this, CameraIndex.RIGHT.getVideoIndex());
+            Log.i(TAG, "Right signal => overlay " + CameraIndex.RIGHT);
         } else {
             long delayMs = computeOverlayHideDelayMs();
             mainHandler.postDelayed(hideRunnable, delayMs);
@@ -544,10 +543,10 @@ public class SignalService extends Service {
     }
 
     private void maybeTriggerDashcamEventForHazards(int previousLamp) {
-        if (currentLamp != HAZARD_LAMP_VALUE) {
+        if (TurnSignal.fromValue(currentLamp) != TurnSignal.HAZARD) {
             return;
         }
-        if (previousLamp == Integer.MIN_VALUE || previousLamp == HAZARD_LAMP_VALUE) {
+        if (previousLamp == Integer.MIN_VALUE || TurnSignal.fromValue(previousLamp) == TurnSignal.HAZARD) {
             return;
         }
         long now = SystemClock.elapsedRealtime();
@@ -589,7 +588,8 @@ public class SignalService extends Service {
 
     private int readNextPollingDelayMs(int lamp) {
         SharedPreferences sp = UiPrefs.getPrefs(this);
-        if (lamp == 1 || lamp == 2) {
+        TurnSignal signal = TurnSignal.fromValue(lamp);
+        if (signal == TurnSignal.LEFT || signal == TurnSignal.RIGHT) {
             return UiPrefs.getDevSignalOffPollMs(sp);
         }
         return UiPrefs.getDevDefaultPollMs(sp);
@@ -640,7 +640,7 @@ public class SignalService extends Service {
     }
 
     private void reconcileOemAvmState() {
-        if (!isOemCoexistActive()) {
+        if (!isOemCoexistActive() && !isDigitalRearviewEnabled()) {
             lastObservedOemForeground = false;
             return;
         }
@@ -652,7 +652,7 @@ public class SignalService extends Service {
             if (!latched) {
                 DevRuntimeLog.add("SignalService", "OEM foreground fallback => pause");
                 setOemAvmActive(this, true);
-                RecordingService.pauseForOemRequest(this);
+                if (isOemCoexistActive()) RecordingService.pauseForOemRequest(this);
             }
             return;
         }
@@ -660,7 +660,7 @@ public class SignalService extends Service {
         if (lastObservedOemForeground && latched) {
             DevRuntimeLog.add("SignalService", "OEM foreground fallback => resume");
             setOemAvmActive(this, false);
-            RecordingService.resumeAfterOemRequest(this);
+            if (isOemCoexistActive()) RecordingService.resumeAfterOemRequest(this);
         }
         lastObservedOemForeground = false;
     }
@@ -712,16 +712,6 @@ public class SignalService extends Service {
     @Override
     public IBinder onBind(Intent intent) {
         return null;
-    }
-
-    private void createNotificationChannel() {
-        NotificationChannel ch = new NotificationChannel(
-                CHANNEL_ID,
-                "MG4 Signal",
-                NotificationManager.IMPORTANCE_LOW
-        );
-        NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-        if (nm != null) nm.createNotificationChannel(ch);
     }
 
     private void registerDebugBroadcastSniffer() {

@@ -20,8 +20,10 @@ public final class UiPrefs {
     public static final String KEY_DEV_FOREGROUND_MODE_POLL_MS = "devForegroundModePollMs";
     public static final String KEY_DEV_DEFAULT_POLL_MS = "devDefaultPollMs";
     public static final String KEY_DEV_SIGNAL_OFF_POLL_MS = "devSignalOffPollMs";
+    public static final String KEY_DEV_OEM_AVM_MAX_SPEED_KMH = "devOemAvmMaxSpeedKmh";
     public static final String KEY_SAFETY_WARNING = "safetyWarning";
     public static final String KEY_OEM_AVM_ACTIVE = "oemAvmActive";
+    public static final String KEY_DIGITAL_REARVIEW_ENABLED = "digitalRearviewEnabled";
     private static final String LEGACY_AVM_PREFS_NAME = "AVM_Settings";
     private static final String LEGACY_KEY_SAFETY_WARNING = "ShowSafetyWarning";
     public static final int MAX_TILE_CORNER_RADIUS = 35;
@@ -30,6 +32,10 @@ public final class UiPrefs {
     public static final int MIN_DEV_POLLING_MS = 20;
     public static final int MAX_DEV_POLLING_MS = 5000;
     public static final int MAX_DEV_OVERLAY_TOP_INSET_PX = 200;
+    // 0 is intentionally allowed as a dev-only "standstill only" mode, which effectively
+    // disables OEM AVM coexistence as soon as the car starts rolling.
+    public static final int MIN_DEV_OEM_AVM_MAX_SPEED_KMH = 0;
+    public static final int MAX_DEV_OEM_AVM_MAX_SPEED_KMH = 60;
     public static final int OVERLAY_HIDE_DELAY_STEP_MS = 100;
     public static final int OVERLAY_MIN_SHOW_STEP_MS = 100;
     private static final int DEFAULT_TILE_CORNER_RADIUS = 3;
@@ -39,6 +45,7 @@ public final class UiPrefs {
     public static final int DEFAULT_DEV_FOREGROUND_MODE_POLL_MS = 1000;
     public static final int DEFAULT_DEV_DEFAULT_POLLING_MS = 100;
     public static final int DEFAULT_DEV_SIGNAL_OFF_POLLING_MS = 20;
+    public static final int DEFAULT_DEV_OEM_AVM_MAX_SPEED_KMH = 20;
     private static final String DEFAULT_ACCENT_COLOR = "#E7E7E7";
 
     private UiPrefs() {
@@ -103,6 +110,10 @@ public final class UiPrefs {
         prefs.edit().putBoolean(KEY_OEM_AVM_ACTIVE, active).apply();
     }
 
+    public static boolean isDigitalRearviewEnabled(SharedPreferences prefs) {
+        return prefs.getBoolean(KEY_DIGITAL_REARVIEW_ENABLED, false);
+    }
+
     /**
      * One-shot migration from the legacy AVM_Settings file. Safe to call on every
      * cold start —
@@ -140,6 +151,11 @@ public final class UiPrefs {
     public static int getDevForegroundModePollMs(SharedPreferences prefs) {
         return clampDevPollingMs(
                 prefs.getInt(KEY_DEV_FOREGROUND_MODE_POLL_MS, DEFAULT_DEV_FOREGROUND_MODE_POLL_MS));
+    }
+
+    public static int getDevOemAvmMaxSpeedKmh(SharedPreferences prefs) {
+        return clampDevOemAvmMaxSpeedKmh(
+                prefs.getInt(KEY_DEV_OEM_AVM_MAX_SPEED_KMH, DEFAULT_DEV_OEM_AVM_MAX_SPEED_KMH));
     }
 
     public static float getCornerRadiusFraction(SharedPreferences prefs) {
@@ -225,5 +241,9 @@ public final class UiPrefs {
 
     public static int clampDevOverlayTopInsetPx(int value) {
         return Math.max(0, Math.min(MAX_DEV_OVERLAY_TOP_INSET_PX, value));
+    }
+
+    public static int clampDevOemAvmMaxSpeedKmh(int value) {
+        return Math.max(MIN_DEV_OEM_AVM_MAX_SPEED_KMH, Math.min(MAX_DEV_OEM_AVM_MAX_SPEED_KMH, value));
     }
 }

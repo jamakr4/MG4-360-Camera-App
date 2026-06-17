@@ -1,5 +1,6 @@
 package com.drivehub.kamera;
 
+import com.drivehub.kamera.camera.CameraIndex;
 import com.drivehub.kamera.camera.OverlayService;
 import com.drivehub.kamera.dashcam.DashcamSettingsController;
 import com.drivehub.kamera.dashcam.RecordingService;
@@ -41,7 +42,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private View recordingStatusDot;
     private TextView tvRecordingStatus;
     private Button btnRecordTestClip;
-    private int currentVideoIndex = 15;
+    private int currentVideoIndex = CameraIndex.FRONT.getVideoIndex();
     private int activePreviewCameraIndex = -1;
     private boolean previewRunning = false;
     private boolean previewPausedForTestClip = false;
@@ -171,12 +172,12 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                     float dx = event.getX() - downX;
                     float dy = event.getY() - downY;
                     if (Math.abs(dx) > Math.abs(dy)) {
-                        if (dx > SWIPE_THRESHOLD_PX) currentVideoIndex = 14;
-                        else if (dx < -SWIPE_THRESHOLD_PX) currentVideoIndex = 16;
+                        if (dx > SWIPE_THRESHOLD_PX) currentVideoIndex = CameraIndex.RIGHT.getVideoIndex();
+                        else if (dx < -SWIPE_THRESHOLD_PX) currentVideoIndex = CameraIndex.LEFT.getVideoIndex();
                         else return true;
                     } else {
-                        if (dy < -SWIPE_THRESHOLD_PX) currentVideoIndex = 15;
-                        else if (dy > SWIPE_THRESHOLD_PX) currentVideoIndex = 17;
+                        if (dy < -SWIPE_THRESHOLD_PX) currentVideoIndex = CameraIndex.FRONT.getVideoIndex();
+                        else if (dy > SWIPE_THRESHOLD_PX) currentVideoIndex = CameraIndex.REAR.getVideoIndex();
                         else return true;
                     }
                     if (tvStatus != null) {
@@ -363,17 +364,9 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     }
 
     private String cameraLabel(int videoIndex) {
-        switch (videoIndex) {
-            case 14:
-                return getString(R.string.main_camera_label_right);
-            case 15:
-                return getString(R.string.main_camera_label_front);
-            case 16:
-                return getString(R.string.main_camera_label_left);
-            case 17:
-                return getString(R.string.main_camera_label_rear);
-            default:
-                return getString(R.string.main_camera_label_unknown, videoIndex);
-        }
+        CameraIndex ci = CameraIndex.fromVideoIndex(videoIndex);
+        return ci != null
+                ? getString(ci.getLabelResId())
+                : getString(R.string.main_camera_label_unknown, videoIndex);
     }
 }

@@ -79,7 +79,9 @@
     <string name="settings_dev_default_poll">Default-Polling (ms)</string>
     <string name="settings_dev_signal_off_poll">Blinker-Aus-Erkennung (ms)</string>
     <string name="settings_dev_foreground_mode_poll">AA/CP-Vordergrund-Polling (ms)</string>
+    <string name="settings_dev_oem_avm_max_speed">OEM-AVM-Maximalgeschwindigkeit (km/h)</string>
     <string name="settings_dev_polling_rates_hint">Default-Polling läuft, solange kein Blinker aktiv ist. Die Blinker-Aus-Erkennung wird nur bei aktivem Blinker genutzt. Werte werden auf 20..5000 ms begrenzt.</string>
+    <string name="settings_dev_oem_avm_max_speed_hint">OEM-AVM-Start-/Launch-Broadcasts oberhalb dieser Geschwindigkeit ignorieren. Standard ist 20 km/h. Mit 0 nur im Stand erlauben.</string>
     <string name="settings_dev_reset_defaults">Dev-Defaults zurücksetzen</string>
     <string name="settings_dev_defaults_reset">Dev-Defaults zurückgesetzt</string>
     <string name="settings_dev_overlay_safe_area">Overlay-Safe-Area</string>

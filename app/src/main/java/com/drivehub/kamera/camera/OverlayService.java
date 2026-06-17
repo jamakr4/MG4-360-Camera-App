@@ -3,11 +3,11 @@ package com.drivehub.kamera.camera;
 import com.drivehub.kamera.CameraProbe;
 import com.drivehub.kamera.R;
 
+import com.drivehub.kamera.helper.app.NotificationChannelHelper;
 import com.drivehub.kamera.settings.UiPrefs;
 
 import android.app.ActivityManager;
 import android.app.Notification;
-import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.Service;
 import android.content.ComponentName;
@@ -73,7 +73,7 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
     private TextureView textureView;
     private Surface textureSurface;
     private WindowManager.LayoutParams overlayParams;
-    private int cameraIndex = 15; // Default: front
+    private int cameraIndex = CameraIndex.FRONT.getVideoIndex();
     private int attachedPreviewCameraIndex = -1;
 
     /** Current window size, updated via pinch gestures. */
@@ -128,13 +128,13 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
         uiPrefs = UiPrefs.getPrefs(this);
         uiPrefs.registerOnSharedPreferenceChangeListener(prefListener);
-        createNotificationChannel();
+        NotificationChannelHelper.ensureChannel(this, CHANNEL_ID, "MG4 Overlay");
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent != null && intent.hasExtra(EXTRA_CAMERA_INDEX)) {
-            cameraIndex = intent.getIntExtra(EXTRA_CAMERA_INDEX, 15);
+            cameraIndex = intent.getIntExtra(EXTRA_CAMERA_INDEX, CameraIndex.FRONT.getVideoIndex());
         }
         // Run as a foreground service so the overlay survives while the app is in the background.
         Notification notif = new NotificationCompat.Builder(this, CHANNEL_ID)
@@ -399,16 +399,17 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
     }
 
     private boolean shouldRotatePreviewToDrivingDirection() {
+        CameraIndex ci = CameraIndex.fromVideoIndex(cameraIndex);
         return uiPrefs != null
                 && UiPrefs.isOverlayRotationToDrivingDirectionEnabled(uiPrefs)
-                && (cameraIndex == 14 || cameraIndex == 16);
+                && ci != null && ci.isSide();
     }
 
     private float getPreviewRotationDegrees() {
         if (!shouldRotatePreviewToDrivingDirection()) {
             return 0f;
         }
-        return cameraIndex == 16 ? -90f : 90f;
+        return CameraIndex.fromVideoIndex(cameraIndex) == CameraIndex.LEFT ? -90f : 90f;
     }
 
     private void updateOverlayPresentation(boolean persist) {
@@ -590,18 +591,6 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
         }
         overlayView = null;
         textureView = null;
-    }
-
-    private void createNotificationChannel() {
-        NotificationChannel ch = new NotificationChannel(
-                CHANNEL_ID,
-                "MG4 Overlay",
-                NotificationManager.IMPORTANCE_LOW
-        );
-        NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-        if (nm != null) {
-            nm.createNotificationChannel(ch);
-        }
     }
 
     @Nullable

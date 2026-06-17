@@ -90,12 +90,41 @@
 
         </LinearLayout>
 
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:minHeight="44dp"
+            android:orientation="horizontal">
+
+            <TextView
+                style="@style/DrivehubSettingsCardRowLabel"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/settings_dev_oem_avm_max_speed" />
+
+            <EditText
+                android:id="@+id/etDevOemAvmMaxSpeedKmh"
+                style="@style/DrivehubSettingsSliderValue"
+                android:inputType="number"
+                android:maxLength="2" />
+
+        </LinearLayout>
+
         <TextView
             style="@style/DrivehubSettingsCaption"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="14dp"
             android:text="@string/settings_dev_polling_rates_hint" />
+
+        <TextView
+            style="@style/DrivehubSettingsCaption"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="@string/settings_dev_oem_avm_max_speed_hint" />
 
         <Button
             android:id="@+id/btnDevResetDefaults"

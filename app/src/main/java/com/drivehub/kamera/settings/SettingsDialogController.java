@@ -213,6 +213,7 @@ public final class SettingsDialogController {
         v.etDevDefaultPollMs = dialog.findViewById(R.id.etDevDefaultPollMs);
         v.etDevSignalOffPollMs = dialog.findViewById(R.id.etDevSignalOffPollMs);
         v.etDevForegroundModePollMs = dialog.findViewById(R.id.etDevForegroundModePollMs);
+        v.etDevOemAvmMaxSpeedKmh = dialog.findViewById(R.id.etDevOemAvmMaxSpeedKmh);
         v.seekDevOverlayTopInsetPx = dialog.findViewById(R.id.seekDevOverlayTopInsetPx);
         v.etDevOverlayTopInsetPx = dialog.findViewById(R.id.etDevOverlayTopInsetPx);
         v.etDevDashcamRetentionClipCount = dialog.findViewById(R.id.etDevDashcamRetentionClipCount);
@@ -328,6 +329,7 @@ public final class SettingsDialogController {
                 views.etDevForegroundModePollMs,
                 views.etDevDefaultPollMs,
                 views.etDevSignalOffPollMs,
+                views.etDevOemAvmMaxSpeedKmh,
                 views.etDevDashcamRetentionClipCount,
                 views.etDevDashcamMaxEventDirs,
                 views.etDevDashcamRecordsPath,
@@ -410,8 +412,8 @@ public final class SettingsDialogController {
             }
         }
         appearance.reapplyForActiveTab(activeIndex);
-        // Dev-Status zeigt live-updates (turn lamp, dashcam enabled, ...) — periodisch
-        // pollen, sonst friert die Anzeige auf dem Stand vom Dialog-Öffnen ein.
+        // Dev status tab shows live updates (turn lamp, dashcam enabled, ...) — poll
+        // periodically; otherwise the display freezes at the state when the dialog opened.
         devStatusHandler.removeCallbacks(devStatusRefreshRunnable);
         if (activeIndex == DEV_STATUS_TAB_INDEX) {
             devStatusHandler.post(devStatusRefreshRunnable);
@@ -572,6 +574,7 @@ public final class SettingsDialogController {
         EditText etDevDefaultPollMs;
         EditText etDevSignalOffPollMs;
         EditText etDevForegroundModePollMs;
+        EditText etDevOemAvmMaxSpeedKmh;
         SeekBar seekDevOverlayTopInsetPx;
         EditText etDevOverlayTopInsetPx;
         EditText etDevDashcamRetentionClipCount;

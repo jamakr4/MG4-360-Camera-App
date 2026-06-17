@@ -21,27 +21,27 @@
 #-renamesourcefileattribute SourceFile
 
 # -----------------------------
-# Drivehub Kamera - decompile zorlaştırma
+# Drivehub Kamera – obfuscation hardening
 # -----------------------------
 
-# JNI: CameraProbe native fonksiyonları (JNI name-mangling) nedeniyle
-# sınıf ve native method adları korunmalı.
+# JNI: CameraProbe native methods must be kept because JNI uses name-mangling;
+# the class and its native method names need to survive R8 shrinking.
 -keep class com.drivehub.kamera.CameraProbe { *; }
 -keepclasseswithmembernames class * {
     native <methods>;
 }
 
-# AndroidX core bazen yansıma ile yüklenir; R8 silmesin.
+# AndroidX core is sometimes loaded via reflection – prevent R8 from stripping it.
 -keep class androidx.core.app.** { *; }
 -dontwarn androidx.core.app.**
 
-# @Keep anotasyonu olan üyeler korunur.
+# Keep members annotated with @Keep.
 -keepclassmembers class * {
     @androidx.annotation.Keep *;
 }
 
-# Kaynak dosya adlarını gizle.
+# Obfuscate source file names in stack traces.
 -renamesourcefileattribute SourceFile
 
-# Paket yapısını daha az okunur hale getir.
+# Flatten the package structure to make the bytecode less readable.
 -repackageclasses ''

@@ -4,10 +4,11 @@ import com.drivehub.kamera.R;
 
 import com.drivehub.kamera.CameraProbe;
 import com.drivehub.kamera.dev.DevRuntimeLog;
+import com.drivehub.kamera.helper.app.NotificationChannelHelper;
+import com.drivehub.kamera.helper.vehiclesensors.VehicleSpeedReader;
 import com.drivehub.kamera.settings.UiPrefs;
 
 import android.app.Notification;
-import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.Service;
 import android.content.Context;
@@ -180,7 +181,7 @@ public class RecordingService extends Service {
     public void onCreate() {
         super.onCreate();
         sServiceRunning = true;
-        createNotificationChannel();
+        NotificationChannelHelper.ensureChannel(this, CHANNEL_ID, R.string.notification_channel_recording);
         restoreEventState();
     }
 
@@ -497,7 +498,7 @@ public class RecordingService extends Service {
                 && !segmentStopRequested
                 && (SystemClock.elapsedRealtime() - start) < durationMs) {
             if (showSpeed) {
-                CameraProbe.updateCombinedRecordingSpeed(readSpeedKmhFromSystemProperty());
+                CameraProbe.updateCombinedRecordingSpeed(VehicleSpeedReader.readSpeedKmh());
             }
             try {
                 Thread.sleep(200);
@@ -538,20 +539,6 @@ public class RecordingService extends Service {
             publishStatus(STATUS_STARTING, 0, TOTAL_CAMERAS, "");
         }
         return true;
-    }
-
-    private int readSpeedKmhFromSystemProperty() {
-        try {
-            Class<?> sp = Class.forName("android.os.SystemProperties");
-            java.lang.reflect.Method get = sp.getMethod("get", String.class, String.class);
-            String value = (String) get.invoke(null, "arcsoft.avm.mCurCarSpeed", "");
-            if (value == null || value.isEmpty()) {
-                return 0;
-            }
-            return Math.max(0, Math.round(Float.parseFloat(value)));
-        } catch (Throwable ignored) {
-            return 0;
-        }
     }
 
     private void onSegmentCompleted(File baseDir, String baseName, long startMs, long endMs, int keepSegments) {
@@ -1359,16 +1346,6 @@ public class RecordingService extends Service {
                 .putString(KEY_EVENT_RECENT_SEGMENTS, segmentsJson.toString())
                 .putString(KEY_EVENT_PENDING_REQUESTS, requestsJson.toString())
                 .apply();
-    }
-
-    private void createNotificationChannel() {
-        NotificationChannel ch = new NotificationChannel(
-                CHANNEL_ID,
-                getString(R.string.notification_channel_recording),
-                NotificationManager.IMPORTANCE_LOW);
-        NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-        if (nm != null)
-            nm.createNotificationChannel(ch);
     }
 
     @Nullable

@@ -50,6 +50,15 @@ namespace camera_stream_manager
         static constexpr int COLOR_FORMAT_YUV420_PLANAR = 19;
         static constexpr int COLOR_FORMAT_YUV420_SEMIPLANAR = 21;
 
+        // Camera /dev/videoX indices – keep in sync with CameraIndex.java.
+        static constexpr int CAMERA_VIDEO_INDEX_RIGHT = 14;
+        static constexpr int CAMERA_VIDEO_INDEX_FRONT = 15;
+        static constexpr int CAMERA_VIDEO_INDEX_LEFT  = 16;
+        static constexpr int CAMERA_VIDEO_INDEX_REAR  = 17;
+
+        // The rear camera feed is flipped horizontally to match driver expectations.
+        static constexpr int CAMERA_INDEX_REAR = 17;
+
         void logPrint(int level, const char *fmt, va_list args)
         {
             __android_log_vprint(level, TAG, fmt, args);
@@ -1261,7 +1270,7 @@ namespace camera_stream_manager
             bool startRecording(int slot, const std::string &outputPath, int width, int height, int fps, int bitrate)
             {
                 auto sink = std::make_shared<RecordingSink>(
-                    slot, videoIndex_, outputPath, width, height, fps, bitrate, videoIndex_ == 17);
+                    slot, videoIndex_, outputPath, width, height, fps, bitrate, videoIndex_ == CAMERA_INDEX_REAR);
                 auto consumer = std::make_shared<SingleCameraRecordingConsumer>(sink);
                 bool started = false;
                 bool shouldStopAfterInitFailure = false;
@@ -1541,7 +1550,7 @@ namespace camera_stream_manager
                 }
 
                 const cv::Mat *previewSource = &rgbaFrame;
-                if (videoIndex_ == 17)
+                if (videoIndex_ == CAMERA_INDEX_REAR)
                 {
                     previewScratch_.create(rgbaFrame.rows, rgbaFrame.cols, rgbaFrame.type());
                     cv::flip(rgbaFrame, previewScratch_, 1);
@@ -1724,7 +1733,10 @@ namespace camera_stream_manager
         bool gCombinedRecordingActive = false;
 
         static constexpr int COMBINED_CONSUMER_ID_BASE = 1000;
-        static constexpr std::array<int, 4> COMBINED_VIDEO_INDICES = {15, 14, 16, 17};
+        static constexpr std::array<int, 4> COMBINED_VIDEO_INDICES = {
+            CAMERA_VIDEO_INDEX_FRONT, CAMERA_VIDEO_INDEX_RIGHT,
+            CAMERA_VIDEO_INDEX_LEFT,  CAMERA_VIDEO_INDEX_REAR
+        };
 
         std::shared_ptr<CameraSession> getOrCreateSession(int videoIndex)
         {

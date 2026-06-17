@@ -79,7 +79,9 @@
     <string name="settings_dev_default_poll">Default polling (ms)</string>
     <string name="settings_dev_signal_off_poll">Signal-off detection (ms)</string>
     <string name="settings_dev_foreground_mode_poll">AA/CP foreground poll (ms)</string>
+    <string name="settings_dev_oem_avm_max_speed">OEM AVM max speed (km/h)</string>
     <string name="settings_dev_polling_rates_hint">Default polling runs while no turn signal is active. Signal-off detection is used only while a turn signal is active. Values are clamped to 20..5000 ms.</string>
+    <string name="settings_dev_oem_avm_max_speed_hint">Ignore OEM AVM start/launch broadcasts above this speed. Default is 20 km/h. Set 0 for standstill-only behavior.</string>
     <string name="settings_dev_reset_defaults">Reset dev defaults</string>
     <string name="settings_dev_defaults_reset">Dev defaults reset</string>
     <string name="settings_dev_overlay_safe_area">Overlay safe area</string>

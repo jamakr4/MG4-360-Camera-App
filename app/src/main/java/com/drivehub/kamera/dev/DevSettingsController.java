@@ -31,6 +31,7 @@ public final class DevSettingsController {
             EditText etForegroundModePollMs,
             EditText etDefaultPollMs,
             EditText etSignalOffPollMs,
+            EditText etOemAvmMaxSpeedKmh,
             EditText etDashcamRetentionClipCount,
             EditText etDashcamMaxEventDirs,
             EditText etDashcamRecordsPath,
@@ -66,6 +67,13 @@ public final class DevSettingsController {
                 UiPrefs.KEY_DEV_SIGNAL_OFF_POLL_MS,
                 UiPrefs.getDevSignalOffPollMs(prefs)
         );
+        bindNonNegativeIntField(
+                prefs,
+                etOemAvmMaxSpeedKmh,
+                UiPrefs.KEY_DEV_OEM_AVM_MAX_SPEED_KMH,
+                UiPrefs.getDevOemAvmMaxSpeedKmh(prefs),
+                UiPrefs::clampDevOemAvmMaxSpeedKmh
+        );
         bindCapacityField(
                 prefs,
                 etDashcamRetentionClipCount,
@@ -88,6 +96,7 @@ public final class DevSettingsController {
                 etForegroundModePollMs,
                 etDefaultPollMs,
                 etSignalOffPollMs,
+                etOemAvmMaxSpeedKmh,
                 etDashcamRetentionClipCount,
                 etDashcamMaxEventDirs,
                 btnResetDefaults);
@@ -192,6 +201,7 @@ public final class DevSettingsController {
             EditText etForegroundModePollMs,
             EditText etDefaultPollMs,
             EditText etSignalOffPollMs,
+            EditText etOemAvmMaxSpeedKmh,
             EditText etDashcamRetentionClipCount,
             EditText etDashcamMaxEventDirs,
             Button btnResetDefaults
@@ -203,6 +213,7 @@ public final class DevSettingsController {
                     .putInt(UiPrefs.KEY_DEV_FOREGROUND_MODE_POLL_MS, UiPrefs.DEFAULT_DEV_FOREGROUND_MODE_POLL_MS)
                     .putInt(UiPrefs.KEY_DEV_DEFAULT_POLL_MS, UiPrefs.DEFAULT_DEV_DEFAULT_POLLING_MS)
                     .putInt(UiPrefs.KEY_DEV_SIGNAL_OFF_POLL_MS, UiPrefs.DEFAULT_DEV_SIGNAL_OFF_POLLING_MS)
+                    .putInt(UiPrefs.KEY_DEV_OEM_AVM_MAX_SPEED_KMH, UiPrefs.DEFAULT_DEV_OEM_AVM_MAX_SPEED_KMH)
                     .apply();
             DashcamSettingsController.setRetentionClipCount(prefs,
                     DashcamSettingsController.DEFAULT_RETENTION_CLIP_COUNT);
@@ -215,6 +226,7 @@ public final class DevSettingsController {
             setPollingFieldValue(etForegroundModePollMs, UiPrefs.DEFAULT_DEV_FOREGROUND_MODE_POLL_MS);
             setPollingFieldValue(etDefaultPollMs, UiPrefs.DEFAULT_DEV_DEFAULT_POLLING_MS);
             setPollingFieldValue(etSignalOffPollMs, UiPrefs.DEFAULT_DEV_SIGNAL_OFF_POLLING_MS);
+            setIntFieldValue(etOemAvmMaxSpeedKmh, UiPrefs.DEFAULT_DEV_OEM_AVM_MAX_SPEED_KMH);
             setIntFieldValue(etDashcamRetentionClipCount, DashcamSettingsController.DEFAULT_RETENTION_CLIP_COUNT);
             setIntFieldValue(etDashcamMaxEventDirs, DashcamSettingsController.DEFAULT_MAX_RETAINED_EVENT_DIRS);
             SignalService.requestRecheck();
@@ -349,6 +361,45 @@ public final class DevSettingsController {
                 editText.setSelection(editText.getText().length());
             }
             SignalService.requestRecheck();
+        });
+    }
+
+    private void bindNonNegativeIntField(
+            SharedPreferences prefs,
+            EditText editText,
+            String key,
+            int initialValue,
+            IntUnaryOperator clamp
+    ) {
+        if (editText == null) return;
+        setIntFieldValue(editText, initialValue);
+        editText.addTextChangedListener(new SimpleTextWatcher() {
+            @Override
+            public void afterTextChanged(Editable s) {
+                if (s == null) return;
+                String text = s.toString().trim();
+                if (text.isEmpty()) return;
+                try {
+                    prefs.edit().putInt(key, clamp.applyAsInt(Integer.parseInt(text))).apply();
+                } catch (NumberFormatException ignored) {
+                }
+            }
+        });
+        editText.setOnFocusChangeListener((v, hasFocus) -> {
+            if (hasFocus) return;
+            String text = editText.getText() == null ? "" : editText.getText().toString().trim();
+            int value;
+            try {
+                value = text.isEmpty() ? initialValue : clamp.applyAsInt(Integer.parseInt(text));
+            } catch (NumberFormatException ignored) {
+                value = initialValue;
+            }
+            prefs.edit().putInt(key, value).apply();
+            String normalized = String.valueOf(value);
+            if (!normalized.contentEquals(editText.getText())) {
+                editText.setText(normalized);
+                editText.setSelection(editText.getText().length());
+            }
         });
     }
 

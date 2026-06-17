@@ -1,10 +1,10 @@
 package com.drivehub.kamera.dashcam;
 
 import com.drivehub.kamera.R;
+import com.drivehub.kamera.helper.app.NotificationChannelHelper;
 import com.drivehub.kamera.settings.UiPrefs;
 
 import android.app.Notification;
-import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.Service;
 import android.content.Context;
@@ -190,7 +190,7 @@ public class DashcamEventOverlayService extends Service {
     public void onCreate() {
         super.onCreate();
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
-        createNotificationChannel();
+        NotificationChannelHelper.ensureChannel(this, CHANNEL_ID, R.string.notification_channel_dashcam_event_overlay);
     }
 
     @Override
@@ -386,17 +386,6 @@ public class DashcamEventOverlayService extends Service {
         titleView = null;
         subtitleView = null;
         stopForeground(true);
-    }
-
-    private void createNotificationChannel() {
-        NotificationChannel channel = new NotificationChannel(
-                CHANNEL_ID,
-                getString(R.string.notification_channel_dashcam_event_overlay),
-                NotificationManager.IMPORTANCE_LOW);
-        NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-        if (notificationManager != null) {
-            notificationManager.createNotificationChannel(channel);
-        }
     }
 
     @Nullable

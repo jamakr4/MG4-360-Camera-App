@@ -19,7 +19,12 @@ public class TileViewActivity extends AppCompatActivity {
 
     private static final int[] SURFACE_IDS = { R.id.sfFront, R.id.sfRight, R.id.sfLeft, R.id.sfRear };
     private static final int[] TILE_IDS = { R.id.tileFront, R.id.tileRight, R.id.tileLeft, R.id.tileRear };
-    private static final int[] CAMERA_INDICES = { 15, 14, 16, 17 };
+    private static final int[] CAMERA_INDICES = {
+        CameraIndex.FRONT.getVideoIndex(),
+        CameraIndex.RIGHT.getVideoIndex(),
+        CameraIndex.LEFT.getVideoIndex(),
+        CameraIndex.REAR.getVideoIndex()
+    };
 
     private final SurfaceHolder[] holders = new SurfaceHolder[4];
     private final SurfaceHolder.Callback[] callbacks = new SurfaceHolder.Callback[4];
