@@ -4,6 +4,7 @@ import com.drivehub.kamera.CameraProbe;
 import com.drivehub.kamera.R;
 
 import com.drivehub.kamera.helper.app.NotificationChannelHelper;
+import com.drivehub.kamera.signal.SignalService;
 import com.drivehub.kamera.settings.UiPrefs;
 
 import android.app.ActivityManager;
@@ -42,6 +43,9 @@ import androidx.core.app.NotificationCompat;
 public class OverlayService extends Service implements TextureView.SurfaceTextureListener {
 
     public static final String EXTRA_CAMERA_INDEX = "camera_index";
+    public static final String EXTRA_OVERLAY_REASON = "overlay_reason";
+    public static final String OVERLAY_REASON_SIGNAL = "signal";
+    public static final String OVERLAY_REASON_DIGITAL_REARVIEW = "digital_rearview";
 
     private static final String CHANNEL_ID = "mg4_overlay";
     private static final int NOTIF_ID = 99;
@@ -75,6 +79,7 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
     private WindowManager.LayoutParams overlayParams;
     private int cameraIndex = CameraIndex.FRONT.getVideoIndex();
     private int attachedPreviewCameraIndex = -1;
+    private String overlayReason = OVERLAY_REASON_SIGNAL;
 
     /** Current window size, updated via pinch gestures. */
     private int overlayWidthPx = DEFAULT_OVERLAY_WIDTH_PX;
@@ -112,8 +117,13 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
             };
 
     public static void showOverlay(Context context, int cameraIndex) {
+        showOverlay(context, cameraIndex, OVERLAY_REASON_SIGNAL);
+    }
+
+    public static void showOverlay(Context context, int cameraIndex, String overlayReason) {
         Intent i = new Intent(context, OverlayService.class);
         i.putExtra(EXTRA_CAMERA_INDEX, cameraIndex);
+        i.putExtra(EXTRA_OVERLAY_REASON, overlayReason);
         context.startForegroundService(i);
     }
 
@@ -136,11 +146,14 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
         if (intent != null && intent.hasExtra(EXTRA_CAMERA_INDEX)) {
             cameraIndex = intent.getIntExtra(EXTRA_CAMERA_INDEX, CameraIndex.FRONT.getVideoIndex());
         }
+        if (intent != null && intent.hasExtra(EXTRA_OVERLAY_REASON)) {
+            overlayReason = intent.getStringExtra(EXTRA_OVERLAY_REASON);
+        }
         // Run as a foreground service so the overlay survives while the app is in the background.
         Notification notif = new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.ic_menu_camera)
                 .setContentTitle(getString(R.string.app_name))
-                .setContentText(getString(R.string.notification_overlay_text))
+                .setContentText(getOverlayNotificationText())
                 .setOngoing(true)
                 .setPriority(NotificationCompat.PRIORITY_LOW)
                 .build();
@@ -279,6 +292,15 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
                     return true;
                 case MotionEvent.ACTION_UP:
                     saveOverlayLayoutPrefs();
+                    float tapDx = event.getRawX() - initialTouchX;
+                    float tapDy = event.getRawY() - initialTouchY;
+                    boolean isTap = (tapDx * tapDx + tapDy * tapDy) < (float) (dpToPx(12) * dpToPx(12));
+                    if (isTap
+                            && OVERLAY_REASON_DIGITAL_REARVIEW.equals(overlayReason)
+                            && uiPrefs != null
+                            && UiPrefs.isDigitalRearviewTapToHideEnabled(uiPrefs)) {
+                        SignalService.startRearviewTempHide(OverlayService.this);
+                    }
                     v.performClick();
                     return true;
                 default:
@@ -320,7 +342,13 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
         btnDismissOverlay.setColorFilter(0xFFFFFFFF);
         btnDismissOverlay.setPadding(dpToPx(20), dpToPx(20), dpToPx(20), dpToPx(20));
         btnDismissOverlay.setContentDescription("Close overlay");
-        btnDismissOverlay.setOnClickListener(v -> hideOverlay(OverlayService.this));
+        btnDismissOverlay.setOnClickListener(v -> {
+            if (OVERLAY_REASON_DIGITAL_REARVIEW.equals(overlayReason) && uiPrefs != null) {
+                UiPrefs.setDigitalRearviewEnabled(uiPrefs, false);
+                SignalService.requestRecheck();
+            }
+            hideOverlay(OverlayService.this);
+        });
         card.addView(btnDismissOverlay);
         applyOverlayCornerRadius(card);
 
@@ -346,6 +374,13 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
 
     private int dpToPx(int dp) {
         return Math.round(dp * getResources().getDisplayMetrics().density);
+    }
+
+    private String getOverlayNotificationText() {
+        if (OVERLAY_REASON_DIGITAL_REARVIEW.equals(overlayReason)) {
+            return getString(R.string.notification_digital_rearview_text);
+        }
+        return getString(R.string.notification_overlay_text);
     }
 
     /** Keeps the active overlay aspect ratio while clamping size to screen and min/max bounds. */

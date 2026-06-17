@@ -52,6 +52,11 @@
                     android:text="@string/settings_tab_signal_camera" />
 
                 <TextView
+                    android:id="@+id/tabManeuverMode"
+                    style="@style/DrivehubSettingsTabInactive"
+                    android:text="@string/settings_tab_maneuver_mode" />
+
+                <TextView
                     android:id="@+id/tabDashcam"
                     style="@style/DrivehubSettingsTabInactive"
                     android:text="@string/settings_tab_dashcam" />
@@ -153,6 +158,8 @@
             <include layout="@layout/dialog_settings_section_settings" />
 
             <include layout="@layout/dialog_settings_section_signal_camera" />
+
+            <include layout="@layout/dialog_settings_section_maneuver_mode" />
 
             <include layout="@layout/dialog_settings_section_dashcam" />
 

@@ -1,7 +1,6 @@
 package com.drivehub.kamera.signal;
 
 import com.drivehub.kamera.MainActivity;
-import com.drivehub.kamera.camera.OverlayService;
 import com.drivehub.kamera.settings.SimpleTextWatcher;
 import com.drivehub.kamera.settings.UiPrefs;
 
@@ -24,6 +23,9 @@ public final class SignalCameraSettingsController {
     public void bind(
             SharedPreferences prefs,
             Switch swOverlay,
+            Switch swDigitalRearview,
+            Switch swRearviewTapToHide,
+            EditText etRearviewTapToHideDurationSec,
             Switch swRotateToDrivingDirection,
             SeekBar seekOverlayHideDelay,
             EditText etOverlayHideDelayValue,
@@ -35,8 +37,47 @@ public final class SignalCameraSettingsController {
             swOverlay.setOnCheckedChangeListener((btn, checked) -> {
                 prefs.edit().putBoolean(UiPrefs.KEY_OVERLAY_ON_SIGNAL, checked).apply();
                 if (!checked) {
-                    OverlayService.hideOverlay(activity);
+                    SignalService.requestRecheck();
                 }
+            });
+        }
+
+        if (swDigitalRearview != null) {
+            swDigitalRearview.setChecked(UiPrefs.isDigitalRearviewEnabled(prefs));
+            swDigitalRearview.setOnCheckedChangeListener((btn, checked) -> {
+                UiPrefs.setDigitalRearviewEnabled(prefs, checked);
+                SignalService.requestRecheck();
+            });
+        }
+
+        if (swRearviewTapToHide != null) {
+            swRearviewTapToHide.setChecked(UiPrefs.isDigitalRearviewTapToHideEnabled(prefs));
+            swRearviewTapToHide.setOnCheckedChangeListener((btn, checked) ->
+                    prefs.edit().putBoolean(UiPrefs.KEY_DIGITAL_REARVIEW_TAP_TO_HIDE_ENABLED, checked).apply());
+        }
+
+        if (etRearviewTapToHideDurationSec != null) {
+            int saved = UiPrefs.getDigitalRearviewTapToHideDurationSec(prefs);
+            etRearviewTapToHideDurationSec.setText(String.valueOf(saved));
+            etRearviewTapToHideDurationSec.setSelection(etRearviewTapToHideDurationSec.getText().length());
+            etRearviewTapToHideDurationSec.addTextChangedListener(new SimpleTextWatcher() {
+                @Override
+                public void afterTextChanged(android.text.Editable s) {
+                    if (s == null) return;
+                    String text = s.toString().trim();
+                    if (text.isEmpty()) return;
+                    try {
+                        int v = UiPrefs.clampRearviewTapToHideDurationSec(Integer.parseInt(text));
+                        prefs.edit().putInt(UiPrefs.KEY_DIGITAL_REARVIEW_TAP_TO_HIDE_DURATION_SEC, v).apply();
+                    } catch (NumberFormatException ignored) {
+                    }
+                }
+            });
+            etRearviewTapToHideDurationSec.setOnFocusChangeListener((v, hasFocus) -> {
+                if (hasFocus) return;
+                int clamped = UiPrefs.getDigitalRearviewTapToHideDurationSec(prefs);
+                etRearviewTapToHideDurationSec.setText(String.valueOf(clamped));
+                etRearviewTapToHideDurationSec.setSelection(etRearviewTapToHideDurationSec.getText().length());
             });
         }
 

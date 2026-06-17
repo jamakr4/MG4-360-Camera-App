@@ -14,6 +14,12 @@ public final class UiPrefs {
     public static final String KEY_ALLOW_BETA_UPDATES = "allowBetaUpdates";
     public static final String KEY_OVERLAY_ON_SIGNAL = "overlayOnSignal";
     public static final String KEY_OVERLAY_ROTATE_TO_DRIVING_DIRECTION = "overlayRotateToDrivingDirection";
+    public static final String KEY_DIGITAL_REARVIEW_ENABLED = "digitalRearviewEnabled";
+    public static final String KEY_DIGITAL_REARVIEW_TAP_TO_HIDE_ENABLED = "digitalRearviewTapToHideEnabled";
+    public static final String KEY_DIGITAL_REARVIEW_TAP_TO_HIDE_DURATION_SEC = "digitalRearviewTapToHideDurationSec";
+    public static final int DEFAULT_DIGITAL_REARVIEW_TAP_TO_HIDE_DURATION_SEC = 30;
+    public static final int MIN_DIGITAL_REARVIEW_TAP_TO_HIDE_SEC = 5;
+    public static final int MAX_DIGITAL_REARVIEW_TAP_TO_HIDE_SEC = 300;
     public static final String KEY_OVERLAY_HIDE_DELAY_MS = "overlayHideDelayMs";
     public static final String KEY_OVERLAY_MIN_SHOW_MS = "overlayMinShowMs";
     public static final String KEY_DEV_OVERLAY_TOP_INSET_PX = "devOverlayTopInsetPx";
@@ -23,7 +29,6 @@ public final class UiPrefs {
     public static final String KEY_DEV_OEM_AVM_MAX_SPEED_KMH = "devOemAvmMaxSpeedKmh";
     public static final String KEY_SAFETY_WARNING = "safetyWarning";
     public static final String KEY_OEM_AVM_ACTIVE = "oemAvmActive";
-    public static final String KEY_DIGITAL_REARVIEW_ENABLED = "digitalRearviewEnabled";
     private static final String LEGACY_AVM_PREFS_NAME = "AVM_Settings";
     private static final String LEGACY_KEY_SAFETY_WARNING = "ShowSafetyWarning";
     public static final int MAX_TILE_CORNER_RADIUS = 35;
@@ -90,6 +95,29 @@ public final class UiPrefs {
         return prefs.getBoolean(KEY_OVERLAY_ON_SIGNAL, true);
     }
 
+    public static boolean isDigitalRearviewEnabled(SharedPreferences prefs) {
+        return prefs.getBoolean(KEY_DIGITAL_REARVIEW_ENABLED, false);
+    }
+
+    public static void setDigitalRearviewEnabled(SharedPreferences prefs, boolean enabled) {
+        prefs.edit().putBoolean(KEY_DIGITAL_REARVIEW_ENABLED, enabled).apply();
+    }
+
+    public static boolean isDigitalRearviewTapToHideEnabled(SharedPreferences prefs) {
+        return prefs.getBoolean(KEY_DIGITAL_REARVIEW_TAP_TO_HIDE_ENABLED, false);
+    }
+
+    public static int getDigitalRearviewTapToHideDurationSec(SharedPreferences prefs) {
+        return clampRearviewTapToHideDurationSec(
+                prefs.getInt(KEY_DIGITAL_REARVIEW_TAP_TO_HIDE_DURATION_SEC,
+                        DEFAULT_DIGITAL_REARVIEW_TAP_TO_HIDE_DURATION_SEC));
+    }
+
+    public static int clampRearviewTapToHideDurationSec(int value) {
+        return Math.max(MIN_DIGITAL_REARVIEW_TAP_TO_HIDE_SEC,
+                Math.min(MAX_DIGITAL_REARVIEW_TAP_TO_HIDE_SEC, value));
+    }
+
     public static boolean isDashcamEnabled(SharedPreferences prefs) {
         return prefs.getBoolean(DashcamSettingsController.KEY_ENABLED, false);
     }
@@ -108,10 +136,6 @@ public final class UiPrefs {
 
     public static void setOemAvmActive(SharedPreferences prefs, boolean active) {
         prefs.edit().putBoolean(KEY_OEM_AVM_ACTIVE, active).apply();
-    }
-
-    public static boolean isDigitalRearviewEnabled(SharedPreferences prefs) {
-        return prefs.getBoolean(KEY_DIGITAL_REARVIEW_ENABLED, false);
     }
 
     /**

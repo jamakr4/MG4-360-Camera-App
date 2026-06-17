@@ -41,8 +41,8 @@ import java.io.File;
 public final class SettingsDialogController {
 
     private static final int DEFAULT_TAB_INDEX = 1; // Settings
-    private static final int DEV_TAB_INDEX = 5;
-    private static final int DEV_STATUS_TAB_INDEX = 6;
+    private static final int DEV_TAB_INDEX = 6;
+    private static final int DEV_STATUS_TAB_INDEX = 7;
     private static final int DEV_UNLOCK_TAPS = 5;
     private static final int EXPECTED_TOTAL_CAMERAS = 4;
     private static final int CAMERA_PROBE_MAX_INDEX = 18;
@@ -165,6 +165,9 @@ public final class SettingsDialogController {
     private Views bindViews(SharedPreferences prefs) {
         Views v = new Views();
         v.swOverlay = dialog.findViewById(R.id.switchOverlayOnSignal);
+        v.swDigitalRearview = dialog.findViewById(R.id.switchDigitalRearview);
+        v.swRearviewTapToHide = dialog.findViewById(R.id.switchRearviewTapToHide);
+        v.etRearviewTapToHideDurationSec = dialog.findViewById(R.id.etRearviewTapToHideDurationSec);
         v.swRotateToDrivingDirection = dialog.findViewById(R.id.switchOverlayRotateToDrivingDirection);
         v.swDashcamEnabled = dialog.findViewById(R.id.switchDashcamEnabled);
         v.swSafetyWarning = dialog.findViewById(R.id.switchSafetyWarning);
@@ -228,23 +231,25 @@ public final class SettingsDialogController {
         v.tabUpdate = dialog.findViewById(R.id.tabUpdate);
         v.tabSettings = dialog.findViewById(R.id.tabSettings);
         v.tabSignalCamera = dialog.findViewById(R.id.tabSignalCamera);
+        v.tabManeuverMode = dialog.findViewById(R.id.tabManeuverMode);
         v.tabDashcam = dialog.findViewById(R.id.tabDashcam);
         v.tabCredits = dialog.findViewById(R.id.tabCredits);
         v.tabDev = dialog.findViewById(R.id.tabDev);
         v.tabDevStatus = dialog.findViewById(R.id.tabDevStatus);
         v.settingsTabs = new TextView[]{
-                v.tabUpdate, v.tabSettings, v.tabSignalCamera, v.tabDashcam,
+                v.tabUpdate, v.tabSettings, v.tabSignalCamera, v.tabManeuverMode, v.tabDashcam,
                 v.tabCredits, v.tabDev, v.tabDevStatus
         };
         v.sectionUpdate = dialog.findViewById(R.id.sectionUpdate);
         v.sectionSettings = dialog.findViewById(R.id.sectionSettings);
         v.sectionSignalCamera = dialog.findViewById(R.id.sectionSignalCamera);
+        v.sectionManeuverMode = dialog.findViewById(R.id.sectionManeuverMode);
         v.sectionDashcam = dialog.findViewById(R.id.sectionDashcam);
         v.sectionCredits = dialog.findViewById(R.id.sectionCredits);
         v.sectionDev = dialog.findViewById(R.id.sectionDev);
         v.sectionDevStatus = dialog.findViewById(R.id.sectionDevStatus);
         v.settingsSections = new View[]{
-                v.sectionUpdate, v.sectionSettings, v.sectionSignalCamera, v.sectionDashcam,
+                v.sectionUpdate, v.sectionSettings, v.sectionSignalCamera, v.sectionManeuverMode, v.sectionDashcam,
                 v.sectionCredits, v.sectionDev, v.sectionDevStatus
         };
         v.accentRow = dialog.findViewById(R.id.rowAccentColor);
@@ -278,6 +283,9 @@ public final class SettingsDialogController {
         signalCam.bind(
                 prefs,
                 views.swOverlay,
+                views.swDigitalRearview,
+                views.swRearviewTapToHide,
+                views.etRearviewTapToHideDurationSec,
                 views.swRotateToDrivingDirection,
                 views.seekOverlayHideDelay,
                 views.etOverlayHideDelayValue,
@@ -344,6 +352,8 @@ public final class SettingsDialogController {
                 prefs,
                 new Switch[]{
                         views.swOverlay,
+                        views.swDigitalRearview,
+                        views.swRearviewTapToHide,
                         views.swRotateToDrivingDirection,
                         views.swDashcamEnabled,
                         views.swDashcamShowSpeed,
@@ -372,6 +382,7 @@ public final class SettingsDialogController {
                 views.tabUpdate,
                 views.tabSettings,
                 views.tabSignalCamera,
+                views.tabManeuverMode,
                 views.tabDashcam,
                 views.tabCredits,
                 views.tabDev,
@@ -534,6 +545,9 @@ public final class SettingsDialogController {
 
     private static final class Views {
         Switch swOverlay;
+        Switch swDigitalRearview;
+        Switch swRearviewTapToHide;
+        EditText etRearviewTapToHideDurationSec;
         Switch swRotateToDrivingDirection;
         Switch swDashcamEnabled;
         Switch swSafetyWarning;
@@ -589,6 +603,7 @@ public final class SettingsDialogController {
         TextView tabUpdate;
         TextView tabSettings;
         TextView tabSignalCamera;
+        TextView tabManeuverMode;
         TextView tabDashcam;
         TextView tabCredits;
         TextView tabDev;
@@ -597,6 +612,7 @@ public final class SettingsDialogController {
         View sectionUpdate;
         View sectionSettings;
         View sectionSignalCamera;
+        View sectionManeuverMode;
         View sectionDashcam;
         View sectionCredits;
         View sectionDev;

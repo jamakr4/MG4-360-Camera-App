@@ -92,15 +92,18 @@ public class SignalService extends Service {
     private boolean lastObservedOemForeground = false;
     private volatile long overlayShownAtMs = 0L;
     private volatile long lastHazardTriggerAtMs = 0L;
-    private volatile long rearviewTempHiddenUntilMs = 0L;
+    private long rearviewTempHiddenUntilMs = 0L; // mainHandler only
 
     private final Handler mainHandler = new Handler();
     private final Runnable hideRunnable = new Runnable() {
         @Override
         public void run() {
             clearOverlayShownTimestamp();
-            OverlayService.hideOverlay(SignalService.this);
-            Log.i(TAG, "Signal off (delayed) => overlay hide");
+            lastLamp = Integer.MIN_VALUE;
+            lastGear = Integer.MIN_VALUE;
+            currentMode = -1;
+            updateOverlayDecision();
+            Log.i(TAG, "Signal off (delayed) => overlay state reapplied");
         }
     };
 
@@ -110,6 +113,7 @@ public class SignalService extends Service {
         lastGear = Integer.MIN_VALUE;
         currentMode = -1;
         updateOverlayDecision();
+        Log.i(TAG, "Rearview temp-hide expired => overlay state reapplied");
     };
 
     public static void start(Context context) {
@@ -153,6 +157,38 @@ public class SignalService extends Service {
             inst.lastGear = Integer.MIN_VALUE;
             inst.currentMode = -1;
             inst.updateOverlayDecision();
+        });
+    }
+
+    public static void startRearviewTempHide(Context context) {
+        SignalService inst = sInstance;
+        if (inst == null) return;
+        inst.mainHandler.post(() -> {
+            int durationSec = UiPrefs.getDigitalRearviewTapToHideDurationSec(UiPrefs.getPrefs(context));
+            long durationMs = durationSec * 1000L;
+            inst.rearviewTempHiddenUntilMs = android.os.SystemClock.elapsedRealtime() + durationMs;
+            inst.mainHandler.removeCallbacks(inst.rearviewRestoreRunnable);
+            inst.mainHandler.postDelayed(inst.rearviewRestoreRunnable, durationMs);
+            inst.lastLamp = Integer.MIN_VALUE;
+            inst.lastGear = Integer.MIN_VALUE;
+            inst.currentMode = -1;
+            inst.updateOverlayDecision();
+            Log.i(TAG, "Rearview temp-hide started for " + durationSec + "s");
+        });
+    }
+
+    public static void cancelRearviewTempHide(Context context) {
+        SignalService inst = sInstance;
+        if (inst == null) return;
+        inst.mainHandler.post(() -> {
+            if (inst.rearviewTempHiddenUntilMs == 0L) return;
+            inst.mainHandler.removeCallbacks(inst.rearviewRestoreRunnable);
+            inst.rearviewTempHiddenUntilMs = 0L;
+            inst.lastLamp = Integer.MIN_VALUE;
+            inst.lastGear = Integer.MIN_VALUE;
+            inst.currentMode = -1;
+            inst.updateOverlayDecision();
+            Log.i(TAG, "Rearview temp-hide cancelled");
         });
     }
 
@@ -306,6 +342,7 @@ public class SignalService extends Service {
                 mainHandler.post(this::applyOemCoexistState);
             } else if (UiPrefs.KEY_DIGITAL_REARVIEW_ENABLED.equals(key)) {
                 mainHandler.post(() -> {
+                    // Any explicit pref change cancels the temp-hide so the new state takes effect immediately.
                     mainHandler.removeCallbacks(rearviewRestoreRunnable);
                     rearviewTempHiddenUntilMs = 0L;
                     applyOemCoexistState();
@@ -473,19 +510,22 @@ public class SignalService extends Service {
             nextMode = 1;
         } else if (signal == TurnSignal.RIGHT) {
             nextMode = 2;
+        } else if (isDigitalRearviewEnabled() && !isRearviewTempHidden()) {
+            nextMode = 4;
         } else {
             nextMode = 0;
         }
 
         if (nextMode == currentMode) return;
-        currentMode = nextMode;
+        int previousMode = currentMode;
 
         // If MainActivity is visible, do not use the overlay; route the main preview camera instead.
         if (MainActivity.shouldBlockOverlay()) {
+            currentMode = nextMode;
             mainHandler.removeCallbacks(hideRunnable);
             clearOverlayShownTimestamp();
             OverlayService.hideOverlay(this);
-            CameraIndex targetCamera = (nextMode == 3) ? CameraIndex.REAR
+            CameraIndex targetCamera = (nextMode == 3 || nextMode == 4) ? CameraIndex.REAR
                     : (nextMode == 1) ? CameraIndex.LEFT
                     : (nextMode == 2) ? CameraIndex.RIGHT
                     : CameraIndex.FRONT;
@@ -497,8 +537,9 @@ public class SignalService extends Service {
             return;
         }
 
-        // If the main screen is not visible, only use the overlay when the setting is enabled.
-        if (!isOverlayEnabled()) {
+        // Signal overlay and digital rearview are controlled separately.
+        if ((nextMode == 1 || nextMode == 2) && !isOverlayEnabled()) {
+            currentMode = nextMode;
             // Also hide any leftover overlay if the setting is disabled.
             mainHandler.removeCallbacks(hideRunnable);
             clearOverlayShownTimestamp();
@@ -508,6 +549,7 @@ public class SignalService extends Service {
         }
 
         if (nextMode == 3) { // reverse
+            currentMode = nextMode;
             // No overlay is wanted for reverse: hide it if present and leave only OEM/main screen behavior.
             mainHandler.removeCallbacks(hideRunnable);
             clearOverlayShownTimestamp();
@@ -519,6 +561,7 @@ public class SignalService extends Service {
         // Prefer the OEM AVM latch from broadcasts so we can react immediately before
         // ActivityManager catches up and the OEM app is actually top-most.
         if (isOemAvmLatchedActive() || isOemAvmInForeground()) {
+            currentMode = nextMode;
             mainHandler.removeCallbacks(hideRunnable);
             clearOverlayShownTimestamp();
             OverlayService.hideOverlay(this);
@@ -526,6 +569,16 @@ public class SignalService extends Service {
             return;
         }
 
+        if ((previousMode == 1 || previousMode == 2) && (nextMode == 0 || nextMode == 4)) {
+            currentMode = -2;
+            long delayMs = computeOverlayHideDelayMs();
+            mainHandler.removeCallbacks(hideRunnable);
+            mainHandler.postDelayed(hideRunnable, delayMs);
+            Log.i(TAG, "Signal/gear off => will reapply overlay state after " + delayMs + "ms");
+            return;
+        }
+
+        currentMode = nextMode;
         mainHandler.removeCallbacks(hideRunnable);
         if (nextMode == 1) {
             markOverlayShownNow();
@@ -535,10 +588,15 @@ public class SignalService extends Service {
             markOverlayShownNow();
             OverlayService.showOverlay(this, CameraIndex.RIGHT.getVideoIndex());
             Log.i(TAG, "Right signal => overlay " + CameraIndex.RIGHT);
+        } else if (nextMode == 4) {
+            clearOverlayShownTimestamp();
+            OverlayService.showOverlay(this, CameraIndex.REAR.getVideoIndex(),
+                    OverlayService.OVERLAY_REASON_DIGITAL_REARVIEW);
+            Log.i(TAG, "Digital rearview => overlay " + CameraIndex.REAR);
         } else {
-            long delayMs = computeOverlayHideDelayMs();
-            mainHandler.postDelayed(hideRunnable, delayMs);
-            Log.i(TAG, "Signal/gear off => will hide overlay after " + delayMs + "ms");
+            clearOverlayShownTimestamp();
+            OverlayService.hideOverlay(this);
+            Log.i(TAG, "No active overlay mode => overlay hide");
         }
     }
 
@@ -574,6 +632,11 @@ public class SignalService extends Service {
         } catch (Throwable t) {
             return false;
         }
+    }
+
+    private boolean isRearviewTempHidden() {
+        return rearviewTempHiddenUntilMs > 0L
+                && android.os.SystemClock.elapsedRealtime() < rearviewTempHiddenUntilMs;
     }
 
     private long readOverlayHideDelayMs() {
@@ -704,6 +767,7 @@ public class SignalService extends Service {
         stopOemLifecycleMonitor();
         unregisterOemCoexistListener();
         mainHandler.removeCallbacks(hideRunnable);
+        mainHandler.removeCallbacks(rearviewRestoreRunnable);
         OverlayService.hideOverlay(this);
         sInstance = null;
     }

@@ -92,6 +92,15 @@
                 <action android:name="com.drivehub.kamera.action.TRIGGER_DASHCAM_EVENT" />
             </intent-filter>
         </receiver>
+
+        <receiver
+            android:name=".signal.DigitalRearviewTriggerReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.drivehub.kamera.action.SET_DIGITAL_REARVIEW" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>
