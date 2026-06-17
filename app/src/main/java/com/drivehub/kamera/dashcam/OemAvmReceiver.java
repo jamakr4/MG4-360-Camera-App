@@ -32,9 +32,8 @@ public class OemAvmReceiver extends BroadcastReceiver {
             return;
         }
         SharedPreferences prefs = UiPrefs.getPrefs(context);
-        boolean coexistActive = DashcamSettingsController.isOemCoexistActive(prefs);
-        boolean rearviewActive = UiPrefs.isDigitalRearviewEnabled(prefs);
-        if (!coexistActive && !rearviewActive) {
+        boolean coexistEnabled = UiPrefs.isOemAvmCoexistEnabled(prefs);
+        if (!coexistEnabled) {
             return;
         }
         int startMessage = intent.getIntExtra(EXTRA_START_MESSAGE, Integer.MIN_VALUE);
@@ -56,13 +55,13 @@ public class OemAvmReceiver extends BroadcastReceiver {
             }
             Log.i(TAG, "OEM AVM start/launch received: " + action);
             SignalService.setOemAvmActive(context, true);
-            if (coexistActive) RecordingService.pauseForOemRequest(context);
+            RecordingService.pauseForOemRequest(context);
             return;
         }
         if (ACTION_AVM_STOP.equals(action)) {
             Log.i(TAG, "OEM AVM stop received");
             SignalService.setOemAvmActive(context, false);
-            if (coexistActive) RecordingService.resumeAfterOemRequest(context);
+            RecordingService.resumeAfterOemRequest(context);
         }
     }
 }

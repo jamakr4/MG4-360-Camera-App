@@ -362,7 +362,7 @@ public class SignalService extends Service {
 
     private boolean isOemCoexistActive() {
         try {
-            return DashcamSettingsController.isOemCoexistActive(UiPrefs.getPrefs(this));
+            return UiPrefs.isOemAvmCoexistEnabled(UiPrefs.getPrefs(this));
         } catch (Throwable ignored) {
             return false;
         }
@@ -380,8 +380,7 @@ public class SignalService extends Service {
         if (oemCoexistPrefListener != null) return;
         SharedPreferences prefs = UiPrefs.getPrefs(this);
         oemCoexistPrefListener = (sp, key) -> {
-            if (DashcamSettingsController.KEY_ENABLED.equals(key)
-                    || DashcamSettingsController.KEY_OEM_COEXIST.equals(key)) {
+            if (UiPrefs.KEY_OEM_AVM_COEXIST.equals(key)) {
                 mainHandler.post(this::applyOemCoexistState);
             } else if (UiPrefs.KEY_DIGITAL_REARVIEW_ENABLED.equals(key)) {
                 mainHandler.post(() -> {
@@ -405,11 +404,11 @@ public class SignalService extends Service {
     }
 
     private void applyOemCoexistState() {
-        if (isOemCoexistActive() || isDigitalRearviewEnabled()) {
+        if (isOemCoexistActive()) {
             startOemLifecycleMonitor();
         } else {
             stopOemLifecycleMonitor();
-            // Both coexist and rearview are off — release any stuck latch and resume recording.
+            // OEM coexist is off — release any stuck latch and resume recording.
             if (isOemAvmLatchedActive()) {
                 setOemAvmActive(this, false);
                 RecordingService.resumeAfterOemRequest(this);
@@ -469,10 +468,10 @@ public class SignalService extends Service {
         DevRuntimeLog.add("SignalService", "OEM lifecycle: '" + prev + "' => '" + next + "'");
         if (OEM_LIFECYCLE_START.equals(next)) {
             setOemAvmActive(this, true);
-            if (isOemCoexistActive()) RecordingService.pauseForOemRequest(this);
+            RecordingService.pauseForOemRequest(this);
         } else if (OEM_LIFECYCLE_DESTROYED.equals(next)) {
             setOemAvmActive(this, false);
-            if (isOemCoexistActive()) RecordingService.resumeAfterOemRequest(this);
+            RecordingService.resumeAfterOemRequest(this);
         }
     }
 
@@ -766,7 +765,7 @@ public class SignalService extends Service {
     }
 
     private void reconcileOemAvmState() {
-        if (!isOemCoexistActive() && !isDigitalRearviewEnabled()) {
+        if (!isOemCoexistActive()) {
             lastObservedOemForeground = false;
             return;
         }
@@ -778,7 +777,7 @@ public class SignalService extends Service {
             if (!latched) {
                 DevRuntimeLog.add("SignalService", "OEM foreground fallback => pause");
                 setOemAvmActive(this, true);
-                if (isOemCoexistActive()) RecordingService.pauseForOemRequest(this);
+                RecordingService.pauseForOemRequest(this);
             }
             return;
         }
@@ -786,7 +785,7 @@ public class SignalService extends Service {
         if (lastObservedOemForeground && latched) {
             DevRuntimeLog.add("SignalService", "OEM foreground fallback => resume");
             setOemAvmActive(this, false);
-            if (isOemCoexistActive()) RecordingService.resumeAfterOemRequest(this);
+            RecordingService.resumeAfterOemRequest(this);
         }
         lastObservedOemForeground = false;
     }

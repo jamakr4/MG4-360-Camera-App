@@ -33,6 +33,7 @@ public final class UiPrefs {
     public static final String KEY_DEV_SIGNAL_OFF_POLL_MS = "devSignalOffPollMs";
     public static final String KEY_DEV_OEM_AVM_MAX_SPEED_KMH = "devOemAvmMaxSpeedKmh";
     public static final String KEY_SAFETY_WARNING = "safetyWarning";
+    public static final String KEY_OEM_AVM_COEXIST = "oemCoexist";
     public static final String KEY_OEM_AVM_ACTIVE = "oemAvmActive";
     private static final String LEGACY_AVM_PREFS_NAME = "AVM_Settings";
     private static final String LEGACY_KEY_SAFETY_WARNING = "ShowSafetyWarning";
@@ -148,6 +149,14 @@ public final class UiPrefs {
 
     public static void setSafetyWarningEnabled(SharedPreferences prefs, boolean enabled) {
         prefs.edit().putBoolean(KEY_SAFETY_WARNING, enabled).apply();
+    }
+
+    public static boolean isOemAvmCoexistEnabled(SharedPreferences prefs) {
+        return prefs.getBoolean(KEY_OEM_AVM_COEXIST, true);
+    }
+
+    public static void setOemAvmCoexistEnabled(SharedPreferences prefs, boolean enabled) {
+        prefs.edit().putBoolean(KEY_OEM_AVM_COEXIST, enabled).apply();
     }
 
     public static boolean isOemAvmActive(SharedPreferences prefs) {

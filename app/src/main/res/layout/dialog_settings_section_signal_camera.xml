@@ -267,8 +267,7 @@
 
             <EditText
                 android:id="@+id/etSignalTapToHideDurationSec"
-                android:layout_width="64dp"
-                android:layout_height="wrap_content"
+                style="@style/DrivehubSettingsSliderValue"
                 android:inputType="number"
                 android:maxLength="3"
                 android:textAlignment="center" />

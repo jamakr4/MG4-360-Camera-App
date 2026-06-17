@@ -45,9 +45,9 @@
     <string name="settings_dashcam_storage_usb_clip_count">USB-Ringpuffer-Clips</string>
     <string name="settings_dashcam_storage_usb_event_dirs">USB-Ereignisse</string>
     <string name="settings_dashcam_storage_usb_limits_hint">Limits für Aufnahmen auf USB. Der interne Speicher behält seine eigenen, konservativeren Limits (siehe Dev-Einstellungen).</string>
-    <string name="settings_section_dashcam_oem_coexist">OEM 360°-Kamera</string>
-    <string name="settings_dashcam_oem_coexist">OEM-360°-App weiter nutzen</string>
-    <string name="settings_dashcam_oem_coexist_hint">Wenn aktiv, pausiert die Dashcam kurz, damit die werkseitige 360°-Ansicht starten kann. Wenn deaktiviert, läuft die Aufnahme durch — die OEM-360°-Ansicht startet aber nicht, solange die Dashcam die Kameras belegt.</string>
+    <string name="settings_section_oem_avm">OEM 360°-Kamera</string>
+    <string name="settings_oem_avm_coexist">OEM-360°-App weiter nutzen</string>
+    <string name="settings_oem_avm_coexist_hint">Globale Einstellung fuer die werkseitige 360°-Kamera-App. Wenn aktiv, gibt die App bei Bedarf den Kamerazugriff frei, damit die OEM-Rueckfahr-/360°-Ansicht weiter starten kann. Wenn deaktiviert, haben die Custom-Features immer Vorrang und die OEM-360°-App wird parallel bewusst nicht unterstuetzt.</string>
     <string name="settings_dashcam_banners_section">Benachrichtigungs-Banner</string>
     <string name="settings_dashcam_banner_group_event">Ereignis gespeichert</string>
     <string name="settings_dashcam_banner_group_pause_resume">Aufnahme pausiert / fortgesetzt</string>

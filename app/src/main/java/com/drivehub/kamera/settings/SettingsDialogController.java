@@ -171,6 +171,7 @@ public final class SettingsDialogController {
         v.swRotateToDrivingDirection = dialog.findViewById(R.id.switchOverlayRotateToDrivingDirection);
         v.swDashcamEnabled = dialog.findViewById(R.id.switchDashcamEnabled);
         v.swSafetyWarning = dialog.findViewById(R.id.switchSafetyWarning);
+        v.swOemAvmCoexist = dialog.findViewById(R.id.switchOemAvmCoexist);
         v.swAllowBetaUpdates = dialog.findViewById(R.id.switchAllowBetaUpdates);
         v.seekOverlayHideDelay = dialog.findViewById(R.id.seekOverlayHideDelay);
         v.etOverlayHideDelayValue = dialog.findViewById(R.id.etOverlayHideDelayValue);
@@ -183,7 +184,6 @@ public final class SettingsDialogController {
         v.swDashcamShowSpeed = dialog.findViewById(R.id.switchDashcamShowSpeed);
         v.swDashcamTestRecordEnabled = dialog.findViewById(R.id.switchDashcamTestRecordEnabled);
         v.etDashcamTestRecordDuration = dialog.findViewById(R.id.etDashcamTestRecordDuration);
-        v.swDashcamOemCoexist = dialog.findViewById(R.id.switchDashcamOemCoexist);
         // Temporarily disabled storage UI:
         // v.segDashcamStorageTarget = dialog.findViewById(R.id.segDashcamStorageTarget);
         // v.tvDashcamStorageStatus = dialog.findViewById(R.id.tvDashcamStorageStatus);
@@ -278,6 +278,11 @@ public final class SettingsDialogController {
             UiPrefs.setSafetyWarningEnabled(prefs, checked);
             onSafetyWarningChanged.run();
         });
+        if (v.swOemAvmCoexist != null) {
+            v.swOemAvmCoexist.setChecked(UiPrefs.isOemAvmCoexistEnabled(prefs));
+            v.swOemAvmCoexist.setOnCheckedChangeListener((btn, checked) ->
+                    UiPrefs.setOemAvmCoexistEnabled(prefs, checked));
+        }
         return v;
     }
 
@@ -304,7 +309,6 @@ public final class SettingsDialogController {
                 views.swDashcamShowSpeed,
                 views.swDashcamTestRecordEnabled,
                 views.etDashcamTestRecordDuration,
-                views.swDashcamOemCoexist,
                 // Re-enable this block when the storage section comes back:
                 // new DashcamSettingsController.StorageViews(
                 //         views.segDashcamStorageTarget,
@@ -363,7 +367,7 @@ public final class SettingsDialogController {
                         views.swDashcamEnabled,
                         views.swDashcamShowSpeed,
                         views.swDashcamTestRecordEnabled,
-                        views.swDashcamOemCoexist,
+                        views.swOemAvmCoexist,
                         views.swBannerEvent,
                         views.swBannerPauseResume,
                         views.swBannerErrorRecovered,
@@ -558,6 +562,7 @@ public final class SettingsDialogController {
         Switch swRotateToDrivingDirection;
         Switch swDashcamEnabled;
         Switch swSafetyWarning;
+        Switch swOemAvmCoexist;
         Switch swAllowBetaUpdates;
         SeekBar seekOverlayHideDelay;
         EditText etOverlayHideDelayValue;
@@ -568,7 +573,6 @@ public final class SettingsDialogController {
         Switch swDashcamShowSpeed;
         Switch swDashcamTestRecordEnabled;
         EditText etDashcamTestRecordDuration;
-        Switch swDashcamOemCoexist;
         SegmentedControl segDashcamStorageTarget;
         TextView tvDashcamStorageStatus;
         TextView tvDashcamStorageActivePath;

@@ -103,7 +103,7 @@ To use it:
 1. Open `Settings` -> `Dashcam`.
 2. Enable `Dashcam`.
 3. Optional: adjust FPS, footer signature, and whether speed should be shown in the recording.
-4. Optional: enable OEM coexistence if you want the app to yield camera ownership briefly to the stock 360/reverse system when needed (recommended).
+4. Optional: in `Settings`, enable the global OEM 360° AVM setting if you still want to use the stock reverse/360 camera app alongside the custom features (recommended).
 5. Use `Trigger event save` in the app, the hazard-light trigger, or an external broadcast to save an event clip.
 
 Notes:
