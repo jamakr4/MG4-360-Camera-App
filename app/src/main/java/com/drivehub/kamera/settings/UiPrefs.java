@@ -17,9 +17,14 @@ public final class UiPrefs {
     public static final String KEY_DIGITAL_REARVIEW_ENABLED = "digitalRearviewEnabled";
     public static final String KEY_DIGITAL_REARVIEW_TAP_TO_HIDE_ENABLED = "digitalRearviewTapToHideEnabled";
     public static final String KEY_DIGITAL_REARVIEW_TAP_TO_HIDE_DURATION_SEC = "digitalRearviewTapToHideDurationSec";
-    public static final int DEFAULT_DIGITAL_REARVIEW_TAP_TO_HIDE_DURATION_SEC = 30;
+    public static final int DEFAULT_DIGITAL_REARVIEW_TAP_TO_HIDE_DURATION_SEC = 5;
     public static final int MIN_DIGITAL_REARVIEW_TAP_TO_HIDE_SEC = 5;
     public static final int MAX_DIGITAL_REARVIEW_TAP_TO_HIDE_SEC = 300;
+    public static final String KEY_SIGNAL_OVERLAY_TAP_TO_HIDE_ENABLED = "signalOverlayTapToHideEnabled";
+    public static final String KEY_SIGNAL_OVERLAY_TAP_TO_HIDE_DURATION_SEC = "signalOverlayTapToHideDurationSec";
+    public static final int DEFAULT_SIGNAL_OVERLAY_TAP_TO_HIDE_DURATION_SEC = 5;
+    public static final int MIN_SIGNAL_OVERLAY_TAP_TO_HIDE_SEC = 3;
+    public static final int MAX_SIGNAL_OVERLAY_TAP_TO_HIDE_SEC = 120;
     public static final String KEY_OVERLAY_HIDE_DELAY_MS = "overlayHideDelayMs";
     public static final String KEY_OVERLAY_MIN_SHOW_MS = "overlayMinShowMs";
     public static final String KEY_DEV_OVERLAY_TOP_INSET_PX = "devOverlayTopInsetPx";
@@ -104,7 +109,7 @@ public final class UiPrefs {
     }
 
     public static boolean isDigitalRearviewTapToHideEnabled(SharedPreferences prefs) {
-        return prefs.getBoolean(KEY_DIGITAL_REARVIEW_TAP_TO_HIDE_ENABLED, false);
+        return prefs.getBoolean(KEY_DIGITAL_REARVIEW_TAP_TO_HIDE_ENABLED, true);
     }
 
     public static int getDigitalRearviewTapToHideDurationSec(SharedPreferences prefs) {
@@ -116,6 +121,21 @@ public final class UiPrefs {
     public static int clampRearviewTapToHideDurationSec(int value) {
         return Math.max(MIN_DIGITAL_REARVIEW_TAP_TO_HIDE_SEC,
                 Math.min(MAX_DIGITAL_REARVIEW_TAP_TO_HIDE_SEC, value));
+    }
+
+    public static boolean isSignalOverlayTapToHideEnabled(SharedPreferences prefs) {
+        return prefs.getBoolean(KEY_SIGNAL_OVERLAY_TAP_TO_HIDE_ENABLED, true);
+    }
+
+    public static int getSignalOverlayTapToHideDurationSec(SharedPreferences prefs) {
+        return clampSignalTapToHideDurationSec(
+                prefs.getInt(KEY_SIGNAL_OVERLAY_TAP_TO_HIDE_DURATION_SEC,
+                        DEFAULT_SIGNAL_OVERLAY_TAP_TO_HIDE_DURATION_SEC));
+    }
+
+    public static int clampSignalTapToHideDurationSec(int value) {
+        return Math.max(MIN_SIGNAL_OVERLAY_TAP_TO_HIDE_SEC,
+                Math.min(MAX_SIGNAL_OVERLAY_TAP_TO_HIDE_SEC, value));
     }
 
     public static boolean isDashcamEnabled(SharedPreferences prefs) {

@@ -70,6 +70,9 @@
     <string name="settings_rearview_tap_to_hide">Tippen zum kurzzeitigen Ausblenden</string>
     <string name="settings_rearview_tap_to_hide_duration">Automatisch einblenden nach (Sek.)</string>
     <string name="settings_rearview_tap_to_hide_hint">Tippe auf das Overlay, um es kurzzeitig auszublenden. Es erscheint nach der eingestellten Zeit wieder. Das × schliesst es dauerhaft.</string>
+    <string name="settings_signal_tap_to_hide">Tippen zum kurzzeitigen Ausblenden</string>
+    <string name="settings_signal_tap_to_hide_duration">Automatisch einblenden nach (Sek.)</string>
+    <string name="settings_signal_tap_to_hide_hint">Tippe auf das Blinker-Kamera-Overlay, um es kurzzeitig auszublenden. Es erscheint nach der eingestellten Zeit wieder, solange der Blinker noch aktiv ist.</string>
     <string name="settings_overlay_rotate_to_driving_direction">Blinker-Kamera in Fahrtrichtung drehen</string>
     <string name="safety_warning_text">Bitte achte auf die Umgebung!</string>
     <string name="show_safety_warning">Sicherheitswarnung anzeigen</string>

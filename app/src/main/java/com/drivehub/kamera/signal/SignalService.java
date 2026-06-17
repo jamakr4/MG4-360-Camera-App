@@ -5,6 +5,7 @@ import com.drivehub.kamera.R;
 import com.drivehub.kamera.MainActivity;
 import com.drivehub.kamera.camera.CameraIndex;
 import com.drivehub.kamera.camera.OverlayService;
+import com.drivehub.kamera.camera.TileViewActivity;
 import com.drivehub.kamera.dashcam.DashcamSettingsController;
 import com.drivehub.kamera.dashcam.RecordingService;
 import com.drivehub.kamera.dev.DevRuntimeLog;
@@ -93,6 +94,7 @@ public class SignalService extends Service {
     private volatile long overlayShownAtMs = 0L;
     private volatile long lastHazardTriggerAtMs = 0L;
     private long rearviewTempHiddenUntilMs = 0L; // mainHandler only
+    private long signalTempHiddenUntilMs = 0L;   // mainHandler only
 
     private final Handler mainHandler = new Handler();
     private final Runnable hideRunnable = new Runnable() {
@@ -114,6 +116,15 @@ public class SignalService extends Service {
         currentMode = -1;
         updateOverlayDecision();
         Log.i(TAG, "Rearview temp-hide expired => overlay state reapplied");
+    };
+
+    private final Runnable signalRestoreRunnable = () -> {
+        signalTempHiddenUntilMs = 0L;
+        lastLamp = Integer.MIN_VALUE;
+        lastGear = Integer.MIN_VALUE;
+        currentMode = -1;
+        updateOverlayDecision();
+        Log.i(TAG, "Signal temp-hide expired => overlay state reapplied");
     };
 
     public static void start(Context context) {
@@ -189,6 +200,38 @@ public class SignalService extends Service {
             inst.currentMode = -1;
             inst.updateOverlayDecision();
             Log.i(TAG, "Rearview temp-hide cancelled");
+        });
+    }
+
+    public static void startSignalTempHide(Context context) {
+        SignalService inst = sInstance;
+        if (inst == null) return;
+        inst.mainHandler.post(() -> {
+            int durationSec = UiPrefs.getSignalOverlayTapToHideDurationSec(UiPrefs.getPrefs(context));
+            long durationMs = durationSec * 1000L;
+            inst.signalTempHiddenUntilMs = android.os.SystemClock.elapsedRealtime() + durationMs;
+            inst.mainHandler.removeCallbacks(inst.signalRestoreRunnable);
+            inst.mainHandler.postDelayed(inst.signalRestoreRunnable, durationMs);
+            inst.lastLamp = Integer.MIN_VALUE;
+            inst.lastGear = Integer.MIN_VALUE;
+            inst.currentMode = -1;
+            inst.updateOverlayDecision();
+            Log.i(TAG, "Signal temp-hide started for " + durationSec + "s");
+        });
+    }
+
+    public static void cancelSignalTempHide(Context context) {
+        SignalService inst = sInstance;
+        if (inst == null) return;
+        inst.mainHandler.post(() -> {
+            if (inst.signalTempHiddenUntilMs == 0L) return;
+            inst.mainHandler.removeCallbacks(inst.signalRestoreRunnable);
+            inst.signalTempHiddenUntilMs = 0L;
+            inst.lastLamp = Integer.MIN_VALUE;
+            inst.lastGear = Integer.MIN_VALUE;
+            inst.currentMode = -1;
+            inst.updateOverlayDecision();
+            Log.i(TAG, "Signal temp-hide cancelled");
         });
     }
 
@@ -506,9 +549,9 @@ public class SignalService extends Service {
         int nextMode;
         if (currentGear == REVERSE_GEAR_VALUE) {
             nextMode = 3;
-        } else if (signal == TurnSignal.LEFT) {
+        } else if (signal == TurnSignal.LEFT && !isSignalTempHidden()) {
             nextMode = 1;
-        } else if (signal == TurnSignal.RIGHT) {
+        } else if (signal == TurnSignal.RIGHT && !isSignalTempHidden()) {
             nextMode = 2;
         } else if (isDigitalRearviewEnabled() && !isRearviewTempHidden()) {
             nextMode = 4;
@@ -520,12 +563,17 @@ public class SignalService extends Service {
         int previousMode = currentMode;
 
         // If MainActivity is visible, do not use the overlay; route the main preview camera instead.
+        // Digital rearview (nextMode==4) is skipped here — the main preview should stay independent.
         if (MainActivity.shouldBlockOverlay()) {
             currentMode = nextMode;
             mainHandler.removeCallbacks(hideRunnable);
             clearOverlayShownTimestamp();
             OverlayService.hideOverlay(this);
-            CameraIndex targetCamera = (nextMode == 3 || nextMode == 4) ? CameraIndex.REAR
+            if (nextMode == 4 || nextMode == 0) {
+                Log.i(TAG, "Main visible => no route (mode " + nextMode + ")");
+                return;
+            }
+            CameraIndex targetCamera = (nextMode == 3) ? CameraIndex.REAR
                     : (nextMode == 1) ? CameraIndex.LEFT
                     : (nextMode == 2) ? CameraIndex.RIGHT
                     : CameraIndex.FRONT;
@@ -534,6 +582,16 @@ public class SignalService extends Service {
             i.putExtra(EXTRA_CAMERA_INDEX, targetCamera.getVideoIndex());
             sendBroadcast(i);
             Log.i(TAG, "Main visible => route camera to main preview: " + targetCamera);
+            return;
+        }
+
+        // TileView holds all four cameras directly — suppress every overlay to avoid conflicts.
+        if (TileViewActivity.isVisible()) {
+            currentMode = nextMode;
+            mainHandler.removeCallbacks(hideRunnable);
+            clearOverlayShownTimestamp();
+            OverlayService.hideOverlay(this);
+            Log.i(TAG, "TileView visible => suppress overlay (mode " + nextMode + ")");
             return;
         }
 
@@ -569,7 +627,7 @@ public class SignalService extends Service {
             return;
         }
 
-        if ((previousMode == 1 || previousMode == 2) && (nextMode == 0 || nextMode == 4)) {
+        if ((previousMode == 1 || previousMode == 2) && nextMode == 0) {
             currentMode = -2;
             long delayMs = computeOverlayHideDelayMs();
             mainHandler.removeCallbacks(hideRunnable);
@@ -637,6 +695,11 @@ public class SignalService extends Service {
     private boolean isRearviewTempHidden() {
         return rearviewTempHiddenUntilMs > 0L
                 && android.os.SystemClock.elapsedRealtime() < rearviewTempHiddenUntilMs;
+    }
+
+    private boolean isSignalTempHidden() {
+        return signalTempHiddenUntilMs > 0L
+                && android.os.SystemClock.elapsedRealtime() < signalTempHiddenUntilMs;
     }
 
     private long readOverlayHideDelayMs() {
@@ -768,6 +831,7 @@ public class SignalService extends Service {
         unregisterOemCoexistListener();
         mainHandler.removeCallbacks(hideRunnable);
         mainHandler.removeCallbacks(rearviewRestoreRunnable);
+        mainHandler.removeCallbacks(signalRestoreRunnable);
         OverlayService.hideOverlay(this);
         sInstance = null;
     }

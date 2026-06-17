@@ -4,6 +4,7 @@ import com.drivehub.kamera.CameraProbe;
 import com.drivehub.kamera.R;
 
 import com.drivehub.kamera.settings.UiPrefs;
+import com.drivehub.kamera.signal.SignalService;
 
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
@@ -16,6 +17,12 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.google.android.material.card.MaterialCardView;
 
 public class TileViewActivity extends AppCompatActivity {
+
+    private static volatile boolean sTileViewVisible = false;
+
+    public static boolean isVisible() {
+        return sTileViewVisible;
+    }
 
     private static final int[] SURFACE_IDS = { R.id.sfFront, R.id.sfRight, R.id.sfLeft, R.id.sfRear };
     private static final int[] TILE_IDS = { R.id.tileFront, R.id.tileRight, R.id.tileLeft, R.id.tileRear };
@@ -92,12 +99,19 @@ public class TileViewActivity extends AppCompatActivity {
     @Override
     protected void onStart() {
         super.onStart();
+        sTileViewVisible = true;
+        OverlayService.hideOverlay(this);
+        // Reset SignalService internal state so currentMode doesn't stay at 4
+        // and the later onStop() recheck can actually re-evaluate.
+        SignalService.requestRecheck();
         prefs.registerOnSharedPreferenceChangeListener(prefListener);
     }
 
     @Override
     protected void onStop() {
+        sTileViewVisible = false;
         prefs.unregisterOnSharedPreferenceChangeListener(prefListener);
+        SignalService.requestRecheck();
         super.onStop();
     }
 

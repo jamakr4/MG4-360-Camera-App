@@ -176,6 +176,8 @@ public final class SettingsDialogController {
         v.etOverlayHideDelayValue = dialog.findViewById(R.id.etOverlayHideDelayValue);
         v.seekOverlayMinShow = dialog.findViewById(R.id.seekOverlayMinShow);
         v.etOverlayMinShowValue = dialog.findViewById(R.id.etOverlayMinShowValue);
+        v.swSignalTapToHide = dialog.findViewById(R.id.switchSignalTapToHide);
+        v.etSignalTapToHideDurationSec = dialog.findViewById(R.id.etSignalTapToHideDurationSec);
         v.etDashcamFps = dialog.findViewById(R.id.etDashcamFps);
         v.etDashcamSignature = dialog.findViewById(R.id.etDashcamSignature);
         v.swDashcamShowSpeed = dialog.findViewById(R.id.switchDashcamShowSpeed);
@@ -286,6 +288,8 @@ public final class SettingsDialogController {
                 views.swDigitalRearview,
                 views.swRearviewTapToHide,
                 views.etRearviewTapToHideDurationSec,
+                views.swSignalTapToHide,
+                views.etSignalTapToHideDurationSec,
                 views.swRotateToDrivingDirection,
                 views.seekOverlayHideDelay,
                 views.etOverlayHideDelayValue,
@@ -354,6 +358,7 @@ public final class SettingsDialogController {
                         views.swOverlay,
                         views.swDigitalRearview,
                         views.swRearviewTapToHide,
+                        views.swSignalTapToHide,
                         views.swRotateToDrivingDirection,
                         views.swDashcamEnabled,
                         views.swDashcamShowSpeed,
@@ -548,6 +553,8 @@ public final class SettingsDialogController {
         Switch swDigitalRearview;
         Switch swRearviewTapToHide;
         EditText etRearviewTapToHideDurationSec;
+        Switch swSignalTapToHide;
+        EditText etSignalTapToHideDurationSec;
         Switch swRotateToDrivingDirection;
         Switch swDashcamEnabled;
         Switch swSafetyWarning;

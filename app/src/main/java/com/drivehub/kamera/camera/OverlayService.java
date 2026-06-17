@@ -295,11 +295,14 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
                     float tapDx = event.getRawX() - initialTouchX;
                     float tapDy = event.getRawY() - initialTouchY;
                     boolean isTap = (tapDx * tapDx + tapDy * tapDy) < (float) (dpToPx(12) * dpToPx(12));
-                    if (isTap
-                            && OVERLAY_REASON_DIGITAL_REARVIEW.equals(overlayReason)
-                            && uiPrefs != null
-                            && UiPrefs.isDigitalRearviewTapToHideEnabled(uiPrefs)) {
-                        SignalService.startRearviewTempHide(OverlayService.this);
+                    if (isTap && uiPrefs != null) {
+                        if (OVERLAY_REASON_DIGITAL_REARVIEW.equals(overlayReason)
+                                && UiPrefs.isDigitalRearviewTapToHideEnabled(uiPrefs)) {
+                            SignalService.startRearviewTempHide(OverlayService.this);
+                        } else if (OVERLAY_REASON_SIGNAL.equals(overlayReason)
+                                && UiPrefs.isSignalOverlayTapToHideEnabled(uiPrefs)) {
+                            SignalService.startSignalTempHide(OverlayService.this);
+                        }
                     }
                     v.performClick();
                     return true;

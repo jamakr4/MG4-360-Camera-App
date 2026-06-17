@@ -70,6 +70,9 @@
     <string name="settings_rearview_tap_to_hide">Tap to temporarily hide</string>
     <string name="settings_rearview_tap_to_hide_duration">Auto-restore after (sec)</string>
     <string name="settings_rearview_tap_to_hide_hint">Tap the overlay to hide it temporarily. It reappears after the set duration. The × closes it permanently.</string>
+    <string name="settings_signal_tap_to_hide">Tap to hide</string>
+    <string name="settings_signal_tap_to_hide_duration">Auto-restore after (sec)</string>
+    <string name="settings_signal_tap_to_hide_hint">Tap the blinker camera overlay to hide it temporarily. It reappears after the set duration if the turn signal is still active.</string>
     <string name="settings_overlay_rotate_to_driving_direction">Rotate side cameras to driving direction</string>
     <string name="safety_warning_text">Please pay attention to the surrounding environment!</string>
     <string name="show_safety_warning">Show safety warning</string>

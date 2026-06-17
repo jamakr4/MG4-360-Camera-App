@@ -71,6 +71,72 @@ Community mod for the MG4 EV (AAOS 9, pre-2026 facelift) that replaces the stock
   <a href="https://youtu.be/Rzb_Owc_RT0">▶ Full demo on YouTube</a>
 </p>
 
+## Quick Guides
+
+<details>
+<summary><strong>Indicator Cam</strong></summary>
+
+The indicator camera opens automatically when you activate the left or right turn signal.
+
+To use it:
+
+1. Open `Settings` -> `Signal Camera`.
+2. Enable `Overlay on signal`.
+3. Optional: enable `Rotate side cameras to driving direction` if you prefer the side cameras to match the direction of travel.
+4. Optional: tune `Overlay hide delay` and `Minimum on-time` so the camera does not disappear too abruptly.
+5. `Tap to hide` is enabled by default (5 seconds) – one tap dismisses the overlay temporarily, it reappears afterwards if the signal is still active.
+
+Important:
+
+- Disable the OEM SAIC indicator camera popup first, otherwise both systems may compete.
+- While the main app is open, the app can route the signal camera into the main preview instead of showing the floating overlay.
+
+</details>
+
+<details>
+<summary><strong>Dashcam</strong></summary>
+
+The dashcam records all four factory cameras into one combined clip and can also save dedicated event recordings.
+
+To use it:
+
+1. Open `Settings` -> `Dashcam`.
+2. Enable `Dashcam`.
+3. Optional: adjust FPS, footer signature, and whether speed should be shown in the recording.
+4. Optional: enable OEM coexistence if you want the app to yield camera ownership briefly to the stock 360/reverse system when needed (recommended).
+5. Use `Trigger event save` in the app, the hazard-light trigger, or an external broadcast to save an event clip.
+
+Notes:
+
+- One normal rolling clip is 30 seconds long.
+- Event saves keep a separate pre/post buffer in the `events/` folder.
+- The companion app can trigger an event save externally via `com.drivehub.kamera.action.TRIGGER_DASHCAM_EVENT`.
+- If the dashcam is currently off and you still trigger an event, the app can switch into future-only recording so at least the post-trigger window is captured.
+
+</details>
+
+<details>
+<summary><strong>Maneuver Mode</strong></summary>
+
+Maneuver Mode is the persistent rear camera overlay, similar to a digital rearview mirror.
+
+To use it:
+
+1. Open `Settings` -> `Maneuver Mode`.
+2. Enable `Digital rearview`.
+3. The rear camera will stay visible as a floating window when no higher-priority signal overlay is active.
+4. You can drag and resize the overlay, and the app restores the last layout automatically.
+5. `Tap to temporarily hide` is enabled by default (5 seconds) – one tap dismisses it and it reappears after the set duration.
+6. The "X" in the preview will close it permanently until turned back on.
+
+Behavior:
+
+- Reverse gear still has priority and follows the OEM/main-screen flow.
+- Turn-signal cameras temporarily override Maneuver Mode and the rearview returns afterwards.
+- The digital rearview can also be toggled by the separate companion trigger app.
+
+</details>
+
 
 ## OEM SAIC 360Cam Setup
 

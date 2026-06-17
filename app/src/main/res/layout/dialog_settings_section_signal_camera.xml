@@ -212,6 +212,78 @@
 
     </LinearLayout>
 
+    <!-- ============ SIGNAL TAP-TO-HIDE ============ -->
+    <TextView
+        style="@style/DrivehubSettingsCardLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="22dp"
+        android:layout_marginBottom="8dp"
+        android:text="@string/settings_signal_tap_to_hide" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_settings_inline_card"
+        android:orientation="vertical"
+        android:paddingStart="18dp"
+        android:paddingTop="6dp"
+        android:paddingEnd="18dp"
+        android:paddingBottom="6dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:minHeight="56dp"
+            android:orientation="horizontal">
+
+            <TextView
+                style="@style/DrivehubSettingsCardRowLabel"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/settings_signal_tap_to_hide" />
+
+            <Switch
+                android:id="@+id/switchSignalTapToHide"
+                style="@style/DrivehubSettingsSwitch" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:minHeight="56dp"
+            android:orientation="horizontal">
+
+            <TextView
+                style="@style/DrivehubSettingsCardRowLabel"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/settings_signal_tap_to_hide_duration" />
+
+            <EditText
+                android:id="@+id/etSignalTapToHideDurationSec"
+                android:layout_width="64dp"
+                android:layout_height="wrap_content"
+                android:inputType="number"
+                android:maxLength="3"
+                android:textAlignment="center" />
+
+        </LinearLayout>
+
+        <TextView
+            style="@style/DrivehubSettingsCaption"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/settings_signal_tap_to_hide_hint" />
+
+    </LinearLayout>
+
     <!-- ============ CORNER RADIUS ============ -->
     <TextView
         style="@style/DrivehubSettingsCardLabel"

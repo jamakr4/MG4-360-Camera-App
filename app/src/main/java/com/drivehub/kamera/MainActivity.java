@@ -220,6 +220,8 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         super.onStop();
         sMainVisible = false;
         sSettingsDialogOpen = false;
+        // Re-apply signal/rearview overlay state once MainActivity stops blocking it.
+        SignalService.requestRecheck();
         otaController.stop();
         try {
             unregisterReceiver(cameraRouteReceiver);

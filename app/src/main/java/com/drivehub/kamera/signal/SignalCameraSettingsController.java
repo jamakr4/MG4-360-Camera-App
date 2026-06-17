@@ -26,6 +26,8 @@ public final class SignalCameraSettingsController {
             Switch swDigitalRearview,
             Switch swRearviewTapToHide,
             EditText etRearviewTapToHideDurationSec,
+            Switch swSignalTapToHide,
+            EditText etSignalTapToHideDurationSec,
             Switch swRotateToDrivingDirection,
             SeekBar seekOverlayHideDelay,
             EditText etOverlayHideDelayValue,
@@ -78,6 +80,37 @@ public final class SignalCameraSettingsController {
                 int clamped = UiPrefs.getDigitalRearviewTapToHideDurationSec(prefs);
                 etRearviewTapToHideDurationSec.setText(String.valueOf(clamped));
                 etRearviewTapToHideDurationSec.setSelection(etRearviewTapToHideDurationSec.getText().length());
+            });
+        }
+
+        if (swSignalTapToHide != null) {
+            swSignalTapToHide.setChecked(UiPrefs.isSignalOverlayTapToHideEnabled(prefs));
+            swSignalTapToHide.setOnCheckedChangeListener((btn, checked) ->
+                    prefs.edit().putBoolean(UiPrefs.KEY_SIGNAL_OVERLAY_TAP_TO_HIDE_ENABLED, checked).apply());
+        }
+
+        if (etSignalTapToHideDurationSec != null) {
+            int saved = UiPrefs.getSignalOverlayTapToHideDurationSec(prefs);
+            etSignalTapToHideDurationSec.setText(String.valueOf(saved));
+            etSignalTapToHideDurationSec.setSelection(etSignalTapToHideDurationSec.getText().length());
+            etSignalTapToHideDurationSec.addTextChangedListener(new SimpleTextWatcher() {
+                @Override
+                public void afterTextChanged(android.text.Editable s) {
+                    if (s == null) return;
+                    String text = s.toString().trim();
+                    if (text.isEmpty()) return;
+                    try {
+                        int v = UiPrefs.clampSignalTapToHideDurationSec(Integer.parseInt(text));
+                        prefs.edit().putInt(UiPrefs.KEY_SIGNAL_OVERLAY_TAP_TO_HIDE_DURATION_SEC, v).apply();
+                    } catch (NumberFormatException ignored) {
+                    }
+                }
+            });
+            etSignalTapToHideDurationSec.setOnFocusChangeListener((v, hasFocus) -> {
+                if (hasFocus) return;
+                int clamped = UiPrefs.getSignalOverlayTapToHideDurationSec(prefs);
+                etSignalTapToHideDurationSec.setText(String.valueOf(clamped));
+                etSignalTapToHideDurationSec.setSelection(etSignalTapToHideDurationSec.getText().length());
             });
         }
 
