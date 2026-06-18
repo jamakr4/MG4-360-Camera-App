@@ -23,7 +23,7 @@
     <string name="settings_dashcam_test_record_button">Test-Aufnahme-Button</string>
     <string name="settings_dashcam_test_record_duration">Testdauer (Sek.)</string>
     <string name="settings_dashcam_test_record_hint">Aktiviert den Button auf dem Hauptscreen. Erlaubt sind 0 bis 120 Sekunden.</string>
-    <string name="settings_dashcam_storage_target">Speicherziel</string>
+<string name="settings_dashcam_storage_target">Speicherziel</string>
     <string name="settings_dashcam_storage_target_auto">Auto</string>
     <string name="settings_dashcam_storage_target_usb">USB</string>
     <string name="settings_dashcam_storage_target_internal">Intern</string>
@@ -48,7 +48,7 @@
     <string name="settings_dashcam_storage_usb_limits_hint">Limits für Aufnahmen auf USB. Der interne Speicher behält seine eigenen, konservativeren Limits (siehe Dev-Einstellungen).</string>
     <string name="settings_section_oem_avm">OEM 360°-Kamera</string>
     <string name="settings_oem_avm_coexist">OEM-360°-App weiter nutzen</string>
-    <string name="settings_oem_avm_coexist_hint">Globale Einstellung fuer die werkseitige 360°-Kamera-App. Wenn aktiv, gibt die App bei Bedarf den Kamerazugriff frei, damit die OEM-Rueckfahr-/360°-Ansicht weiter starten kann. Wenn deaktiviert, haben die Custom-Features immer Vorrang und die OEM-360°-App wird parallel bewusst nicht unterstuetzt.</string>
+    <string name="settings_oem_avm_coexist_hint">Globale Einstellung für die werkseitige 360°-Kamera-App. Wenn aktiv, gibt die App bei Bedarf den Kamerazugriff frei, damit die OEM-Rueckfahr-/360°-Ansicht weiter starten kann. Wenn deaktiviert, haben die Custom-Features immer Vorrang und die OEM-360°-App wird parallel bewusst nicht unterstuetzt.</string>
     <string name="settings_dashcam_banners_section">Benachrichtigungs-Banner</string>
     <string name="settings_dashcam_banner_group_event">Ereignis gespeichert</string>
     <string name="settings_dashcam_banner_group_pause_resume">Aufnahme pausiert / fortgesetzt</string>

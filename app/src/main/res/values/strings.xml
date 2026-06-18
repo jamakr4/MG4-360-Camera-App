@@ -23,7 +23,7 @@
     <string name="settings_dashcam_test_record_button">Test record button</string>
     <string name="settings_dashcam_test_record_duration">Test duration (sec)</string>
     <string name="settings_dashcam_test_record_hint">Enable the button on the home screen and choose a duration from 0 to 120 seconds.</string>
-    <string name="settings_dashcam_storage_target">Storage target</string>
+<string name="settings_dashcam_storage_target">Storage target</string>
     <string name="settings_dashcam_storage_target_auto">Auto</string>
     <string name="settings_dashcam_storage_target_usb">USB</string>
     <string name="settings_dashcam_storage_target_internal">Internal</string>
