@@ -154,6 +154,9 @@ public final class DashcamSettingsController {
         this.activity = activity;
     }
 
+    // ---------- View binding ----------
+
+    // Wires all settings views; starts/stops RecordingService via the enabled toggle.
     public void bind(
             SharedPreferences prefs,
             Switch swEnabled,
@@ -228,6 +231,7 @@ public final class DashcamSettingsController {
         bindFields(prefs, etRecordingFps, etSignature, etTestRecordDuration);
     }
 
+    // Wires storage target, USB limits, and eject button. Null-safe — pass null to skip the whole section.
     private void bindStorageGroup(SharedPreferences prefs, StorageViews views) {
         if (views == null) {
             return;
@@ -285,10 +289,9 @@ public final class DashcamSettingsController {
         refreshStorageStatus(prefs, views);
     }
 
-    /**
-     * Recomputes the storage resolution (incl. real USB write test) on a worker thread and
-     * publishes the result to the status views — same pattern as the OTA source status rows.
-     */
+    // ---------- Storage status ----------
+
+    // Runs a USB write test on a worker thread and updates the status label + active path.
     private void refreshStorageStatus(SharedPreferences prefs, StorageViews views) {
         if (views == null || views.statusText == null) {
             return;
@@ -310,6 +313,7 @@ public final class DashcamSettingsController {
         }, "DashcamStorageStatusProbe").start();
     }
 
+    // Maps a resolved DashcamStorageManager.Resolution to the status label, path text, and eject button visibility.
     private void applyStorageStatus(StorageViews views, DashcamStorageManager.Resolution res) {
         if (views.statusText == null) {
             return;
@@ -351,6 +355,9 @@ public final class DashcamSettingsController {
         }
     }
 
+    // ---------- USB eject flow ----------
+
+    // Shows the USB eject confirmation dialog before initiating the eject sequence.
     private void showUsbEjectConfirmDialog() {
         showConfirmDialog(
                 activity.getString(R.string.settings_dashcam_storage_eject_title),
@@ -359,6 +366,7 @@ public final class DashcamSettingsController {
                 this::requestUsbEject);
     }
 
+    // Registers a one-shot broadcast receiver for the eject result and sends the eject action to RecordingService.
     private void requestUsbEject() {
         unregisterUsbEjectReceiver();
         usbEjectReceiver = new BroadcastReceiver() {
@@ -389,6 +397,7 @@ public final class DashcamSettingsController {
         RecordingService.requestUsbEject(activity);
     }
 
+    // Called when the settings dialog closes — unregisters the USB eject receiver if still pending.
     public void onDismiss() {
         unregisterUsbEjectReceiver();
     }
@@ -404,6 +413,9 @@ public final class DashcamSettingsController {
         usbEjectReceiver = null;
     }
 
+    // ---------- Dialog helpers ----------
+
+    // Shows a confirm/cancel dialog reusing the OTA dialog layout.
     private void showConfirmDialog(String title, String message, String confirmText, Runnable onConfirm) {
         Dialog dialog = createBaseDialog();
         TextView titleView = dialog.findViewById(R.id.tvOtaRefreshTitle);
@@ -432,6 +444,7 @@ public final class DashcamSettingsController {
         showCentered(dialog, 540);
     }
 
+    // Shows an info-only dialog (no confirm button).
     private void showMessageDialog(String title, String message) {
         Dialog dialog = createBaseDialog();
         TextView titleView = dialog.findViewById(R.id.tvOtaRefreshTitle);
@@ -523,6 +536,9 @@ public final class DashcamSettingsController {
         }
     }
 
+    // ---------- Banner group binding ----------
+
+    // Wires toggle, S/M/L size selector, volume slider, and test button for one banner group.
     private void bindBannerGroup(SharedPreferences prefs, BannerGroup group, BannerGroupViews views) {
         if (views == null) {
             return;
@@ -578,6 +594,8 @@ public final class DashcamSettingsController {
         }
     }
 
+    // Fires a forced banner preview for the settings test button.
+    // Paired groups (PAUSE_RESUME, ERROR_RECOVERED) show both banners with a 2 s gap.
     private void triggerTestBanner(BannerGroup group) {
         Context ctx = activity;
         switch (group) {
@@ -602,6 +620,9 @@ public final class DashcamSettingsController {
         }
     }
 
+    // ---------- Field persistence ----------
+
+    // Attaches text watchers to the three editable recording fields (FPS, signature, duration).
     private void bindFields(SharedPreferences prefs, EditText etRecordingFps, EditText etSignature,
             EditText etTestRecordDuration) {
         android.text.TextWatcher watcher = new SimpleTextWatcher() {
@@ -626,6 +647,8 @@ public final class DashcamSettingsController {
         });
     }
 
+    // Reads, clamps, and persists all three editable fields.
+    // When normalizeFields is true the EditTexts are also updated to their clamped values.
     private void saveFields(SharedPreferences prefs, EditText etRecordingFps, EditText etSignature,
             EditText etTestRecordDuration, boolean normalizeFields) {
         int recordingFps = clampRecordingFps(parsePositiveInt(textOf(etRecordingFps), DEFAULT_RECORDING_FPS));
@@ -645,6 +668,9 @@ public final class DashcamSettingsController {
         normalizeField(etTestRecordDuration, testRecordDurationSec);
     }
 
+    // ---------- Prefs getters / setters ----------
+
+    // Returns the fixed segment duration (30 s); not user-configurable.
     static int getSegmentDurationSec() {
         return DEFAULT_SEGMENT_SEC;
     }
@@ -670,6 +696,7 @@ public final class DashcamSettingsController {
                 prefs.getInt(KEY_TEST_RECORD_DURATION_SEC, DEFAULT_TEST_RECORD_DURATION_SEC));
     }
 
+    // Rolling clip count for the ring buffer (dev setting).
     public static int getRetentionClipCount(SharedPreferences prefs) {
         return clampRetentionClipCount(prefs.getInt(KEY_RETENTION_CLIP_COUNT, DEFAULT_RETENTION_CLIP_COUNT));
     }
@@ -678,6 +705,7 @@ public final class DashcamSettingsController {
         prefs.edit().putInt(KEY_RETENTION_CLIP_COUNT, clampRetentionClipCount(count)).apply();
     }
 
+    // Maximum number of saved event directories (dev setting).
     public static int getMaxRetainedEventDirs(SharedPreferences prefs) {
         return clampMaxRetainedEventDirs(
                 prefs.getInt(KEY_MAX_RETAINED_EVENT_DIRS, DEFAULT_MAX_RETAINED_EVENT_DIRS));
@@ -707,6 +735,7 @@ public final class DashcamSettingsController {
         return clampVolume(prefs.getInt(group.volumeKey(), DEFAULT_BANNER_VOLUME));
     }
 
+    // Custom records path override (dev setting); empty string means use the default Downloads/dashcam.
     public static String getConfiguredRecordsPath(SharedPreferences prefs) {
         return normalizeRecordsPath(prefs.getString(KEY_RECORDS_PATH, ""));
     }
@@ -715,6 +744,7 @@ public final class DashcamSettingsController {
         prefs.edit().putString(KEY_RECORDS_PATH, normalizeRecordsPath(recordsPath)).apply();
     }
 
+    // Resolves the active records directory — custom path if set, otherwise Downloads/dashcam.
     public static File getRecordsBaseDir(Context context) {
         SharedPreferences prefs = UiPrefs.getPrefs(context);
         String customPath = getConfiguredRecordsPath(prefs);

@@ -2,7 +2,6 @@ package com.drivehub.kamera.dashcam;
 
 import com.drivehub.kamera.dev.DevRuntimeLog;
 import com.drivehub.kamera.settings.UiPrefs;
-
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;

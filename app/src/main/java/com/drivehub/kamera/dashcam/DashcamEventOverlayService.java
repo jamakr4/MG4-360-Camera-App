@@ -38,7 +38,8 @@ public class DashcamEventOverlayService extends Service {
     private static final String EXTRA_SUBTITLE_RES_ID = "subtitle_res_id";
     private static final String EXTRA_NOTIFICATION_TEXT_RES_ID = "notification_text_res_id";
 
-    // Base dimensions (SMALL = 1.0x). Apply scale factor for MEDIUM (1.6x) and LARGE (2.2x).
+    // Base dimensions (SMALL = 1.0x). Apply scale factor for MEDIUM (1.6x) and
+    // LARGE (2.2x).
     private static final float TITLE_BASE_SP = 16f;
     private static final float SUBTITLE_BASE_SP = 13f;
     private static final float DOT_BASE_DP = 12f;
@@ -46,7 +47,7 @@ public class DashcamEventOverlayService extends Service {
     private static final float PADDING_V_BASE_DP = 14f;
     private static final float DOT_TEXT_GAP_BASE_DP = 12f;
     private static final float SUBTITLE_TOP_BASE_DP = 2f;
-    private static final float[] BANNER_SIZE_SCALES = {1.0f, 1.6f, 2.2f};
+    private static final float[] BANNER_SIZE_SCALES = { 1.0f, 1.6f, 2.2f };
 
     public enum BannerType {
         EVENT(
@@ -86,6 +87,8 @@ public class DashcamEventOverlayService extends Service {
         final int subtitleRes;
         final int notificationRes;
 
+        // Bundles a banner's settings group, accent color, and string resources into
+        // one enum constant.
         BannerType(DashcamSettingsController.BannerGroup group, int dotColor,
                 int titleRes, int subtitleRes, int notificationRes) {
             this.group = group;
@@ -109,10 +112,13 @@ public class DashcamEventOverlayService extends Service {
 
     // ---------- Public API: respects per-group enabled toggle ----------
 
+    // Shows the standard event confirmation banner, if the EVENT group is enabled.
     public static void showConfirmation(Context context) {
         show(context, BannerType.EVENT, BannerType.EVENT.subtitleRes, BannerType.EVENT.notificationRes, false);
     }
 
+    // Shows the event banner with "future events only" wording, if the EVENT group
+    // is enabled.
     public static void showFutureOnlyConfirmation(Context context) {
         show(
                 context,
@@ -122,29 +128,42 @@ public class DashcamEventOverlayService extends Service {
                 false);
     }
 
+    // Shows the OEM-pause banner, if the PAUSE_RESUME group is enabled.
     public static void showOemPause(Context context) {
-        show(context, BannerType.OEM_PAUSE, BannerType.OEM_PAUSE.subtitleRes, BannerType.OEM_PAUSE.notificationRes, false);
+        show(context, BannerType.OEM_PAUSE, BannerType.OEM_PAUSE.subtitleRes, BannerType.OEM_PAUSE.notificationRes,
+                false);
     }
 
+    // Shows the OEM-resume banner, if the PAUSE_RESUME group is enabled.
     public static void showOemResume(Context context) {
-        show(context, BannerType.OEM_RESUME, BannerType.OEM_RESUME.subtitleRes, BannerType.OEM_RESUME.notificationRes, false);
+        show(context, BannerType.OEM_RESUME, BannerType.OEM_RESUME.subtitleRes, BannerType.OEM_RESUME.notificationRes,
+                false);
     }
 
+    // Shows the recording-error banner with caller-supplied subtitle/notification
+    // text, if the ERROR_RECOVERED group is enabled.
     public static void showRecordingError(Context context, int subtitleResId, int notificationTextResId) {
         show(context, BannerType.RECORDING_ERROR, subtitleResId, notificationTextResId, false);
     }
 
+    // Shows the recording-recovered banner, if the ERROR_RECOVERED group is
+    // enabled.
     public static void showRecordingRecovered(Context context) {
         show(context, BannerType.RECORDING_RECOVERED, BannerType.RECORDING_RECOVERED.subtitleRes,
                 BannerType.RECORDING_RECOVERED.notificationRes, false);
     }
 
-    // ---------- Test API: bypasses enabled check, used by settings preview buttons ----------
+    // ---------- Test API: bypasses enabled check, used by settings preview buttons
+    // ----------
 
+    // Forces the event confirmation banner regardless of the enabled toggle
+    // (settings preview).
     public static void showConfirmationForced(Context context) {
         show(context, BannerType.EVENT, BannerType.EVENT.subtitleRes, BannerType.EVENT.notificationRes, true);
     }
 
+    // Forces the "future events only" event banner regardless of the enabled toggle
+    // (settings preview).
     public static void showFutureOnlyConfirmationForced(Context context) {
         show(
                 context,
@@ -154,23 +173,35 @@ public class DashcamEventOverlayService extends Service {
                 true);
     }
 
+    // Forces the OEM-pause banner regardless of the enabled toggle (settings
+    // preview).
     public static void showOemPauseForced(Context context) {
-        show(context, BannerType.OEM_PAUSE, BannerType.OEM_PAUSE.subtitleRes, BannerType.OEM_PAUSE.notificationRes, true);
+        show(context, BannerType.OEM_PAUSE, BannerType.OEM_PAUSE.subtitleRes, BannerType.OEM_PAUSE.notificationRes,
+                true);
     }
 
+    // Forces the OEM-resume banner regardless of the enabled toggle (settings
+    // preview).
     public static void showOemResumeForced(Context context) {
-        show(context, BannerType.OEM_RESUME, BannerType.OEM_RESUME.subtitleRes, BannerType.OEM_RESUME.notificationRes, true);
+        show(context, BannerType.OEM_RESUME, BannerType.OEM_RESUME.subtitleRes, BannerType.OEM_RESUME.notificationRes,
+                true);
     }
 
+    // Forces the recording-error banner regardless of the enabled toggle (settings
+    // preview).
     public static void showRecordingErrorForced(Context context, int subtitleResId, int notificationTextResId) {
         show(context, BannerType.RECORDING_ERROR, subtitleResId, notificationTextResId, true);
     }
 
+    // Forces the recording-recovered banner regardless of the enabled toggle
+    // (settings preview).
     public static void showRecordingRecoveredForced(Context context) {
         show(context, BannerType.RECORDING_RECOVERED, BannerType.RECORDING_RECOVERED.subtitleRes,
                 BannerType.RECORDING_RECOVERED.notificationRes, true);
     }
 
+    // Checks the per-group enabled toggle (unless forced) and starts the service
+    // with the chosen banner's data
     private static void show(Context context, BannerType type, int subtitleResId,
             int notificationTextResId, boolean force) {
         if (!force) {
@@ -186,6 +217,8 @@ public class DashcamEventOverlayService extends Service {
         context.startForegroundService(intent);
     }
 
+    // Grabs the WindowManager service and ensures the notification channel exists
+    // before the service is used.
     @Override
     public void onCreate() {
         super.onCreate();
@@ -193,6 +226,10 @@ public class DashcamEventOverlayService extends Service {
         NotificationChannelHelper.ensureChannel(this, CHANNEL_ID, R.string.notification_channel_dashcam_event_overlay);
     }
 
+    // Reads the requested banner from the intent, posts the foreground
+    // notification, (re)shows the overlay
+    // with the right size/color/text, plays the tone, and schedules the banner to
+    // auto-hide.
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         BannerType type = readBannerType(intent);
@@ -226,8 +263,11 @@ public class DashcamEventOverlayService extends Service {
         return START_NOT_STICKY;
     }
 
+    // Resolves the BannerType from the intent's ordinal extra, falling back to
+    // EVENT if missing/out of range.
     private BannerType readBannerType(Intent intent) {
-        if (intent == null) return BannerType.EVENT;
+        if (intent == null)
+            return BannerType.EVENT;
         int ordinal = intent.getIntExtra(EXTRA_TYPE_ORDINAL, BannerType.EVENT.ordinal());
         BannerType[] all = BannerType.values();
         if (ordinal < 0 || ordinal >= all.length) {
@@ -236,6 +276,8 @@ public class DashcamEventOverlayService extends Service {
         return all[ordinal];
     }
 
+    // Plays the banner's notification tone at the group's configured volume
+    // (skips/stops if volume is 0).
     private void playBannerTone(DashcamSettingsController.BannerGroup group, SharedPreferences prefs) {
         int volumePct = DashcamSettingsController.getBannerVolume(prefs, group);
         if (volumePct <= 0) {
@@ -244,9 +286,12 @@ public class DashcamEventOverlayService extends Service {
         }
         releaseBannerTone();
 
-        // No audio focus request: requesting AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK reliably ducks
-        // Android Auto, but its volume sometimes doesn't recover when we abandon focus until the
-        // user pauses + resumes playback. For a sub-second notification tone, mixing over music is
+        // No audio focus request: requesting AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK
+        // reliably ducks
+        // Android Auto, but its volume sometimes doesn't recover when we abandon focus
+        // until the
+        // user pauses + resumes playback. For a sub-second notification tone, mixing
+        // over music is
         // good enough — user can compensate via the per-group banner volume.
         AudioAttributes attributes = new AudioAttributes.Builder()
                 .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
@@ -254,8 +299,7 @@ public class DashcamEventOverlayService extends Service {
                 .build();
 
         MediaPlayer player = new MediaPlayer();
-        try (AssetFileDescriptor afd =
-                     getResources().openRawResourceFd(R.raw.notification_sound_7062_henrycena82595)) {
+        try (AssetFileDescriptor afd = getResources().openRawResourceFd(R.raw.notification_sound_7062_henrycena82595)) {
             if (afd == null) {
                 player.release();
                 return;
@@ -280,6 +324,8 @@ public class DashcamEventOverlayService extends Service {
         }
     }
 
+    // Stops and releases the active tone MediaPlayer, if any, swallowing any
+    // cleanup errors.
     private void releaseBannerTone() {
         if (bannerTonePlayer != null) {
             try {
@@ -294,6 +340,9 @@ public class DashcamEventOverlayService extends Service {
         }
     }
 
+    // Inflates the overlay layout, grabs its child view references, and adds it as
+    // a non-touchable
+    // system overlay window anchored to the bottom-center of the screen.
     private void showOverlayWindow() {
         if (windowManager == null) {
             return;
@@ -317,18 +366,19 @@ public class DashcamEventOverlayService extends Service {
         windowManager.addView(overlayView, params);
     }
 
+    // Scales title/subtitle text size, dot size, margins, and padding according to
+    // the configured banner size.
     private void applyBannerSize(int sizeIndex) {
-        if (overlayView == null) return;
-        float scale = BANNER_SIZE_SCALES[
-                Math.max(0, Math.min(BANNER_SIZE_SCALES.length - 1, sizeIndex))];
+        if (overlayView == null)
+            return;
+        float scale = BANNER_SIZE_SCALES[Math.max(0, Math.min(BANNER_SIZE_SCALES.length - 1, sizeIndex))];
 
         if (titleView != null) {
             titleView.setTextSize(TypedValue.COMPLEX_UNIT_SP, TITLE_BASE_SP * scale);
         }
         if (subtitleView != null) {
             subtitleView.setTextSize(TypedValue.COMPLEX_UNIT_SP, SUBTITLE_BASE_SP * scale);
-            ViewGroup.MarginLayoutParams subParams =
-                    (ViewGroup.MarginLayoutParams) subtitleView.getLayoutParams();
+            ViewGroup.MarginLayoutParams subParams = (ViewGroup.MarginLayoutParams) subtitleView.getLayoutParams();
             if (subParams != null) {
                 subParams.topMargin = dpToPx(SUBTITLE_TOP_BASE_DP * scale);
                 subtitleView.setLayoutParams(subParams);
@@ -342,8 +392,8 @@ public class DashcamEventOverlayService extends Service {
             dotView.setLayoutParams(dotParams);
         }
         if (textContainerView != null) {
-            ViewGroup.MarginLayoutParams textParams =
-                    (ViewGroup.MarginLayoutParams) textContainerView.getLayoutParams();
+            ViewGroup.MarginLayoutParams textParams = (ViewGroup.MarginLayoutParams) textContainerView
+                    .getLayoutParams();
             if (textParams != null) {
                 textParams.setMarginStart(dpToPx(DOT_TEXT_GAP_BASE_DP * scale));
                 textContainerView.setLayoutParams(textParams);
@@ -354,11 +404,15 @@ public class DashcamEventOverlayService extends Service {
         overlayView.setPadding(padH, padV, padH, padV);
     }
 
+    // Tints the status dot view's background with the banner type's accent color.
     private void applyDotColor(int colorArgb) {
-        if (dotView == null) return;
+        if (dotView == null)
+            return;
         dotView.setBackgroundTintList(ColorStateList.valueOf(colorArgb));
     }
 
+    // Sets the title and subtitle text view contents from the given string
+    // resources.
     private void bindText(int titleResId, int subtitleResId) {
         if (titleView != null) {
             titleView.setText(titleResId);
@@ -368,10 +422,14 @@ public class DashcamEventOverlayService extends Service {
         }
     }
 
+    // Converts a dp value to pixels based on the device's current display density.
     private int dpToPx(float dp) {
         return Math.round(dp * getResources().getDisplayMetrics().density);
     }
 
+    // Cancels the pending auto-hide callback, releases the tone player, and removes
+    // the overlay
+    // view from the WindowManager when the service is torn down.
     @Override
     public void onDestroy() {
         super.onDestroy();
@@ -388,6 +446,7 @@ public class DashcamEventOverlayService extends Service {
         stopForeground(true);
     }
 
+    // Unbindable: this is a started (not bound) service.
     @Nullable
     @Override
     public IBinder onBind(Intent intent) {
