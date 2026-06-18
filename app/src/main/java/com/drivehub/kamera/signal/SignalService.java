@@ -552,7 +552,8 @@ public class SignalService extends Service {
             nextMode = 1;
         } else if (signal == TurnSignal.RIGHT && !isSignalTempHidden()) {
             nextMode = 2;
-        } else if (isDigitalRearviewEnabled() && !isRearviewTempHidden()) {
+        } else if (isDigitalRearviewEnabled() && !isRearviewTempHidden()
+                && !MainActivity.isSettingsDialogOpen()) {
             nextMode = 4;
         } else {
             nextMode = 0;

@@ -60,6 +60,10 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         sSettingsDialogOpen = open;
     }
 
+    public static boolean isSettingsDialogOpen() {
+        return sSettingsDialogOpen;
+    }
+
     private final BroadcastReceiver cameraRouteReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
