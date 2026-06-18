@@ -118,7 +118,9 @@
                 android:inputType="textCapWords|textNoSuggestions"
                 android:imeOptions="flagNoExtractUi"
                 android:maxLength="40"
-                android:maxLines="1" />
+                android:maxLines="1"
+                android:hint="@string/settings_dashcam_signature_placeholder"
+                android:textColorHint="@color/settings_text_muted" />
 
         </LinearLayout>
 

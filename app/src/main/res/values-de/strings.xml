@@ -18,6 +18,7 @@
     <string name="settings_dashcam_enabled">Dashcam aktivieren</string>
     <string name="settings_dashcam_fps">Aufnahme-FPS</string>
     <string name="settings_dashcam_signature">Signatur</string>
+    <string name="settings_dashcam_signature_placeholder">z.B. MG4 EV</string>
     <string name="settings_dashcam_show_speed">Geschwindigkeit im Video anzeigen</string>
     <string name="settings_dashcam_test_record_button">Test-Aufnahme-Button</string>
     <string name="settings_dashcam_test_record_duration">Testdauer (Sek.)</string>
