@@ -91,6 +91,12 @@ Important:
 - Disable the OEM SAIC indicator camera popup first, otherwise both systems may compete.
 - While the main app is open, the app can route the signal camera into the main preview instead of showing the floating overlay.
 
+<p align="center">
+  <img src="images/setting%231.jpg" alt="OEM SAIC 360 camera settings step 1" width="48%">
+  &nbsp;
+  <img src="images/setting%232.jpg" alt="OEM SAIC 360 camera settings step 2" width="48%">
+</p>
+
 </details>
 
 <details>
@@ -136,19 +142,6 @@ Behavior:
 - The digital rearview can also be toggled by the separate companion trigger app.
 
 </details>
-
-
-## OEM SAIC 360Cam Setup
-
-To avoid conflicts with the modified turn signal camera behavior in this app, disable the original turn signal camera popup inside the OEM SAIC 360 camera app.
-
-If the OEM feature stays enabled, both systems may respond to the same indicator event. That can cause overlapping behavior, inconsistent switching, or the OEM app taking over when you want the custom flow from `MG4-Camera-Mod`.
-
-<p align="center">
-  <img src="images/setting%231.jpg" alt="OEM SAIC 360 camera settings step 1" width="48%">
-  &nbsp;
-  <img src="images/setting%232.jpg" alt="OEM SAIC 360 camera settings step 2" width="48%">
-</p>
 
 ## Build Setup
 <details>
