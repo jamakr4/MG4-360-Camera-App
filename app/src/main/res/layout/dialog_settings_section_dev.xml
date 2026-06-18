@@ -6,83 +6,318 @@
     android:orientation="vertical"
     android:visibility="gone">
 
+    <!-- ============ POLLING RATES ============ -->
     <TextView
-        style="@style/DrivehubSettingsHeading2"
-        android:layout_width="match_parent"
+        style="@style/DrivehubSettingsCardLabel"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="12dp"
-        android:text="@string/settings_section_dev" />
-
-    <TextView
-        style="@style/DrivehubSettingsBodyMuted"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="@string/settings_dev_hint" />
-
-    <TextView
-        style="@style/DrivehubSettingsHeading2"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="22dp"
-        android:layout_marginBottom="12dp"
+        android:layout_marginBottom="8dp"
         android:text="@string/settings_dev_polling_rates" />
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:gravity="center_vertical"
-        android:orientation="horizontal">
+        android:background="@drawable/bg_settings_inline_card"
+        android:orientation="vertical"
+        android:paddingStart="18dp"
+        android:paddingTop="14dp"
+        android:paddingEnd="18dp"
+        android:paddingBottom="16dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:minHeight="44dp"
+            android:orientation="horizontal">
+
+            <TextView
+                style="@style/DrivehubSettingsCardRowLabel"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/settings_dev_default_poll" />
+
+            <EditText
+                android:id="@+id/etDevDefaultPollMs"
+                style="@style/DrivehubSettingsSliderValue"
+                android:inputType="number"
+                android:maxLength="4" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:minHeight="44dp"
+            android:orientation="horizontal">
+
+            <TextView
+                style="@style/DrivehubSettingsCardRowLabel"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/settings_dev_signal_off_poll" />
+
+            <EditText
+                android:id="@+id/etDevSignalOffPollMs"
+                style="@style/DrivehubSettingsSliderValue"
+                android:inputType="number"
+                android:maxLength="4" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:minHeight="44dp"
+            android:orientation="horizontal">
+
+            <TextView
+                style="@style/DrivehubSettingsCardRowLabel"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/settings_dev_foreground_mode_poll" />
+
+            <EditText
+                android:id="@+id/etDevForegroundModePollMs"
+                style="@style/DrivehubSettingsSliderValue"
+                android:inputType="number"
+                android:maxLength="4" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:minHeight="44dp"
+            android:orientation="horizontal">
+
+            <TextView
+                style="@style/DrivehubSettingsCardRowLabel"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/settings_dev_oem_avm_max_speed" />
+
+            <EditText
+                android:id="@+id/etDevOemAvmMaxSpeedKmh"
+                style="@style/DrivehubSettingsSliderValue"
+                android:inputType="number"
+                android:maxLength="2" />
+
+        </LinearLayout>
 
         <TextView
-            style="@style/DrivehubSettingsLabel"
-            android:layout_width="0dp"
+            style="@style/DrivehubSettingsCaption"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="@string/settings_dev_default_poll" />
+            android:layout_marginTop="14dp"
+            android:text="@string/settings_dev_polling_rates_hint" />
 
-        <EditText
-            android:id="@+id/etDevDefaultPollMs"
-            style="@style/DrivehubSettingsSliderValue"
-            android:inputType="number"
-            android:maxLength="4" />
+        <TextView
+            style="@style/DrivehubSettingsCaption"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="@string/settings_dev_oem_avm_max_speed_hint" />
+
+        <Button
+            android:id="@+id/btnDevResetDefaults"
+            style="@style/DrivehubDialogButtonSecondary"
+            android:layout_width="wrap_content"
+            android:layout_height="44dp"
+            android:layout_marginTop="14dp"
+            android:text="@string/settings_dev_reset_defaults" />
 
     </LinearLayout>
+
+    <!-- ============ DASHCAM CAPACITY ============ -->
+    <TextView
+        style="@style/DrivehubSettingsCardLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="22dp"
+        android:layout_marginBottom="8dp"
+        android:text="@string/settings_dev_dashcam_capacity" />
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:gravity="center_vertical"
-        android:orientation="horizontal">
+        android:background="@drawable/bg_settings_inline_card"
+        android:orientation="vertical"
+        android:paddingStart="18dp"
+        android:paddingTop="14dp"
+        android:paddingEnd="18dp"
+        android:paddingBottom="16dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:minHeight="44dp"
+            android:orientation="horizontal">
+
+            <TextView
+                style="@style/DrivehubSettingsCardRowLabel"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/settings_dev_dashcam_retention_clip_count" />
+
+            <EditText
+                android:id="@+id/etDevDashcamRetentionClipCount"
+                style="@style/DrivehubSettingsSliderValue"
+                android:inputType="number"
+                android:maxLength="4" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:minHeight="44dp"
+            android:orientation="horizontal">
+
+            <TextView
+                style="@style/DrivehubSettingsCardRowLabel"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/settings_dev_dashcam_max_event_dirs" />
+
+            <EditText
+                android:id="@+id/etDevDashcamMaxEventDirs"
+                style="@style/DrivehubSettingsSliderValue"
+                android:inputType="number"
+                android:maxLength="4" />
+
+        </LinearLayout>
 
         <TextView
-            style="@style/DrivehubSettingsLabel"
-            android:layout_width="0dp"
+            style="@style/DrivehubSettingsCaption"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="@string/settings_dev_signal_off_poll" />
-
-        <EditText
-            android:id="@+id/etDevSignalOffPollMs"
-            style="@style/DrivehubSettingsSliderValue"
-            android:inputType="number"
-            android:maxLength="4" />
+            android:layout_marginTop="14dp"
+            android:text="@string/settings_dev_dashcam_capacity_warning" />
 
     </LinearLayout>
 
+    <!-- ============ OVERLAY SAFE AREA ============ -->
     <TextView
-        style="@style/DrivehubSettingsCaption"
+        style="@style/DrivehubSettingsCardLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="22dp"
+        android:layout_marginBottom="8dp"
+        android:text="@string/settings_dev_overlay_safe_area" />
+
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:text="@string/settings_dev_polling_rates_hint" />
+        android:background="@drawable/bg_settings_inline_card"
+        android:orientation="vertical"
+        android:paddingStart="18dp"
+        android:paddingTop="14dp"
+        android:paddingEnd="18dp"
+        android:paddingBottom="16dp">
 
-    <Button
-        android:id="@+id/btnDevResetDefaults"
-        style="@style/DrivehubDialogButtonSecondary"
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:minHeight="44dp"
+            android:orientation="horizontal">
+
+            <TextView
+                style="@style/DrivehubSettingsCardRowLabel"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/settings_dev_overlay_top_inset" />
+
+            <EditText
+                android:id="@+id/etDevOverlayTopInsetPx"
+                style="@style/DrivehubSettingsSliderValue"
+                android:inputType="number"
+                android:maxLength="3" />
+
+        </LinearLayout>
+
+        <SeekBar
+            android:id="@+id/seekDevOverlayTopInsetPx"
+            style="@style/DrivehubSettingsSlider"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp" />
+
+        <TextView
+            style="@style/DrivehubSettingsCaption"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="@string/settings_dev_overlay_top_inset_hint" />
+
+    </LinearLayout>
+
+    <!-- ============ STORAGE OVERRIDE ============ -->
+    <TextView
+        style="@style/DrivehubSettingsCardLabel"
         android:layout_width="wrap_content"
-        android:layout_height="44dp"
-        android:layout_marginTop="14dp"
-        android:text="@string/settings_dev_reset_defaults" />
+        android:layout_height="wrap_content"
+        android:layout_marginTop="22dp"
+        android:layout_marginBottom="8dp"
+        android:text="@string/settings_dev_storage_override" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_settings_inline_card"
+        android:orientation="vertical"
+        android:paddingStart="18dp"
+        android:paddingTop="14dp"
+        android:paddingEnd="18dp"
+        android:paddingBottom="14dp">
+
+        <EditText
+            android:id="@+id/etDevDashcamRecordsPath"
+            style="@style/DrivehubSettingsAccentValue"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="@string/settings_records_path_hint"
+            android:imeOptions="flagNoExtractUi"
+            android:inputType="textUri|textNoSuggestions"
+            android:maxLines="1" />
+
+        <TextView
+            style="@style/DrivehubSettingsCaption"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/settings_records_path_default_hint" />
+
+        <TextView
+            android:id="@+id/tvDevDashcamRecordsPath"
+            style="@style/DrivehubSettingsBodyMuted"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:textIsSelectable="true" />
+
+        <Button
+            android:id="@+id/btnDevDashcamBrowseFolder"
+            style="@style/DrivehubDialogButtonSecondary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:minHeight="44dp"
+            android:text="@string/settings_browse_folder" />
+
+    </LinearLayout>
 
 </LinearLayout>

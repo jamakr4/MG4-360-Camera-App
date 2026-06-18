@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-    <background android:drawable="@drawable/drivehub_kamera_background"/>
-    <foreground android:drawable="@mipmap/drivehub_kamera_foreground"/>
+    <background android:drawable="@drawable/drivehub_kamera_adaptive_background"/>
+    <foreground android:drawable="@drawable/drivehub_kamera_adaptive_foreground"/>
 </adaptive-icon>

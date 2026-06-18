@@ -8,6 +8,7 @@ find_package(OpenCV REQUIRED core imgproc)
 add_library(cameraprobe SHARED
         cameraprobe.cpp
         cameraprobe_record.cpp
+        camera_stream_manager.cpp
 )
 
 find_library(log-lib log)
