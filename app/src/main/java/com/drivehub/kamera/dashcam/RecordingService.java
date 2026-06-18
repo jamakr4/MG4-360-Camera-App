@@ -334,15 +334,24 @@ public class RecordingService extends Service {
     }
 
     private void recordTestClip(long durationMs) {
-        File baseDir = resolveActiveBaseDir(true);
-        if (baseDir == null) {
+        File recordsBase = resolveActiveBaseDir(true);
+        if (recordsBase == null) {
             worker = null;
             stopForeground(true);
             stopSelf();
             return;
         }
-        boolean startedAnyCamera = recordClip(baseDir, durationMs,
-                "test_" + makeTimestampBase(System.currentTimeMillis(), "yyMMddHHmmss"), -1);
+        // Write test clips into a separate subdirectory so they never participate
+        // in ring-buffer cleanup and don't accumulate as phantom entries there.
+        File testDir = new File(recordsBase, "test");
+        if (!ensureDirectoryExists(testDir, "test dir")) {
+            worker = null;
+            stopForeground(true);
+            stopSelf();
+            return;
+        }
+        boolean startedAnyCamera = recordClip(testDir, durationMs,
+                makeTimestampBase(System.currentTimeMillis(), "yyMMddHHmmss"), -1);
         worker = null;
         if (startedAnyCamera) {
             publishStatus(STATUS_OFF, 0, TOTAL_CAMERAS, "");
