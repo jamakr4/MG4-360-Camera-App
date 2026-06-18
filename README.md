@@ -119,7 +119,14 @@ Notes:
 - The companion app can trigger an event save externally via `com.drivehub.kamera.action.TRIGGER_DASHCAM_EVENT`.
 - If the dashcam is currently off and you still trigger an event, the app can switch into future-only recording so at least the post-trigger window is captured.
 
-> [!WARNING]
+**On-demand recording without loop mode**
+
+You do not need to run the dashcam in continuous loop mode to capture video. Two lighter alternatives are available:
+
+- **Test clip** — a button on the home screen starts a single recording for a configurable duration (default 30 s, adjustable in Settings up to 120 s). Useful for quickly capturing something without enabling the full ring buffer. Test clips are saved to a separate `test/` subfolder and do not participate in the ring-buffer cleanup cycle.
+- **Future-only event recording** — if continuous recording is off but you still trigger an event save (via the home screen button or the companion app broadcast `com.drivehub.kamera.action.TRIGGER_DASHCAM_EVENT`), the app automatically starts a short recording from that moment forward and saves it as an event. The pre-trigger window is lost since no loop was running, but at least the next few clips are captured.
+
+> [!CAUTION]
 > Continuous loop recording writes constantly to internal storage. This can accelerate flash wear over time. Use at your own risk. Test clips and event-only recording are not affected since they only record on demand.
 
 </details>
