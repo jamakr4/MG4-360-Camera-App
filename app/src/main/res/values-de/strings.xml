@@ -11,6 +11,7 @@
     <string name="settings_section_display">Anzeige</string>
     <string name="settings_section_signal_camera">Blinker-Kamera</string>
     <string name="settings_section_maneuver_mode">Manövriermodus</string>
+    <string name="settings_section_digital_rearview">Digitaler Rückspiegel</string>
     <string name="settings_section_dashcam_status">Status</string>
     <string name="settings_section_dashcam_loop">Aufnahme</string>
     <string name="settings_section_dashcam_overlay">Aufnahme-Overlay</string>

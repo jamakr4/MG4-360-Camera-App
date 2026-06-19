@@ -7,7 +7,7 @@ cd "$ROOT_DIR"
 source "${ROOT_DIR}/tools/java_env.sh"
 configure_gradle_java
 
-SERIAL="${ANDROID_SERIAL:-emulator-5554}"
+SERIAL="${ANDROID_SERIAL:-emulator-5556}"
 PACKAGE_NAME="com.drivehub.kamera"
 MAIN_ACTIVITY="${PACKAGE_NAME}/.MainActivity"
 APK_PATH="app/build/outputs/apk/debug/app-debug.apk"
@@ -17,7 +17,7 @@ OPEN_SETTINGS=0
 SCREENSHOT_PATH="${SCREENSHOT_PATH:-/tmp/drivehub_settings_open.png}"
 
 usage() {
-  echo "Usage: $0 [--serial emulator-5554] [--open-settings] [--screenshot /tmp/file.png]"
+  echo "Usage: $0 [--serial emulator-5556] [--open-settings] [--screenshot /tmp/file.png]"
 }
 
 while [[ $# -gt 0 ]]; do

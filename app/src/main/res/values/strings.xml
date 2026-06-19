@@ -11,6 +11,7 @@
     <string name="settings_section_display">Display</string>
     <string name="settings_section_signal_camera">Signal camera</string>
     <string name="settings_section_maneuver_mode">Maneuver Mode</string>
+    <string name="settings_section_digital_rearview">Digital Rearview</string>
     <string name="settings_section_dashcam_status">Status</string>
     <string name="settings_section_dashcam_loop">Recording</string>
     <string name="settings_section_dashcam_overlay">Recording overlay</string>
