@@ -627,9 +627,11 @@ public class SignalService extends Service {
             return;
         }
 
-        if ((previousMode == 1 || previousMode == 2) && nextMode == 0) {
+        if ((previousMode == 1 || previousMode == 2) && (nextMode == 0 || nextMode == 4)) {
             currentMode = -2;
-            long delayMs = computeOverlayHideDelayMs();
+            // For mode 0: respect both hideDelay and minShowTime.
+            // For mode 4 (rearview): only respect minShowTime — no artificial gap before the mirror.
+            long delayMs = nextMode == 4 ? computeRemainingMinShowMs() : computeOverlayHideDelayMs();
             mainHandler.removeCallbacks(hideRunnable);
             mainHandler.postDelayed(hideRunnable, delayMs);
             Log.i(TAG, "Signal/gear off => will reapply overlay state after " + delayMs + "ms");
@@ -739,6 +741,18 @@ public class SignalService extends Service {
         long elapsedVisibleMs = Math.max(0L, SystemClock.elapsedRealtime() - shownAtMs);
         long remainingMinShowMs = Math.max(0L, minShowMs - elapsedVisibleMs);
         return Math.max(hideDelayMs, remainingMinShowMs);
+    }
+
+    // Only the remaining min-show time, without adding the regular hide delay.
+    // Used when transitioning from a signal overlay to rearview (mode 4).
+    private long computeRemainingMinShowMs() {
+        long minShowMs = readOverlayMinShowMs();
+        long shownAtMs = overlayShownAtMs;
+        if (shownAtMs <= 0L || minShowMs <= 0L) {
+            return 0L;
+        }
+        long elapsedVisibleMs = Math.max(0L, SystemClock.elapsedRealtime() - shownAtMs);
+        return Math.max(0L, minShowMs - elapsedVisibleMs);
     }
 
     private boolean isOemAvmInForeground() {
