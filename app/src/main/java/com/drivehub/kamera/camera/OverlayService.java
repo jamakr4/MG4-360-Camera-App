@@ -46,6 +46,7 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
     public static final String EXTRA_OVERLAY_REASON = "overlay_reason";
     public static final String OVERLAY_REASON_SIGNAL = "signal";
     public static final String OVERLAY_REASON_DIGITAL_REARVIEW = "digital_rearview";
+    public static final String OVERLAY_REASON_MANEUVER = "maneuver";
 
     private static final String CHANNEL_ID = "mg4_overlay";
     private static final int NOTIF_ID = 99;
@@ -71,6 +72,9 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
     private static final String KEY_OVERLAY_W = "overlay_w";
     private static final String KEY_OVERLAY_H = "overlay_h";
     private static final String KEY_LAST_OVERLAY_MODE = "last_overlay_mode";
+
+    private static volatile boolean sOverlayVisible = false;
+    private static volatile String sOverlayReason = "";
 
     private WindowManager windowManager;
     private View overlayView;
@@ -132,6 +136,14 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
         context.stopService(i);
     }
 
+    public static boolean isVisible() {
+        return sOverlayVisible;
+    }
+
+    public static boolean isVisibleForReason(String reason) {
+        return sOverlayVisible && reason != null && reason.equals(sOverlayReason);
+    }
+
     @Override
     public void onCreate() {
         super.onCreate();
@@ -149,6 +161,7 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
         if (intent != null && intent.hasExtra(EXTRA_OVERLAY_REASON)) {
             overlayReason = intent.getStringExtra(EXTRA_OVERLAY_REASON);
         }
+        sOverlayReason = overlayReason == null ? "" : overlayReason;
         // Run as a foreground service so the overlay survives while the app is in the background.
         Notification notif = new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.ic_menu_camera)
@@ -162,6 +175,7 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
         if (overlayView == null) {
             showFloatingWindow();
         } else {
+            sOverlayVisible = true;
             refreshOverlayMode(false);
             applyOverlayCornerRadius();
             updateOverlayPresentation(false);
@@ -252,6 +266,8 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
                 });
 
         windowManager.addView(overlayView, overlayParams);
+        sOverlayVisible = true;
+        sOverlayReason = overlayReason == null ? "" : overlayReason;
         applyPreviewTransform();
 
         overlayView.setOnTouchListener((v, event) -> {
@@ -629,6 +645,8 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
         }
         overlayView = null;
         textureView = null;
+        sOverlayVisible = false;
+        sOverlayReason = "";
     }
 
     @Nullable

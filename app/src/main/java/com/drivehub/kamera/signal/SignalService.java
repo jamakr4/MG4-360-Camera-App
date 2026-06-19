@@ -580,11 +580,10 @@ public class SignalService extends Service {
             currentMode = nextMode;
             mainHandler.removeCallbacks(hideRunnable);
             clearOverlayShownTimestamp();
-            OverlayService.hideOverlay(this);
             if (maneuverController != null) {
                 maneuverController.ensureTileState();
             }
-            Log.i(TAG, "Maneuver mode => TileView camera routing");
+            Log.i(TAG, "Maneuver mode => overlay tile camera routing");
             return;
         }
 

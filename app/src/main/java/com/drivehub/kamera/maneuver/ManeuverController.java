@@ -2,9 +2,10 @@ package com.drivehub.kamera.maneuver;
 
 import com.drivehub.kamera.camera.CameraIndex;
 import com.drivehub.kamera.camera.OverlayService;
-import com.drivehub.kamera.camera.TileViewActivity;
 import com.drivehub.kamera.dev.DevRuntimeLog;
 import com.drivehub.kamera.MainActivity;
+import com.drivehub.kamera.helper.audio.MediaKeySuppressor;
+import com.drivehub.kamera.helper.audio.VolumeRestoreGuard;
 import com.drivehub.kamera.helper.vehiclesensors.VehicleSpeedReader;
 import com.drivehub.kamera.settings.UiPrefs;
 import com.drivehub.kamera.signal.SignalService;
@@ -47,6 +48,8 @@ public final class ManeuverController {
 
     private final Context context;
     private final Handler mainHandler;
+    private final MediaKeySuppressor mediaKeySuppressor;
+    private final VolumeRestoreGuard volumeRestoreGuard;
     private SharedPreferences prefs;
     private BroadcastReceiver hardkeyReceiver;
     private BroadcastReceiver logicalHardkeyReceiver;
@@ -57,6 +60,7 @@ public final class ManeuverController {
     private boolean tileCleared;
     private boolean oemPaused;
     private boolean suppressorPublished;
+    private boolean suppressorHeartbeatRunning;
     private int shownCameraIndex = -1;
     private CameraIndex selectedCamera = CameraIndex.REAR;
 
@@ -70,7 +74,10 @@ public final class ManeuverController {
     private final Runnable suppressorHeartbeatRunnable = new Runnable() {
         @Override
         public void run() {
-            if (!captureActive) return;
+            if (!captureActive) {
+                suppressorHeartbeatRunning = false;
+                return;
+            }
             publishSuppressorState(true, true);
             mainHandler.postDelayed(this, SUPPRESSOR_HEARTBEAT_MS);
         }
@@ -79,6 +86,8 @@ public final class ManeuverController {
     public ManeuverController(Context context, Handler mainHandler) {
         this.context = context.getApplicationContext();
         this.mainHandler = mainHandler;
+        this.mediaKeySuppressor = new MediaKeySuppressor(this.context, mainHandler);
+        this.volumeRestoreGuard = new VolumeRestoreGuard(this.context, mainHandler);
     }
 
     public void register() {
@@ -133,6 +142,7 @@ public final class ManeuverController {
         sInstance = null;
         mainHandler.removeCallbacks(speedMonitorRunnable);
         mainHandler.removeCallbacks(suppressorHeartbeatRunnable);
+        suppressorHeartbeatRunning = false;
         if (prefs != null && prefListener != null) {
             try {
                 prefs.unregisterOnSharedPreferenceChangeListener(prefListener);
@@ -157,6 +167,8 @@ public final class ManeuverController {
         if (captureActive || suppressorPublished) {
             publishSuppressorState(false, false);
         }
+        mediaKeySuppressor.setActive(false);
+        mediaKeySuppressor.release();
         captureActive = false;
         tileCleared = false;
         oemPaused = false;
@@ -180,12 +192,7 @@ public final class ManeuverController {
 
     public static void onOemAvmState(Context context, boolean active) {
         ManeuverController inst = sInstance;
-        if (inst == null) {
-            if (active) {
-                TileViewActivity.hideManeuver(context);
-            }
-            return;
-        }
+        if (inst == null) return;
         inst.mainHandler.post(() -> inst.handleOemAvmState(active));
     }
 
@@ -208,11 +215,14 @@ public final class ManeuverController {
 
         if (captureActive) {
             publishSuppressorState(true, false);
+            volumeRestoreGuard.captureBaseline();
             startSuppressorHeartbeat();
             updateTileState();
         } else {
             mainHandler.removeCallbacks(suppressorHeartbeatRunnable);
+            suppressorHeartbeatRunning = false;
             publishSuppressorState(false, false);
+            mediaKeySuppressor.setActive(false);
             if (changed) {
                 tileCleared = false;
                 oemPaused = false;
@@ -230,25 +240,29 @@ public final class ManeuverController {
 
     private void updateTileState() {
         if (!captureActive) {
+            mediaKeySuppressor.setActive(false);
             hideManeuverTile();
             return;
         }
         if (oemPaused && UiPrefs.isManeuverOemAvmAllowed(prefs)) {
+            mediaKeySuppressor.setActive(false);
             hideManeuverTile();
             return;
         }
         if (MainActivity.isSettingsDialogOpen() || SignalService.isReverseActive()) {
+            mediaKeySuppressor.setActive(false);
             hideManeuverTile();
             return;
         }
-        OverlayService.hideOverlay(context);
+        mediaKeySuppressor.setActive(true);
         if (!tileCleared) {
             // Only (re)launch on an actual transition: a different camera, or when the
             // tile is no longer in front. Without this guard the 500ms speed monitor would
-            // fire startActivity(REORDER_TO_FRONT) every tick and steal focus.
+            // restart the foreground overlay service every tick.
             int target = selectedCamera.getVideoIndex();
-            if (target != shownCameraIndex || !TileViewActivity.isManeuverVisible()) {
-                TileViewActivity.showManeuver(context, target);
+            if (target != shownCameraIndex
+                    || !OverlayService.isVisibleForReason(OverlayService.OVERLAY_REASON_MANEUVER)) {
+                OverlayService.showOverlay(context, target, OverlayService.OVERLAY_REASON_MANEUVER);
                 shownCameraIndex = target;
             }
         }
@@ -256,7 +270,7 @@ public final class ManeuverController {
 
     private void hideManeuverTile() {
         shownCameraIndex = -1;
-        TileViewActivity.hideManeuver(context);
+        OverlayService.hideOverlay(context);
     }
 
     private void handleRawHardkey(Intent intent) {
@@ -271,6 +285,10 @@ public final class ManeuverController {
         }
         if (!isDown || !shouldOwnSteeringStick() || !isStickCode(rawCode)) {
             return;
+        }
+
+        if (isVolumeMappedStickCode(rawCode)) {
+            volumeRestoreGuard.restoreBaselineSoon(formatHex(rawCode));
         }
 
         if (rawCode == RAW_SWC_CENTER) {
@@ -331,10 +349,15 @@ public final class ManeuverController {
         oemPaused = active;
         if (active) {
             hideManeuverTile();
+            mainHandler.removeCallbacks(suppressorHeartbeatRunnable);
+            suppressorHeartbeatRunning = false;
             publishSuppressorState(false, false);
+            mediaKeySuppressor.setActive(false);
             DevRuntimeLog.add("Maneuver", "paused for OEM AVM");
         } else {
             publishSuppressorState(true, false);
+            startSuppressorHeartbeat();
+            mediaKeySuppressor.setActive(true);
             updateTileState();
             DevRuntimeLog.add("Maneuver", "resumed after OEM AVM");
         }
@@ -352,7 +375,8 @@ public final class ManeuverController {
     }
 
     private void startSuppressorHeartbeat() {
-        mainHandler.removeCallbacks(suppressorHeartbeatRunnable);
+        if (suppressorHeartbeatRunning) return;
+        suppressorHeartbeatRunning = true;
         mainHandler.postDelayed(suppressorHeartbeatRunnable, SUPPRESSOR_HEARTBEAT_MS);
     }
 
@@ -405,6 +429,10 @@ public final class ManeuverController {
                 || rawCode == RAW_SWC_LEFT
                 || rawCode == RAW_SWC_RIGHT
                 || rawCode == RAW_SWC_CENTER;
+    }
+
+    private static boolean isVolumeMappedStickCode(int rawCode) {
+        return rawCode == RAW_SWC_UP || rawCode == RAW_SWC_DOWN;
     }
 
     private static boolean isLogicalStickCode(int logicalCode) {
