@@ -23,7 +23,7 @@ public final class UiPrefs {
     public static final String KEY_SIGNAL_OVERLAY_TAP_TO_HIDE_ENABLED = "signalOverlayTapToHideEnabled";
     public static final String KEY_SIGNAL_OVERLAY_TAP_TO_HIDE_DURATION_SEC = "signalOverlayTapToHideDurationSec";
     public static final int DEFAULT_SIGNAL_OVERLAY_TAP_TO_HIDE_DURATION_SEC = 5;
-    public static final int MIN_SIGNAL_OVERLAY_TAP_TO_HIDE_SEC = 3;
+    public static final int MIN_SIGNAL_OVERLAY_TAP_TO_HIDE_SEC = 2;
     public static final int MAX_SIGNAL_OVERLAY_TAP_TO_HIDE_SEC = 120;
     public static final String KEY_OVERLAY_HIDE_DELAY_MS = "overlayHideDelayMs";
     public static final String KEY_OVERLAY_MIN_SHOW_MS = "overlayMinShowMs";
