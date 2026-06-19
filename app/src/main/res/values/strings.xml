@@ -66,6 +66,13 @@
     <string name="settings_dashcam_status_paused_oem">Recording paused while OEM camera is being opened</string>
     <string name="settings_dashcam_status_error">Recording error: %1$s</string>
     <string name="settings_overlay_on_signal">Show Signal Camera on turn signal</string>
+    <string name="settings_maneuver_mode_enabled">Enable Maneuver Mode</string>
+    <string name="settings_maneuver_mode_hint">Uses the steering-wheel stick to control the camera tile view. While active, turn-signal cameras and Digital Rearview are overridden.</string>
+    <string name="settings_maneuver_threshold_enabled">Use speed threshold</string>
+    <string name="settings_maneuver_threshold_kmh">Active below (km/h)</string>
+    <string name="settings_maneuver_threshold_hint">When enabled, Maneuver Mode releases the buttons and exits once vehicle speed reaches this threshold.</string>
+    <string name="settings_maneuver_allow_oem_avm">Allow OEM 360° during Maneuver</string>
+    <string name="settings_maneuver_allow_oem_avm_hint">When disabled, Maneuver Mode keeps camera priority and ignores OEM 360° launch requests. When enabled, the stock 360° app may take over on demand.</string>
     <string name="settings_digital_rearview_enabled">Enable Digital Rearview Mirror</string>
     <string name="settings_digital_rearview_hint">Shows the rear camera continuously until you switch it off. Turn-signal cameras take priority and the rear view returns afterwards.</string>
     <string name="settings_rearview_tap_to_hide">Tap to temporarily hide</string>

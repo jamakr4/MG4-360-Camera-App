@@ -9,6 +9,7 @@ import com.drivehub.kamera.dashcam.DashcamSettingsController;
 import com.drivehub.kamera.dashcam.RecordingService;
 import com.drivehub.kamera.dev.DevRuntimeLog;
 import com.drivehub.kamera.dev.DevSettingsController;
+import com.drivehub.kamera.maneuver.ManeuverSettingsController;
 import com.drivehub.kamera.ota.OtaController;
 import com.drivehub.kamera.signal.SignalCameraSettingsController;
 import com.drivehub.kamera.signal.SignalService;
@@ -55,6 +56,7 @@ public final class SettingsDialogController {
     private final Runnable onSafetyWarningChanged;
 
     private final SignalCameraSettingsController signalCam;
+    private final ManeuverSettingsController maneuver = new ManeuverSettingsController();
     private final DashcamSettingsController dashcam;
     private final DevSettingsController dev = new DevSettingsController();
 
@@ -165,6 +167,10 @@ public final class SettingsDialogController {
     private Views bindViews(SharedPreferences prefs) {
         Views v = new Views();
         v.swOverlay = dialog.findViewById(R.id.switchOverlayOnSignal);
+        v.swManeuverMode = dialog.findViewById(R.id.switchManeuverMode);
+        v.swManeuverThreshold = dialog.findViewById(R.id.switchManeuverThreshold);
+        v.etManeuverThresholdKmh = dialog.findViewById(R.id.etManeuverThresholdKmh);
+        v.swManeuverAllowOemAvm = dialog.findViewById(R.id.switchManeuverAllowOemAvm);
         v.swDigitalRearview = dialog.findViewById(R.id.switchDigitalRearview);
         v.swRearviewTapToHide = dialog.findViewById(R.id.switchRearviewTapToHide);
         v.etRearviewTapToHideDurationSec = dialog.findViewById(R.id.etRearviewTapToHideDurationSec);
@@ -301,6 +307,13 @@ public final class SettingsDialogController {
                 views.seekOverlayMinShow,
                 views.etOverlayMinShowValue
         );
+        maneuver.bind(
+                prefs,
+                views.swManeuverMode,
+                views.swManeuverThreshold,
+                views.etManeuverThresholdKmh,
+                views.swManeuverAllowOemAvm
+        );
         dashcam.bind(
                 prefs,
                 views.swDashcamEnabled,
@@ -360,6 +373,9 @@ public final class SettingsDialogController {
                 prefs,
                 new Switch[]{
                         views.swOverlay,
+                        views.swManeuverMode,
+                        views.swManeuverThreshold,
+                        views.swManeuverAllowOemAvm,
                         views.swDigitalRearview,
                         views.swRearviewTapToHide,
                         views.swSignalTapToHide,
@@ -554,6 +570,10 @@ public final class SettingsDialogController {
 
     private static final class Views {
         Switch swOverlay;
+        Switch swManeuverMode;
+        Switch swManeuverThreshold;
+        EditText etManeuverThresholdKmh;
+        Switch swManeuverAllowOemAvm;
         Switch swDigitalRearview;
         Switch swRearviewTapToHide;
         EditText etRearviewTapToHideDurationSec;

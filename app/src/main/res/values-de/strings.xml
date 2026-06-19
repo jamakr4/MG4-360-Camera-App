@@ -66,6 +66,13 @@
     <string name="settings_dashcam_status_paused_oem">Aufnahme pausiert, damit die OEM-Kamera geoeffnet werden kann</string>
     <string name="settings_dashcam_status_error">Aufnahmefehler: %1$s</string>
     <string name="settings_overlay_on_signal">Kamera beim Blinken anzeigen</string>
+    <string name="settings_maneuver_mode_enabled">Manövriermodus aktivieren</string>
+    <string name="settings_maneuver_mode_hint">Nutzt den Lenkrad-Stick zur Steuerung der Kamera-Tileview. Solange aktiv, überschreibt der Modus Blinker-Kameras und den digitalen Rueckspiegel.</string>
+    <string name="settings_maneuver_threshold_enabled">Geschwindigkeitslimit nutzen</string>
+    <string name="settings_maneuver_threshold_kmh">Aktiv unter (km/h)</string>
+    <string name="settings_maneuver_threshold_hint">Wenn aktiv, gibt der Manövriermodus die Tasten frei und beendet sich, sobald die Fahrzeuggeschwindigkeit diesen Wert erreicht.</string>
+    <string name="settings_maneuver_allow_oem_avm">OEM-360° im Manövriermodus erlauben</string>
+    <string name="settings_maneuver_allow_oem_avm_hint">Wenn deaktiviert, behält der Manövriermodus die Kamera-Priorität und ignoriert OEM-360°-Startanfragen. Wenn aktiv, darf die werkseitige 360°-App bei Bedarf übernehmen.</string>
     <string name="settings_digital_rearview_enabled">Digitalen Rueckspiegel aktivieren</string>
     <string name="settings_digital_rearview_hint">Zeigt die Heckkamera dauerhaft, bis du sie wieder ausschaltest. Blinker-Kameras haben Vorrang, danach kehrt die Heckansicht zurueck.</string>
     <string name="settings_rearview_tap_to_hide">Tippen zum kurzzeitigen Ausblenden</string>

@@ -11,6 +11,7 @@ import com.drivehub.kamera.dashcam.RecordingService;
 import com.drivehub.kamera.dev.DevRuntimeLog;
 import com.drivehub.kamera.helper.app.NotificationChannelHelper;
 import com.drivehub.kamera.helper.vehiclesensors.SystemPropertiesHelper;
+import com.drivehub.kamera.maneuver.ManeuverController;
 import com.drivehub.kamera.settings.UiPrefs;
 
 import android.app.Notification;
@@ -89,12 +90,13 @@ public class SignalService extends Service {
     private int lastLamp = Integer.MIN_VALUE;
     private int currentLamp = 0;
     private int currentGear = 0;
-    private int currentMode = -1; // -1:init, 0:none, 1:left, 2:right, 3:reverse
+    private int currentMode = -1; // -1:init, 0:none, 1:left, 2:right, 3:reverse, 4:rearview, 5:maneuver
     private boolean lastObservedOemForeground = false;
     private volatile long overlayShownAtMs = 0L;
     private volatile long lastHazardTriggerAtMs = 0L;
     private long rearviewTempHiddenUntilMs = 0L; // mainHandler only
     private long signalTempHiddenUntilMs = 0L;   // mainHandler only
+    private ManeuverController maneuverController;
 
     private final Handler mainHandler = new Handler();
     private final Runnable hideRunnable = new Runnable() {
@@ -140,6 +142,7 @@ public class SignalService extends Service {
         SharedPreferences prefs = UiPrefs.getPrefs(context);
         UiPrefs.setOemAvmActive(prefs, active);
         DevRuntimeLog.add("SignalService", "OEM latch=" + active);
+        ManeuverController.onOemAvmState(context, active);
         SignalService inst = sInstance;
         if (inst == null) {
             if (active) {
@@ -158,6 +161,11 @@ public class SignalService extends Service {
             inst.currentMode = -1;
             inst.updateOverlayDecision();
         });
+    }
+
+    public static boolean isReverseActive() {
+        SignalService inst = sInstance;
+        return inst != null && inst.currentGear == REVERSE_GEAR_VALUE;
     }
 
     public static void requestRecheck() {
@@ -258,6 +266,8 @@ public class SignalService extends Service {
         super.onCreate();
         sInstance = this;
         NotificationChannelHelper.ensureChannel(this, CHANNEL_ID, "MG4 Signal");
+        maneuverController = new ManeuverController(this, mainHandler);
+        maneuverController.register();
         registerDebugBroadcastSniffer();
     }
 
@@ -467,6 +477,11 @@ public class SignalService extends Service {
     private void onOemLifecycleChanged(String prev, String next) {
         DevRuntimeLog.add("SignalService", "OEM lifecycle: '" + prev + "' => '" + next + "'");
         if (OEM_LIFECYCLE_START.equals(next)) {
+            if (ManeuverController.shouldBlockOemAvm(this)) {
+                DevRuntimeLog.add("SignalService", "OEM lifecycle start blocked during Maneuver");
+                setOemAvmActive(this, false);
+                return;
+            }
             setOemAvmActive(this, true);
             RecordingService.pauseForOemRequest(this);
         } else if (OEM_LIFECYCLE_DESTROYED.equals(next)) {
@@ -548,6 +563,8 @@ public class SignalService extends Service {
         int nextMode;
         if (currentGear == REVERSE_GEAR_VALUE) {
             nextMode = 3;
+        } else if (maneuverController != null && maneuverController.isCachedCaptureActive()) {
+            nextMode = 5;
         } else if (signal == TurnSignal.LEFT && !isSignalTempHidden()) {
             nextMode = 1;
         } else if (signal == TurnSignal.RIGHT && !isSignalTempHidden()) {
@@ -557,6 +574,18 @@ public class SignalService extends Service {
             nextMode = 4;
         } else {
             nextMode = 0;
+        }
+
+        if (nextMode == 5) {
+            currentMode = nextMode;
+            mainHandler.removeCallbacks(hideRunnable);
+            clearOverlayShownTimestamp();
+            OverlayService.hideOverlay(this);
+            if (maneuverController != null) {
+                maneuverController.ensureTileState();
+            }
+            Log.i(TAG, "Maneuver mode => TileView camera routing");
+            return;
         }
 
         if (nextMode == currentMode) return;
@@ -612,6 +641,7 @@ public class SignalService extends Service {
             mainHandler.removeCallbacks(hideRunnable);
             clearOverlayShownTimestamp();
             OverlayService.hideOverlay(this);
+            TileViewActivity.hideManeuver(this);
             Log.i(TAG, "Reverse => no overlay (disabled for reverse)");
             return;
         }
@@ -788,6 +818,14 @@ public class SignalService extends Service {
         boolean latched = isOemAvmLatchedActive();
 
         if (foreground) {
+            if (ManeuverController.shouldBlockOemAvm(this)) {
+                lastObservedOemForeground = false;
+                if (latched) {
+                    setOemAvmActive(this, false);
+                }
+                DevRuntimeLog.add("SignalService", "OEM foreground ignored during Maneuver");
+                return;
+            }
             lastObservedOemForeground = true;
             if (!latched) {
                 DevRuntimeLog.add("SignalService", "OEM foreground fallback => pause");
@@ -846,6 +884,10 @@ public class SignalService extends Service {
         mainHandler.removeCallbacks(hideRunnable);
         mainHandler.removeCallbacks(rearviewRestoreRunnable);
         mainHandler.removeCallbacks(signalRestoreRunnable);
+        if (maneuverController != null) {
+            maneuverController.unregister();
+            maneuverController = null;
+        }
         OverlayService.hideOverlay(this);
         sInstance = null;
     }
