@@ -15,6 +15,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.os.Bundle;
 import android.os.Handler;
 import android.util.Log;
 
@@ -26,8 +27,13 @@ public final class ManeuverController {
     private static final String ACTION_RAW_HARDKEY = "com.saic.keyevent.hardkey.report";
     private static final String ACTION_SYSTEMUI_HARDKEY = "com.android.systemui.ACTION_HARD_KEY_EVENT";
     private static final String EXTRA_RAW_KEYCODE = "android.intent.extra.hardkey.keycode";
+    private static final String EXTRA_RAW_KEYCODE_ALT = "keycode";
+    private static final String EXTRA_RAW_KEYCODE_CAMEL = "keyCode";
     private static final String EXTRA_RAW_DOWN = "android.intent.extra.hardkey.down";
+    private static final String EXTRA_RAW_DOWN_ALT = "down";
     private static final String EXTRA_RAW_LONGPRESS = "android.intent.extra.hardkey.longpress";
+    private static final String EXTRA_RAW_LONGPRESS_ALT = "longpress";
+    private static final String EXTRA_RAW_LONGPRESS_CAMEL = "longPress";
     private static final String EXTRA_LOGICAL_KEY_CODE = "KEY_CODE";
     private static final String EXTRA_LOGICAL_DOWN = "DOWN";
 
@@ -277,9 +283,10 @@ public final class ManeuverController {
 
     private void handleRawHardkey(Intent intent, BroadcastReceiver receiver) {
         if (intent == null) return;
-        int rawCode = intent.getIntExtra(EXTRA_RAW_KEYCODE, -1);
-        boolean isDown = intent.getBooleanExtra(EXTRA_RAW_DOWN, false);
-        boolean isLongPress = intent.getBooleanExtra(EXTRA_RAW_LONGPRESS, false);
+        int rawCode = readRawKeyCode(intent);
+        boolean isDown = readBooleanExtra(intent, EXTRA_RAW_DOWN, EXTRA_RAW_DOWN_ALT);
+        boolean isLongPress = readBooleanExtra(intent, EXTRA_RAW_LONGPRESS,
+                EXTRA_RAW_LONGPRESS_ALT, EXTRA_RAW_LONGPRESS_CAMEL);
         boolean ownsStick = shouldOwnSteeringStick() && isStickCode(rawCode);
         if (isStickCode(rawCode)) {
             DevRuntimeLog.add("Maneuver", "raw=" + formatHex(rawCode)
@@ -287,8 +294,8 @@ public final class ManeuverController {
                     + " capture=" + captureActive);
         }
         if (ownsStick) {
-            rearmSuppressorForBurst();
             suppressOrderedRawBroadcast(receiver, rawCode, isDown);
+            rearmSuppressorForBurst();
         }
         if (!isDown || !ownsStick) {
             return;
@@ -332,11 +339,11 @@ public final class ManeuverController {
 
     private void handleLogicalHardkey(Intent intent, BroadcastReceiver receiver) {
         if (intent == null || !shouldOwnSteeringStick()) return;
-        int logicalCode = intent.getIntExtra(EXTRA_LOGICAL_KEY_CODE, -1);
+        int logicalCode = readIntExtra(intent, EXTRA_LOGICAL_KEY_CODE,
+                EXTRA_RAW_KEYCODE, EXTRA_RAW_KEYCODE_ALT, EXTRA_RAW_KEYCODE_CAMEL);
         if (!isLogicalStickCode(logicalCode)) return;
 
-        boolean down = intent.getBooleanExtra(EXTRA_LOGICAL_DOWN, false);
-        rearmSuppressorForBurst();
+        boolean down = readBooleanExtra(intent, EXTRA_LOGICAL_DOWN, EXTRA_RAW_DOWN_ALT);
         if (receiver.isOrderedBroadcast()) {
             receiver.abortBroadcast();
             if (down) {
@@ -345,6 +352,7 @@ public final class ManeuverController {
         } else if (down) {
             DevRuntimeLog.add("Maneuver", "logical=" + logicalCode + " not ordered");
         }
+        rearmSuppressorForBurst();
     }
 
     private boolean shouldOwnSteeringStick() {
@@ -481,6 +489,64 @@ public final class ManeuverController {
 
     private static boolean isLogicalStickCode(int logicalCode) {
         return logicalCode >= 1 && logicalCode <= 15;
+    }
+
+    private static int readRawKeyCode(Intent intent) {
+        return readIntExtra(intent, EXTRA_RAW_KEYCODE, EXTRA_RAW_KEYCODE_ALT, EXTRA_RAW_KEYCODE_CAMEL);
+    }
+
+    private static int readIntExtra(Intent intent, String... keys) {
+        Bundle extras = intent.getExtras();
+        if (extras == null) {
+            return -1;
+        }
+        for (String key : keys) {
+            if (!extras.containsKey(key)) {
+                continue;
+            }
+            Object value = extras.get(key);
+            if (value instanceof Number) {
+                int intValue = ((Number) value).intValue();
+                if (intValue >= 0) {
+                    return intValue;
+                }
+            } else if (value instanceof String) {
+                try {
+                    int intValue = Integer.parseInt((String) value);
+                    if (intValue >= 0) {
+                        return intValue;
+                    }
+                } catch (NumberFormatException ignored) {
+                }
+            }
+        }
+        return -1;
+    }
+
+    private static boolean readBooleanExtra(Intent intent, String... keys) {
+        Bundle extras = intent.getExtras();
+        if (extras == null) {
+            return false;
+        }
+        for (String key : keys) {
+            if (!extras.containsKey(key)) {
+                continue;
+            }
+            Object value = extras.get(key);
+            if (value instanceof Boolean && (Boolean) value) {
+                return true;
+            }
+            if (value instanceof Number && ((Number) value).intValue() != 0) {
+                return true;
+            }
+            if (value instanceof String) {
+                String text = (String) value;
+                if ("true".equalsIgnoreCase(text) || "1".equals(text)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private static String formatHex(int value) {
