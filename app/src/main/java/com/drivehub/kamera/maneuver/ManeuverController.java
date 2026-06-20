@@ -42,7 +42,8 @@ public final class ManeuverController {
     private static final int RAW_SWC_CENTER = 0x12d;
 
     private static final long SPEED_MONITOR_MS = 500L;
-    private static final long SUPPRESSOR_HEARTBEAT_MS = 2500L;
+    private static final long SUPPRESSOR_HEARTBEAT_MS = 300L;
+    private static final long[] SUPPRESSOR_REARM_DELAYS_MS = {0L, 80L, 180L};
 
     private static volatile ManeuverController sInstance;
 
@@ -96,10 +97,11 @@ public final class ManeuverController {
         hardkeyReceiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
-                handleRawHardkey(intent);
+                handleRawHardkey(intent, this);
             }
         };
         IntentFilter filter = new IntentFilter(ACTION_RAW_HARDKEY);
+        filter.setPriority(1000);
         try {
             ContextCompat.registerReceiver(context, hardkeyReceiver, filter,
                     ContextCompat.RECEIVER_EXPORTED);
@@ -273,17 +275,22 @@ public final class ManeuverController {
         OverlayService.hideOverlay(context);
     }
 
-    private void handleRawHardkey(Intent intent) {
+    private void handleRawHardkey(Intent intent, BroadcastReceiver receiver) {
         if (intent == null) return;
         int rawCode = intent.getIntExtra(EXTRA_RAW_KEYCODE, -1);
         boolean isDown = intent.getBooleanExtra(EXTRA_RAW_DOWN, false);
         boolean isLongPress = intent.getBooleanExtra(EXTRA_RAW_LONGPRESS, false);
+        boolean ownsStick = shouldOwnSteeringStick() && isStickCode(rawCode);
         if (isStickCode(rawCode)) {
             DevRuntimeLog.add("Maneuver", "raw=" + formatHex(rawCode)
                     + " down=" + isDown + " long=" + isLongPress
                     + " capture=" + captureActive);
         }
-        if (!isDown || !shouldOwnSteeringStick() || !isStickCode(rawCode)) {
+        if (ownsStick) {
+            rearmSuppressorForBurst();
+            suppressOrderedRawBroadcast(receiver, rawCode, isDown);
+        }
+        if (!isDown || !ownsStick) {
             return;
         }
 
@@ -304,12 +311,32 @@ public final class ManeuverController {
         DevRuntimeLog.add("Maneuver", "selected " + target.name());
     }
 
+    private void suppressOrderedRawBroadcast(BroadcastReceiver receiver, int rawCode, boolean isDown) {
+        if (receiver == null) return;
+        if (receiver.isOrderedBroadcast()) {
+            try {
+                receiver.abortBroadcast();
+                if (isDown) {
+                    DevRuntimeLog.add("Maneuver", "suppressed raw=" + formatHex(rawCode));
+                }
+            } catch (Throwable t) {
+                if (isDown) {
+                    DevRuntimeLog.add("Maneuver", "raw suppress failed: "
+                            + t.getClass().getSimpleName());
+                }
+            }
+        } else if (isDown) {
+            DevRuntimeLog.add("Maneuver", "raw=" + formatHex(rawCode) + " not ordered");
+        }
+    }
+
     private void handleLogicalHardkey(Intent intent, BroadcastReceiver receiver) {
         if (intent == null || !shouldOwnSteeringStick()) return;
         int logicalCode = intent.getIntExtra(EXTRA_LOGICAL_KEY_CODE, -1);
         if (!isLogicalStickCode(logicalCode)) return;
 
         boolean down = intent.getBooleanExtra(EXTRA_LOGICAL_DOWN, false);
+        rearmSuppressorForBurst();
         if (receiver.isOrderedBroadcast()) {
             receiver.abortBroadcast();
             if (down) {
@@ -368,15 +395,32 @@ public final class ManeuverController {
         suppressorPublished = enabled;
         Intent intent = new Intent(ACTION_SUPPRESSOR_STATE);
         intent.putExtra(EXTRA_SUPPRESSOR_ENABLED, enabled);
+        intent.addFlags(Intent.FLAG_RECEIVER_FOREGROUND);
         context.sendBroadcast(intent);
         if (!heartbeat) {
             DevRuntimeLog.add("Maneuver", "suppressor=" + enabled);
         }
     }
 
+    private void rearmSuppressorForBurst() {
+        if (!captureActive) return;
+        for (long delayMs : SUPPRESSOR_REARM_DELAYS_MS) {
+            if (delayMs <= 0L) {
+                publishSuppressorState(true, true);
+            } else {
+                mainHandler.postDelayed(() -> {
+                    if (captureActive) {
+                        publishSuppressorState(true, true);
+                    }
+                }, delayMs);
+            }
+        }
+    }
+
     private void startSuppressorHeartbeat() {
         if (suppressorHeartbeatRunning) return;
         suppressorHeartbeatRunning = true;
+        publishSuppressorState(true, true);
         mainHandler.postDelayed(suppressorHeartbeatRunnable, SUPPRESSOR_HEARTBEAT_MS);
     }
 
