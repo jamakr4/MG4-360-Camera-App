@@ -10,42 +10,16 @@ import com.drivehub.kamera.helper.vehiclesensors.VehicleSpeedReader;
 import com.drivehub.kamera.settings.UiPrefs;
 import com.drivehub.kamera.signal.SignalService;
 
-import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
 import android.content.SharedPreferences;
-import android.os.Bundle;
 import android.os.Handler;
-import android.util.Log;
-
-import androidx.core.content.ContextCompat;
 
 public final class ManeuverController {
-
-    private static final String TAG = "ManeuverController";
-    private static final String ACTION_RAW_HARDKEY = "com.saic.keyevent.hardkey.report";
-    private static final String ACTION_SYSTEMUI_HARDKEY = "com.android.systemui.ACTION_HARD_KEY_EVENT";
-    private static final String EXTRA_RAW_KEYCODE = "android.intent.extra.hardkey.keycode";
-    private static final String EXTRA_RAW_KEYCODE_ALT = "keycode";
-    private static final String EXTRA_RAW_KEYCODE_CAMEL = "keyCode";
-    private static final String EXTRA_RAW_DOWN = "android.intent.extra.hardkey.down";
-    private static final String EXTRA_RAW_DOWN_ALT = "down";
-    private static final String EXTRA_RAW_LONGPRESS = "android.intent.extra.hardkey.longpress";
-    private static final String EXTRA_RAW_LONGPRESS_ALT = "longpress";
-    private static final String EXTRA_RAW_LONGPRESS_CAMEL = "longPress";
-    private static final String EXTRA_LOGICAL_KEY_CODE = "KEY_CODE";
-    private static final String EXTRA_LOGICAL_DOWN = "DOWN";
 
     public static final String ACTION_SUPPRESSOR_STATE =
             "com.drivehub.kamera.action.SET_MANEUVER_SUPPRESSOR";
     public static final String EXTRA_SUPPRESSOR_ENABLED = "enabled";
-
-    private static final int RAW_SWC_UP = 0x129;
-    private static final int RAW_SWC_DOWN = 0x12a;
-    private static final int RAW_SWC_LEFT = 0x12b;
-    private static final int RAW_SWC_RIGHT = 0x12c;
-    private static final int RAW_SWC_CENTER = 0x12d;
 
     private static final long SPEED_MONITOR_MS = 500L;
     private static final long SUPPRESSOR_HEARTBEAT_MS = 300L;
@@ -57,9 +31,8 @@ public final class ManeuverController {
     private final Handler mainHandler;
     private final MediaKeySuppressor mediaKeySuppressor;
     private final VolumeRestoreGuard volumeRestoreGuard;
+    private final ManeuverHardkeySuppressor hardkeySuppressor;
     private SharedPreferences prefs;
-    private BroadcastReceiver hardkeyReceiver;
-    private BroadcastReceiver logicalHardkeyReceiver;
     private SharedPreferences.OnSharedPreferenceChangeListener prefListener;
 
     private boolean registered;
@@ -95,45 +68,34 @@ public final class ManeuverController {
         this.mainHandler = mainHandler;
         this.mediaKeySuppressor = new MediaKeySuppressor(this.context, mainHandler);
         this.volumeRestoreGuard = new VolumeRestoreGuard(this.context, mainHandler);
+        this.hardkeySuppressor = new ManeuverHardkeySuppressor(this.context,
+                new ManeuverHardkeySuppressor.Callback() {
+                    @Override
+                    public boolean isCaptureActive() {
+                        return ManeuverController.this.captureActive;
+                    }
+
+                    @Override
+                    public boolean shouldOwnSteeringStick() {
+                        return ManeuverController.this.shouldOwnSteeringStick();
+                    }
+
+                    @Override
+                    public void onStickDown(int rawCode) {
+                        ManeuverController.this.handleStickDown(rawCode);
+                    }
+
+                    @Override
+                    public void onSuppressorRearmRequested() {
+                        ManeuverController.this.rearmSuppressorForBurst();
+                    }
+                });
     }
 
     public void register() {
         if (registered) return;
         prefs = UiPrefs.getPrefs(context);
-        hardkeyReceiver = new BroadcastReceiver() {
-            @Override
-            public void onReceive(Context context, Intent intent) {
-                handleRawHardkey(intent, this);
-            }
-        };
-        IntentFilter filter = new IntentFilter(ACTION_RAW_HARDKEY);
-        filter.setPriority(1000);
-        try {
-            ContextCompat.registerReceiver(context, hardkeyReceiver, filter,
-                    ContextCompat.RECEIVER_EXPORTED);
-            DevRuntimeLog.add("Maneuver", "raw hardkey receiver registered");
-        } catch (Throwable t) {
-            DevRuntimeLog.add("Maneuver", "raw hardkey receiver failed: " + t.getClass().getSimpleName());
-            Log.w(TAG, "Failed to register raw hardkey receiver", t);
-        }
-
-        logicalHardkeyReceiver = new BroadcastReceiver() {
-            @Override
-            public void onReceive(Context context, Intent intent) {
-                handleLogicalHardkey(intent, this);
-            }
-        };
-        IntentFilter logicalFilter = new IntentFilter(ACTION_SYSTEMUI_HARDKEY);
-        logicalFilter.setPriority(1000);
-        try {
-            ContextCompat.registerReceiver(context, logicalHardkeyReceiver, logicalFilter,
-                    ContextCompat.RECEIVER_EXPORTED);
-            DevRuntimeLog.add("Maneuver", "logical hardkey suppressor registered");
-        } catch (Throwable t) {
-            DevRuntimeLog.add("Maneuver", "logical suppressor failed: " + t.getClass().getSimpleName());
-            Log.w(TAG, "Failed to register logical hardkey suppressor", t);
-        }
-
+        hardkeySuppressor.register();
         prefListener = (sp, key) -> {
             if (key == null || isManeuverPrefKey(key)) {
                 mainHandler.post(this::refreshState);
@@ -158,20 +120,7 @@ public final class ManeuverController {
             }
         }
         prefListener = null;
-        if (hardkeyReceiver != null) {
-            try {
-                context.unregisterReceiver(hardkeyReceiver);
-            } catch (Throwable ignored) {
-            }
-        }
-        hardkeyReceiver = null;
-        if (logicalHardkeyReceiver != null) {
-            try {
-                context.unregisterReceiver(logicalHardkeyReceiver);
-            } catch (Throwable ignored) {
-            }
-        }
-        logicalHardkeyReceiver = null;
+        hardkeySuppressor.unregister();
         if (captureActive || suppressorPublished) {
             publishSuppressorState(false, false);
         }
@@ -281,31 +230,12 @@ public final class ManeuverController {
         OverlayService.hideOverlay(context);
     }
 
-    private void handleRawHardkey(Intent intent, BroadcastReceiver receiver) {
-        if (intent == null) return;
-        int rawCode = readRawKeyCode(intent);
-        boolean isDown = readBooleanExtra(intent, EXTRA_RAW_DOWN, EXTRA_RAW_DOWN_ALT);
-        boolean isLongPress = readBooleanExtra(intent, EXTRA_RAW_LONGPRESS,
-                EXTRA_RAW_LONGPRESS_ALT, EXTRA_RAW_LONGPRESS_CAMEL);
-        boolean ownsStick = shouldOwnSteeringStick() && isStickCode(rawCode);
-        if (isStickCode(rawCode)) {
-            DevRuntimeLog.add("Maneuver", "raw=" + formatHex(rawCode)
-                    + " down=" + isDown + " long=" + isLongPress
-                    + " capture=" + captureActive);
-        }
-        if (ownsStick) {
-            suppressOrderedRawBroadcast(receiver, rawCode, isDown);
-            rearmSuppressorForBurst();
-        }
-        if (!isDown || !ownsStick) {
-            return;
-        }
-
-        if (isVolumeMappedStickCode(rawCode)) {
+    private void handleStickDown(int rawCode) {
+        if (ManeuverHardkeySuppressor.isVolumeMappedStickCode(rawCode)) {
             volumeRestoreGuard.restoreBaselineSoon(formatHex(rawCode));
         }
 
-        if (rawCode == RAW_SWC_CENTER) {
+        if (rawCode == ManeuverHardkeySuppressor.RAW_SWC_CENTER) {
             toggleClear();
             return;
         }
@@ -316,43 +246,6 @@ public final class ManeuverController {
         tileCleared = false;
         updateTileState();
         DevRuntimeLog.add("Maneuver", "selected " + target.name());
-    }
-
-    private void suppressOrderedRawBroadcast(BroadcastReceiver receiver, int rawCode, boolean isDown) {
-        if (receiver == null) return;
-        if (receiver.isOrderedBroadcast()) {
-            try {
-                receiver.abortBroadcast();
-                if (isDown) {
-                    DevRuntimeLog.add("Maneuver", "suppressed raw=" + formatHex(rawCode));
-                }
-            } catch (Throwable t) {
-                if (isDown) {
-                    DevRuntimeLog.add("Maneuver", "raw suppress failed: "
-                            + t.getClass().getSimpleName());
-                }
-            }
-        } else if (isDown) {
-            DevRuntimeLog.add("Maneuver", "raw=" + formatHex(rawCode) + " not ordered");
-        }
-    }
-
-    private void handleLogicalHardkey(Intent intent, BroadcastReceiver receiver) {
-        if (intent == null || !shouldOwnSteeringStick()) return;
-        int logicalCode = readIntExtra(intent, EXTRA_LOGICAL_KEY_CODE,
-                EXTRA_RAW_KEYCODE, EXTRA_RAW_KEYCODE_ALT, EXTRA_RAW_KEYCODE_CAMEL);
-        if (!isLogicalStickCode(logicalCode)) return;
-
-        boolean down = readBooleanExtra(intent, EXTRA_LOGICAL_DOWN, EXTRA_RAW_DOWN_ALT);
-        if (receiver.isOrderedBroadcast()) {
-            receiver.abortBroadcast();
-            if (down) {
-                DevRuntimeLog.add("Maneuver", "suppressed logical=" + logicalCode);
-            }
-        } else if (down) {
-            DevRuntimeLog.add("Maneuver", "logical=" + logicalCode + " not ordered");
-        }
-        rearmSuppressorForBurst();
     }
 
     private boolean shouldOwnSteeringStick() {
@@ -462,91 +355,17 @@ public final class ManeuverController {
 
     private static CameraIndex mapCamera(int rawCode) {
         switch (rawCode) {
-            case RAW_SWC_UP:
+            case ManeuverHardkeySuppressor.RAW_SWC_UP:
                 return CameraIndex.FRONT;
-            case RAW_SWC_DOWN:
+            case ManeuverHardkeySuppressor.RAW_SWC_DOWN:
                 return CameraIndex.REAR;
-            case RAW_SWC_LEFT:
+            case ManeuverHardkeySuppressor.RAW_SWC_LEFT:
                 return CameraIndex.LEFT;
-            case RAW_SWC_RIGHT:
+            case ManeuverHardkeySuppressor.RAW_SWC_RIGHT:
                 return CameraIndex.RIGHT;
             default:
                 return null;
         }
-    }
-
-    private static boolean isStickCode(int rawCode) {
-        return rawCode == RAW_SWC_UP
-                || rawCode == RAW_SWC_DOWN
-                || rawCode == RAW_SWC_LEFT
-                || rawCode == RAW_SWC_RIGHT
-                || rawCode == RAW_SWC_CENTER;
-    }
-
-    private static boolean isVolumeMappedStickCode(int rawCode) {
-        return rawCode == RAW_SWC_UP || rawCode == RAW_SWC_DOWN;
-    }
-
-    private static boolean isLogicalStickCode(int logicalCode) {
-        return logicalCode >= 1 && logicalCode <= 15;
-    }
-
-    private static int readRawKeyCode(Intent intent) {
-        return readIntExtra(intent, EXTRA_RAW_KEYCODE, EXTRA_RAW_KEYCODE_ALT, EXTRA_RAW_KEYCODE_CAMEL);
-    }
-
-    private static int readIntExtra(Intent intent, String... keys) {
-        Bundle extras = intent.getExtras();
-        if (extras == null) {
-            return -1;
-        }
-        for (String key : keys) {
-            if (!extras.containsKey(key)) {
-                continue;
-            }
-            Object value = extras.get(key);
-            if (value instanceof Number) {
-                int intValue = ((Number) value).intValue();
-                if (intValue >= 0) {
-                    return intValue;
-                }
-            } else if (value instanceof String) {
-                try {
-                    int intValue = Integer.parseInt((String) value);
-                    if (intValue >= 0) {
-                        return intValue;
-                    }
-                } catch (NumberFormatException ignored) {
-                }
-            }
-        }
-        return -1;
-    }
-
-    private static boolean readBooleanExtra(Intent intent, String... keys) {
-        Bundle extras = intent.getExtras();
-        if (extras == null) {
-            return false;
-        }
-        for (String key : keys) {
-            if (!extras.containsKey(key)) {
-                continue;
-            }
-            Object value = extras.get(key);
-            if (value instanceof Boolean && (Boolean) value) {
-                return true;
-            }
-            if (value instanceof Number && ((Number) value).intValue() != 0) {
-                return true;
-            }
-            if (value instanceof String) {
-                String text = (String) value;
-                if ("true".equalsIgnoreCase(text) || "1".equals(text)) {
-                    return true;
-                }
-            }
-        }
-        return false;
     }
 
     private static String formatHex(int value) {

@@ -684,7 +684,11 @@ public class SignalService extends Service {
             Log.i(TAG, "Digital rearview => overlay " + CameraIndex.REAR);
         } else {
             clearOverlayShownTimestamp();
-            OverlayService.hideOverlay(this);
+            if (previousMode == -2 && !isSignalTempHidden()) {
+                OverlayService.hideOverlayWithFade(this);
+            } else {
+                OverlayService.hideOverlay(this);
+            }
             Log.i(TAG, "No active overlay mode => overlay hide");
         }
     }
