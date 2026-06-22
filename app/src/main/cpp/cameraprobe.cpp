@@ -139,6 +139,17 @@ Java_com_drivehub_kamera_CameraProbe_attachPreview(JNIEnv* env, jclass /*clazz*/
 }
 
 extern "C"
+JNIEXPORT jboolean JNICALL
+Java_com_drivehub_kamera_CameraProbe_attachPreviewSized(JNIEnv* env, jclass /*clazz*/,
+                                                        jint videoIndex, jobject surface,
+                                                        jint targetWidth, jint targetHeight) {
+    return camera_stream_manager::attachPreview(env, static_cast<int>(videoIndex), surface,
+                                                static_cast<int>(targetWidth),
+                                                static_cast<int>(targetHeight))
+           ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C"
 JNIEXPORT void JNICALL
 Java_com_drivehub_kamera_CameraProbe_detachPreview(JNIEnv* /*env*/, jclass /*clazz*/,
                                                    jint videoIndex) {

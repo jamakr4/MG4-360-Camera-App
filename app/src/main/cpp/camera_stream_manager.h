@@ -7,6 +7,7 @@
 namespace camera_stream_manager {
 
 bool attachPreview(JNIEnv* env, int videoIndex, jobject surface);
+bool attachPreview(JNIEnv* env, int videoIndex, jobject surface, int targetWidth, int targetHeight);
 void detachPreview(int videoIndex);
 void detachAllPreviews();
 

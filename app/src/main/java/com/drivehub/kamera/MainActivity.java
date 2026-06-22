@@ -337,7 +337,8 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             CameraProbe.detachPreview(activePreviewCameraIndex);
             activePreviewCameraIndex = -1;
         }
-        boolean ok = CameraProbe.attachPreview(currentVideoIndex, surfaceHolder.getSurface());
+        boolean ok = CameraProbe.attachPreviewSized(currentVideoIndex, surfaceHolder.getSurface(),
+                CameraProbe.OEM_PREVIEW_WIDTH, CameraProbe.OEM_PREVIEW_HEIGHT);
         previewRunning = ok;
         activePreviewCameraIndex = ok ? currentVideoIndex : -1;
         if (tvStatus != null) {

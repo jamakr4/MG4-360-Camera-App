@@ -1182,6 +1182,11 @@ namespace camera_stream_manager
 
             bool attachPreview(JNIEnv *env, jobject surface)
             {
+                return attachPreview(env, surface, 0, 0);
+            }
+
+            bool attachPreview(JNIEnv *env, jobject surface, int targetWidth, int targetHeight)
+            {
                 if (surface == nullptr)
                 {
                     return false;
@@ -1202,6 +1207,8 @@ namespace camera_stream_manager
                         ANativeWindow_release(previewWindow_);
                     }
                     previewWindow_ = window;
+                    previewTargetWidth_ = std::max(0, targetWidth);
+                    previewTargetHeight_ = std::max(0, targetHeight);
                     stopRequested_.store(false);
                     started = ensureStartedLocked();
                     if (started)
@@ -1236,6 +1243,8 @@ namespace camera_stream_manager
                     {
                         ANativeWindow_release(previewWindow_);
                         previewWindow_ = nullptr;
+                        previewTargetWidth_ = 0;
+                        previewTargetHeight_ = 0;
                     }
                     else
                     {
@@ -1254,6 +1263,8 @@ namespace camera_stream_manager
                     {
                         ANativeWindow_release(previewWindow_);
                         previewWindow_ = nullptr;
+                        previewTargetWidth_ = 0;
+                        previewTargetHeight_ = 0;
                     }
                     shouldStop = consumers_.empty();
                     if (shouldStop)
@@ -1392,7 +1403,9 @@ namespace camera_stream_manager
                 {
                     return;
                 }
-                ANativeWindow_setBuffersGeometry(previewWindow_, cropWidth_, cropHeight_,
+                const int bufferWidth = previewTargetWidth_ > 0 ? previewTargetWidth_ : cropWidth_;
+                const int bufferHeight = previewTargetHeight_ > 0 ? previewTargetHeight_ : cropHeight_;
+                ANativeWindow_setBuffersGeometry(previewWindow_, bufferWidth, bufferHeight,
                                                  AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM);
             }
 
@@ -1552,9 +1565,9 @@ namespace camera_stream_manager
                 const cv::Mat *previewSource = &rgbaFrame;
                 if (videoIndex_ == CAMERA_INDEX_REAR)
                 {
-                    previewScratch_.create(rgbaFrame.rows, rgbaFrame.cols, rgbaFrame.type());
-                    cv::flip(rgbaFrame, previewScratch_, 1);
-                    previewSource = &previewScratch_;
+                    previewFlipScratch_.create(rgbaFrame.rows, rgbaFrame.cols, rgbaFrame.type());
+                    cv::flip(rgbaFrame, previewFlipScratch_, 1);
+                    previewSource = &previewFlipScratch_;
                 }
 
                 ANativeWindow_Buffer outBuffer{};
@@ -1563,12 +1576,30 @@ namespace camera_stream_manager
                     return;
                 }
 
+                if (outBuffer.bits == nullptr || outBuffer.width <= 0 || outBuffer.height <= 0 ||
+                    outBuffer.stride <= 0)
+                {
+                    ANativeWindow_unlockAndPost(previewWindow_);
+                    return;
+                }
+
+                const bool scalePreview = previewTargetWidth_ > 0 && previewTargetHeight_ > 0;
+                if (scalePreview &&
+                    (previewSource->cols != outBuffer.width || previewSource->rows != outBuffer.height))
+                {
+                    previewResizeScratch_.create(outBuffer.height, outBuffer.width, previewSource->type());
+                    cv::resize(*previewSource, previewResizeScratch_, cv::Size(outBuffer.width, outBuffer.height),
+                               0, 0, cv::INTER_LINEAR);
+                    previewSource = &previewResizeScratch_;
+                }
+
                 const int copyWidth = std::min(previewSource->cols, outBuffer.width);
                 const int copyHeight = std::min(previewSource->rows, outBuffer.height);
                 const uint8_t *src = previewSource->data;
                 uint8_t *dst = static_cast<uint8_t *>(outBuffer.bits);
                 const int srcStrideBytes = static_cast<int>(previewSource->step[0]);
                 const int dstStrideBytes = outBuffer.stride * 4;
+                std::memset(dst, 0, static_cast<size_t>(dstStrideBytes) * static_cast<size_t>(outBuffer.height));
                 for (int row = 0; row < copyHeight; row++)
                 {
                     std::memcpy(dst + row * dstStrideBytes, src + row * srcStrideBytes, static_cast<size_t>(copyWidth) * 4U);
@@ -1717,12 +1748,15 @@ namespace camera_stream_manager
             int cropHeight_ = 0;
             std::vector<MappedBuffer> buffers_;
             ANativeWindow *previewWindow_ = nullptr;
+            int previewTargetWidth_ = 0;
+            int previewTargetHeight_ = 0;
             std::unordered_map<int, std::shared_ptr<FrameConsumer>> consumers_;
             std::atomic<bool> running_{false};
             std::atomic<bool> stopRequested_{false};
             std::thread worker_;
             cv::Mat rgbaScratch_;
-            cv::Mat previewScratch_;
+            cv::Mat previewFlipScratch_;
+            cv::Mat previewResizeScratch_;
         };
 
         std::mutex gManagerMutex;
@@ -1794,6 +1828,17 @@ namespace camera_stream_manager
     {
         auto session = getOrCreateSession(videoIndex);
         const bool ok = session->attachPreview(env, surface);
+        if (!ok)
+        {
+            eraseSessionIfIdle(videoIndex, session);
+        }
+        return ok;
+    }
+
+    bool attachPreview(JNIEnv *env, int videoIndex, jobject surface, int targetWidth, int targetHeight)
+    {
+        auto session = getOrCreateSession(videoIndex);
+        const bool ok = session->attachPreview(env, surface, targetWidth, targetHeight);
         if (!ok)
         {
             eraseSessionIfIdle(videoIndex, session);

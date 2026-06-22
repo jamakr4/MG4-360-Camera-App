@@ -1,6 +1,9 @@
 package com.drivehub.kamera;
 
 public final class CameraProbe {
+    public static final int OEM_PREVIEW_WIDTH = 930;
+    public static final int OEM_PREVIEW_HEIGHT = 640;
+
     static {
         System.loadLibrary("cameraprobe");
     }
@@ -13,6 +16,10 @@ public final class CameraProbe {
 
     /** Attaches a preview consumer to the given /dev/video index. */
     public static native boolean attachPreview(int videoIndex, android.view.Surface surface);
+
+    /** Attaches a preview consumer using an explicit native buffer size. */
+    public static native boolean attachPreviewSized(int videoIndex, android.view.Surface surface,
+            int targetWidth, int targetHeight);
 
     /** Detaches the preview consumer from the given /dev/video index. */
     public static native void detachPreview(int videoIndex);

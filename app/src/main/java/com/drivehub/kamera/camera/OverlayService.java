@@ -52,8 +52,8 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
     private static final int NOTIF_ID = 99;
 
     /** Default overlay size in px; the aspect ratio is preserved. */
-    private static final int DEFAULT_OVERLAY_WIDTH_PX = 1000;
-    private static final int DEFAULT_OVERLAY_HEIGHT_PX = 480;
+    private static final int DEFAULT_OVERLAY_WIDTH_PX = CameraProbe.OEM_PREVIEW_WIDTH;
+    private static final int DEFAULT_OVERLAY_HEIGHT_PX = CameraProbe.OEM_PREVIEW_HEIGHT;
     /** Min/max bounds for two-finger pinch resizing. */
     private static final int OVERLAY_MIN_WIDTH_PX = 240;
     private static final int OVERLAY_MAX_WIDTH_PX = 3840;
@@ -696,7 +696,8 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
         if (attachedPreviewCameraIndex == cameraIndex) {
             return;
         }
-        if (CameraProbe.attachPreview(cameraIndex, textureSurface)) {
+        if (CameraProbe.attachPreviewSized(cameraIndex, textureSurface,
+                CameraProbe.OEM_PREVIEW_WIDTH, CameraProbe.OEM_PREVIEW_HEIGHT)) {
             attachedPreviewCameraIndex = cameraIndex;
         }
     }
