@@ -52,6 +52,7 @@ final class ManeuverSuppressorController {
         }
         owningSteeringStick = owning;
         activeSuppressor.setOwningSteeringStick(owning);
+        DevRuntimeLog.add("Maneuver", "stick owner=" + owning);
     }
 
     void onRawHardkey(

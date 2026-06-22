@@ -9,6 +9,7 @@ import com.drivehub.kamera.dashcam.DashcamSettingsController;
 import com.drivehub.kamera.dashcam.RecordingService;
 import com.drivehub.kamera.dev.DevRuntimeLog;
 import com.drivehub.kamera.dev.DevSettingsController;
+import com.drivehub.kamera.maneuver.ManeuverController;
 import com.drivehub.kamera.maneuver.ManeuverSettingsController;
 import com.drivehub.kamera.ota.OtaController;
 import com.drivehub.kamera.signal.SignalCameraSettingsController;
@@ -109,6 +110,7 @@ public final class SettingsDialogController {
     @SuppressWarnings("deprecation")
     public void show() {
         MainActivity.setSettingsDialogOpen(true);
+        ManeuverController.requestRefresh();
         SignalService.requestRecheck();
 
         dialog = new Dialog(activity);
@@ -149,6 +151,7 @@ public final class SettingsDialogController {
         views = null;
         dialog = null;
         appearance.applyMainUiIconColors();
+        ManeuverController.requestRefresh();
         SignalService.requestRecheck();
     }
 
