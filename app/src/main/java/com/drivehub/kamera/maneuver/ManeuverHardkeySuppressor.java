@@ -18,9 +18,58 @@ final class ManeuverHardkeySuppressor {
 
         boolean shouldOwnSteeringStick();
 
+        void onRawHardkey(RawEvent event, BroadcastAbort abort);
+
+        void onLogicalHardkey(LogicalEvent event, BroadcastAbort abort);
+
         void onStickDown(int rawCode);
 
         void onSuppressorRearmRequested();
+    }
+
+    interface BroadcastAbort {
+        boolean isOrdered();
+
+        void abort();
+    }
+
+    static final class RawEvent {
+        final int rawCode;
+        final boolean down;
+        final boolean longPress;
+        final boolean stickCode;
+        final boolean ownsStick;
+        final boolean captureActive;
+
+        RawEvent(
+                int rawCode,
+                boolean down,
+                boolean longPress,
+                boolean stickCode,
+                boolean ownsStick,
+                boolean captureActive
+        ) {
+            this.rawCode = rawCode;
+            this.down = down;
+            this.longPress = longPress;
+            this.stickCode = stickCode;
+            this.ownsStick = ownsStick;
+            this.captureActive = captureActive;
+        }
+    }
+
+    static final class LogicalEvent {
+        final int logicalCode;
+        final boolean down;
+        final boolean stickCode;
+        final boolean ownsStick;
+
+        LogicalEvent(int logicalCode, boolean down, boolean stickCode, boolean ownsStick) {
+            this.logicalCode = logicalCode;
+            this.down = down;
+            this.stickCode = stickCode;
+            this.ownsStick = ownsStick;
+        }
     }
 
     static final int RAW_SWC_UP = 0x129;
@@ -60,7 +109,7 @@ final class ManeuverHardkeySuppressor {
         hardkeyReceiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
-                handleRawHardkey(intent, this);
+                handleRawHardkey(intent, createAbortHandle(this));
             }
         };
         IntentFilter filter = new IntentFilter(ACTION_RAW_HARDKEY);
@@ -77,7 +126,7 @@ final class ManeuverHardkeySuppressor {
         logicalHardkeyReceiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
-                handleLogicalHardkey(intent, this);
+                handleLogicalHardkey(intent, createAbortHandle(this));
             }
         };
         IntentFilter logicalFilter = new IntentFilter(ACTION_SYSTEMUI_HARDKEY);
@@ -85,10 +134,10 @@ final class ManeuverHardkeySuppressor {
         try {
             ContextCompat.registerReceiver(context, logicalHardkeyReceiver, logicalFilter,
                     ContextCompat.RECEIVER_EXPORTED);
-            DevRuntimeLog.add("Maneuver", "logical hardkey suppressor registered");
+            DevRuntimeLog.add("Maneuver", "logical hardkey receiver registered");
         } catch (Throwable t) {
-            DevRuntimeLog.add("Maneuver", "logical suppressor failed: " + t.getClass().getSimpleName());
-            Log.w(TAG, "Failed to register logical hardkey suppressor", t);
+            DevRuntimeLog.add("Maneuver", "logical receiver failed: " + t.getClass().getSimpleName());
+            Log.w(TAG, "Failed to register logical hardkey receiver", t);
         }
     }
 
@@ -110,24 +159,46 @@ final class ManeuverHardkeySuppressor {
         logicalHardkeyReceiver = null;
     }
 
+    static boolean isStickCode(int rawCode) {
+        return rawCode == RAW_SWC_UP
+                || rawCode == RAW_SWC_DOWN
+                || rawCode == RAW_SWC_LEFT
+                || rawCode == RAW_SWC_RIGHT
+                || rawCode == RAW_SWC_CENTER;
+    }
+
     static boolean isVolumeMappedStickCode(int rawCode) {
         return rawCode == RAW_SWC_UP || rawCode == RAW_SWC_DOWN;
     }
 
-    private void handleRawHardkey(Intent intent, BroadcastReceiver receiver) {
+    static boolean isLogicalStickCode(int logicalCode) {
+        return logicalCode >= 1 && logicalCode <= 15;
+    }
+
+    static String formatHex(int value) {
+        if (value < 0) return String.valueOf(value);
+        return "0x" + Integer.toHexString(value);
+    }
+
+    private void handleRawHardkey(Intent intent, BroadcastAbort abort) {
         if (intent == null) return;
         int rawCode = readRawKeyCode(intent);
         boolean isDown = readBooleanExtra(intent, EXTRA_RAW_DOWN, EXTRA_RAW_DOWN_ALT);
         boolean isLongPress = readBooleanExtra(intent, EXTRA_RAW_LONGPRESS,
                 EXTRA_RAW_LONGPRESS_ALT, EXTRA_RAW_LONGPRESS_CAMEL);
-        boolean ownsStick = callback.shouldOwnSteeringStick() && isStickCode(rawCode);
-        if (isStickCode(rawCode)) {
+        boolean stickCode = isStickCode(rawCode);
+        boolean ownsStick = callback.shouldOwnSteeringStick() && stickCode;
+        RawEvent event = new RawEvent(rawCode, isDown, isLongPress, stickCode,
+                ownsStick, callback.isCaptureActive());
+
+        if (stickCode) {
             DevRuntimeLog.add("Maneuver", "raw=" + formatHex(rawCode)
                     + " down=" + isDown + " long=" + isLongPress
-                    + " capture=" + callback.isCaptureActive());
+                    + " capture=" + event.captureActive);
         }
+
+        callback.onRawHardkey(event, abort);
         if (ownsStick) {
-            suppressOrderedRawBroadcast(receiver, rawCode, isDown);
             callback.onSuppressorRearmRequested();
         }
         if (!isDown || !ownsStick) {
@@ -136,53 +207,39 @@ final class ManeuverHardkeySuppressor {
         callback.onStickDown(rawCode);
     }
 
-    private void suppressOrderedRawBroadcast(BroadcastReceiver receiver, int rawCode, boolean isDown) {
-        if (receiver == null) return;
-        if (receiver.isOrderedBroadcast()) {
-            try {
-                receiver.abortBroadcast();
-                if (isDown) {
-                    DevRuntimeLog.add("Maneuver", "suppressed raw=" + formatHex(rawCode));
-                }
-            } catch (Throwable t) {
-                if (isDown) {
-                    DevRuntimeLog.add("Maneuver", "raw suppress failed: "
-                            + t.getClass().getSimpleName());
-                }
-            }
-        } else if (isDown) {
-            DevRuntimeLog.add("Maneuver", "raw=" + formatHex(rawCode) + " not ordered");
-        }
-    }
-
-    private void handleLogicalHardkey(Intent intent, BroadcastReceiver receiver) {
-        if (intent == null || !callback.shouldOwnSteeringStick()) return;
+    private void handleLogicalHardkey(Intent intent, BroadcastAbort abort) {
+        if (intent == null) return;
         int logicalCode = readIntExtra(intent, EXTRA_LOGICAL_KEY_CODE,
                 EXTRA_RAW_KEYCODE, EXTRA_RAW_KEYCODE_ALT, EXTRA_RAW_KEYCODE_CAMEL);
-        if (!isLogicalStickCode(logicalCode)) return;
-
+        boolean stickCode = isLogicalStickCode(logicalCode);
+        boolean ownsStick = callback.shouldOwnSteeringStick() && stickCode;
         boolean down = readBooleanExtra(intent, EXTRA_LOGICAL_DOWN, EXTRA_RAW_DOWN_ALT);
-        if (receiver.isOrderedBroadcast()) {
-            receiver.abortBroadcast();
-            if (down) {
-                DevRuntimeLog.add("Maneuver", "suppressed logical=" + logicalCode);
-            }
-        } else if (down) {
-            DevRuntimeLog.add("Maneuver", "logical=" + logicalCode + " not ordered");
+        LogicalEvent event = new LogicalEvent(logicalCode, down, stickCode, ownsStick);
+
+        if (!stickCode) return;
+        if (down) {
+            DevRuntimeLog.add("Maneuver", "logical=" + logicalCode);
         }
-        callback.onSuppressorRearmRequested();
+        callback.onLogicalHardkey(event, abort);
+        if (ownsStick) {
+            callback.onSuppressorRearmRequested();
+        }
     }
 
-    private static boolean isStickCode(int rawCode) {
-        return rawCode == RAW_SWC_UP
-                || rawCode == RAW_SWC_DOWN
-                || rawCode == RAW_SWC_LEFT
-                || rawCode == RAW_SWC_RIGHT
-                || rawCode == RAW_SWC_CENTER;
-    }
+    private static BroadcastAbort createAbortHandle(BroadcastReceiver receiver) {
+        return new BroadcastAbort() {
+            @Override
+            public boolean isOrdered() {
+                return receiver != null && receiver.isOrderedBroadcast();
+            }
 
-    private static boolean isLogicalStickCode(int logicalCode) {
-        return logicalCode >= 1 && logicalCode <= 15;
+            @Override
+            public void abort() {
+                if (receiver != null) {
+                    receiver.abortBroadcast();
+                }
+            }
+        };
     }
 
     private static int readRawKeyCode(Intent intent) {
@@ -240,10 +297,5 @@ final class ManeuverHardkeySuppressor {
             return false;
         }
         return false;
-    }
-
-    private static String formatHex(int value) {
-        if (value < 0) return String.valueOf(value);
-        return "0x" + Integer.toHexString(value);
     }
 }

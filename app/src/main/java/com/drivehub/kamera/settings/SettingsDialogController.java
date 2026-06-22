@@ -28,6 +28,7 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.SeekBar;
+import android.widget.Spinner;
 import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -225,6 +226,7 @@ public final class SettingsDialogController {
         v.etDevSignalOffPollMs = dialog.findViewById(R.id.etDevSignalOffPollMs);
         v.etDevForegroundModePollMs = dialog.findViewById(R.id.etDevForegroundModePollMs);
         v.etDevOemAvmMaxSpeedKmh = dialog.findViewById(R.id.etDevOemAvmMaxSpeedKmh);
+        v.spinnerDevManeuverSuppressorMode = dialog.findViewById(R.id.spinnerDevManeuverSuppressorMode);
         v.seekDevOverlayTopInsetPx = dialog.findViewById(R.id.seekDevOverlayTopInsetPx);
         v.etDevOverlayTopInsetPx = dialog.findViewById(R.id.etDevOverlayTopInsetPx);
         v.etDevDashcamRetentionClipCount = dialog.findViewById(R.id.etDevDashcamRetentionClipCount);
@@ -359,6 +361,7 @@ public final class SettingsDialogController {
                 views.etDevDefaultPollMs,
                 views.etDevSignalOffPollMs,
                 views.etDevOemAvmMaxSpeedKmh,
+                views.spinnerDevManeuverSuppressorMode,
                 views.etDevDashcamRetentionClipCount,
                 views.etDevDashcamMaxEventDirs,
                 views.etDevDashcamRecordsPath,
@@ -620,6 +623,7 @@ public final class SettingsDialogController {
         EditText etDevSignalOffPollMs;
         EditText etDevForegroundModePollMs;
         EditText etDevOemAvmMaxSpeedKmh;
+        Spinner spinnerDevManeuverSuppressorMode;
         SeekBar seekDevOverlayTopInsetPx;
         EditText etDevOverlayTopInsetPx;
         EditText etDevDashcamRetentionClipCount;

@@ -3,6 +3,8 @@ package com.drivehub.kamera.dev;
 import com.drivehub.kamera.R;
 
 import com.drivehub.kamera.dashcam.DashcamSettingsController;
+import com.drivehub.kamera.maneuver.ManeuverController;
+import com.drivehub.kamera.maneuver.ManeuverSuppressorMode;
 import com.drivehub.kamera.settings.SimpleTextWatcher;
 import com.drivehub.kamera.settings.UiPrefs;
 import com.drivehub.kamera.signal.SignalService;
@@ -10,9 +12,12 @@ import com.drivehub.kamera.signal.SignalService;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.text.Editable;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.SeekBar;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -32,6 +37,7 @@ public final class DevSettingsController {
             EditText etDefaultPollMs,
             EditText etSignalOffPollMs,
             EditText etOemAvmMaxSpeedKmh,
+            Spinner spinnerManeuverSuppressorMode,
             EditText etDashcamRetentionClipCount,
             EditText etDashcamMaxEventDirs,
             EditText etDashcamRecordsPath,
@@ -74,6 +80,7 @@ public final class DevSettingsController {
                 UiPrefs.getDevOemAvmMaxSpeedKmh(prefs),
                 UiPrefs::clampDevOemAvmMaxSpeedKmh
         );
+        bindManeuverSuppressorMode(prefs, spinnerManeuverSuppressorMode);
         bindCapacityField(
                 prefs,
                 etDashcamRetentionClipCount,
@@ -97,6 +104,7 @@ public final class DevSettingsController {
                 etDefaultPollMs,
                 etSignalOffPollMs,
                 etOemAvmMaxSpeedKmh,
+                spinnerManeuverSuppressorMode,
                 etDashcamRetentionClipCount,
                 etDashcamMaxEventDirs,
                 btnResetDefaults);
@@ -202,6 +210,7 @@ public final class DevSettingsController {
             EditText etDefaultPollMs,
             EditText etSignalOffPollMs,
             EditText etOemAvmMaxSpeedKmh,
+            Spinner spinnerManeuverSuppressorMode,
             EditText etDashcamRetentionClipCount,
             EditText etDashcamMaxEventDirs,
             Button btnResetDefaults
@@ -214,6 +223,8 @@ public final class DevSettingsController {
                     .putInt(UiPrefs.KEY_DEV_DEFAULT_POLL_MS, UiPrefs.DEFAULT_DEV_DEFAULT_POLLING_MS)
                     .putInt(UiPrefs.KEY_DEV_SIGNAL_OFF_POLL_MS, UiPrefs.DEFAULT_DEV_SIGNAL_OFF_POLLING_MS)
                     .putInt(UiPrefs.KEY_DEV_OEM_AVM_MAX_SPEED_KMH, UiPrefs.DEFAULT_DEV_OEM_AVM_MAX_SPEED_KMH)
+                    .putString(UiPrefs.KEY_DEV_MANEUVER_SUPPRESSOR_MODE,
+                            ManeuverSuppressorMode.DEFAULT.preferenceValue())
                     .apply();
             DashcamSettingsController.setRetentionClipCount(prefs,
                     DashcamSettingsController.DEFAULT_RETENTION_CLIP_COUNT);
@@ -227,8 +238,10 @@ public final class DevSettingsController {
             setPollingFieldValue(etDefaultPollMs, UiPrefs.DEFAULT_DEV_DEFAULT_POLLING_MS);
             setPollingFieldValue(etSignalOffPollMs, UiPrefs.DEFAULT_DEV_SIGNAL_OFF_POLLING_MS);
             setIntFieldValue(etOemAvmMaxSpeedKmh, UiPrefs.DEFAULT_DEV_OEM_AVM_MAX_SPEED_KMH);
+            setSuppressorSpinnerSelection(spinnerManeuverSuppressorMode, ManeuverSuppressorMode.DEFAULT);
             setIntFieldValue(etDashcamRetentionClipCount, DashcamSettingsController.DEFAULT_RETENTION_CLIP_COUNT);
             setIntFieldValue(etDashcamMaxEventDirs, DashcamSettingsController.DEFAULT_MAX_RETAINED_EVENT_DIRS);
+            ManeuverController.requestRefresh();
             SignalService.requestRecheck();
             Toast.makeText(v.getContext(), R.string.settings_dev_defaults_reset, Toast.LENGTH_SHORT).show();
         });
@@ -401,6 +414,50 @@ public final class DevSettingsController {
                 editText.setSelection(editText.getText().length());
             }
         });
+    }
+
+    private void bindManeuverSuppressorMode(SharedPreferences prefs, Spinner spinner) {
+        if (spinner == null) return;
+        ManeuverSuppressorMode[] modes = ManeuverSuppressorMode.values();
+        String[] labels = new String[modes.length];
+        for (int i = 0; i < modes.length; i++) {
+            labels[i] = spinner.getContext().getString(modes[i].labelResId());
+        }
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(
+                spinner.getContext(),
+                R.layout.item_settings_spinner,
+                labels
+        );
+        adapter.setDropDownViewResource(R.layout.item_settings_spinner_dropdown);
+        spinner.setAdapter(adapter);
+        setSuppressorSpinnerSelection(spinner, UiPrefs.getDevManeuverSuppressorMode(prefs));
+        spinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, android.view.View view, int position, long id) {
+                if (position < 0 || position >= modes.length) return;
+                ManeuverSuppressorMode selected = modes[position];
+                if (selected == UiPrefs.getDevManeuverSuppressorMode(prefs)) return;
+                UiPrefs.setDevManeuverSuppressorMode(prefs, selected);
+                ManeuverController.requestRefresh();
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+            }
+        });
+    }
+
+    private void setSuppressorSpinnerSelection(Spinner spinner, ManeuverSuppressorMode mode) {
+        if (spinner == null) return;
+        ManeuverSuppressorMode safeMode = mode == null ? ManeuverSuppressorMode.DEFAULT : mode;
+        ManeuverSuppressorMode[] modes = ManeuverSuppressorMode.values();
+        for (int i = 0; i < modes.length; i++) {
+            if (modes[i] == safeMode) {
+                spinner.setSelection(i);
+                return;
+            }
+        }
+        spinner.setSelection(0);
     }
 
     private Integer parsePollingMsOrNull(String value) {

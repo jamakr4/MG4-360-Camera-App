@@ -47,6 +47,14 @@
             android:exported="false"
             android:launchMode="singleTop" />
 
+        <activity
+            android:name=".maneuver.ManeuverKeyActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
         <service
             android:name=".dashcam.RecordingService"
             android:exported="false"

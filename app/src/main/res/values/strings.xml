@@ -94,6 +94,17 @@
     <string name="settings_dev_dashcam_retention_clip_count">Rolling clips kept</string>
     <string name="settings_dev_dashcam_max_event_dirs">Saved events kept</string>
     <string name="settings_dev_dashcam_capacity_warning">⚠ Raising these values can fill storage quickly. Each 30 s clip is ~33 MB; each saved event keeps ~5 clips. The app does not check free space — too-high values can lead to storage overflow or other unpredictable issues.</string>
+    <string name="settings_dev_maneuver_suppressor">Maneuver suppressor</string>
+    <string name="settings_dev_maneuver_suppressor_mode">Test mode</string>
+    <string name="settings_dev_maneuver_suppressor_hint">Switches the hardkey suppression strategy live for testing. Camera selection still uses the SAIC hardkey broadcasts.</string>
+    <string name="settings_dev_maneuver_suppressor_off">Observe only</string>
+    <string name="settings_dev_maneuver_suppressor_media_session">MediaSession + volume restore</string>
+    <string name="settings_dev_maneuver_suppressor_broadcast_abort">Broadcast abort</string>
+    <string name="settings_dev_maneuver_suppressor_activity">Activity interception</string>
+    <string name="settings_dev_maneuver_suppressor_shell">Shell counteraction</string>
+    <string name="settings_dev_maneuver_suppressor_activity_media">Activity + MediaSession</string>
+    <string name="settings_dev_maneuver_suppressor_broadcast_activity">Broadcast + Activity</string>
+    <string name="settings_dev_maneuver_suppressor_all">All strategies</string>
     <string name="settings_dev_polling_rates">Polling rates</string>
     <string name="settings_dev_default_poll">Default polling (ms)</string>
     <string name="settings_dev_signal_off_poll">Signal-off detection (ms)</string>

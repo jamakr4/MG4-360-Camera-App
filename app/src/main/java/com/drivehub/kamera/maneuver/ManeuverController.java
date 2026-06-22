@@ -4,8 +4,6 @@ import com.drivehub.kamera.camera.CameraIndex;
 import com.drivehub.kamera.camera.OverlayService;
 import com.drivehub.kamera.dev.DevRuntimeLog;
 import com.drivehub.kamera.MainActivity;
-import com.drivehub.kamera.helper.audio.MediaKeySuppressor;
-import com.drivehub.kamera.helper.audio.VolumeRestoreGuard;
 import com.drivehub.kamera.helper.vehiclesensors.VehicleSpeedReader;
 import com.drivehub.kamera.settings.UiPrefs;
 import com.drivehub.kamera.signal.SignalService;
@@ -29,10 +27,9 @@ public final class ManeuverController {
 
     private final Context context;
     private final Handler mainHandler;
-    private final MediaKeySuppressor mediaKeySuppressor;
-    private final VolumeRestoreGuard volumeRestoreGuard;
-    private final ManeuverHardkeySuppressor hardkeySuppressor;
+    private final ManeuverSuppressorController suppressorController;
     private SharedPreferences prefs;
+    private ManeuverHardkeySuppressor hardkeySuppressor;
     private SharedPreferences.OnSharedPreferenceChangeListener prefListener;
 
     private boolean registered;
@@ -66,36 +63,52 @@ public final class ManeuverController {
     public ManeuverController(Context context, Handler mainHandler) {
         this.context = context.getApplicationContext();
         this.mainHandler = mainHandler;
-        this.mediaKeySuppressor = new MediaKeySuppressor(this.context, mainHandler);
-        this.volumeRestoreGuard = new VolumeRestoreGuard(this.context, mainHandler);
-        this.hardkeySuppressor = new ManeuverHardkeySuppressor(this.context,
-                new ManeuverHardkeySuppressor.Callback() {
-                    @Override
-                    public boolean isCaptureActive() {
-                        return ManeuverController.this.captureActive;
-                    }
-
-                    @Override
-                    public boolean shouldOwnSteeringStick() {
-                        return ManeuverController.this.shouldOwnSteeringStick();
-                    }
-
-                    @Override
-                    public void onStickDown(int rawCode) {
-                        ManeuverController.this.handleStickDown(rawCode);
-                    }
-
-                    @Override
-                    public void onSuppressorRearmRequested() {
-                        ManeuverController.this.rearmSuppressorForBurst();
-                    }
-                });
+        this.suppressorController = new ManeuverSuppressorController(this.context, mainHandler);
     }
 
     public void register() {
         if (registered) return;
         prefs = UiPrefs.getPrefs(context);
+
+        hardkeySuppressor = new ManeuverHardkeySuppressor(context, new ManeuverHardkeySuppressor.Callback() {
+            @Override
+            public boolean isCaptureActive() {
+                return captureActive;
+            }
+
+            @Override
+            public boolean shouldOwnSteeringStick() {
+                return ManeuverController.this.shouldOwnSteeringStick();
+            }
+
+            @Override
+            public void onRawHardkey(
+                    ManeuverHardkeySuppressor.RawEvent event,
+                    ManeuverHardkeySuppressor.BroadcastAbort abort
+            ) {
+                suppressorController.onRawHardkey(event, abort);
+            }
+
+            @Override
+            public void onLogicalHardkey(
+                    ManeuverHardkeySuppressor.LogicalEvent event,
+                    ManeuverHardkeySuppressor.BroadcastAbort abort
+            ) {
+                suppressorController.onLogicalHardkey(event, abort);
+            }
+
+            @Override
+            public void onStickDown(int rawCode) {
+                handleStickDown(rawCode);
+            }
+
+            @Override
+            public void onSuppressorRearmRequested() {
+                rearmSuppressorForBurst();
+            }
+        });
         hardkeySuppressor.register();
+
         prefListener = (sp, key) -> {
             if (key == null || isManeuverPrefKey(key)) {
                 mainHandler.post(this::refreshState);
@@ -120,12 +133,14 @@ public final class ManeuverController {
             }
         }
         prefListener = null;
-        hardkeySuppressor.unregister();
+        if (hardkeySuppressor != null) {
+            hardkeySuppressor.unregister();
+        }
+        hardkeySuppressor = null;
         if (captureActive || suppressorPublished) {
             publishSuppressorState(false, false);
         }
-        mediaKeySuppressor.setActive(false);
-        mediaKeySuppressor.release();
+        suppressorController.release();
         captureActive = false;
         tileCleared = false;
         oemPaused = false;
@@ -140,6 +155,17 @@ public final class ManeuverController {
 
     public static boolean isCaptureActive(Context context) {
         return evaluateCaptureActive(UiPrefs.getPrefs(context));
+    }
+
+    public static boolean shouldInterceptManeuverKeys(Context context) {
+        ManeuverController inst = sInstance;
+        if (inst != null) {
+            return inst.shouldOwnSteeringStick();
+        }
+        SharedPreferences prefs = UiPrefs.getPrefs(context);
+        return evaluateCaptureActive(prefs)
+                && !MainActivity.isSettingsDialogOpen()
+                && !SignalService.isReverseActive();
     }
 
     public static boolean shouldBlockOemAvm(Context context) {
@@ -169,17 +195,17 @@ public final class ManeuverController {
         boolean nextCaptureActive = evaluateCaptureActive(prefs);
         boolean changed = nextCaptureActive != captureActive;
         captureActive = nextCaptureActive;
+        syncSuppressorMode();
 
         if (captureActive) {
             publishSuppressorState(true, false);
-            volumeRestoreGuard.captureBaseline();
             startSuppressorHeartbeat();
             updateTileState();
         } else {
             mainHandler.removeCallbacks(suppressorHeartbeatRunnable);
             suppressorHeartbeatRunning = false;
             publishSuppressorState(false, false);
-            mediaKeySuppressor.setActive(false);
+            suppressorController.setOwningSteeringStick(false);
             if (changed) {
                 tileCleared = false;
                 oemPaused = false;
@@ -196,26 +222,20 @@ public final class ManeuverController {
     }
 
     private void updateTileState() {
+        syncSuppressorOwnership();
         if (!captureActive) {
-            mediaKeySuppressor.setActive(false);
             hideManeuverTile();
             return;
         }
         if (oemPaused && UiPrefs.isManeuverOemAvmAllowed(prefs)) {
-            mediaKeySuppressor.setActive(false);
             hideManeuverTile();
             return;
         }
         if (MainActivity.isSettingsDialogOpen() || SignalService.isReverseActive()) {
-            mediaKeySuppressor.setActive(false);
             hideManeuverTile();
             return;
         }
-        mediaKeySuppressor.setActive(true);
         if (!tileCleared) {
-            // Only (re)launch on an actual transition: a different camera, or when the
-            // tile is no longer in front. Without this guard the 500ms speed monitor would
-            // restart the foreground overlay service every tick.
             int target = selectedCamera.getVideoIndex();
             if (target != shownCameraIndex
                     || !OverlayService.isVisibleForReason(OverlayService.OVERLAY_REASON_MANEUVER)) {
@@ -230,10 +250,18 @@ public final class ManeuverController {
         OverlayService.hideOverlay(context);
     }
 
+    private void syncSuppressorMode() {
+        if (prefs == null) return;
+        suppressorController.setMode(UiPrefs.getDevManeuverSuppressorMode(prefs));
+    }
+
+    private void syncSuppressorOwnership() {
+        syncSuppressorMode();
+        suppressorController.setOwningSteeringStick(shouldOwnSteeringStick());
+    }
+
     private void handleStickDown(int rawCode) {
-        if (ManeuverHardkeySuppressor.isVolumeMappedStickCode(rawCode)) {
-            volumeRestoreGuard.restoreBaselineSoon(formatHex(rawCode));
-        }
+        suppressorController.onStickDown(rawCode);
 
         if (rawCode == ManeuverHardkeySuppressor.RAW_SWC_CENTER) {
             toggleClear();
@@ -280,12 +308,11 @@ public final class ManeuverController {
             mainHandler.removeCallbacks(suppressorHeartbeatRunnable);
             suppressorHeartbeatRunning = false;
             publishSuppressorState(false, false);
-            mediaKeySuppressor.setActive(false);
+            syncSuppressorOwnership();
             DevRuntimeLog.add("Maneuver", "paused for OEM AVM");
         } else {
             publishSuppressorState(true, false);
             startSuppressorHeartbeat();
-            mediaKeySuppressor.setActive(true);
             updateTileState();
             DevRuntimeLog.add("Maneuver", "resumed after OEM AVM");
         }
@@ -350,8 +377,11 @@ public final class ManeuverController {
         return UiPrefs.KEY_MANEUVER_MODE_ENABLED.equals(key)
                 || UiPrefs.KEY_MANEUVER_SPEED_THRESHOLD_ENABLED.equals(key)
                 || UiPrefs.KEY_MANEUVER_SPEED_THRESHOLD_KMH.equals(key)
-                || UiPrefs.KEY_MANEUVER_ALLOW_OEM_AVM.equals(key);
+                || UiPrefs.KEY_MANEUVER_ALLOW_OEM_AVM.equals(key)
+                || UiPrefs.KEY_DEV_MANEUVER_SUPPRESSOR_MODE.equals(key);
     }
+
+    // ---- Key code helpers ----
 
     private static CameraIndex mapCamera(int rawCode) {
         switch (rawCode) {
@@ -366,10 +396,5 @@ public final class ManeuverController {
             default:
                 return null;
         }
-    }
-
-    private static String formatHex(int value) {
-        if (value < 0) return String.valueOf(value);
-        return "0x" + Integer.toHexString(value);
     }
 }

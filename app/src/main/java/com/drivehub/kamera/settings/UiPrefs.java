@@ -1,6 +1,7 @@
 package com.drivehub.kamera.settings;
 
 import com.drivehub.kamera.dashcam.DashcamSettingsController;
+import com.drivehub.kamera.maneuver.ManeuverSuppressorMode;
 
 import android.content.Context;
 import android.content.SharedPreferences;
@@ -39,6 +40,7 @@ public final class UiPrefs {
     public static final String KEY_DEV_DEFAULT_POLL_MS = "devDefaultPollMs";
     public static final String KEY_DEV_SIGNAL_OFF_POLL_MS = "devSignalOffPollMs";
     public static final String KEY_DEV_OEM_AVM_MAX_SPEED_KMH = "devOemAvmMaxSpeedKmh";
+    public static final String KEY_DEV_MANEUVER_SUPPRESSOR_MODE = "devManeuverSuppressorMode";
     public static final String KEY_SAFETY_WARNING = "safetyWarning";
     public static final String KEY_OEM_AVM_COEXIST = "oemCoexist";
     public static final String KEY_OEM_AVM_ACTIVE = "oemAvmActive";
@@ -245,6 +247,20 @@ public final class UiPrefs {
     public static int getDevOemAvmMaxSpeedKmh(SharedPreferences prefs) {
         return clampDevOemAvmMaxSpeedKmh(
                 prefs.getInt(KEY_DEV_OEM_AVM_MAX_SPEED_KMH, DEFAULT_DEV_OEM_AVM_MAX_SPEED_KMH));
+    }
+
+    public static ManeuverSuppressorMode getDevManeuverSuppressorMode(SharedPreferences prefs) {
+        return ManeuverSuppressorMode.fromPreferenceValue(
+                prefs.getString(KEY_DEV_MANEUVER_SUPPRESSOR_MODE,
+                        ManeuverSuppressorMode.DEFAULT.preferenceValue()));
+    }
+
+    public static void setDevManeuverSuppressorMode(
+            SharedPreferences prefs,
+            ManeuverSuppressorMode mode
+    ) {
+        ManeuverSuppressorMode safeMode = mode == null ? ManeuverSuppressorMode.DEFAULT : mode;
+        prefs.edit().putString(KEY_DEV_MANEUVER_SUPPRESSOR_MODE, safeMode.preferenceValue()).apply();
     }
 
     public static float getCornerRadiusFraction(SharedPreferences prefs) {
