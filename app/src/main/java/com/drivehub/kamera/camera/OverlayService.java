@@ -122,6 +122,17 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
                     updateOverlayPresentation(true);
                 } else if (UiPrefs.KEY_DEV_FOREGROUND_MODE_POLL_MS.equals(key)) {
                     restartForegroundModePolling();
+                } else if (UiPrefs.KEY_SMOOTH_ENTRY.equals(key)
+                        && !UiPrefs.isSmoothEntryEnabled(sharedPreferences)
+                        && overlayView != null) {
+                    if (fadeOutPending) {
+                        fadeOutPending = false;
+                        overlayView.animate().cancel();
+                        stopSelf();
+                    } else {
+                        overlayView.animate().cancel();
+                        overlayView.setAlpha(1f);
+                    }
                 }
             };
 
@@ -143,6 +154,10 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
 
     public static void hideOverlayWithFade(Context context) {
         if (!sOverlayVisible) return;
+        if (!UiPrefs.isSmoothEntryEnabled(UiPrefs.getPrefs(context))) {
+            hideOverlay(context);
+            return;
+        }
         Intent i = new Intent(context, OverlayService.class);
         i.putExtra(EXTRA_HIDE_WITH_FADE, true);
         context.startForegroundService(i);
@@ -399,7 +414,9 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
     }
 
     private boolean shouldFadeInOnShow() {
-        return OVERLAY_REASON_SIGNAL.equals(overlayReason);
+        return OVERLAY_REASON_SIGNAL.equals(overlayReason)
+                && uiPrefs != null
+                && UiPrefs.isSmoothEntryEnabled(uiPrefs);
     }
 
     private void startFadeInIfNeeded() {
@@ -412,7 +429,10 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
     }
 
     private void fadeOutAndStop() {
-        if (overlayView == null || !OVERLAY_REASON_SIGNAL.equals(overlayReason)) {
+        if (overlayView == null
+                || !OVERLAY_REASON_SIGNAL.equals(overlayReason)
+                || uiPrefs == null
+                || !UiPrefs.isSmoothEntryEnabled(uiPrefs)) {
             stopSelf();
             return;
         }

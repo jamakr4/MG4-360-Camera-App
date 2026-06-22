@@ -181,6 +181,7 @@ public final class SettingsDialogController {
         v.swRotateToDrivingDirection = dialog.findViewById(R.id.switchOverlayRotateToDrivingDirection);
         v.swDashcamEnabled = dialog.findViewById(R.id.switchDashcamEnabled);
         v.swSafetyWarning = dialog.findViewById(R.id.switchSafetyWarning);
+        v.swSmoothEntry = dialog.findViewById(R.id.switchSmoothEntry);
         v.swOemAvmCoexist = dialog.findViewById(R.id.switchOemAvmCoexist);
         v.swAllowBetaUpdates = dialog.findViewById(R.id.switchAllowBetaUpdates);
         v.seekOverlayHideDelay = dialog.findViewById(R.id.seekOverlayHideDelay);
@@ -289,6 +290,11 @@ public final class SettingsDialogController {
             UiPrefs.setSafetyWarningEnabled(prefs, checked);
             onSafetyWarningChanged.run();
         });
+        if (v.swSmoothEntry != null) {
+            v.swSmoothEntry.setChecked(UiPrefs.isSmoothEntryEnabled(prefs));
+            v.swSmoothEntry.setOnCheckedChangeListener((btn, checked) ->
+                    UiPrefs.setSmoothEntryEnabled(prefs, checked));
+        }
         if (v.swOemAvmCoexist != null) {
             v.swOemAvmCoexist.setChecked(UiPrefs.isOemAvmCoexistEnabled(prefs));
             v.swOemAvmCoexist.setOnCheckedChangeListener((btn, checked) ->
@@ -394,6 +400,7 @@ public final class SettingsDialogController {
                         views.swBannerPauseResume,
                         views.swBannerErrorRecovered,
                         views.swSafetyWarning,
+                        views.swSmoothEntry,
                         views.swAllowBetaUpdates
                 },
                 views.dialogClose,
@@ -588,6 +595,7 @@ public final class SettingsDialogController {
         Switch swRotateToDrivingDirection;
         Switch swDashcamEnabled;
         Switch swSafetyWarning;
+        Switch swSmoothEntry;
         Switch swOemAvmCoexist;
         Switch swAllowBetaUpdates;
         SeekBar seekOverlayHideDelay;

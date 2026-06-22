@@ -13,6 +13,7 @@ public final class UiPrefs {
     public static final String KEY_TILE_CORNER_RADIUS = "tileCornerRadius";
     public static final String KEY_ACCENT_COLOR = "accentColor";
     public static final String KEY_ALLOW_BETA_UPDATES = "allowBetaUpdates";
+    public static final String KEY_SMOOTH_ENTRY = "smoothEntry";
     public static final String KEY_OVERLAY_ON_SIGNAL = "overlayOnSignal";
     public static final String KEY_OVERLAY_ROTATE_TO_DRIVING_DIRECTION = "overlayRotateToDrivingDirection";
     public static final String KEY_DIGITAL_REARVIEW_ENABLED = "digitalRearviewEnabled";
@@ -187,6 +188,14 @@ public final class UiPrefs {
 
     public static void setSafetyWarningEnabled(SharedPreferences prefs, boolean enabled) {
         prefs.edit().putBoolean(KEY_SAFETY_WARNING, enabled).apply();
+    }
+
+    public static boolean isSmoothEntryEnabled(SharedPreferences prefs) {
+        return prefs.getBoolean(KEY_SMOOTH_ENTRY, true);
+    }
+
+    public static void setSmoothEntryEnabled(SharedPreferences prefs, boolean enabled) {
+        prefs.edit().putBoolean(KEY_SMOOTH_ENTRY, enabled).apply();
     }
 
     public static boolean isOemAvmCoexistEnabled(SharedPreferences prefs) {

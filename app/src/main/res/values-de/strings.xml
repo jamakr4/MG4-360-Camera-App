@@ -50,6 +50,7 @@
     <string name="settings_section_oem_avm">OEM 360°-Kamera</string>
     <string name="settings_oem_avm_coexist">OEM-360°-App weiter nutzen</string>
     <string name="settings_oem_avm_coexist_hint">Globale Einstellung für die werkseitige 360°-Kamera-App. Wenn aktiv, gibt die App bei Bedarf den Kamerazugriff frei, damit die OEM-Rueckfahr-/360°-Ansicht weiter starten kann. Wenn deaktiviert, haben die Custom-Features immer Vorrang und die OEM-360°-App wird parallel bewusst nicht unterstuetzt.</string>
+    <string name="settings_smooth_entry">Smooth Entry</string>
     <string name="settings_dashcam_banners_section">Benachrichtigungs-Banner</string>
     <string name="settings_dashcam_banner_group_event">Ereignis gespeichert</string>
     <string name="settings_dashcam_banner_group_pause_resume">Aufnahme pausiert / fortgesetzt</string>
