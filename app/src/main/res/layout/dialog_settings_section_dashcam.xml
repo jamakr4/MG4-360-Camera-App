@@ -7,6 +7,12 @@
     android:orientation="vertical"
     android:visibility="gone">
 
+    <LinearLayout
+        android:id="@+id/sectionDashcamMain"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
     <!-- ============ STATUS ============ -->
     <TextView
         style="@style/DrivehubSettingsCardLabel"
@@ -129,6 +135,152 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/settings_dashcam_signature_hint" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:gravity="center_vertical"
+            android:minHeight="44dp"
+            android:orientation="horizontal">
+
+            <TextView
+                style="@style/DrivehubSettingsCardRowLabel"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/settings_dashcam_show_speed" />
+
+            <Switch
+                android:id="@+id/switchDashcamShowSpeed"
+                style="@style/DrivehubSettingsSwitch" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:gravity="center_vertical"
+            android:minHeight="44dp"
+            android:orientation="horizontal">
+
+            <TextView
+                style="@style/DrivehubSettingsCardRowLabel"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/settings_dashcam_record_cameras" />
+
+            <TextView
+                android:id="@+id/tvDashcamCameraDropdown"
+                android:layout_width="wrap_content"
+                android:layout_height="44dp"
+                android:background="@android:color/transparent"
+                android:clickable="true"
+                android:drawableEnd="@drawable/ic_chevron_down"
+                android:drawablePadding="4dp"
+                android:focusable="true"
+                android:gravity="end|center_vertical"
+                android:minWidth="62dp"
+                android:paddingStart="6dp"
+                android:paddingEnd="0dp"
+                android:text="@string/settings_dashcam_camera_selection_default"
+                android:textColor="@color/settings_text_secondary"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/layoutDashcamCameraDropdown"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:minHeight="42dp"
+                android:orientation="horizontal">
+
+                <TextView
+                    style="@style/DrivehubSettingsCaption"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/camera_front" />
+
+                <Switch
+                    android:id="@+id/switchDashcamCameraFront"
+                    style="@style/DrivehubSettingsSwitch" />
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:minHeight="42dp"
+                android:orientation="horizontal">
+
+                <TextView
+                    style="@style/DrivehubSettingsCaption"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/camera_rear" />
+
+                <Switch
+                    android:id="@+id/switchDashcamCameraRear"
+                    style="@style/DrivehubSettingsSwitch" />
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:minHeight="42dp"
+                android:orientation="horizontal">
+
+                <TextView
+                    style="@style/DrivehubSettingsCaption"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/camera_left" />
+
+                <Switch
+                    android:id="@+id/switchDashcamCameraLeft"
+                    style="@style/DrivehubSettingsSwitch" />
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:minHeight="42dp"
+                android:orientation="horizontal">
+
+                <TextView
+                    style="@style/DrivehubSettingsCaption"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/camera_right" />
+
+                <Switch
+                    android:id="@+id/switchDashcamCameraRight"
+                    style="@style/DrivehubSettingsSwitch" />
+
+            </LinearLayout>
+
+        </LinearLayout>
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -339,44 +491,72 @@
     </LinearLayout>
     -->
 
-    <!-- ============ RECORDING OVERLAY ============ -->
+    <!-- ============ ADVANCED ============ -->
     <TextView
         style="@style/DrivehubSettingsCardLabel"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="22dp"
         android:layout_marginBottom="8dp"
-        android:text="@string/settings_section_dashcam_overlay" />
+        android:text="@string/settings_section_dashcam_advanced" />
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="@drawable/bg_settings_inline_card"
-        android:orientation="vertical"
+        android:gravity="center_vertical"
+        android:minHeight="64dp"
+        android:orientation="horizontal"
         android:paddingStart="18dp"
-        android:paddingTop="8dp"
+        android:paddingTop="12dp"
         android:paddingEnd="18dp"
-        android:paddingBottom="8dp">
+        android:paddingBottom="12dp">
 
-        <LinearLayout
-            android:layout_width="match_parent"
+        <TextView
+            style="@style/DrivehubSettingsCardRowLabel"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:gravity="center_vertical"
-            android:minHeight="56dp"
-            android:orientation="horizontal">
+            android:layout_weight="1"
+            android:text="@string/settings_dashcam_advanced_row" />
 
-            <TextView
-                style="@style/DrivehubSettingsCardRowLabel"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/settings_dashcam_show_speed" />
+        <Button
+            android:id="@+id/btnDashcamAdvanced"
+            style="@style/DrivehubDialogButtonSecondary"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/settings_dashcam_advanced_button" />
 
-            <Switch
-                android:id="@+id/switchDashcamShowSpeed"
-                style="@style/DrivehubSettingsSwitch" />
+    </LinearLayout>
 
-        </LinearLayout>
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/sectionDashcamAdvanced"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:layout_marginBottom="8dp">
+
+        <TextView
+            style="@style/DrivehubSettingsCardLabel"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/settings_dashcam_advanced_title" />
+
+        <Button
+            android:id="@+id/btnDashcamAdvancedBack"
+            style="@style/DrivehubDialogButtonSecondary"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/settings_dashcam_advanced_back" />
 
     </LinearLayout>
 
@@ -688,6 +868,8 @@
                 android:text="@string/settings_dashcam_banner_test" />
 
         </LinearLayout>
+
+    </LinearLayout>
 
     </LinearLayout>
 

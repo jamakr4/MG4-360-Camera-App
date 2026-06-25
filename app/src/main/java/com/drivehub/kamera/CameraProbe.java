@@ -32,12 +32,13 @@ public final class CameraProbe {
     /** Stops MP4 recording for the given slot. */
     public static native boolean stopMp4Record(int slot);
 
-    /** Starts a grid MP4 recording that combines all four cameras. */
+    /** Starts a grid MP4 recording that combines the selected cameras. */
     public static native boolean startCombinedMp4Record(String outputPath,
             int cellWidth, int cellHeight,
             int fps, int bitrate,
             String signature,
-            boolean showSpeed);
+            boolean showSpeed,
+            int cameraMask);
 
     /** Stops the currently running combined grid recording. */
     public static native boolean stopCombinedMp4Record();

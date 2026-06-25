@@ -1733,6 +1733,7 @@ namespace camera_stream_manager
         bool gCombinedRecordingActive = false;
 
         static constexpr int COMBINED_CONSUMER_ID_BASE = 1000;
+        static constexpr int COMBINED_CAMERA_MASK_ALL = 0x0F;
         static constexpr std::array<int, 4> COMBINED_VIDEO_INDICES = {
             CAMERA_VIDEO_INDEX_FRONT, CAMERA_VIDEO_INDEX_RIGHT,
             CAMERA_VIDEO_INDEX_LEFT,  CAMERA_VIDEO_INDEX_REAR
@@ -1847,7 +1848,7 @@ namespace camera_stream_manager
 
     bool startCombinedRecording(JNIEnv * /*env*/, const std::string &outputPath,
                                 int cellWidth, int cellHeight, int fps, int bitrate,
-                                const std::string &signature, bool showSpeed)
+                                const std::string &signature, bool showSpeed, int cameraMask)
     {
         std::lock_guard<std::mutex> combinedLock(gCombinedMutex);
         std::shared_ptr<CombinedRecordingSink> sink;
@@ -1855,6 +1856,11 @@ namespace camera_stream_manager
         {
             logw("combined recording already active");
             return false;
+        }
+        int normalizedMask = cameraMask & COMBINED_CAMERA_MASK_ALL;
+        if (normalizedMask == 0)
+        {
+            normalizedMask = COMBINED_CAMERA_MASK_ALL;
         }
 
         sink = std::make_shared<CombinedRecordingSink>(
@@ -1874,6 +1880,10 @@ namespace camera_stream_manager
         std::vector<int> attachedConsumerIds;
         for (size_t i = 0; i < COMBINED_VIDEO_INDICES.size(); i++)
         {
+            if ((normalizedMask & (1 << static_cast<int>(i))) == 0)
+            {
+                continue;
+            }
             const int videoIndex = COMBINED_VIDEO_INDICES[i];
             const int consumerId = COMBINED_CONSUMER_ID_BASE + static_cast<int>(i);
             auto session = getOrCreateSession(videoIndex);
@@ -1895,7 +1905,7 @@ namespace camera_stream_manager
 
         gCombinedSink = sink;
         gCombinedRecordingActive = true;
-        logi("combined recording attached to all 4 cameras");
+        logi("combined recording attached with camera mask 0x%x", normalizedMask);
         return true;
     }
 
