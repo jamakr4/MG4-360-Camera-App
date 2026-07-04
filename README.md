@@ -46,7 +46,7 @@ Community mod for the MG4 EV (AAOS 9, pre-2026 facelift) that replaces the stock
 ## Feature Highlights
 
 - **Turn signal overlay**: opens automatically when the indicator is activated, without the original speed-based auto-close behavior.
-- **Maneuver Mode / digital rearview mirror**: keeps the factory rear camera visible as a persistent floating mirror for situations where the rear window is blocked by cargo, while still yielding to turn-signal cameras and then restoring the rear view afterwards.
+- **Digital rearview mirror**: keeps the factory rear camera visible as a persistent floating mirror for situations where the rear window is blocked by cargo, while still yielding to turn-signal cameras and then restoring the rear view afterwards.
 - **Tesla-style tile view**: replaces the launcher-like OEM overlay, also known as the fullscreen takeover, with a cleaner presentation.
 - **Native 4-camera dashcam**: records all four factory cameras into a single 720x240 grid clip with a footer including time, speed, and a custom signature.
 - **Event capture**: saves a pre/post recording window into a separate `events/` folder
@@ -84,7 +84,7 @@ To use it:
 2. Enable `Overlay on signal`.
 3. Optional: enable `Rotate side cameras to driving direction` if you prefer the side cameras to match the direction of travel.
 4. Optional: tune `Overlay hide delay` and `Minimum on-time` so the camera does not disappear too abruptly.
-5. `Tap to hide` is enabled by default (5 seconds) – one tap dismisses the overlay temporarily, it reappears afterwards if the signal is still active.
+5. `Tap to hide` is enabled by default (2 seconds) – one tap dismisses the overlay temporarily, it reappears afterwards if the signal is still active.
 
 Important:
 
@@ -131,13 +131,13 @@ You do not need to run the dashcam in continuous loop mode to capture video. Two
 > Continuous loop recording writes constantly to internal storage. This can accelerate flash wear over time. Use at your own risk. Test clips and event-only recording are not affected since they only record on demand.
 
 <details>
-<summary><strong>Maneuver Mode</strong></summary>
+<summary><strong>Digital Rearview</strong></summary>
 
-Maneuver Mode is the persistent rear camera overlay, similar to a digital rearview mirror.
+Digital Rearview is the persistent rear camera overlay.
 
 To use it:
 
-1. Open `Settings` -> `Maneuver Mode`.
+1. Open `Settings` -> `Digital Rearview`.
 2. Enable `Digital rearview`.
 3. The rear camera will stay visible as a floating window when no higher-priority signal overlay is active.
 4. You can drag and resize the overlay, and the app restores the last layout automatically.
@@ -147,7 +147,7 @@ To use it:
 Behavior:
 
 - Reverse gear still has priority and follows the OEM/main-screen flow.
-- Turn-signal cameras temporarily override Maneuver Mode and the rearview returns afterwards.
+- Turn-signal cameras temporarily override Digital Rearview and the rearview returns afterwards.
 - The digital rearview can also be toggled by the separate companion trigger app.
 
 </details>

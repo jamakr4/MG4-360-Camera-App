@@ -2,7 +2,6 @@ package com.drivehub.kamera.dashcam;
 
 import com.drivehub.kamera.dev.DevRuntimeLog;
 import com.drivehub.kamera.helper.vehiclesensors.VehicleSpeedReader;
-import com.drivehub.kamera.maneuver.ManeuverController;
 import com.drivehub.kamera.settings.UiPrefs;
 import com.drivehub.kamera.signal.SignalService;
 
@@ -30,12 +29,6 @@ public class OemAvmReceiver extends BroadcastReceiver {
         }
         String action = intent.getAction();
         if (action == null) {
-            return;
-        }
-        if ((ACTION_OEM_LAUNCH.equals(action) || ACTION_AVM_START.equals(action))
-                && ManeuverController.shouldBlockOemAvm(context)) {
-            DevRuntimeLog.add("OemAvmReceiver", "blocked " + action + " during Maneuver");
-            Log.i(TAG, "Blocking OEM AVM start/launch during Maneuver mode: " + action);
             return;
         }
         SharedPreferences prefs = UiPrefs.getPrefs(context);

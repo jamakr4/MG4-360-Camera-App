@@ -1,8 +1,6 @@
 package com.drivehub.kamera.settings;
 
 import com.drivehub.kamera.dashcam.DashcamSettingsController;
-import com.drivehub.kamera.maneuver.ManeuverSuppressorMode;
-
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.view.View;
@@ -19,19 +17,12 @@ public final class UiPrefs {
     public static final String KEY_DIGITAL_REARVIEW_ENABLED = "digitalRearviewEnabled";
     public static final String KEY_DIGITAL_REARVIEW_TAP_TO_HIDE_ENABLED = "digitalRearviewTapToHideEnabled";
     public static final String KEY_DIGITAL_REARVIEW_TAP_TO_HIDE_DURATION_SEC = "digitalRearviewTapToHideDurationSec";
-    public static final String KEY_MANEUVER_MODE_ENABLED = "maneuverModeEnabled";
-    public static final String KEY_MANEUVER_SPEED_THRESHOLD_ENABLED = "maneuverSpeedThresholdEnabled";
-    public static final String KEY_MANEUVER_SPEED_THRESHOLD_KMH = "maneuverSpeedThresholdKmh";
-    public static final String KEY_MANEUVER_ALLOW_OEM_AVM = "maneuverAllowOemAvm";
-    public static final int DEFAULT_MANEUVER_SPEED_THRESHOLD_KMH = 15;
-    public static final int MIN_MANEUVER_SPEED_THRESHOLD_KMH = 0;
-    public static final int MAX_MANEUVER_SPEED_THRESHOLD_KMH = 60;
     public static final int DEFAULT_DIGITAL_REARVIEW_TAP_TO_HIDE_DURATION_SEC = 5;
     public static final int MIN_DIGITAL_REARVIEW_TAP_TO_HIDE_SEC = 5;
     public static final int MAX_DIGITAL_REARVIEW_TAP_TO_HIDE_SEC = 300;
     public static final String KEY_SIGNAL_OVERLAY_TAP_TO_HIDE_ENABLED = "signalOverlayTapToHideEnabled";
     public static final String KEY_SIGNAL_OVERLAY_TAP_TO_HIDE_DURATION_SEC = "signalOverlayTapToHideDurationSec";
-    public static final int DEFAULT_SIGNAL_OVERLAY_TAP_TO_HIDE_DURATION_SEC = 5;
+    public static final int DEFAULT_SIGNAL_OVERLAY_TAP_TO_HIDE_DURATION_SEC = 2;
     public static final int MIN_SIGNAL_OVERLAY_TAP_TO_HIDE_SEC = 2;
     public static final int MAX_SIGNAL_OVERLAY_TAP_TO_HIDE_SEC = 120;
     public static final String KEY_OVERLAY_HIDE_DELAY_MS = "overlayHideDelayMs";
@@ -41,7 +32,6 @@ public final class UiPrefs {
     public static final String KEY_DEV_DEFAULT_POLL_MS = "devDefaultPollMs";
     public static final String KEY_DEV_SIGNAL_OFF_POLL_MS = "devSignalOffPollMs";
     public static final String KEY_DEV_OEM_AVM_MAX_SPEED_KMH = "devOemAvmMaxSpeedKmh";
-    public static final String KEY_DEV_MANEUVER_SUPPRESSOR_MODE = "devManeuverSuppressorMode";
     public static final String KEY_SAFETY_WARNING = "safetyWarning";
     public static final String KEY_OEM_AVM_COEXIST = "oemCoexist";
     public static final String KEY_OEM_AVM_ACTIVE = "oemAvmActive";
@@ -117,35 +107,6 @@ public final class UiPrefs {
 
     public static void setDigitalRearviewEnabled(SharedPreferences prefs, boolean enabled) {
         prefs.edit().putBoolean(KEY_DIGITAL_REARVIEW_ENABLED, enabled).apply();
-    }
-
-    public static boolean isManeuverModeEnabled(SharedPreferences prefs) {
-        return prefs.getBoolean(KEY_MANEUVER_MODE_ENABLED, false);
-    }
-
-    public static void setManeuverModeEnabled(SharedPreferences prefs, boolean enabled) {
-        prefs.edit().putBoolean(KEY_MANEUVER_MODE_ENABLED, enabled).apply();
-    }
-
-    public static boolean isManeuverSpeedThresholdEnabled(SharedPreferences prefs) {
-        return prefs.getBoolean(KEY_MANEUVER_SPEED_THRESHOLD_ENABLED, false);
-    }
-
-    public static void setManeuverSpeedThresholdEnabled(SharedPreferences prefs, boolean enabled) {
-        prefs.edit().putBoolean(KEY_MANEUVER_SPEED_THRESHOLD_ENABLED, enabled).apply();
-    }
-
-    public static int getManeuverSpeedThresholdKmh(SharedPreferences prefs) {
-        return clampManeuverSpeedThresholdKmh(
-                prefs.getInt(KEY_MANEUVER_SPEED_THRESHOLD_KMH, DEFAULT_MANEUVER_SPEED_THRESHOLD_KMH));
-    }
-
-    public static boolean isManeuverOemAvmAllowed(SharedPreferences prefs) {
-        return prefs.getBoolean(KEY_MANEUVER_ALLOW_OEM_AVM, false);
-    }
-
-    public static void setManeuverOemAvmAllowed(SharedPreferences prefs, boolean allowed) {
-        prefs.edit().putBoolean(KEY_MANEUVER_ALLOW_OEM_AVM, allowed).apply();
     }
 
     public static boolean isDigitalRearviewTapToHideEnabled(SharedPreferences prefs) {
@@ -258,20 +219,6 @@ public final class UiPrefs {
                 prefs.getInt(KEY_DEV_OEM_AVM_MAX_SPEED_KMH, DEFAULT_DEV_OEM_AVM_MAX_SPEED_KMH));
     }
 
-    public static ManeuverSuppressorMode getDevManeuverSuppressorMode(SharedPreferences prefs) {
-        return ManeuverSuppressorMode.fromPreferenceValue(
-                prefs.getString(KEY_DEV_MANEUVER_SUPPRESSOR_MODE,
-                        ManeuverSuppressorMode.DEFAULT.preferenceValue()));
-    }
-
-    public static void setDevManeuverSuppressorMode(
-            SharedPreferences prefs,
-            ManeuverSuppressorMode mode
-    ) {
-        ManeuverSuppressorMode safeMode = mode == null ? ManeuverSuppressorMode.DEFAULT : mode;
-        prefs.edit().putString(KEY_DEV_MANEUVER_SUPPRESSOR_MODE, safeMode.preferenceValue()).apply();
-    }
-
     public static float getCornerRadiusFraction(SharedPreferences prefs) {
         return clampRadiusSetting(getTileCornerRadiusSetting(prefs)) / (float) MAX_TILE_CORNER_RADIUS;
     }
@@ -361,8 +308,4 @@ public final class UiPrefs {
         return Math.max(MIN_DEV_OEM_AVM_MAX_SPEED_KMH, Math.min(MAX_DEV_OEM_AVM_MAX_SPEED_KMH, value));
     }
 
-    public static int clampManeuverSpeedThresholdKmh(int value) {
-        return Math.max(MIN_MANEUVER_SPEED_THRESHOLD_KMH,
-                Math.min(MAX_MANEUVER_SPEED_THRESHOLD_KMH, value));
-    }
 }

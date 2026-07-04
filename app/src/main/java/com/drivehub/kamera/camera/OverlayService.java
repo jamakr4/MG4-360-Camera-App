@@ -47,7 +47,6 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
     private static final String EXTRA_HIDE_WITH_FADE = "hide_with_fade";
     public static final String OVERLAY_REASON_SIGNAL = "signal";
     public static final String OVERLAY_REASON_DIGITAL_REARVIEW = "digital_rearview";
-    public static final String OVERLAY_REASON_MANEUVER = "maneuver";
 
     private static final String CHANNEL_ID = "mg4_overlay";
     private static final int NOTIF_ID = 99;

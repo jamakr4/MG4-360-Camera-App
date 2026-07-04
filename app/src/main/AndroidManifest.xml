@@ -12,7 +12,6 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
-    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <uses-permission android:name="android.permission.CAMERA" />
     <!-- Declare camera permission but mark the hardware feature as optional
          to avoid Play Store filtering – this device has physical cameras. -->
@@ -46,14 +45,6 @@
             android:name=".camera.TileViewActivity"
             android:exported="false"
             android:launchMode="singleTop" />
-
-        <activity
-            android:name=".maneuver.ManeuverKeyActivity"
-            android:excludeFromRecents="true"
-            android:exported="false"
-            android:launchMode="singleTop"
-            android:noHistory="true"
-            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 
         <service
             android:name=".dashcam.RecordingService"
