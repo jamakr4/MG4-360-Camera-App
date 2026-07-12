@@ -89,13 +89,16 @@ public class SignalService extends Service {
     private int lastLamp = Integer.MIN_VALUE;
     private int currentLamp = 0;
     private int currentGear = 0;
-    private int currentMode = -1; // -1:init, 0:none, 1:left, 2:right, 3:reverse
+    private int currentMode = -1; // -1:init, 0:none, 1:left, 2:right, 3:reverse, 4:rearview
+    // A lamp value read while the OEM AVM owns the screen can be stale by the time its
+    // Activity is closed. Do not let that value resurrect our signal overlay; wait for a
+    // sample that was read after the OEM hand-off instead.
+    private long waitForSignalSampleAfterOemReleaseAtMs = 0L; // mainHandler only
     private boolean lastObservedOemForeground = false;
     private volatile long overlayShownAtMs = 0L;
     private volatile long lastHazardTriggerAtMs = 0L;
     private long rearviewTempHiddenUntilMs = 0L; // mainHandler only
     private long signalTempHiddenUntilMs = 0L;   // mainHandler only
-
     private final Handler mainHandler = new Handler();
     private final Runnable hideRunnable = new Runnable() {
         @Override
@@ -138,6 +141,7 @@ public class SignalService extends Service {
 
     public static void setOemAvmActive(Context context, boolean active) {
         SharedPreferences prefs = UiPrefs.getPrefs(context);
+        boolean wasActive = UiPrefs.isOemAvmActive(prefs);
         UiPrefs.setOemAvmActive(prefs, active);
         DevRuntimeLog.add("SignalService", "OEM latch=" + active);
         SignalService inst = sInstance;
@@ -149,15 +153,26 @@ public class SignalService extends Service {
         }
         inst.mainHandler.post(() -> {
             if (active) {
+                inst.waitForSignalSampleAfterOemReleaseAtMs = 0L;
                 inst.mainHandler.removeCallbacks(inst.hideRunnable);
                 inst.clearOverlayShownTimestamp();
                 OverlayService.hideOverlay(inst);
+            } else if (wasActive) {
+                inst.waitForSignalSampleAfterOemReleaseAtMs = SystemClock.elapsedRealtime();
+                inst.clearOverlayShownTimestamp();
+                OverlayService.hideOverlay(inst);
+                DevRuntimeLog.add("SignalService", "OEM released => waiting for fresh lamp sample");
             }
             inst.lastLamp = Integer.MIN_VALUE;
             inst.lastGear = Integer.MIN_VALUE;
             inst.currentMode = -1;
             inst.updateOverlayDecision();
         });
+    }
+
+    public static boolean isReverseActive() {
+        SignalService inst = sInstance;
+        return inst != null && inst.currentGear == REVERSE_GEAR_VALUE;
     }
 
     public static void requestRecheck() {
@@ -327,11 +342,9 @@ public class SignalService extends Service {
 
             Object valueObj = carPropertyValue.getClass().getMethod("getValue").invoke(carPropertyValue);
             int lamp = (valueObj instanceof Integer) ? (Integer) valueObj : Integer.MIN_VALUE;
-            currentLamp = lamp;
-            // The Car API can be incomplete or fail, so read the gear from the current system property.
-            currentGear = SystemPropertiesHelper.getInt("arcsoft.avm.mCurCarGear", 0);
-            reconcileOemAvmState();
-            updateOverlayDecision();
+            final int gear = SystemPropertiesHelper.getInt("arcsoft.avm.mCurCarGear", 0);
+            final long sampledAtMs = SystemClock.elapsedRealtime();
+            mainHandler.post(() -> onVehicleStateSample(lamp, gear, sampledAtMs));
             return null;
         }
     }
@@ -348,16 +361,26 @@ public class SignalService extends Service {
                 if (!polling) return;
                 final int lamp = SystemPropertiesHelper.getInt("arcsoft.avm.mCurCarTurnLamp", 0);
                 final int gear = SystemPropertiesHelper.getInt("arcsoft.avm.mCurCarGear", 0);
+                final long sampledAtMs = SystemClock.elapsedRealtime();
                 mainHandler.post(() -> {
                     if (!polling) return;
-                    currentLamp = lamp;
-                    currentGear = gear;
-                    reconcileOemAvmState();
-                    updateOverlayDecision();
+                    onVehicleStateSample(lamp, gear, sampledAtMs);
                 });
                 pollHandler.postDelayed(this, readNextPollingDelayMs(lamp));
             }
         });
+    }
+
+    private void onVehicleStateSample(int lamp, int gear, long sampledAtMs) {
+        currentLamp = lamp;
+        currentGear = gear;
+        if (waitForSignalSampleAfterOemReleaseAtMs > 0L
+                && sampledAtMs >= waitForSignalSampleAfterOemReleaseAtMs) {
+            waitForSignalSampleAfterOemReleaseAtMs = 0L;
+            DevRuntimeLog.add("SignalService", "Fresh lamp sample after OEM release: " + lamp);
+        }
+        reconcileOemAvmState();
+        updateOverlayDecision();
     }
 
     private boolean isOemCoexistActive() {
@@ -548,9 +571,11 @@ public class SignalService extends Service {
         int nextMode;
         if (currentGear == REVERSE_GEAR_VALUE) {
             nextMode = 3;
-        } else if (signal == TurnSignal.LEFT && !isSignalTempHidden()) {
+        } else if (signal == TurnSignal.LEFT && !isSignalTempHidden()
+                && !isWaitingForSignalSampleAfterOemRelease()) {
             nextMode = 1;
-        } else if (signal == TurnSignal.RIGHT && !isSignalTempHidden()) {
+        } else if (signal == TurnSignal.RIGHT && !isSignalTempHidden()
+                && !isWaitingForSignalSampleAfterOemRelease()) {
             nextMode = 2;
         } else if (isDigitalRearviewEnabled() && !isRearviewTempHidden()
                 && !MainActivity.isSettingsDialogOpen()) {
@@ -655,7 +680,11 @@ public class SignalService extends Service {
             Log.i(TAG, "Digital rearview => overlay " + CameraIndex.REAR);
         } else {
             clearOverlayShownTimestamp();
-            OverlayService.hideOverlay(this);
+            if (previousMode == -2 && !isSignalTempHidden()) {
+                OverlayService.hideOverlayWithFade(this);
+            } else {
+                OverlayService.hideOverlay(this);
+            }
             Log.i(TAG, "No active overlay mode => overlay hide");
         }
     }
@@ -702,6 +731,10 @@ public class SignalService extends Service {
     private boolean isSignalTempHidden() {
         return signalTempHiddenUntilMs > 0L
                 && android.os.SystemClock.elapsedRealtime() < signalTempHiddenUntilMs;
+    }
+
+    private boolean isWaitingForSignalSampleAfterOemRelease() {
+        return waitForSignalSampleAfterOemReleaseAtMs > 0L;
     }
 
     private long readOverlayHideDelayMs() {

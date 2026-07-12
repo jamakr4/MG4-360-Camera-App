@@ -485,6 +485,8 @@ public class RecordingService extends Service {
         int recordingFps = DashcamSettingsController.getRecordingFps(prefs);
         String signature = DashcamSettingsController.getRecordingSignature(prefs);
         boolean showSpeed = DashcamSettingsController.shouldShowSpeed(prefs);
+        int cameraMask = DashcamSettingsController.getRecordingCameraMask(prefs);
+        int selectedCameraCount = DashcamSettingsController.getRecordingCameraCount(cameraMask);
         File outputFile = new File(baseDir, baseName + ".mp4");
         boolean started = CameraProbe.startCombinedMp4Record(
                 outputFile.getAbsolutePath(),
@@ -493,14 +495,15 @@ public class RecordingService extends Service {
                 recordingFps,
                 9_000_000,
                 signature,
-                showSpeed);
+                showSpeed,
+                cameraMask);
 
         if (!started) {
             publishStatus(STATUS_ERROR, 0, TOTAL_CAMERAS, ERROR_GRID_START_FAILED);
             return false;
         }
 
-        publishStatus(STATUS_RECORDING, TOTAL_CAMERAS, TOTAL_CAMERAS, "");
+        publishStatus(STATUS_RECORDING, selectedCameraCount, TOTAL_CAMERAS, "");
 
         long start = SystemClock.elapsedRealtime();
         while (!stopRequested

@@ -53,6 +53,7 @@ public final class DashcamSettingsController {
     private static final String KEY_RECORDING_FPS = "recordingFps";
     private static final String KEY_SIGNATURE = "recordingSignature";
     private static final String KEY_SHOW_SPEED = "recordingShowSpeed";
+    private static final String KEY_CAMERA_MASK = "recordingCameraMask";
     private static final String KEY_TEST_RECORD_ENABLED = "testRecordEnabled";
     private static final String KEY_TEST_RECORD_DURATION_SEC = "testRecordDurationSec";
     private static final String KEY_RETENTION_CLIP_COUNT = "devRetentionClipCount";
@@ -66,6 +67,14 @@ public final class DashcamSettingsController {
     private static final int MAX_TEST_RECORD_DURATION_SEC = 120;
     private static final int MAX_SIGNATURE_LENGTH = 40;
     private static final String RECORDS_DIR_NAME = "dashcam";
+    public static final int CAMERA_MASK_FRONT = 1;
+    public static final int CAMERA_MASK_RIGHT = 1 << 1;
+    public static final int CAMERA_MASK_LEFT = 1 << 2;
+    public static final int CAMERA_MASK_REAR = 1 << 3;
+    public static final int DEFAULT_CAMERA_MASK = CAMERA_MASK_FRONT
+            | CAMERA_MASK_RIGHT
+            | CAMERA_MASK_LEFT
+            | CAMERA_MASK_REAR;
 
     // ---------- Banner group settings ----------
     public static final int BANNER_SIZE_SMALL = 0;
@@ -148,6 +157,7 @@ public final class DashcamSettingsController {
     private final MainActivity activity;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private boolean syncingEnabled;
+    private boolean syncingCameraSelection;
     private BroadcastReceiver usbEjectReceiver;
 
     public DashcamSettingsController(MainActivity activity) {
@@ -163,6 +173,12 @@ public final class DashcamSettingsController {
             EditText etRecordingFps,
             EditText etSignature,
             Switch swShowSpeed,
+            TextView tvCameraDropdown,
+            View cameraDropdownPanel,
+            Switch swCameraFront,
+            Switch swCameraRight,
+            Switch swCameraLeft,
+            Switch swCameraRear,
             Switch swTestRecordEnabled,
             EditText etTestRecordDuration,
             StorageViews storageViews,
@@ -211,6 +227,8 @@ public final class DashcamSettingsController {
             swShowSpeed.setOnCheckedChangeListener(
                     (buttonView, checked) -> prefs.edit().putBoolean(KEY_SHOW_SPEED, checked).apply());
         }
+        bindCameraSelection(prefs, tvCameraDropdown, cameraDropdownPanel,
+                swCameraFront, swCameraRight, swCameraLeft, swCameraRear);
         if (swTestRecordEnabled != null) {
             swTestRecordEnabled.setChecked(isTestRecordEnabled(prefs));
             swTestRecordEnabled.setOnCheckedChangeListener((buttonView, checked) -> {
@@ -229,6 +247,81 @@ public final class DashcamSettingsController {
         bindBannerGroup(prefs, BannerGroup.ERROR_RECOVERED, errorRecoveredBanner);
 
         bindFields(prefs, etRecordingFps, etSignature, etTestRecordDuration);
+    }
+
+    private void bindCameraSelection(SharedPreferences prefs, TextView dropdownLabel, View dropdownPanel,
+            Switch swFront, Switch swRight, Switch swLeft, Switch swRear) {
+        if (dropdownLabel == null && dropdownPanel == null
+                && swFront == null && swRight == null && swLeft == null && swRear == null) {
+            return;
+        }
+        int mask = getRecordingCameraMask(prefs);
+        syncingCameraSelection = true;
+        setChecked(swFront, (mask & CAMERA_MASK_FRONT) != 0);
+        setChecked(swRight, (mask & CAMERA_MASK_RIGHT) != 0);
+        setChecked(swLeft, (mask & CAMERA_MASK_LEFT) != 0);
+        setChecked(swRear, (mask & CAMERA_MASK_REAR) != 0);
+        syncingCameraSelection = false;
+        updateCameraDropdownLabel(dropdownLabel, mask);
+        if (dropdownPanel != null) {
+            dropdownPanel.setVisibility(View.GONE);
+        }
+        if (dropdownLabel != null && dropdownPanel != null) {
+            dropdownLabel.setOnClickListener(v -> dropdownPanel.setVisibility(
+                    dropdownPanel.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE));
+        }
+
+        android.widget.CompoundButton.OnCheckedChangeListener listener = (buttonView, checked) -> {
+            if (syncingCameraSelection) {
+                return;
+            }
+            int selectedMask = readCameraMask(swFront, swRight, swLeft, swRear);
+            if (selectedMask == 0) {
+                syncingCameraSelection = true;
+                buttonView.setChecked(true);
+                syncingCameraSelection = false;
+                updateCameraDropdownLabel(dropdownLabel, readCameraMask(swFront, swRight, swLeft, swRear));
+                Toast.makeText(activity, R.string.settings_dashcam_camera_selection_required, Toast.LENGTH_SHORT)
+                        .show();
+                return;
+            }
+            setRecordingCameraMask(prefs, selectedMask);
+            updateCameraDropdownLabel(dropdownLabel, selectedMask);
+        };
+        setListener(swFront, listener);
+        setListener(swRight, listener);
+        setListener(swLeft, listener);
+        setListener(swRear, listener);
+    }
+
+    private void setChecked(Switch sw, boolean checked) {
+        if (sw != null) {
+            sw.setChecked(checked);
+        }
+    }
+
+    private void setListener(Switch sw,
+            android.widget.CompoundButton.OnCheckedChangeListener listener) {
+        if (sw != null) {
+            sw.setOnCheckedChangeListener(listener);
+        }
+    }
+
+    private int readCameraMask(Switch swFront, Switch swRight, Switch swLeft, Switch swRear) {
+        int mask = 0;
+        if (swFront != null && swFront.isChecked()) mask |= CAMERA_MASK_FRONT;
+        if (swRight != null && swRight.isChecked()) mask |= CAMERA_MASK_RIGHT;
+        if (swLeft != null && swLeft.isChecked()) mask |= CAMERA_MASK_LEFT;
+        if (swRear != null && swRear.isChecked()) mask |= CAMERA_MASK_REAR;
+        return mask;
+    }
+
+    private void updateCameraDropdownLabel(TextView dropdownLabel, int cameraMask) {
+        if (dropdownLabel != null) {
+            dropdownLabel.setText(activity.getString(
+                    R.string.settings_dashcam_camera_selection_count,
+                    getRecordingCameraCount(cameraMask)));
+        }
     }
 
     // Wires storage target, USB limits, and eject button. Null-safe — pass null to skip the whole section.
@@ -687,6 +780,18 @@ public final class DashcamSettingsController {
         return prefs.getBoolean(KEY_SHOW_SPEED, true);
     }
 
+    public static int getRecordingCameraMask(SharedPreferences prefs) {
+        return normalizeCameraMask(prefs.getInt(KEY_CAMERA_MASK, DEFAULT_CAMERA_MASK));
+    }
+
+    public static void setRecordingCameraMask(SharedPreferences prefs, int cameraMask) {
+        prefs.edit().putInt(KEY_CAMERA_MASK, normalizeCameraMask(cameraMask)).apply();
+    }
+
+    public static int getRecordingCameraCount(int cameraMask) {
+        return Integer.bitCount(normalizeCameraMask(cameraMask));
+    }
+
     public static boolean isTestRecordEnabled(SharedPreferences prefs) {
         return prefs.getBoolean(KEY_TEST_RECORD_ENABLED, true);
     }
@@ -757,6 +862,11 @@ public final class DashcamSettingsController {
 
     private static int clampRecordingFps(int fps) {
         return Math.max(MIN_RECORDING_FPS, Math.min(MAX_RECORDING_FPS, fps));
+    }
+
+    private static int normalizeCameraMask(int cameraMask) {
+        int normalized = cameraMask & DEFAULT_CAMERA_MASK;
+        return normalized == 0 ? DEFAULT_CAMERA_MASK : normalized;
     }
 
     private static int clampTestRecordDurationSec(int durationSec) {

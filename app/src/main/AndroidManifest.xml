@@ -43,7 +43,8 @@
 
         <activity
             android:name=".camera.TileViewActivity"
-            android:exported="false" />
+            android:exported="false"
+            android:launchMode="singleTop" />
 
         <service
             android:name=".dashcam.RecordingService"

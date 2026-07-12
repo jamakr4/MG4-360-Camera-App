@@ -13,26 +13,35 @@ MAIN_ACTIVITY="${PACKAGE_NAME}/.MainActivity"
 APK_PATH="app/build/outputs/apk/debug/app-debug.apk"
 SDK_DIR="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/Users/jan/Library/Android/sdk}}"
 DEFAULT_JAVA_HOME="/Library/Java/JavaVirtualMachines/jdk-17.jdk/Contents/Home"
-OPEN_SETTINGS=0
-SCREENSHOT_PATH="${SCREENSHOT_PATH:-/tmp/drivehub_settings_open.png}"
+DEVICE_WAIT_TIMEOUT_SECONDS="${DEVICE_WAIT_TIMEOUT_SECONDS:-20}"
 
 usage() {
-  echo "Usage: $0 [--serial emulator-5554] [--open-settings] [--screenshot /tmp/file.png]"
+  echo "Usage: $0 [--serial emulator-5554]"
+}
+
+wait_for_target_device() {
+  local deadline=$((SECONDS + DEVICE_WAIT_TIMEOUT_SECONDS))
+  local state=""
+
+  while (( SECONDS < deadline )); do
+    state="$(adb -s "$SERIAL" get-state 2>/dev/null || true)"
+    if [[ "$state" == "device" ]]; then
+      return 0
+    fi
+    sleep 1
+  done
+
+  echo "Android device '${SERIAL}' did not become available within ${DEVICE_WAIT_TIMEOUT_SECONDS}s." >&2
+  echo "Connected devices:" >&2
+  adb devices >&2 || true
+  echo "Start the matching emulator or pass --serial <serial>." >&2
+  exit 1
 }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --serial)
       SERIAL="${2:?Missing serial value}"
-      shift 2
-      ;;
-    --open-settings)
-      OPEN_SETTINGS=1
-      shift
-      ;;
-    --screenshot)
-      SCREENSHOT_PATH="${2:?Missing screenshot path}"
-      OPEN_SETTINGS=1
       shift 2
       ;;
     -h|--help)
@@ -60,29 +69,30 @@ if [[ -n "${JAVA_HOME:-}" ]]; then
   echo "Using JAVA_HOME=${JAVA_HOME}"
 fi
 
+echo "Checking Android device: ${SERIAL}"
+wait_for_target_device
+
 echo "Building debug APK..."
 ./gradlew --no-daemon :app:assembleDebug
 
-echo "Waiting for Android device: ${SERIAL}"
-adb -s "$SERIAL" wait-for-device
-
 echo "Installing ${APK_PATH}..."
-adb -s "$SERIAL" install -r "$APK_PATH"
+if ! INSTALL_OUTPUT="$(adb -s "$SERIAL" install -r "$APK_PATH" 2>&1)"; then
+  echo "$INSTALL_OUTPUT" >&2
+  if [[ "$INSTALL_OUTPUT" == *"INSTALL_FAILED_UPDATE_INCOMPATIBLE"* ]]; then
+    echo "Existing ${PACKAGE_NAME} install has a different signature; uninstalling from simulator and retrying..."
+    adb -s "$SERIAL" uninstall "$PACKAGE_NAME" >/dev/null || true
+    adb -s "$SERIAL" install -r "$APK_PATH"
+  else
+    exit 1
+  fi
+else
+  echo "$INSTALL_OUTPUT"
+fi
 
 echo "Stopping previous app instance..."
 adb -s "$SERIAL" shell am force-stop "$PACKAGE_NAME"
 
 echo "Launching ${MAIN_ACTIVITY}..."
 adb -s "$SERIAL" shell am start -n "$MAIN_ACTIVITY" >/dev/null
-
-if [[ "$OPEN_SETTINGS" -eq 1 ]]; then
-  echo "Opening settings dialog and capturing screenshot..."
-  sleep 1
-  adb -s "$SERIAL" shell input tap 50 575
-  sleep 1
-  adb -s "$SERIAL" shell screencap -p /sdcard/drivehub_settings_open.png
-  adb -s "$SERIAL" pull /sdcard/drivehub_settings_open.png "$SCREENSHOT_PATH" >/dev/null
-  echo "Screenshot: ${SCREENSHOT_PATH}"
-fi
 
 echo "Done."

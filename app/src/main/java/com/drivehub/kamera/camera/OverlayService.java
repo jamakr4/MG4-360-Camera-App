@@ -44,6 +44,7 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
 
     public static final String EXTRA_CAMERA_INDEX = "camera_index";
     public static final String EXTRA_OVERLAY_REASON = "overlay_reason";
+    private static final String EXTRA_HIDE_WITH_FADE = "hide_with_fade";
     public static final String OVERLAY_REASON_SIGNAL = "signal";
     public static final String OVERLAY_REASON_DIGITAL_REARVIEW = "digital_rearview";
 
@@ -62,6 +63,9 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
     private static final int MG4_SAIC_WORK_AREA_WIDTH_PX = MG4_DISPLAY_WIDTH_PX - MG4_LAUNCHER_BAR_WIDTH_PX;
     private static final int OVERLAY_MODE_SAIC = 0;
     private static final int OVERLAY_MODE_FULLSCREEN = 1;
+    private static final long SIGNAL_FADE_IN_MS = 110L;
+    private static final long SIGNAL_FADE_OUT_MS = 90L;
+    private static final float SIGNAL_FADE_IN_START_ALPHA = 0.18f;
     private static final String ANDROID_AUTO_PACKAGE = "com.allgo.app.androidauto";
     private static final String CARPLAY_PACKAGE = "com.allgo.remoteui.mediabrowserservice";
 
@@ -72,6 +76,9 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
     private static final String KEY_OVERLAY_H = "overlay_h";
     private static final String KEY_LAST_OVERLAY_MODE = "last_overlay_mode";
 
+    private static volatile boolean sOverlayVisible = false;
+    private static volatile String sOverlayReason = "";
+
     private WindowManager windowManager;
     private View overlayView;
     private TextureView textureView;
@@ -80,6 +87,7 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
     private int cameraIndex = CameraIndex.FRONT.getVideoIndex();
     private int attachedPreviewCameraIndex = -1;
     private String overlayReason = OVERLAY_REASON_SIGNAL;
+    private boolean fadeOutPending;
 
     /** Current window size, updated via pinch gestures. */
     private int overlayWidthPx = DEFAULT_OVERLAY_WIDTH_PX;
@@ -113,6 +121,17 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
                     updateOverlayPresentation(true);
                 } else if (UiPrefs.KEY_DEV_FOREGROUND_MODE_POLL_MS.equals(key)) {
                     restartForegroundModePolling();
+                } else if (UiPrefs.KEY_SMOOTH_ENTRY.equals(key)
+                        && !UiPrefs.isSmoothEntryEnabled(sharedPreferences)
+                        && overlayView != null) {
+                    if (fadeOutPending) {
+                        fadeOutPending = false;
+                        overlayView.animate().cancel();
+                        stopSelf();
+                    } else {
+                        overlayView.animate().cancel();
+                        overlayView.setAlpha(1f);
+                    }
                 }
             };
 
@@ -132,6 +151,25 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
         context.stopService(i);
     }
 
+    public static void hideOverlayWithFade(Context context) {
+        if (!sOverlayVisible) return;
+        if (!UiPrefs.isSmoothEntryEnabled(UiPrefs.getPrefs(context))) {
+            hideOverlay(context);
+            return;
+        }
+        Intent i = new Intent(context, OverlayService.class);
+        i.putExtra(EXTRA_HIDE_WITH_FADE, true);
+        context.startForegroundService(i);
+    }
+
+    public static boolean isVisible() {
+        return sOverlayVisible;
+    }
+
+    public static boolean isVisibleForReason(String reason) {
+        return sOverlayVisible && reason != null && reason.equals(sOverlayReason);
+    }
+
     @Override
     public void onCreate() {
         super.onCreate();
@@ -149,6 +187,7 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
         if (intent != null && intent.hasExtra(EXTRA_OVERLAY_REASON)) {
             overlayReason = intent.getStringExtra(EXTRA_OVERLAY_REASON);
         }
+        sOverlayReason = overlayReason == null ? "" : overlayReason;
         // Run as a foreground service so the overlay survives while the app is in the background.
         Notification notif = new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.ic_menu_camera)
@@ -159,9 +198,18 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
                 .build();
         startForeground(NOTIF_ID, notif);
 
+        if (intent != null && intent.getBooleanExtra(EXTRA_HIDE_WITH_FADE, false)) {
+            fadeOutAndStop();
+            return START_NOT_STICKY;
+        }
+
         if (overlayView == null) {
             showFloatingWindow();
         } else {
+            fadeOutPending = false;
+            overlayView.animate().cancel();
+            overlayView.setAlpha(1f);
+            sOverlayVisible = true;
             refreshOverlayMode(false);
             applyOverlayCornerRadius();
             updateOverlayPresentation(false);
@@ -251,7 +299,13 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
                     }
                 });
 
+        if (shouldFadeInOnShow()) {
+            overlayView.setAlpha(SIGNAL_FADE_IN_START_ALPHA);
+        }
         windowManager.addView(overlayView, overlayParams);
+        sOverlayVisible = true;
+        sOverlayReason = overlayReason == null ? "" : overlayReason;
+        startFadeInIfNeeded();
         applyPreviewTransform();
 
         overlayView.setOnTouchListener((v, event) -> {
@@ -356,6 +410,43 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
         applyOverlayCornerRadius(card);
 
         return card;
+    }
+
+    private boolean shouldFadeInOnShow() {
+        return OVERLAY_REASON_SIGNAL.equals(overlayReason)
+                && uiPrefs != null
+                && UiPrefs.isSmoothEntryEnabled(uiPrefs);
+    }
+
+    private void startFadeInIfNeeded() {
+        if (overlayView == null || !shouldFadeInOnShow()) return;
+        overlayView.animate()
+                .alpha(1f)
+                .setDuration(SIGNAL_FADE_IN_MS)
+                .setStartDelay(0L)
+                .start();
+    }
+
+    private void fadeOutAndStop() {
+        if (overlayView == null
+                || !OVERLAY_REASON_SIGNAL.equals(overlayReason)
+                || uiPrefs == null
+                || !UiPrefs.isSmoothEntryEnabled(uiPrefs)) {
+            stopSelf();
+            return;
+        }
+        fadeOutPending = true;
+        overlayView.animate().cancel();
+        overlayView.animate()
+                .alpha(0f)
+                .setDuration(SIGNAL_FADE_OUT_MS)
+                .setStartDelay(0L)
+                .withEndAction(() -> {
+                    if (!fadeOutPending) return;
+                    fadeOutPending = false;
+                    stopSelf();
+                })
+                .start();
     }
 
     private void applyOverlayCornerRadius() {
@@ -619,6 +710,10 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
             uiPrefs.unregisterOnSharedPreferenceChangeListener(prefListener);
         }
         mainHandler.removeCallbacks(foregroundModePollRunnable);
+        fadeOutPending = false;
+        if (overlayView != null) {
+            overlayView.animate().cancel();
+        }
         stopPreview();
         if (textureSurface != null) {
             textureSurface.release();
@@ -629,6 +724,8 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
         }
         overlayView = null;
         textureView = null;
+        sOverlayVisible = false;
+        sOverlayReason = "";
     }
 
     @Nullable

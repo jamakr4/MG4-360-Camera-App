@@ -1,7 +1,6 @@
 package com.drivehub.kamera.settings;
 
 import com.drivehub.kamera.dashcam.DashcamSettingsController;
-
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.view.View;
@@ -12,6 +11,7 @@ public final class UiPrefs {
     public static final String KEY_TILE_CORNER_RADIUS = "tileCornerRadius";
     public static final String KEY_ACCENT_COLOR = "accentColor";
     public static final String KEY_ALLOW_BETA_UPDATES = "allowBetaUpdates";
+    public static final String KEY_SMOOTH_ENTRY = "smoothEntry";
     public static final String KEY_OVERLAY_ON_SIGNAL = "overlayOnSignal";
     public static final String KEY_OVERLAY_ROTATE_TO_DRIVING_DIRECTION = "overlayRotateToDrivingDirection";
     public static final String KEY_DIGITAL_REARVIEW_ENABLED = "digitalRearviewEnabled";
@@ -22,7 +22,7 @@ public final class UiPrefs {
     public static final int MAX_DIGITAL_REARVIEW_TAP_TO_HIDE_SEC = 300;
     public static final String KEY_SIGNAL_OVERLAY_TAP_TO_HIDE_ENABLED = "signalOverlayTapToHideEnabled";
     public static final String KEY_SIGNAL_OVERLAY_TAP_TO_HIDE_DURATION_SEC = "signalOverlayTapToHideDurationSec";
-    public static final int DEFAULT_SIGNAL_OVERLAY_TAP_TO_HIDE_DURATION_SEC = 5;
+    public static final int DEFAULT_SIGNAL_OVERLAY_TAP_TO_HIDE_DURATION_SEC = 2;
     public static final int MIN_SIGNAL_OVERLAY_TAP_TO_HIDE_SEC = 2;
     public static final int MAX_SIGNAL_OVERLAY_TAP_TO_HIDE_SEC = 120;
     public static final String KEY_OVERLAY_HIDE_DELAY_MS = "overlayHideDelayMs";
@@ -149,6 +149,14 @@ public final class UiPrefs {
 
     public static void setSafetyWarningEnabled(SharedPreferences prefs, boolean enabled) {
         prefs.edit().putBoolean(KEY_SAFETY_WARNING, enabled).apply();
+    }
+
+    public static boolean isSmoothEntryEnabled(SharedPreferences prefs) {
+        return prefs.getBoolean(KEY_SMOOTH_ENTRY, true);
+    }
+
+    public static void setSmoothEntryEnabled(SharedPreferences prefs, boolean enabled) {
+        prefs.edit().putBoolean(KEY_SMOOTH_ENTRY, enabled).apply();
     }
 
     public static boolean isOemAvmCoexistEnabled(SharedPreferences prefs) {
@@ -299,4 +307,5 @@ public final class UiPrefs {
     public static int clampDevOemAvmMaxSpeedKmh(int value) {
         return Math.max(MIN_DEV_OEM_AVM_MAX_SPEED_KMH, Math.min(MAX_DEV_OEM_AVM_MAX_SPEED_KMH, value));
     }
+
 }

@@ -26,6 +26,7 @@ import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
+import android.widget.ScrollView;
 import android.widget.SeekBar;
 import android.widget.Switch;
 import android.widget.TextView;
@@ -48,6 +49,7 @@ public final class SettingsDialogController {
     private static final int CAMERA_PROBE_MAX_INDEX = 18;
     private static final int[] EXPECTED_VIDEO_INDEXES = {14, 15, 16, 17};
     private static final long DEV_STATUS_REFRESH_INTERVAL_MS = 500L;
+    private static volatile boolean sDevUnlockedForSession = false;
 
     private final MainActivity activity;
     private final SettingsAppearanceController appearance;
@@ -124,6 +126,7 @@ public final class SettingsDialogController {
         wireSubControllers(prefs);
         wireAppearance(prefs);
         wireDevLogControls();
+        wireDashcamAdvancedNavigation();
         wireTabs();
         wireDevUnlock();
         wireOta();
@@ -171,6 +174,7 @@ public final class SettingsDialogController {
         v.swRotateToDrivingDirection = dialog.findViewById(R.id.switchOverlayRotateToDrivingDirection);
         v.swDashcamEnabled = dialog.findViewById(R.id.switchDashcamEnabled);
         v.swSafetyWarning = dialog.findViewById(R.id.switchSafetyWarning);
+        v.swSmoothEntry = dialog.findViewById(R.id.switchSmoothEntry);
         v.swOemAvmCoexist = dialog.findViewById(R.id.switchOemAvmCoexist);
         v.swAllowBetaUpdates = dialog.findViewById(R.id.switchAllowBetaUpdates);
         v.seekOverlayHideDelay = dialog.findViewById(R.id.seekOverlayHideDelay);
@@ -181,7 +185,17 @@ public final class SettingsDialogController {
         v.etSignalTapToHideDurationSec = dialog.findViewById(R.id.etSignalTapToHideDurationSec);
         v.etDashcamFps = dialog.findViewById(R.id.etDashcamFps);
         v.etDashcamSignature = dialog.findViewById(R.id.etDashcamSignature);
+        v.sectionDashcamMain = dialog.findViewById(R.id.sectionDashcamMain);
+        v.sectionDashcamAdvanced = dialog.findViewById(R.id.sectionDashcamAdvanced);
+        v.btnDashcamAdvanced = dialog.findViewById(R.id.btnDashcamAdvanced);
+        v.btnDashcamAdvancedBack = dialog.findViewById(R.id.btnDashcamAdvancedBack);
         v.swDashcamShowSpeed = dialog.findViewById(R.id.switchDashcamShowSpeed);
+        v.tvDashcamCameraDropdown = dialog.findViewById(R.id.tvDashcamCameraDropdown);
+        v.layoutDashcamCameraDropdown = dialog.findViewById(R.id.layoutDashcamCameraDropdown);
+        v.swDashcamCameraFront = dialog.findViewById(R.id.switchDashcamCameraFront);
+        v.swDashcamCameraRight = dialog.findViewById(R.id.switchDashcamCameraRight);
+        v.swDashcamCameraLeft = dialog.findViewById(R.id.switchDashcamCameraLeft);
+        v.swDashcamCameraRear = dialog.findViewById(R.id.switchDashcamCameraRear);
         v.swDashcamTestRecordEnabled = dialog.findViewById(R.id.switchDashcamTestRecordEnabled);
         v.etDashcamTestRecordDuration = dialog.findViewById(R.id.etDashcamTestRecordDuration);
         // Temporarily disabled storage UI:
@@ -233,25 +247,25 @@ public final class SettingsDialogController {
         v.tabUpdate = dialog.findViewById(R.id.tabUpdate);
         v.tabSettings = dialog.findViewById(R.id.tabSettings);
         v.tabSignalCamera = dialog.findViewById(R.id.tabSignalCamera);
-        v.tabManeuverMode = dialog.findViewById(R.id.tabManeuverMode);
+        v.tabDigitalRearview = dialog.findViewById(R.id.tabDigitalRearview);
         v.tabDashcam = dialog.findViewById(R.id.tabDashcam);
         v.tabCredits = dialog.findViewById(R.id.tabCredits);
         v.tabDev = dialog.findViewById(R.id.tabDev);
         v.tabDevStatus = dialog.findViewById(R.id.tabDevStatus);
         v.settingsTabs = new TextView[]{
-                v.tabUpdate, v.tabSettings, v.tabSignalCamera, v.tabManeuverMode, v.tabDashcam,
+                v.tabUpdate, v.tabSettings, v.tabSignalCamera, v.tabDigitalRearview, v.tabDashcam,
                 v.tabCredits, v.tabDev, v.tabDevStatus
         };
         v.sectionUpdate = dialog.findViewById(R.id.sectionUpdate);
         v.sectionSettings = dialog.findViewById(R.id.sectionSettings);
         v.sectionSignalCamera = dialog.findViewById(R.id.sectionSignalCamera);
-        v.sectionManeuverMode = dialog.findViewById(R.id.sectionManeuverMode);
+        v.sectionDigitalRearview = dialog.findViewById(R.id.sectionDigitalRearview);
         v.sectionDashcam = dialog.findViewById(R.id.sectionDashcam);
         v.sectionCredits = dialog.findViewById(R.id.sectionCredits);
         v.sectionDev = dialog.findViewById(R.id.sectionDev);
         v.sectionDevStatus = dialog.findViewById(R.id.sectionDevStatus);
         v.settingsSections = new View[]{
-                v.sectionUpdate, v.sectionSettings, v.sectionSignalCamera, v.sectionManeuverMode, v.sectionDashcam,
+                v.sectionUpdate, v.sectionSettings, v.sectionSignalCamera, v.sectionDigitalRearview, v.sectionDashcam,
                 v.sectionCredits, v.sectionDev, v.sectionDevStatus
         };
         v.accentRow = dialog.findViewById(R.id.rowAccentColor);
@@ -272,12 +286,18 @@ public final class SettingsDialogController {
         v.tvDevStatusStorageWritable = dialog.findViewById(R.id.tvDevStatusStorageWritable);
         v.tvDevStatusRecordsPath = dialog.findViewById(R.id.tvDevStatusRecordsPath);
         v.tvDevStatusEventLog = dialog.findViewById(R.id.tvDevStatusEventLog);
+        v.contentScroll = dialog.findViewById(R.id.settingsContentScroll);
 
         v.swSafetyWarning.setChecked(UiPrefs.isSafetyWarningEnabled(prefs));
         v.swSafetyWarning.setOnCheckedChangeListener((btn, checked) -> {
             UiPrefs.setSafetyWarningEnabled(prefs, checked);
             onSafetyWarningChanged.run();
         });
+        if (v.swSmoothEntry != null) {
+            v.swSmoothEntry.setChecked(UiPrefs.isSmoothEntryEnabled(prefs));
+            v.swSmoothEntry.setOnCheckedChangeListener((btn, checked) ->
+                    UiPrefs.setSmoothEntryEnabled(prefs, checked));
+        }
         if (v.swOemAvmCoexist != null) {
             v.swOemAvmCoexist.setChecked(UiPrefs.isOemAvmCoexistEnabled(prefs));
             v.swOemAvmCoexist.setOnCheckedChangeListener((btn, checked) ->
@@ -307,6 +327,12 @@ public final class SettingsDialogController {
                 views.etDashcamFps,
                 views.etDashcamSignature,
                 views.swDashcamShowSpeed,
+                views.tvDashcamCameraDropdown,
+                views.layoutDashcamCameraDropdown,
+                views.swDashcamCameraFront,
+                views.swDashcamCameraRight,
+                views.swDashcamCameraLeft,
+                views.swDashcamCameraRear,
                 views.swDashcamTestRecordEnabled,
                 views.etDashcamTestRecordDuration,
                 // Re-enable this block when the storage section comes back:
@@ -366,12 +392,17 @@ public final class SettingsDialogController {
                         views.swRotateToDrivingDirection,
                         views.swDashcamEnabled,
                         views.swDashcamShowSpeed,
+                        views.swDashcamCameraFront,
+                        views.swDashcamCameraRight,
+                        views.swDashcamCameraLeft,
+                        views.swDashcamCameraRear,
                         views.swDashcamTestRecordEnabled,
                         views.swOemAvmCoexist,
                         views.swBannerEvent,
                         views.swBannerPauseResume,
                         views.swBannerErrorRecovered,
                         views.swSafetyWarning,
+                        views.swSmoothEntry,
                         views.swAllowBetaUpdates
                 },
                 views.dialogClose,
@@ -391,7 +422,7 @@ public final class SettingsDialogController {
                 views.tabUpdate,
                 views.tabSettings,
                 views.tabSignalCamera,
-                views.tabManeuverMode,
+                views.tabDigitalRearview,
                 views.tabDashcam,
                 views.tabCredits,
                 views.tabDev,
@@ -410,6 +441,44 @@ public final class SettingsDialogController {
         });
     }
 
+    private void wireDashcamAdvancedNavigation() {
+        showDashcamMainContent(false);
+        if (views.btnDashcamAdvanced != null) {
+            views.btnDashcamAdvanced.setOnClickListener(v -> showDashcamAdvancedContent());
+        }
+        if (views.btnDashcamAdvancedBack != null) {
+            views.btnDashcamAdvancedBack.setOnClickListener(v -> showDashcamMainContent(true));
+        }
+    }
+
+    private void showDashcamAdvancedContent() {
+        if (views.sectionDashcamMain != null) {
+            views.sectionDashcamMain.setVisibility(View.GONE);
+        }
+        if (views.sectionDashcamAdvanced != null) {
+            views.sectionDashcamAdvanced.setVisibility(View.VISIBLE);
+        }
+        scrollContentToTop();
+    }
+
+    private void showDashcamMainContent(boolean scrollToTop) {
+        if (views.sectionDashcamMain != null) {
+            views.sectionDashcamMain.setVisibility(View.VISIBLE);
+        }
+        if (views.sectionDashcamAdvanced != null) {
+            views.sectionDashcamAdvanced.setVisibility(View.GONE);
+        }
+        if (scrollToTop) {
+            scrollContentToTop();
+        }
+    }
+
+    private void scrollContentToTop() {
+        ScrollView scroll = views.contentScroll;
+        if (scroll == null) return;
+        scroll.post(() -> scroll.scrollTo(0, 0));
+    }
+
     private void wireTabs() {
         switchTab(DEFAULT_TAB_INDEX);
         for (int i = 0; i < views.settingsTabs.length; i++) {
@@ -421,6 +490,7 @@ public final class SettingsDialogController {
     }
 
     private void switchTab(int activeIndex) {
+        showDashcamMainContent(false);
         for (int i = 0; i < views.settingsSections.length; i++) {
             if (views.settingsSections[i] != null) {
                 views.settingsSections[i].setVisibility(i == activeIndex ? View.VISIBLE : View.GONE);
@@ -438,11 +508,11 @@ public final class SettingsDialogController {
         if (activeIndex == DEV_STATUS_TAB_INDEX) {
             devStatusHandler.post(devStatusRefreshRunnable);
         }
+        scrollContentToTop();
     }
 
     private void wireDevUnlock() {
         final int[] devTapCount = {0};
-        final boolean[] devUnlocked = {false};
         try {
             String version = activity.getPackageManager().getPackageInfo(activity.getPackageName(), 0).versionName;
             views.tvVersion.setText(activity.getString(R.string.settings_version_format, version));
@@ -450,18 +520,24 @@ public final class SettingsDialogController {
             views.tvVersion.setText(R.string.settings_version_unknown);
         }
         views.tvBeta.setVisibility(BuildConfig.IS_BETA ? View.VISIBLE : View.GONE);
+        applyDevTabVisibility();
         View.OnClickListener unlockDevListener = v -> {
-            if (devUnlocked[0]) return;
+            if (sDevUnlockedForSession) return;
             devTapCount[0]++;
             if (devTapCount[0] < DEV_UNLOCK_TAPS) return;
-            devUnlocked[0] = true;
-            if (views.tabDev != null) views.tabDev.setVisibility(View.VISIBLE);
-            if (views.tabDevStatus != null) views.tabDevStatus.setVisibility(View.VISIBLE);
+            sDevUnlockedForSession = true;
+            applyDevTabVisibility();
             switchTab(DEV_TAB_INDEX);
             Toast.makeText(activity, R.string.settings_dev_unlocked, Toast.LENGTH_SHORT).show();
         };
         views.tvVersion.setOnClickListener(unlockDevListener);
         views.tvBeta.setOnClickListener(unlockDevListener);
+    }
+
+    private void applyDevTabVisibility() {
+        int visibility = sDevUnlockedForSession ? View.VISIBLE : View.GONE;
+        if (views.tabDev != null) views.tabDev.setVisibility(visibility);
+        if (views.tabDevStatus != null) views.tabDevStatus.setVisibility(visibility);
     }
 
     private void wireOta() {
@@ -562,6 +638,7 @@ public final class SettingsDialogController {
         Switch swRotateToDrivingDirection;
         Switch swDashcamEnabled;
         Switch swSafetyWarning;
+        Switch swSmoothEntry;
         Switch swOemAvmCoexist;
         Switch swAllowBetaUpdates;
         SeekBar seekOverlayHideDelay;
@@ -570,7 +647,17 @@ public final class SettingsDialogController {
         EditText etOverlayMinShowValue;
         EditText etDashcamFps;
         EditText etDashcamSignature;
+        View sectionDashcamMain;
+        View sectionDashcamAdvanced;
+        Button btnDashcamAdvanced;
+        Button btnDashcamAdvancedBack;
         Switch swDashcamShowSpeed;
+        TextView tvDashcamCameraDropdown;
+        View layoutDashcamCameraDropdown;
+        Switch swDashcamCameraFront;
+        Switch swDashcamCameraRight;
+        Switch swDashcamCameraLeft;
+        Switch swDashcamCameraRear;
         Switch swDashcamTestRecordEnabled;
         EditText etDashcamTestRecordDuration;
         SegmentedControl segDashcamStorageTarget;
@@ -614,7 +701,7 @@ public final class SettingsDialogController {
         TextView tabUpdate;
         TextView tabSettings;
         TextView tabSignalCamera;
-        TextView tabManeuverMode;
+        TextView tabDigitalRearview;
         TextView tabDashcam;
         TextView tabCredits;
         TextView tabDev;
@@ -623,7 +710,7 @@ public final class SettingsDialogController {
         View sectionUpdate;
         View sectionSettings;
         View sectionSignalCamera;
-        View sectionManeuverMode;
+        View sectionDigitalRearview;
         View sectionDashcam;
         View sectionCredits;
         View sectionDev;
@@ -647,5 +734,6 @@ public final class SettingsDialogController {
         TextView tvDevStatusStorageWritable;
         TextView tvDevStatusRecordsPath;
         TextView tvDevStatusEventLog;
+        ScrollView contentScroll;
     }
 }

@@ -53,7 +53,8 @@ Java_com_drivehub_kamera_CameraProbe_startCombinedMp4Record(JNIEnv* env, jclass 
                                                             jint fps,
                                                             jint bitrate,
                                                             jstring signature,
-                                                            jboolean showSpeed) {
+                                                            jboolean showSpeed,
+                                                            jint cameraMask) {
     if (outputPath == nullptr) {
         return JNI_FALSE;
     }
@@ -83,7 +84,8 @@ Java_com_drivehub_kamera_CameraProbe_startCombinedMp4Record(JNIEnv* env, jclass 
             static_cast<int>(fps),
             static_cast<int>(bitrate),
             signatureText,
-            showSpeed == JNI_TRUE
+            showSpeed == JNI_TRUE,
+            static_cast<int>(cameraMask)
     ) ? JNI_TRUE : JNI_FALSE;
 }
 
