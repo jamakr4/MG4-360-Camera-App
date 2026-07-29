@@ -13,6 +13,8 @@ public final class UiPrefs {
     public static final String KEY_ALLOW_BETA_UPDATES = "allowBetaUpdates";
     public static final String KEY_SMOOTH_ENTRY = "smoothEntry";
     public static final String KEY_OVERLAY_ON_SIGNAL = "overlayOnSignal";
+    public static final String KEY_LANE_CHANGES_ONLY = "laneChangesOnly";
+    public static final String KEY_LANE_CHANGE_MIN_SPEED_KMH = "laneChangeMinSpeedKmh";
     public static final String KEY_OVERLAY_ROTATE_TO_DRIVING_DIRECTION = "overlayRotateToDrivingDirection";
     public static final String KEY_DIGITAL_REARVIEW_ENABLED = "digitalRearviewEnabled";
     public static final String KEY_DIGITAL_REARVIEW_TAP_TO_HIDE_ENABLED = "digitalRearviewTapToHideEnabled";
@@ -40,6 +42,8 @@ public final class UiPrefs {
     public static final int MAX_TILE_CORNER_RADIUS = 35;
     public static final int MAX_OVERLAY_HIDE_DELAY_MS = 3000;
     public static final int MAX_OVERLAY_MIN_SHOW_MS = 6000;
+    public static final int MIN_LANE_CHANGE_SPEED_KMH = 0;
+    public static final int MAX_LANE_CHANGE_SPEED_KMH = 130;
     public static final int MIN_DEV_POLLING_MS = 20;
     public static final int MAX_DEV_POLLING_MS = 5000;
     public static final int MAX_DEV_OVERLAY_TOP_INSET_PX = 200;
@@ -52,6 +56,7 @@ public final class UiPrefs {
     private static final int DEFAULT_TILE_CORNER_RADIUS = 3;
     private static final int DEFAULT_OVERLAY_HIDE_DELAY_MS = 0;
     private static final int DEFAULT_OVERLAY_MIN_SHOW_MS = 3000;
+    public static final int DEFAULT_LANE_CHANGE_MIN_SPEED_KMH = 15;
     public static final int DEFAULT_DEV_OVERLAY_TOP_INSET_PX = 80;
     public static final int DEFAULT_DEV_FOREGROUND_MODE_POLL_MS = 1000;
     public static final int DEFAULT_DEV_DEFAULT_POLLING_MS = 100;
@@ -99,6 +104,15 @@ public final class UiPrefs {
 
     public static boolean isOverlayOnSignalEnabled(SharedPreferences prefs) {
         return prefs.getBoolean(KEY_OVERLAY_ON_SIGNAL, true);
+    }
+
+    public static boolean isLaneChangesOnlyEnabled(SharedPreferences prefs) {
+        return prefs.getBoolean(KEY_LANE_CHANGES_ONLY, false);
+    }
+
+    public static int getLaneChangeMinSpeedKmh(SharedPreferences prefs) {
+        return clampLaneChangeSpeedKmh(
+                prefs.getInt(KEY_LANE_CHANGE_MIN_SPEED_KMH, DEFAULT_LANE_CHANGE_MIN_SPEED_KMH));
     }
 
     public static boolean isDigitalRearviewEnabled(SharedPreferences prefs) {
@@ -294,6 +308,10 @@ public final class UiPrefs {
 
     public static int clampOverlayMinShowMs(int value) {
         return Math.max(0, Math.min(MAX_OVERLAY_MIN_SHOW_MS, value));
+    }
+
+    public static int clampLaneChangeSpeedKmh(int value) {
+        return Math.max(MIN_LANE_CHANGE_SPEED_KMH, Math.min(MAX_LANE_CHANGE_SPEED_KMH, value));
     }
 
     public static int clampDevPollingMs(int value) {

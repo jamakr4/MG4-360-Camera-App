@@ -82,9 +82,10 @@ To use it:
 
 1. Open `Settings` -> `Signal Camera`.
 2. Enable `Overlay on signal`.
-3. Optional: enable `Rotate side cameras to driving direction` if you prefer the side cameras to match the direction of travel.
-4. Optional: tune `Overlay hide delay` and `Minimum on-time` so the camera does not disappear too abruptly.
-5. `Tap to hide` is enabled by default (2 seconds) – one tap dismisses the overlay temporarily, it reappears afterwards if the signal is still active.
+3. Optional: enable `Lane changes only` to show the signal camera only at or above the selected speed (15 km/h by default).
+4. Optional: enable `Rotate side cameras to driving direction` if you prefer the side cameras to match the direction of travel.
+5. Optional: tune `Overlay hide delay` and `Minimum on-time` so the camera does not disappear too abruptly.
+6. `Tap to hide` is enabled by default (2 seconds) – one tap dismisses the overlay temporarily, it reappears afterwards if the signal is still active.
 
 Important:
 
