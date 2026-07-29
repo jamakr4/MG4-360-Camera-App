@@ -32,14 +32,6 @@ body:
     attributes:
       label: Alternatives Considered
       description: Have you considered any other approaches?
-
-  - type: checkboxes
-    id: checklist
-    attributes:
-      label: Checklist
-      options:
-        - label: I have searched existing issues for duplicates
-          required: true
   
   - type: textarea
     id: additional
