@@ -1,0 +1,63 @@
+name: Enhancement Request
+description: Suggest a new feature or improvement
+title: "[Enhancement]: "
+labels: ["enhancement"]
+assignees: jamakr4
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to suggest an improvement! Please fill out the form below.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What feature or behavior would you like to see?
+      placeholder: I would like...
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation / Use Case
+      description: Why would this be useful? What problem does it solve?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Which part of the app does this relate to?
+      options:
+        - Blind Spot Monitor
+        - Tile View (Tesla-style)
+        - Dashcam Recording
+        - Digital Mirror
+        - Turn Signal Camera
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Have you considered any other approaches?
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I have searched existing issues for duplicates
+          required: true
+  
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Information
+      description: Logs, screenshots, links, or anything else that might be relevant

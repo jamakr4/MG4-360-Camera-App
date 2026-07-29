@@ -1,0 +1,60 @@
+name: Bug Report
+description: Report something that isn't working correctly
+title: "[Bug]: "
+labels: ["bug"]
+assignees: jamakr4
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please provide as much detail as possible to help us reproduce the issue.
+
+  - type: input
+    id: mg4_model
+    attributes:
+      label: MG4 Model / Year / SWI
+      placeholder: e.g. MG4 Luxury 2023 (SEH3)
+    validations:
+      required: true
+
+  - type: input
+    id: app_version
+    attributes:
+      label: App Version
+      placeholder: e.g. 1.2.0
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Which part of the app does this relate to?
+      options:
+        - Blind Spot Monitor
+        - Tile View (Tesla-style)
+        - Dashcam Recording
+        - Digital Mirror
+        - Turn Signal Camera
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: What happened? What did you expect to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      placeholder: |
+        1. Open the app
+        2. ...
+    validations:
+      required: true
