@@ -27,21 +27,6 @@ body:
     validations:
       required: true
 
-  - type: dropdown
-    id: area
-    attributes:
-      label: Area
-      description: Which part of the app does this relate to?
-      options:
-        - Blind Spot Monitor
-        - Tile View (Tesla-style)
-        - Dashcam Recording
-        - Digital Mirror
-        - Turn Signal Camera
-        - Other
-    validations:
-      required: true
-
   - type: textarea
     id: alternatives
     attributes:
