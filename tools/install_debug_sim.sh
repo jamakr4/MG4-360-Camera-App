@@ -4,6 +4,11 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+DEFAULT_JAVA_HOME="/Library/Java/JavaVirtualMachines/jdk-17.jdk/Contents/Home"
+if [[ -d "${DEFAULT_JAVA_HOME}" ]]; then
+  export JAVA_HOME="${DEFAULT_JAVA_HOME}"
+fi
+
 source "${ROOT_DIR}/tools/java_env.sh"
 configure_gradle_java
 
@@ -12,8 +17,16 @@ PACKAGE_NAME="com.drivehub.kamera"
 MAIN_ACTIVITY="${PACKAGE_NAME}/.MainActivity"
 APK_PATH="app/build/outputs/apk/debug/app-debug.apk"
 SDK_DIR="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/Users/jan/Library/Android/sdk}}"
-DEFAULT_JAVA_HOME="/Library/Java/JavaVirtualMachines/jdk-17.jdk/Contents/Home"
 DEVICE_WAIT_TIMEOUT_SECONDS="${DEVICE_WAIT_TIMEOUT_SECONDS:-20}"
+ADB_BIN="$(command -v adb 2>/dev/null || true)"
+if [[ -z "${ADB_BIN}" && -x "${SDK_DIR}/platform-tools/adb" ]]; then
+  ADB_BIN="${SDK_DIR}/platform-tools/adb"
+fi
+
+if [[ -z "${ADB_BIN}" ]]; then
+  echo "adb was not found. Install Android SDK Platform-Tools or set ANDROID_SDK_ROOT." >&2
+  exit 1
+fi
 
 usage() {
   echo "Usage: $0 [--serial emulator-5554]"
@@ -24,7 +37,7 @@ wait_for_target_device() {
   local state=""
 
   while (( SECONDS < deadline )); do
-    state="$(adb -s "$SERIAL" get-state 2>/dev/null || true)"
+    state="$("${ADB_BIN}" -s "$SERIAL" get-state 2>/dev/null || true)"
     if [[ "$state" == "device" ]]; then
       return 0
     fi
@@ -33,7 +46,7 @@ wait_for_target_device() {
 
   echo "Android device '${SERIAL}' did not become available within ${DEVICE_WAIT_TIMEOUT_SECONDS}s." >&2
   echo "Connected devices:" >&2
-  adb devices >&2 || true
+  "${ADB_BIN}" devices >&2 || true
   echo "Start the matching emulator or pass --serial <serial>." >&2
   exit 1
 }
@@ -60,15 +73,6 @@ if [[ ! -f local.properties ]]; then
   echo "sdk.dir=${SDK_DIR}" > local.properties
 fi
 
-if [[ -z "${JAVA_HOME:-}" && -d "${DEFAULT_JAVA_HOME}" ]]; then
-  export JAVA_HOME="${DEFAULT_JAVA_HOME}"
-fi
-
-if [[ -n "${JAVA_HOME:-}" ]]; then
-  export PATH="${JAVA_HOME}/bin:${PATH}"
-  echo "Using JAVA_HOME=${JAVA_HOME}"
-fi
-
 echo "Checking Android device: ${SERIAL}"
 wait_for_target_device
 
@@ -76,12 +80,15 @@ echo "Building debug APK..."
 ./gradlew --no-daemon :app:assembleDebug
 
 echo "Installing ${APK_PATH}..."
-if ! INSTALL_OUTPUT="$(adb -s "$SERIAL" install -r "$APK_PATH" 2>&1)"; then
+if ! INSTALL_OUTPUT="$("${ADB_BIN}" -s "$SERIAL" install -r "$APK_PATH" 2>&1)"; then
   echo "$INSTALL_OUTPUT" >&2
-  if [[ "$INSTALL_OUTPUT" == *"INSTALL_FAILED_UPDATE_INCOMPATIBLE"* ]]; then
+  if [[ "$INSTALL_OUTPUT" == *"INSTALL_FAILED_VERSION_DOWNGRADE"* ]]; then
+    echo "A newer app version is installed; retrying debug install with downgrade allowed..."
+    "${ADB_BIN}" -s "$SERIAL" install -r -d "$APK_PATH"
+  elif [[ "$INSTALL_OUTPUT" == *"INSTALL_FAILED_UPDATE_INCOMPATIBLE"* ]]; then
     echo "Existing ${PACKAGE_NAME} install has a different signature; uninstalling from simulator and retrying..."
-    adb -s "$SERIAL" uninstall "$PACKAGE_NAME" >/dev/null || true
-    adb -s "$SERIAL" install -r "$APK_PATH"
+    "${ADB_BIN}" -s "$SERIAL" uninstall "$PACKAGE_NAME" >/dev/null || true
+    "${ADB_BIN}" -s "$SERIAL" install -r "$APK_PATH"
   else
     exit 1
   fi
@@ -90,9 +97,9 @@ else
 fi
 
 echo "Stopping previous app instance..."
-adb -s "$SERIAL" shell am force-stop "$PACKAGE_NAME"
+"${ADB_BIN}" -s "$SERIAL" shell am force-stop "$PACKAGE_NAME"
 
 echo "Launching ${MAIN_ACTIVITY}..."
-adb -s "$SERIAL" shell am start -n "$MAIN_ACTIVITY" >/dev/null
+"${ADB_BIN}" -s "$SERIAL" shell am start -n "$MAIN_ACTIVITY" >/dev/null
 
 echo "Done."

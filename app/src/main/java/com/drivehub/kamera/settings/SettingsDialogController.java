@@ -168,6 +168,9 @@ public final class SettingsDialogController {
     private Views bindViews(SharedPreferences prefs) {
         Views v = new Views();
         v.swOverlay = dialog.findViewById(R.id.switchOverlayOnSignal);
+        v.swLaneChangesOnly = dialog.findViewById(R.id.switchLaneChangesOnly);
+        v.seekLaneChangeMinSpeed = dialog.findViewById(R.id.seekLaneChangeMinSpeed);
+        v.etLaneChangeMinSpeedValue = dialog.findViewById(R.id.etLaneChangeMinSpeedValue);
         v.swDigitalRearview = dialog.findViewById(R.id.switchDigitalRearview);
         v.swRearviewTapToHide = dialog.findViewById(R.id.switchRearviewTapToHide);
         v.etRearviewTapToHideDurationSec = dialog.findViewById(R.id.etRearviewTapToHideDurationSec);
@@ -310,6 +313,9 @@ public final class SettingsDialogController {
         signalCam.bind(
                 prefs,
                 views.swOverlay,
+                views.swLaneChangesOnly,
+                views.seekLaneChangeMinSpeed,
+                views.etLaneChangeMinSpeedValue,
                 views.swDigitalRearview,
                 views.swRearviewTapToHide,
                 views.etRearviewTapToHideDurationSec,
@@ -386,6 +392,7 @@ public final class SettingsDialogController {
                 prefs,
                 new Switch[]{
                         views.swOverlay,
+                        views.swLaneChangesOnly,
                         views.swDigitalRearview,
                         views.swRearviewTapToHide,
                         views.swSignalTapToHide,
@@ -408,6 +415,7 @@ public final class SettingsDialogController {
                 views.dialogClose,
                 new SeekBar[]{
                         views.seekCorner,
+                        views.seekLaneChangeMinSpeed,
                         views.seekOverlayHideDelay,
                         views.seekOverlayMinShow,
                         views.seekBannerEventVolume,
@@ -630,6 +638,9 @@ public final class SettingsDialogController {
 
     private static final class Views {
         Switch swOverlay;
+        Switch swLaneChangesOnly;
+        SeekBar seekLaneChangeMinSpeed;
+        EditText etLaneChangeMinSpeedValue;
         Switch swDigitalRearview;
         Switch swRearviewTapToHide;
         EditText etRearviewTapToHideDurationSec;

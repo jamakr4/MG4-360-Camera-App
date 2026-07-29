@@ -76,6 +76,12 @@
     <string name="settings_dashcam_status_paused_oem">Aufnahme pausiert, damit die OEM-Kamera geoeffnet werden kann</string>
     <string name="settings_dashcam_status_error">Aufnahmefehler: %1$s</string>
     <string name="settings_overlay_on_signal">Kamera beim Blinken anzeigen</string>
+    <string name="settings_lane_changes_only">Nur bei Spurwechseln</string>
+    <string name="settings_lane_change_min_speed">Mindestgeschwindigkeit</string>
+    <string name="settings_lane_change_min_speed_default_input">15</string>
+    <string name="settings_lane_change_min_speed_min">0 km/h</string>
+    <string name="settings_lane_change_min_speed_max">130 km/h</string>
+    <string name="settings_lane_change_min_speed_hint">Wenn aktiviert, erscheint die Blinker-Kamera erst ab der gewählten Geschwindigkeit. Standard: 15 km/h.</string>
     <string name="settings_digital_rearview_enabled">Digitalen Rueckspiegel aktivieren</string>
     <string name="settings_digital_rearview_hint">Zeigt die Heckkamera dauerhaft, bis du sie wieder ausschaltest. Blinker-Kameras haben Vorrang, danach kehrt die Heckansicht zurueck.</string>
     <string name="settings_rearview_tap_to_hide">Tippen zum kurzzeitigen Ausblenden</string>

@@ -11,6 +11,7 @@ import com.drivehub.kamera.dashcam.RecordingService;
 import com.drivehub.kamera.dev.DevRuntimeLog;
 import com.drivehub.kamera.helper.app.NotificationChannelHelper;
 import com.drivehub.kamera.helper.vehiclesensors.SystemPropertiesHelper;
+import com.drivehub.kamera.helper.vehiclesensors.VehicleSpeedReader;
 import com.drivehub.kamera.settings.UiPrefs;
 
 import android.app.Notification;
@@ -50,6 +51,7 @@ public class SignalService extends Service {
     private static final String CHANNEL_ID = "mg4_signal";
     private static final int NOTIF_ID = 100;
     private static final long HAZARD_TRIGGER_COOLDOWN_MS = 30_000L;
+    private static final long LANE_CHANGE_SPEED_POLL_MS = 250L;
 
     private static final int TURN_PROP_ID = 0x21409326;
     private static final int HAZARD_LIGHTS_STATE_PROP_ID = 0x11400e03;
@@ -97,6 +99,7 @@ public class SignalService extends Service {
     private boolean lastObservedOemForeground = false;
     private volatile long overlayShownAtMs = 0L;
     private volatile long lastHazardTriggerAtMs = 0L;
+    private boolean lastLaneChangeSpeedEligible = true;
     private long rearviewTempHiddenUntilMs = 0L; // mainHandler only
     private long signalTempHiddenUntilMs = 0L;   // mainHandler only
     private final Handler mainHandler = new Handler();
@@ -129,6 +132,8 @@ public class SignalService extends Service {
         updateOverlayDecision();
         Log.i(TAG, "Signal temp-hide expired => overlay state reapplied");
     };
+
+    private final Runnable laneChangeSpeedRunnable = this::updateOverlayDecision;
 
     public static void start(Context context) {
         Intent i = new Intent(context, SignalService.class);
@@ -558,24 +563,32 @@ public class SignalService extends Service {
     }
 
     private void updateOverlayDecision() {
+        final TurnSignal signal = TurnSignal.fromValue(currentLamp);
+        refreshLaneChangeSpeedMonitoring(signal);
+        final boolean laneChangeSpeedEligible = isSignalAllowedAtCurrentSpeed();
+
         // Skip work if nothing changed.
-        if (currentLamp == lastLamp && currentGear == readCachedGear()) {
+        if (currentLamp == lastLamp
+                && currentGear == readCachedGear()
+                && laneChangeSpeedEligible == lastLaneChangeSpeedEligible) {
             return;
         }
         int previousLamp = lastLamp;
         cacheGear(currentGear);
         lastLamp = currentLamp;
+        lastLaneChangeSpeedEligible = laneChangeSpeedEligible;
         maybeTriggerDashcamEventForHazards(previousLamp);
 
-        final TurnSignal signal = TurnSignal.fromValue(currentLamp);
         int nextMode;
         if (currentGear == REVERSE_GEAR_VALUE) {
             nextMode = 3;
         } else if (signal == TurnSignal.LEFT && !isSignalTempHidden()
-                && !isWaitingForSignalSampleAfterOemRelease()) {
+                && !isWaitingForSignalSampleAfterOemRelease()
+                && laneChangeSpeedEligible) {
             nextMode = 1;
         } else if (signal == TurnSignal.RIGHT && !isSignalTempHidden()
-                && !isWaitingForSignalSampleAfterOemRelease()) {
+                && !isWaitingForSignalSampleAfterOemRelease()
+                && laneChangeSpeedEligible) {
             nextMode = 2;
         } else if (isDigitalRearviewEnabled() && !isRearviewTempHidden()
                 && !MainActivity.isSettingsDialogOpen()) {
@@ -720,6 +733,30 @@ public class SignalService extends Service {
             return UiPrefs.isOverlayOnSignalEnabled(UiPrefs.getPrefs(this));
         } catch (Throwable t) {
             return false;
+        }
+    }
+
+    private boolean isSignalAllowedAtCurrentSpeed() {
+        try {
+            SharedPreferences prefs = UiPrefs.getPrefs(this);
+            return LaneChangeMode.allowsSignalCamera(
+                    UiPrefs.isLaneChangesOnlyEnabled(prefs),
+                    VehicleSpeedReader.readSpeedKmh(),
+                    UiPrefs.getLaneChangeMinSpeedKmh(prefs)
+            );
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    private void refreshLaneChangeSpeedMonitoring(TurnSignal signal) {
+        mainHandler.removeCallbacks(laneChangeSpeedRunnable);
+        try {
+            if ((signal == TurnSignal.LEFT || signal == TurnSignal.RIGHT)
+                    && UiPrefs.isLaneChangesOnlyEnabled(UiPrefs.getPrefs(this))) {
+                mainHandler.postDelayed(laneChangeSpeedRunnable, LANE_CHANGE_SPEED_POLL_MS);
+            }
+        } catch (Throwable ignored) {
         }
     }
 
@@ -879,6 +916,7 @@ public class SignalService extends Service {
         mainHandler.removeCallbacks(hideRunnable);
         mainHandler.removeCallbacks(rearviewRestoreRunnable);
         mainHandler.removeCallbacks(signalRestoreRunnable);
+        mainHandler.removeCallbacks(laneChangeSpeedRunnable);
         OverlayService.hideOverlay(this);
         sInstance = null;
     }

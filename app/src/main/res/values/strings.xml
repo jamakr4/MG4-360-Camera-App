@@ -76,6 +76,12 @@
     <string name="settings_dashcam_status_paused_oem">Recording paused while OEM camera is being opened</string>
     <string name="settings_dashcam_status_error">Recording error: %1$s</string>
     <string name="settings_overlay_on_signal">Show Signal Camera on turn signal</string>
+    <string name="settings_lane_changes_only">Lane changes only</string>
+    <string name="settings_lane_change_min_speed">Minimum speed</string>
+    <string name="settings_lane_change_min_speed_default_input">15</string>
+    <string name="settings_lane_change_min_speed_min">0 km/h</string>
+    <string name="settings_lane_change_min_speed_max">130 km/h</string>
+    <string name="settings_lane_change_min_speed_hint">When enabled, the signal camera appears only at or above the selected speed. Default: 15 km/h.</string>
     <string name="settings_digital_rearview_enabled">Enable Digital Rearview Mirror</string>
     <string name="settings_digital_rearview_hint">Shows the rear camera continuously until you switch it off. Turn-signal cameras take priority and the rear view returns afterwards.</string>
     <string name="settings_rearview_tap_to_hide">Tap to temporarily hide</string>
