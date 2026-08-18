@@ -221,6 +221,13 @@ Financial support sounds nice in theory, but German tax overhead makes donation 
 >
 > This project modifies behavior around production-vehicle system apps. The author(s) take no responsibility for damage, malfunction, data loss, voided warranty, or any other consequences. Test carefully and only in safe conditions.
 
+> [!NOTE]
+> AI Usage Disclosure.
+>
+> Parts of the code and documentation in this project were developed 
+with AI assistance (e.g. Codex, Claude and DeepSeek). AI-generated images in the Wiki are 
+labeled individually.
+
 This is an independent community project and is **not affiliated with SAIC, MG Motor, or any of their subsidiaries**.
 
 
