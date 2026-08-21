@@ -62,6 +62,46 @@
 
         </LinearLayout>
 
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:minHeight="44dp"
+            android:orientation="horizontal">
+
+            <TextView
+                style="@style/DrivehubSettingsCardRowLabel"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/settings_lock_tile_resizing" />
+
+            <Switch
+                android:id="@+id/switchLockTileResizing"
+                style="@style/DrivehubSettingsSwitch" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:minHeight="44dp"
+            android:orientation="horizontal">
+
+            <TextView
+                style="@style/DrivehubSettingsCardRowLabel"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/settings_lock_tile_moving" />
+
+            <Switch
+                android:id="@+id/switchLockTileMoving"
+                style="@style/DrivehubSettingsSwitch" />
+
+        </LinearLayout>
+
     </LinearLayout>
 
     <TextView

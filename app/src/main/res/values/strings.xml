@@ -59,6 +59,8 @@
     <string name="settings_oem_avm_coexist">Allow OEM 360° camera app</string>
     <string name="settings_oem_avm_coexist_hint">Global setting for the stock 360° camera app. When enabled, the app yields camera ownership where needed so the OEM reverse/360 view can still open. When disabled, all custom features keep priority and the OEM 360° app is intentionally not supported in parallel.</string>
     <string name="settings_smooth_entry">Smooth Entry</string>
+    <string name="settings_lock_tile_resizing">Lock tile resizing</string>
+    <string name="settings_lock_tile_moving">Lock tile moving</string>
     <string name="settings_dashcam_banners_section">Notification banners</string>
     <string name="settings_dashcam_banner_group_event">Event saved</string>
     <string name="settings_dashcam_banner_group_pause_resume">Recording paused / resumed</string>
@@ -76,12 +78,12 @@
     <string name="settings_dashcam_status_paused_oem">Recording paused while OEM camera is being opened</string>
     <string name="settings_dashcam_status_error">Recording error: %1$s</string>
     <string name="settings_overlay_on_signal">Show Signal Camera on turn signal</string>
-    <string name="settings_lane_changes_only">Lane changes only</string>
+    <string name="settings_lane_changes_only">Minimum speed threshold</string>
     <string name="settings_lane_change_min_speed">Minimum speed</string>
     <string name="settings_lane_change_min_speed_default_input">15</string>
     <string name="settings_lane_change_min_speed_min">0 km/h</string>
     <string name="settings_lane_change_min_speed_max">130 km/h</string>
-    <string name="settings_lane_change_min_speed_hint">When enabled, the signal camera appears only at or above the selected speed. Default: 15 km/h.</string>
+    <string name="settings_lane_change_min_speed_hint">When enabled, the signal camera appears only at or above the selected speed.</string>
     <string name="settings_digital_rearview_enabled">Enable Digital Rearview Mirror</string>
     <string name="settings_digital_rearview_hint">Shows the rear camera continuously until you switch it off. Turn-signal cameras take priority and the rear view returns afterwards.</string>
     <string name="settings_rearview_tap_to_hide">Tap to temporarily hide</string>

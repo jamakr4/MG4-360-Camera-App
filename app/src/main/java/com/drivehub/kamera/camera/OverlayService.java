@@ -21,6 +21,7 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.util.Log;
+import android.view.Choreographer;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
@@ -95,7 +96,19 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
     private int overlayMode = OVERLAY_MODE_SAIC;
 
     private ScaleGestureDetector scaleGestureDetector;
+    private float resizeTargetWidthPx = DEFAULT_OVERLAY_WIDTH_PX;
+    private boolean resizePending;
+    private boolean resizeFrameScheduled;
+    private boolean saveLayoutAfterResizeFrame;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private final Choreographer.FrameCallback resizeFrameCallback = frameTimeNanos -> {
+        resizeFrameScheduled = false;
+        applyPendingResize();
+        if (saveLayoutAfterResizeFrame) {
+            saveLayoutAfterResizeFrame = false;
+            saveOverlayLayoutPrefs();
+        }
+    };
     private final Runnable foregroundModePollRunnable = new Runnable() {
         @Override
         public void run() {
@@ -121,6 +134,9 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
                     updateOverlayPresentation(true);
                 } else if (UiPrefs.KEY_DEV_FOREGROUND_MODE_POLL_MS.equals(key)) {
                     restartForegroundModePolling();
+                } else if (UiPrefs.KEY_OVERLAY_RESIZE_LOCKED.equals(key)
+                        && UiPrefs.isOverlayResizeLocked(sharedPreferences)) {
+                    cancelPendingResize();
                 } else if (UiPrefs.KEY_SMOOTH_ENTRY.equals(key)
                         && !UiPrefs.isSmoothEntryEnabled(sharedPreferences)
                         && overlayView != null) {
@@ -278,24 +294,42 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
         scaleGestureDetector = new ScaleGestureDetector(this,
                 new ScaleGestureDetector.SimpleOnScaleGestureListener() {
                     @Override
+                    public boolean onScaleBegin(ScaleGestureDetector detector) {
+                        if (uiPrefs != null && UiPrefs.isOverlayResizeLocked(uiPrefs)) {
+                            return false;
+                        }
+                        if (!resizePending) {
+                            resizeTargetWidthPx = overlayWidthPx;
+                        }
+                        saveLayoutAfterResizeFrame = false;
+                        return true;
+                    }
+
+                    @Override
                     public boolean onScale(ScaleGestureDetector detector) {
+                        if (uiPrefs != null && UiPrefs.isOverlayResizeLocked(uiPrefs)) {
+                            return true;
+                        }
                         float factor = detector.getScaleFactor();
-                        if (factor <= 0f || Float.isNaN(factor)) return true;
-                        int newW = Math.round(overlayWidthPx * factor);
-                        int[] wh = clampOverlaySize(newW);
-                        overlayWidthPx = wh[0];
-                        overlayHeightPx = wh[1];
-                        overlayParams.width = overlayWidthPx;
-                        overlayParams.height = overlayHeightPx;
-                        clampOverlayPositionToScreen();
-                        windowManager.updateViewLayout(overlayView, overlayParams);
-                        applyPreviewTransform();
+                        int minWidth = clampOverlaySize(OVERLAY_MIN_WIDTH_PX)[0];
+                        int maxWidth = clampOverlaySize(OVERLAY_MAX_WIDTH_PX)[0];
+                        float nextTargetWidth = OverlayResizeMath.updateTargetWidth(
+                                resizeTargetWidthPx,
+                                factor,
+                                minWidth,
+                                maxWidth
+                        );
+                        if (Float.compare(nextTargetWidth, resizeTargetWidthPx) != 0) {
+                            resizeTargetWidthPx = nextTargetWidth;
+                            resizePending = true;
+                            scheduleResizeFrame();
+                        }
                         return true;
                     }
 
                     @Override
                     public void onScaleEnd(ScaleGestureDetector detector) {
-                        saveOverlayLayoutPrefs();
+                        finishResizeGesture();
                     }
                 });
 
@@ -315,12 +349,12 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
             int action = event.getActionMasked();
             int pointerCount = event.getPointerCount();
 
+            if (action == MotionEvent.ACTION_CANCEL) {
+                finishResizeGesture();
+                return true;
+            }
+
             if (pointerCount >= 2) {
-                if (action == MotionEvent.ACTION_POINTER_UP
-                        || action == MotionEvent.ACTION_CANCEL
-                        || action == MotionEvent.ACTION_UP) {
-                    saveOverlayLayoutPrefs();
-                }
                 return true;
             }
 
@@ -335,6 +369,9 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
                     if (scaleGestureDetector.isInProgress()) {
                         return true;
                     }
+                    if (uiPrefs != null && UiPrefs.isOverlayMoveLocked(uiPrefs)) {
+                        return true;
+                    }
                     float dx = event.getRawX() - initialTouchX;
                     float dy = event.getRawY() - initialTouchY;
                     int newX = (int) (initialX + dx);
@@ -345,7 +382,7 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
                     windowManager.updateViewLayout(overlayView, overlayParams);
                     return true;
                 case MotionEvent.ACTION_UP:
-                    saveOverlayLayoutPrefs();
+                    finishResizeGesture();
                     float tapDx = event.getRawX() - initialTouchX;
                     float tapDy = event.getRawY() - initialTouchY;
                     boolean isTap = (tapDx * tapDx + tapDy * tapDy) < (float) (dpToPx(12) * dpToPx(12));
@@ -364,6 +401,62 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
                     return false;
             }
         });
+    }
+
+    private void scheduleResizeFrame() {
+        if (resizeFrameScheduled) return;
+        resizeFrameScheduled = true;
+        Choreographer.getInstance().postFrameCallback(resizeFrameCallback);
+    }
+
+    private void finishResizeGesture() {
+        if (!resizePending) {
+            if (!resizeFrameScheduled) {
+                saveOverlayLayoutPrefs();
+            } else {
+                saveLayoutAfterResizeFrame = true;
+            }
+            return;
+        }
+        saveLayoutAfterResizeFrame = true;
+        scheduleResizeFrame();
+    }
+
+    private void applyPendingResize() {
+        if (!resizePending || overlayParams == null || overlayView == null || windowManager == null) {
+            return;
+        }
+        resizePending = false;
+
+        int requestedWidth = Math.round(resizeTargetWidthPx);
+        int[] wh = clampOverlaySize(requestedWidth);
+        if (wh[0] != requestedWidth) {
+            resizeTargetWidthPx = wh[0];
+        }
+        if (overlayWidthPx == wh[0] && overlayHeightPx == wh[1]) {
+            return;
+        }
+
+        overlayWidthPx = wh[0];
+        overlayHeightPx = wh[1];
+        overlayParams.width = overlayWidthPx;
+        overlayParams.height = overlayHeightPx;
+        clampOverlayPositionToScreen();
+        windowManager.updateViewLayout(overlayView, overlayParams);
+        applyPreviewTransform();
+    }
+
+    private void cancelResizeFrame() {
+        if (!resizeFrameScheduled) return;
+        Choreographer.getInstance().removeFrameCallback(resizeFrameCallback);
+        resizeFrameScheduled = false;
+    }
+
+    private void cancelPendingResize() {
+        cancelResizeFrame();
+        resizePending = false;
+        saveLayoutAfterResizeFrame = false;
+        resizeTargetWidthPx = overlayWidthPx;
     }
 
     private View createOverlayCard() {
@@ -560,26 +653,33 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
     private void applyPreviewTransform() {
         final TextureView tv = textureView;
         if (tv == null) return;
-        tv.post(() -> {
-            FrameLayout.LayoutParams params;
-            if (shouldRotatePreviewToDrivingDirection()) {
-                params = new FrameLayout.LayoutParams(
-                        overlayHeightPx,
-                        overlayWidthPx,
-                        Gravity.CENTER
-                );
-            } else {
-                params = new FrameLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        Gravity.CENTER
-                );
-            }
-            tv.setLayoutParams(params);
-            tv.setScaleX(1f);
-            tv.setScaleY(1f);
-            tv.setRotation(getPreviewRotationDegrees());
-        });
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            tv.post(() -> applyPreviewTransformTo(tv));
+            return;
+        }
+        applyPreviewTransformTo(tv);
+    }
+
+    private void applyPreviewTransformTo(TextureView tv) {
+        boolean rotated = shouldRotatePreviewToDrivingDirection();
+        int desiredWidth = rotated ? overlayHeightPx : ViewGroup.LayoutParams.MATCH_PARENT;
+        int desiredHeight = rotated ? overlayWidthPx : ViewGroup.LayoutParams.MATCH_PARENT;
+        float desiredRotation = getPreviewRotationDegrees();
+
+        ViewGroup.LayoutParams currentParams = tv.getLayoutParams();
+        if (!(currentParams instanceof FrameLayout.LayoutParams)
+                || currentParams.width != desiredWidth
+                || currentParams.height != desiredHeight
+                || ((FrameLayout.LayoutParams) currentParams).gravity != Gravity.CENTER) {
+            tv.setLayoutParams(new FrameLayout.LayoutParams(
+                    desiredWidth,
+                    desiredHeight,
+                    Gravity.CENTER
+            ));
+        }
+        if (tv.getScaleX() != 1f) tv.setScaleX(1f);
+        if (tv.getScaleY() != 1f) tv.setScaleY(1f);
+        if (tv.getRotation() != desiredRotation) tv.setRotation(desiredRotation);
     }
 
     private void clampOverlayPositionToScreen() {
@@ -710,6 +810,12 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
             uiPrefs.unregisterOnSharedPreferenceChangeListener(prefListener);
         }
         mainHandler.removeCallbacks(foregroundModePollRunnable);
+        cancelResizeFrame();
+        if (resizePending) {
+            applyPendingResize();
+            saveOverlayLayoutPrefs();
+        }
+        saveLayoutAfterResizeFrame = false;
         fadeOutPending = false;
         if (overlayView != null) {
             overlayView.animate().cancel();

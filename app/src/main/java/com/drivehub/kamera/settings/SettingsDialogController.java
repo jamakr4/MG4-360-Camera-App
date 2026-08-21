@@ -178,6 +178,8 @@ public final class SettingsDialogController {
         v.swDashcamEnabled = dialog.findViewById(R.id.switchDashcamEnabled);
         v.swSafetyWarning = dialog.findViewById(R.id.switchSafetyWarning);
         v.swSmoothEntry = dialog.findViewById(R.id.switchSmoothEntry);
+        v.swLockTileResizing = dialog.findViewById(R.id.switchLockTileResizing);
+        v.swLockTileMoving = dialog.findViewById(R.id.switchLockTileMoving);
         v.swOemAvmCoexist = dialog.findViewById(R.id.switchOemAvmCoexist);
         v.swAllowBetaUpdates = dialog.findViewById(R.id.switchAllowBetaUpdates);
         v.seekOverlayHideDelay = dialog.findViewById(R.id.seekOverlayHideDelay);
@@ -301,6 +303,16 @@ public final class SettingsDialogController {
             v.swSmoothEntry.setOnCheckedChangeListener((btn, checked) ->
                     UiPrefs.setSmoothEntryEnabled(prefs, checked));
         }
+        if (v.swLockTileResizing != null) {
+            v.swLockTileResizing.setChecked(UiPrefs.isOverlayResizeLocked(prefs));
+            v.swLockTileResizing.setOnCheckedChangeListener((btn, checked) ->
+                    UiPrefs.setOverlayResizeLocked(prefs, checked));
+        }
+        if (v.swLockTileMoving != null) {
+            v.swLockTileMoving.setChecked(UiPrefs.isOverlayMoveLocked(prefs));
+            v.swLockTileMoving.setOnCheckedChangeListener((btn, checked) ->
+                    UiPrefs.setOverlayMoveLocked(prefs, checked));
+        }
         if (v.swOemAvmCoexist != null) {
             v.swOemAvmCoexist.setChecked(UiPrefs.isOemAvmCoexistEnabled(prefs));
             v.swOemAvmCoexist.setOnCheckedChangeListener((btn, checked) ->
@@ -410,6 +422,8 @@ public final class SettingsDialogController {
                         views.swBannerErrorRecovered,
                         views.swSafetyWarning,
                         views.swSmoothEntry,
+                        views.swLockTileResizing,
+                        views.swLockTileMoving,
                         views.swAllowBetaUpdates
                 },
                 views.dialogClose,
@@ -650,6 +664,8 @@ public final class SettingsDialogController {
         Switch swDashcamEnabled;
         Switch swSafetyWarning;
         Switch swSmoothEntry;
+        Switch swLockTileResizing;
+        Switch swLockTileMoving;
         Switch swOemAvmCoexist;
         Switch swAllowBetaUpdates;
         SeekBar seekOverlayHideDelay;

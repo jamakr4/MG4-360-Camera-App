@@ -59,6 +59,8 @@
     <string name="settings_oem_avm_coexist">OEM-360°-App weiter nutzen</string>
     <string name="settings_oem_avm_coexist_hint">Globale Einstellung für die werkseitige 360°-Kamera-App. Wenn aktiv, gibt die App bei Bedarf den Kamerazugriff frei, damit die OEM-Rueckfahr-/360°-Ansicht weiter starten kann. Wenn deaktiviert, haben die Custom-Features immer Vorrang und die OEM-360°-App wird parallel bewusst nicht unterstuetzt.</string>
     <string name="settings_smooth_entry">Smooth Entry</string>
+    <string name="settings_lock_tile_resizing">Tile-Größe sperren</string>
+    <string name="settings_lock_tile_moving">Tile-Position sperren</string>
     <string name="settings_dashcam_banners_section">Benachrichtigungs-Banner</string>
     <string name="settings_dashcam_banner_group_event">Ereignis gespeichert</string>
     <string name="settings_dashcam_banner_group_pause_resume">Aufnahme pausiert / fortgesetzt</string>
@@ -76,12 +78,12 @@
     <string name="settings_dashcam_status_paused_oem">Aufnahme pausiert, damit die OEM-Kamera geoeffnet werden kann</string>
     <string name="settings_dashcam_status_error">Aufnahmefehler: %1$s</string>
     <string name="settings_overlay_on_signal">Kamera beim Blinken anzeigen</string>
-    <string name="settings_lane_changes_only">Nur bei Spurwechseln</string>
+    <string name="settings_lane_changes_only">Mindestgeschwindigkeits-Schwelle</string>
     <string name="settings_lane_change_min_speed">Mindestgeschwindigkeit</string>
     <string name="settings_lane_change_min_speed_default_input">15</string>
     <string name="settings_lane_change_min_speed_min">0 km/h</string>
     <string name="settings_lane_change_min_speed_max">130 km/h</string>
-    <string name="settings_lane_change_min_speed_hint">Wenn aktiviert, erscheint die Blinker-Kamera erst ab der gewählten Geschwindigkeit. Standard: 15 km/h.</string>
+    <string name="settings_lane_change_min_speed_hint">Wenn aktiviert, erscheint die Blinker-Kamera erst ab der gewählten Geschwindigkeit.</string>
     <string name="settings_digital_rearview_enabled">Digitalen Rueckspiegel aktivieren</string>
     <string name="settings_digital_rearview_hint">Zeigt die Heckkamera dauerhaft, bis du sie wieder ausschaltest. Blinker-Kameras haben Vorrang, danach kehrt die Heckansicht zurueck.</string>
     <string name="settings_rearview_tap_to_hide">Tippen zum kurzzeitigen Ausblenden</string>
