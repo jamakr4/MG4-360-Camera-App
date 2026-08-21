@@ -12,6 +12,8 @@ public final class UiPrefs {
     public static final String KEY_ACCENT_COLOR = "accentColor";
     public static final String KEY_ALLOW_BETA_UPDATES = "allowBetaUpdates";
     public static final String KEY_SMOOTH_ENTRY = "smoothEntry";
+    public static final String KEY_OVERLAY_RESIZE_LOCKED = "overlayResizeLocked";
+    public static final String KEY_OVERLAY_MOVE_LOCKED = "overlayMoveLocked";
     public static final String KEY_OVERLAY_ON_SIGNAL = "overlayOnSignal";
     public static final String KEY_LANE_CHANGES_ONLY = "laneChangesOnly";
     public static final String KEY_LANE_CHANGE_MIN_SPEED_KMH = "laneChangeMinSpeedKmh";
@@ -171,6 +173,22 @@ public final class UiPrefs {
 
     public static void setSmoothEntryEnabled(SharedPreferences prefs, boolean enabled) {
         prefs.edit().putBoolean(KEY_SMOOTH_ENTRY, enabled).apply();
+    }
+
+    public static boolean isOverlayResizeLocked(SharedPreferences prefs) {
+        return prefs.getBoolean(KEY_OVERLAY_RESIZE_LOCKED, false);
+    }
+
+    public static void setOverlayResizeLocked(SharedPreferences prefs, boolean locked) {
+        prefs.edit().putBoolean(KEY_OVERLAY_RESIZE_LOCKED, locked).apply();
+    }
+
+    public static boolean isOverlayMoveLocked(SharedPreferences prefs) {
+        return prefs.getBoolean(KEY_OVERLAY_MOVE_LOCKED, false);
+    }
+
+    public static void setOverlayMoveLocked(SharedPreferences prefs, boolean locked) {
+        prefs.edit().putBoolean(KEY_OVERLAY_MOVE_LOCKED, locked).apply();
     }
 
     public static boolean isOemAvmCoexistEnabled(SharedPreferences prefs) {
