@@ -49,7 +49,7 @@ Community mod for the MG4 EV (AAOS 9, pre-2026 facelift) that replaces the stock
 - **Digital rearview mirror**: keeps the factory rear camera visible as a persistent floating mirror for situations where the rear window is blocked by cargo, while still yielding to turn-signal cameras and then restoring the rear view afterwards.
 - **Tesla-style tile view**: replaces the launcher-like OEM overlay, also known as the fullscreen takeover, with a cleaner presentation.
 - **Native 4-camera dashcam**: records all four factory cameras into a single 720x240 grid clip with a footer including time, speed, and a custom signature.
-- **Event capture**: saves a pre/post recording window into a separate `events/` folder
+- **Event capture**: saves a pre- and post-trigger recording window into a separate `events/` folder.
 - **Flexible overlay feedback**: pause, resume, event, and error banners with adjustable size and volume.
 - **OEM 360 AVM coexistence**: can briefly yield camera access so the stock reverse/360 view still opens when needed.
 - **External trigger support**: send `com.drivehub.kamera.action.TRIGGER_DASHCAM_EVENT` from ADB or another app to save an event clip.
@@ -71,6 +71,79 @@ Community mod for the MG4 EV (AAOS 9, pre-2026 facelift) that replaces the stock
   <a href="https://youtu.be/Rzb_Owc_RT0">▶ Full demo on YouTube</a>
 </p>
 
+## Installation Instructions
+
+> [!IMPORTANT]
+> Use the signed release APK. The app uses the system shared user to access the vehicle cameras, so an unsigned or differently signed build cannot be installed as a drop-in replacement.
+
+<details>
+<summary><strong>Install via ADB</strong></summary>
+
+1. Download the latest signed APK from [GitHub Releases](https://github.com/jamakr4/MG4-360-Camera-App/releases/latest).
+2. Install the latest [Android SDK Platform Tools](https://developer.android.com/tools/releases/platform-tools) on your computer and make sure the `adb` command is available.
+3. Enable ADB in both places on the MG4 head unit:
+
+   - Enable ADB in **Engineering Mode**.
+   - Open the Android **Developer options** and enable **USB debugging** there as well.
+
+   Enabling ADB in Engineering Mode alone is not sufficient.
+4. Reboot the Android system if ADB is not available immediately after changing both settings.
+5. Connect your computer to the USB Type-C port at the front of the MG4 head unit. If the head unit asks whether to allow USB debugging, accept the prompt.
+6. Verify the connection:
+
+   ```shell
+   adb devices
+   ```
+
+   The head unit must appear with the status `device`. If it appears as `unauthorized`, accept the USB debugging prompt on the head unit and run the command again.
+7. Install or update the app, replacing the example path with the path to the downloaded APK:
+
+   ```shell
+   adb install -r "/path/to/MG4-360-Camera-App-vX.Y.Z-release.apk"
+   ```
+
+   A successful installation ends with `Success`. The `-r` option updates an existing installation while preserving its app data.
+8. Open **MG4 Camera Mod** using the app launcher of your choice. I personally use [Smart Edge](https://github.com/Imtiaz-Official/Smart-Edge).
+
+> ⚠️ **Software-version compatibility**
+>
+> MG has restricted access to the Android system in newer R versions. On SWI68, general Android access may require R69 or earlier, while ADB access may require R67 or earlier.
+>
+> On newer SWIs, such as SWI 133, updates are delivered through SIPS and downgrading via USB is no longer possible. If you rely on sideloaded apps, confirm that ADB access will remain available before updating the FICM to a newer R version.
+
+</details>
+
+<details>
+<summary><strong>Install via USB</strong></summary>
+
+1. Download the latest signed APK from [GitHub Releases](https://github.com/jamakr4/MG4-360-Camera-App/releases/latest) and copy it to a USB drive.
+2. Connect the USB drive to either the front USB Type-A or USB Type-C port.
+3. Open the **Files** app on the vehicle's Android system and select the USB drive.
+4. Select the APK and tap **Install**. If prompted, allow the Files app to install unknown apps.
+5. Open **MG4 Camera Mod** using the app launcher of your choice.
+
+> 💡 **Community video guide**
+>
+> A community member has shared a [video walkthrough of the USB installation process](https://photos.google.com/share/AF1QipNN8yK7XlK_kuZsqp4CMPORAWdtBpp5-LYftlxs43aQ5HNDJsTlL3q0TtYsMThhIQ?key=RjRsWUZBX1pHajR4Z3ZjdGR4dVJNR0lQTW1idlRn). This video was not created or maintained by the project author and is provided as an independent community resource. Its steps may not reflect future software versions, so compare them with the written instructions above.
+
+> ⚠️ **Software-version compatibility**
+>
+> MG has restricted access to the Android system in newer R versions. On SWI68, general Android access may require R69 or earlier.
+>
+> On newer SWIs, such as SWI 133, updates are delivered through SIPS and downgrading via USB is no longer possible. If you rely on sideloaded apps, confirm that Android and USB installation access will remain available before updating the FICM to a newer R version.
+
+</details>
+
+> [!NOTE]
+> **R-version upgrades**
+>
+> Sideloaded apps on the MG4 are usually stored in `/data`. Following MG's complete USB update procedure, including the final factory reset, deletes `/data` and all sideloaded apps. Some users preserve their apps by omitting the final factory reset, but doing so deviates from MG's instructions and may have side effects. For newer MG4s receiving R-version updates through SIPS, there is currently no known way to prevent this data loss.
+
+> [!CAUTION]
+> **Performing downgrades**
+>
+> Remember that you are working on a high-value vehicle, not a disposable device. Follow only instructions written for your exact hardware and software version, and proceed only if you fully understand the process. An incorrect downgrade may leave the FICM unusable or cause other unforeseen problems. This process is not approved or supported by MG. You have been warned.
+
 ## Quick Guides
 
 <details>
@@ -85,7 +158,7 @@ To use it:
 3. Optional: enable `Lane changes only` to show the signal camera only at or above the selected speed (15 km/h by default).
 4. Optional: enable `Rotate side cameras to driving direction` if you prefer the side cameras to match the direction of travel.
 5. Optional: tune `Overlay hide delay` and `Minimum on-time` so the camera does not disappear too abruptly.
-6. `Tap to hide` is enabled by default (2 seconds) – one tap dismisses the overlay temporarily, it reappears afterwards if the signal is still active.
+6. `Tap to hide` is enabled by default (2 seconds) – one tap dismisses the overlay temporarily; it reappears afterwards if the signal is still active.
 
 Important:
 
@@ -116,7 +189,7 @@ To use it:
 Notes:
 
 - One normal rolling clip is 30 seconds long.
-- Event saves keep a separate pre/post buffer in the `events/` folder.
+- Event saves keep a separate pre- and post-trigger buffer in the `events/` folder.
 - The companion app can trigger an event save externally via `com.drivehub.kamera.action.TRIGGER_DASHCAM_EVENT`.
 - If the dashcam is currently off and you still trigger an event, the app can switch into future-only recording so at least the post-trigger window is captured.
 
@@ -142,8 +215,8 @@ To use it:
 2. Enable `Digital rearview`.
 3. The rear camera will stay visible as a floating window when no higher-priority signal overlay is active.
 4. You can drag and resize the overlay, and the app restores the last layout automatically.
-5. `Tap to temporarily hide` is enabled by default (5 seconds) – one tap dismisses it and it reappears after the set duration.
-6. The "X" in the preview will close it permanently until turned back on.
+5. `Tap to temporarily hide` is enabled by default (5 seconds) – one tap dismisses the overlay, and it reappears after the set duration.
+6. The "X" in the preview closes it permanently until Digital Rearview is turned back on.
 
 Behavior:
 
@@ -154,9 +227,11 @@ Behavior:
 </details>
 
 ## Build Setup
-<details>
-OpenCV is referenced from a local path, so Android builds can fail if `OpenCV_DIR` is not set correctly.
 
+<details>
+<summary><strong>Build from source</strong></summary>
+
+OpenCV is referenced from a local path, so Android builds can fail if `OpenCV_DIR` is not set correctly.
 
 Before building:
 
@@ -224,9 +299,7 @@ Financial support sounds nice in theory, but German tax overhead makes donation 
 > [!NOTE]
 > AI Usage Disclosure.
 >
-> Parts of the code and documentation in this project were developed 
-with AI assistance (e.g. Codex, Claude and DeepSeek). AI-generated images in the Wiki are 
-labeled individually.
+> Parts of the code and documentation in this project were developed with AI assistance (e.g. Codex, Claude, and DeepSeek). AI-generated images in the Wiki are labeled individually.
 
 This is an independent community project and is **not affiliated with SAIC, MG Motor, or any of their subsidiaries**.
 
@@ -234,7 +307,7 @@ This is an independent community project and is **not affiliated with SAIC, MG M
 ## Credits
 
 - Analysis based on community research from [XDA Forums: MG4 Electric AAOS 9](https://xdaforums.com/t/mg4-electric-aaos-9-playing-and-possibly-other-mg-models.4697712/)
-- Tile view inspiration from [merth4n](https://xdaforums.com/m/merth4n.13350648/)
+- Tile view inspired by [merth4n on XDA](https://xdaforums.com/m/merth4n.13350648/) and the original [merthankaraman/DriveHub_Kamera](https://github.com/merthankaraman/DriveHub_Kamera) project
 - OpenCV 4.9.0 - Apache License 2.0
 - AndroidX AppCompat 1.7.1 - Apache License 2.0
 - AndroidX Activity 1.12.4 - Apache License 2.0
