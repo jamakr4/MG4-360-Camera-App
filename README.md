@@ -105,8 +105,7 @@ Community mod for the MG4 EV (AAOS 9, pre-2026 facelift) that replaces the stock
    A successful installation ends with `Success`. The `-r` option updates an existing installation while preserving its app data.
 8. Open **MG4 Camera Mod** using the app launcher of your choice. I personally use [Smart Edge](https://github.com/Imtiaz-Official/Smart-Edge).
 
-> [!WARNING]
-> **Software-version compatibility**
+> ⚠️ **Software-version compatibility**
 >
 > MG has restricted access to the Android system in newer R versions. On SWI68, general Android access may require R69 or earlier, while ADB access may require R67 or earlier.
 >
@@ -123,13 +122,11 @@ Community mod for the MG4 EV (AAOS 9, pre-2026 facelift) that replaces the stock
 4. Select the APK and tap **Install**. If prompted, allow the Files app to install unknown apps.
 5. Open **MG4 Camera Mod** using the app launcher of your choice.
 
-> [!TIP]
-> **Community video guide**
+> 💡 **Community video guide**
 >
 > A community member has shared a [video walkthrough of the USB installation process](https://photos.google.com/share/AF1QipNN8yK7XlK_kuZsqp4CMPORAWdtBpp5-LYftlxs43aQ5HNDJsTlL3q0TtYsMThhIQ?key=RjRsWUZBX1pHajR4Z3ZjdGR4dVJNR0lQTW1idlRn). This video was not created or maintained by the project author and is provided as an independent community resource. Its steps may not reflect future software versions, so compare them with the written instructions above.
 
-> [!WARNING]
-> **Software-version compatibility**
+> ⚠️ **Software-version compatibility**
 >
 > MG has restricted access to the Android system in newer R versions. On SWI68, general Android access may require R69 or earlier.
 >
