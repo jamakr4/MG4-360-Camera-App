@@ -101,6 +101,12 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         return sMainVisible && !sSettingsDialogOpen;
     }
 
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        settingsDialog.onActivityResult(requestCode, resultCode, data);
+    }
+
     @SuppressLint("ClickableViewAccessibility")
     @Override
     protected void onCreate(Bundle savedInstanceState) {

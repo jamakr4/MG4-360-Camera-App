@@ -14,19 +14,24 @@ import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.net.Uri;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
+import android.os.ParcelFileDescriptor;
 import android.os.SystemClock;
 import android.util.Log;
 
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
+import androidx.documentfile.provider.DocumentFile;
 
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -105,7 +110,7 @@ public class RecordingService extends Service {
     private volatile int pendingErrorNotificationResId = 0;
     private volatile int pendingErrorGeneration = 0;
     private volatile boolean errorOverlayShown = false;
-    private volatile File activeBaseDir;
+    private volatile DashcamStorageManager.Resolution activeStorage;
     private volatile boolean activeBaseIsUsb;
     private volatile boolean usbEjectInProgress = false;
     private volatile boolean futureOnlyEventSession = false;
@@ -334,24 +339,15 @@ public class RecordingService extends Service {
     }
 
     private void recordTestClip(long durationMs) {
-        File recordsBase = resolveActiveBaseDir(true);
-        if (recordsBase == null) {
+        DashcamStorageManager.Resolution storage = resolveActiveStorage(true);
+        if (storage == null) {
             worker = null;
             stopForeground(true);
             stopSelf();
             return;
         }
-        // Write test clips into a separate subdirectory so they never participate
-        // in ring-buffer cleanup and don't accumulate as phantom entries there.
-        File testDir = new File(recordsBase, "test");
-        if (!ensureDirectoryExists(testDir, "test dir")) {
-            worker = null;
-            stopForeground(true);
-            stopSelf();
-            return;
-        }
-        boolean startedAnyCamera = recordClip(testDir, durationMs,
-                makeTimestampBase(System.currentTimeMillis(), "yyMMddHHmmss"), -1);
+        boolean startedAnyCamera = recordClip(storage, "test", durationMs,
+                makeTimestampBase(System.currentTimeMillis(), "yyMMddHHmmss"));
         worker = null;
         if (startedAnyCamera) {
             publishStatus(STATUS_OFF, 0, TOTAL_CAMERAS, "");
@@ -372,8 +368,8 @@ public class RecordingService extends Service {
             return;
         }
 
-        File baseDir = resolveActiveBaseDir(true);
-        if (baseDir == null) {
+        DashcamStorageManager.Resolution storage = resolveActiveStorage(true);
+        if (storage == null) {
             worker = null;
             stopSelf();
             return;
@@ -390,19 +386,19 @@ public class RecordingService extends Service {
             // Re-resolve between segments so USB hot-plug/unplug and settings changes are
             // picked up. AUTO mode switches targets with a banner; USB_ONLY mode turns a
             // missing medium into a fatal error.
-            File resolved = resolveActiveBaseDir(false);
+            DashcamStorageManager.Resolution resolved = resolveActiveStorage(false);
             if (resolved == null) {
                 endedWithFatalError = true;
                 break;
             }
-            baseDir = resolved;
+            storage = resolved;
 
             // Read every iteration so settings edits take effect between segments. USB and
             // internal storage carry separate retention limits.
             int keepSegments = DashcamStorageManager.getActiveRetentionClipCount(prefs, activeBaseIsUsb);
             long segmentStartWallMs = System.currentTimeMillis();
             String baseName = makeTimestampBase(segmentStartWallMs, "yyMMddHHmmss");
-            boolean startedAnyCamera = recordClip(baseDir, segmentMs, baseName, keepSegments);
+            boolean startedAnyCamera = recordClip(storage, null, segmentMs, baseName);
             if (!startedAnyCamera) {
                 if (isRecoverableUsbFailure()) {
                     // AUTO mode: the segment failed because USB died. The next loop pass
@@ -412,7 +408,7 @@ public class RecordingService extends Service {
                 endedWithFatalError = true;
                 break;
             }
-            onSegmentCompleted(baseDir, baseName, segmentStartWallMs, System.currentTimeMillis(), keepSegments);
+            onSegmentCompleted(storage, baseName, segmentStartWallMs, System.currentTimeMillis(), keepSegments);
 
             // Check whether recording has been disabled in prefs.
             enabled = prefs.getBoolean(DashcamSettingsController.KEY_ENABLED, false);
@@ -437,8 +433,8 @@ public class RecordingService extends Service {
             return;
         }
 
-        File baseDir = resolveActiveBaseDir(true);
-        if (baseDir == null) {
+        DashcamStorageManager.Resolution storage = resolveActiveStorage(true);
+        if (storage == null) {
             futureOnlyEventSession = false;
             worker = null;
             stopSelf();
@@ -450,17 +446,17 @@ public class RecordingService extends Service {
         int remainingSegments = FUTURE_ONLY_EVENT_SEGMENTS;
 
         while (!stopRequested && remainingSegments > 0) {
-            File resolved = resolveActiveBaseDir(false);
+            DashcamStorageManager.Resolution resolved = resolveActiveStorage(false);
             if (resolved == null) {
                 endedWithFatalError = true;
                 break;
             }
-            baseDir = resolved;
+            storage = resolved;
 
             int keepSegments = DashcamStorageManager.getActiveRetentionClipCount(prefs(), activeBaseIsUsb);
             long segmentStartWallMs = System.currentTimeMillis();
             String baseName = makeTimestampBase(segmentStartWallMs, "yyMMddHHmmss");
-            boolean startedAnyCamera = recordClip(baseDir, segmentMs, baseName, keepSegments);
+            boolean startedAnyCamera = recordClip(storage, null, segmentMs, baseName);
             if (!startedAnyCamera) {
                 if (isRecoverableUsbFailure()) {
                     continue;
@@ -468,7 +464,7 @@ public class RecordingService extends Service {
                 endedWithFatalError = true;
                 break;
             }
-            onSegmentCompleted(baseDir, baseName, segmentStartWallMs, System.currentTimeMillis(), keepSegments);
+            onSegmentCompleted(storage, baseName, segmentStartWallMs, System.currentTimeMillis(), keepSegments);
             remainingSegments--;
         }
 
@@ -480,25 +476,59 @@ public class RecordingService extends Service {
         stopServiceIfNotEjecting();
     }
 
-    private boolean recordClip(File baseDir, long durationMs, String baseName, int keepSegments) {
+    private boolean recordClip(DashcamStorageManager.Resolution storage, @Nullable String subdir,
+            long durationMs, String baseName) {
         SharedPreferences prefs = prefs();
         int recordingFps = DashcamSettingsController.getRecordingFps(prefs);
         String signature = DashcamSettingsController.getRecordingSignature(prefs);
         boolean showSpeed = DashcamSettingsController.shouldShowSpeed(prefs);
         int cameraMask = DashcamSettingsController.getRecordingCameraMask(prefs);
         int selectedCameraCount = DashcamSettingsController.getRecordingCameraCount(cameraMask);
-        File outputFile = new File(baseDir, baseName + ".mp4");
-        boolean started = CameraProbe.startCombinedMp4Record(
-                outputFile.getAbsolutePath(),
-                720,
-                240,
-                recordingFps,
-                9_000_000,
-                signature,
-                showSpeed,
-                cameraMask);
+        String fileName = baseName + ".mp4";
+        File outputFile = null;
+        DocumentFile outputDocument = null;
+        boolean started = false;
+        try {
+            if (storage.isSaf()) {
+                DocumentFile outputDir = resolveDocumentDirectory(storage.treeUri, subdir, true);
+                if (outputDir == null) {
+                    publishStatus(STATUS_ERROR, 0, TOTAL_CAMERAS, ERROR_STORAGE_NOT_WRITABLE);
+                    return false;
+                }
+                DocumentFile existing = outputDir.findFile(fileName);
+                if (existing != null) existing.delete();
+                outputDocument = outputDir.createFile("video/mp4", fileName);
+                if (outputDocument == null) {
+                    publishStatus(STATUS_ERROR, 0, TOTAL_CAMERAS, ERROR_STORAGE_NOT_WRITABLE);
+                    return false;
+                }
+                try (ParcelFileDescriptor pfd = getContentResolver()
+                        .openFileDescriptor(outputDocument.getUri(), "rw")) {
+                    if (pfd != null) {
+                        started = CameraProbe.startCombinedMp4RecordFd(
+                                pfd.getFd(), 720, 240, recordingFps, 9_000_000,
+                                signature, showSpeed, cameraMask);
+                    }
+                }
+            } else {
+                File outputDir = subdir == null ? storage.baseDir : new File(storage.baseDir, subdir);
+                if (!ensureDirectoryExists(outputDir, subdir == null ? "records base dir" : subdir + " dir")) {
+                    publishStatus(STATUS_ERROR, 0, TOTAL_CAMERAS, ERROR_STORAGE_NOT_WRITABLE);
+                    return false;
+                }
+                outputFile = new File(outputDir, fileName);
+                started = CameraProbe.startCombinedMp4Record(
+                        outputFile.getAbsolutePath(), 720, 240, recordingFps, 9_000_000,
+                        signature, showSpeed, cameraMask);
+            }
+        } catch (Throwable t) {
+            Log.e(TAG, "Could not open recording output " + storage.locationKey(), t);
+            started = false;
+        }
 
         if (!started) {
+            if (outputDocument != null) outputDocument.delete();
+            if (outputFile != null) outputFile.delete();
             publishStatus(STATUS_ERROR, 0, TOTAL_CAMERAS, ERROR_GRID_START_FAILED);
             return false;
         }
@@ -553,25 +583,26 @@ public class RecordingService extends Service {
         return true;
     }
 
-    private void onSegmentCompleted(File baseDir, String baseName, long startMs, long endMs, int keepSegments) {
+    private void onSegmentCompleted(DashcamStorageManager.Resolution storage,
+            String baseName, long startMs, long endMs, int keepSegments) {
         List<EventCopyJob> copyJobs;
         synchronized (eventLock) {
             long segmentOrdinal = ++completedSegmentCount;
             recentSegments.add(new SegmentInfo(segmentOrdinal, baseName, startMs, endMs,
-                    baseDir.getAbsolutePath()));
+                    storage.locationKey()));
             while (recentSegments.size() > keepSegments + 6) {
                 recentSegments.remove(0);
             }
             copyJobs = collectEventCopyJobsLocked(segmentOrdinal);
             Set<String> protectedBases = collectProtectedBasesLocked();
-            cleanupOldSegments(baseDir, keepSegments, protectedBases);
+            cleanupOldSegments(storage, keepSegments, protectedBases);
             persistEventStateLocked();
         }
         enqueueEventCopyJobs(copyJobs);
     }
 
     private boolean startFutureOnlyEventSession() {
-        if (resolveActiveBaseDir(true) == null) {
+        if (resolveActiveStorage(true) == null) {
             return false;
         }
         if (!armEventCapture(0, FUTURE_ONLY_EVENT_SEGMENTS - 1)) {
@@ -591,17 +622,10 @@ public class RecordingService extends Service {
     private boolean armEventCapture(int segmentsBeforeCurrent, int segmentsAfterCurrent) {
         long now = System.currentTimeMillis();
         String eventBaseName = "event_" + makeTimestampBase(now, "yyMMddHHmmssSSS");
-        File eventsBaseDir = getEventsBaseDir();
-        if (eventsBaseDir == null || !eventsBaseDir.canWrite()) {
+        String eventTargetLocation = getActiveLocationKey();
+        if (!ensureEventDirectory(eventTargetLocation, eventBaseName)) {
             DevRuntimeLog.add("RecordingService", "Event capture failed: events base dir unavailable or not writable");
             Log.e(TAG, "Failed to arm event capture because events base dir is unavailable or not writable");
-            notifyEventStorageFailure();
-            return false;
-        }
-        File eventDir = new File(eventsBaseDir, eventBaseName);
-        if (!ensureDirectoryExists(eventDir, "event dir")) {
-            DevRuntimeLog.add("RecordingService", "Event capture failed: mkdir " + eventDir.getAbsolutePath());
-            Log.e(TAG, "Failed to create event dir " + eventDir.getAbsolutePath());
             notifyEventStorageFailure();
             return false;
         }
@@ -613,9 +637,10 @@ public class RecordingService extends Service {
             pendingEventRequests.add(new EventCaptureRequest(
                     eventBaseName,
                     firstSegmentOrdinal,
-                    lastSegmentOrdinal
+                    lastSegmentOrdinal,
+                    eventTargetLocation
             ));
-            trimOldEventDirsLocked(eventsBaseDir);
+            trimOldEventDirsLocked(eventTargetLocation);
             copyJobs = collectEventCopyJobsLocked(completedSegmentCount);
             persistEventStateLocked();
             DevRuntimeLog.add(
@@ -644,7 +669,7 @@ public class RecordingService extends Service {
                 }
             }
             if (!segments.isEmpty()) {
-                jobs.add(new EventCopyJob(request.eventBaseName, segments));
+                jobs.add(new EventCopyJob(request.eventBaseName, request.targetLocation, segments));
             }
             if (isRequestCompleteLocked(request, completedThroughOrdinal)) {
                 completed.add(request);
@@ -696,18 +721,10 @@ public class RecordingService extends Service {
             onEventCopyFinished(job, new ArrayList<>());
             return;
         }
-        File eventsBaseDir = getEventsBaseDir();
-        if (eventsBaseDir == null || !eventsBaseDir.canWrite()) {
+        String targetLocation = job.targetLocation.isEmpty() ? getActiveLocationKey() : job.targetLocation;
+        if (!ensureEventDirectory(targetLocation, job.eventBaseName)) {
             DevRuntimeLog.add("RecordingService", "Event copy failed: events base dir unavailable or not writable");
             Log.e(TAG, "Failed to copy event segments because events base dir is unavailable or not writable");
-            mainHandler.post(this::notifyEventStorageFailure);
-            onEventCopyFinished(job, new ArrayList<>());
-            return;
-        }
-        File eventDir = new File(eventsBaseDir, job.eventBaseName);
-        if (!ensureDirectoryExists(eventDir, "event dir")) {
-            DevRuntimeLog.add("RecordingService", "Event copy failed: mkdir " + eventDir.getAbsolutePath());
-            Log.e(TAG, "Failed to create event dir " + eventDir.getAbsolutePath());
             mainHandler.post(this::notifyEventStorageFailure);
             onEventCopyFinished(job, new ArrayList<>());
             return;
@@ -718,10 +735,10 @@ public class RecordingService extends Service {
             // Read each segment from the root it was recorded into — after a USB→internal
             // fallback an event can span both roots. Legacy persisted entries without a
             // source path fall back to the currently active root.
-            File sourceDir = ref.sourceDirPath.isEmpty()
-                    ? getActiveRecordsBaseDir()
-                    : new File(ref.sourceDirPath);
-            if (copySegmentGroup(sourceDir, eventDir, ref.baseName)) {
+            String sourceLocation = ref.sourceDirPath.isEmpty()
+                    ? getActiveLocationKey()
+                    : ref.sourceDirPath;
+            if (copySegmentGroup(sourceLocation, targetLocation, job.eventBaseName, ref.baseName)) {
                 copiedBaseNames.add(ref.baseName);
             }
         }
@@ -752,40 +769,82 @@ public class RecordingService extends Service {
         return null;
     }
 
-    private boolean copySegmentGroup(File sourceDir, File targetDir, String baseName) {
-        File combinedSource = new File(sourceDir, baseName + ".mp4");
-        if (combinedSource.exists()) {
-            return copyFile(combinedSource, new File(targetDir, combinedSource.getName()));
+    private boolean copySegmentGroup(String sourceLocation, String targetLocation,
+            String eventBaseName, String baseName) {
+        String combinedName = baseName + ".mp4";
+        if (recordingFileExists(sourceLocation, combinedName)) {
+            return copyRecordingFile(sourceLocation, targetLocation, eventBaseName, combinedName);
         }
-
-        char[] suffixes = new char[] { 'F', 'R', 'X', 'Y' };
         boolean copiedAny = false;
-        for (char suffix : suffixes) {
-            File source = new File(sourceDir, baseName + "_" + suffix + ".mp4");
-            if (!source.exists()) {
-                continue;
+        for (char suffix : new char[] { 'F', 'R', 'X', 'Y' }) {
+            String name = baseName + "_" + suffix + ".mp4";
+            if (recordingFileExists(sourceLocation, name)) {
+                copiedAny |= copyRecordingFile(sourceLocation, targetLocation, eventBaseName, name);
             }
-            File target = new File(targetDir, source.getName());
-            copiedAny |= copyFile(source, target);
         }
         return copiedAny;
     }
 
-    private boolean copyFile(File source, File target) {
-        byte[] buffer = new byte[64 * 1024];
-        File temp = new File(target.getParentFile(), target.getName() + ".tmp");
-        if (temp.exists() && !temp.delete()) {
-            Log.w(TAG, "Could not delete stale temp file " + temp.getAbsolutePath());
+    private boolean recordingFileExists(String location, String fileName) {
+        if (isContentLocation(location)) {
+            DocumentFile root = DashcamStorageManager.resolveTree(this, Uri.parse(location));
+            DocumentFile file = root == null ? null : root.findFile(fileName);
+            return file != null && file.isFile();
         }
-        try (FileInputStream in = new FileInputStream(source);
-                FileOutputStream out = new FileOutputStream(temp)) {
-            int read;
-            while ((read = in.read(buffer)) >= 0) {
-                if (read == 0) {
-                    continue;
+        return !location.isEmpty() && new File(location, fileName).isFile();
+    }
+
+    private boolean copyRecordingFile(String sourceLocation, String targetLocation,
+            String eventBaseName, String fileName) {
+        try (InputStream in = openRecordingInput(sourceLocation, fileName)) {
+            if (in == null) return false;
+            if (isContentLocation(targetLocation)) {
+                DocumentFile eventDir = resolveDocumentDirectory(
+                        Uri.parse(targetLocation), "events/" + eventBaseName, true);
+                if (eventDir == null) return false;
+                DocumentFile existing = eventDir.findFile(fileName);
+                if (existing != null) existing.delete();
+                DocumentFile target = eventDir.createFile("video/mp4", fileName);
+                if (target == null) return false;
+                try (OutputStream out = getContentResolver().openOutputStream(target.getUri(), "w")) {
+                    if (out == null) {
+                        target.delete();
+                        return false;
+                    }
+                    copyStream(in, out);
+                    out.flush();
+                    return true;
+                } catch (Throwable t) {
+                    target.delete();
+                    throw t;
                 }
-                out.write(buffer, 0, read);
             }
+            File eventDir = new File(new File(targetLocation, "events"), eventBaseName);
+            if (!ensureDirectoryExists(eventDir, "event dir")) return false;
+            return copyStreamToFile(in, new File(eventDir, fileName));
+        } catch (Throwable t) {
+            Log.e(TAG, "Failed event copy " + sourceLocation + "/" + fileName
+                    + " -> " + targetLocation, t);
+            return false;
+        }
+    }
+
+    @Nullable
+    private InputStream openRecordingInput(String location, String fileName) throws IOException {
+        if (isContentLocation(location)) {
+            DocumentFile root = DashcamStorageManager.resolveTree(this, Uri.parse(location));
+            DocumentFile source = root == null ? null : root.findFile(fileName);
+            return source == null ? null : getContentResolver().openInputStream(source.getUri());
+        }
+        File source = new File(location, fileName);
+        return source.isFile() ? new FileInputStream(source) : null;
+    }
+
+    private boolean copyStreamToFile(InputStream in, File target) {
+        File temp = new File(target.getParentFile(), target.getName() + ".tmp");
+        if (temp.exists()) temp.delete();
+        try (FileOutputStream out = new FileOutputStream(temp)) {
+            copyStream(in, out);
             out.flush();
             out.getFD().sync();
             if (target.exists() && !target.delete()) {
@@ -796,14 +855,57 @@ public class RecordingService extends Service {
             }
             return true;
         } catch (Throwable t) {
-            Log.e(TAG, "Failed to copy " + source.getAbsolutePath() + " -> " + target.getAbsolutePath(), t);
-            // noinspection ResultOfMethodCallIgnored
+            Log.e(TAG, "Failed to write event target " + target.getAbsolutePath(), t);
             temp.delete();
+            return false;
         }
-        return false;
     }
 
-    private void cleanupOldSegments(File baseDir, int keepSegments, Set<String> protectedBases) {
+    private void copyStream(InputStream in, OutputStream out) throws IOException {
+        byte[] buffer = new byte[64 * 1024];
+        int read;
+        while ((read = in.read(buffer)) >= 0) {
+            if (read > 0) out.write(buffer, 0, read);
+        }
+    }
+
+    private boolean ensureEventDirectory(String location, String eventBaseName) {
+        if (location == null || location.isEmpty()) return false;
+        if (isContentLocation(location)) {
+            return resolveDocumentDirectory(Uri.parse(location),
+                    "events/" + eventBaseName, true) != null;
+        }
+        return ensureDirectoryExists(new File(new File(location, "events"), eventBaseName), "event dir");
+    }
+
+    @Nullable
+    private DocumentFile resolveDocumentDirectory(@Nullable Uri treeUri,
+            @Nullable String relativePath, boolean create) {
+        DocumentFile current = DashcamStorageManager.resolveTree(this, treeUri);
+        if (current == null || !current.isDirectory()) return null;
+        if (relativePath == null || relativePath.trim().isEmpty()) return current;
+        for (String part : relativePath.split("/")) {
+            if (part.isEmpty()) continue;
+            DocumentFile next = current.findFile(part);
+            if (next == null && create) next = current.createDirectory(part);
+            if (next == null || !next.isDirectory()) return null;
+            current = next;
+        }
+        return current;
+    }
+
+    private boolean isContentLocation(String location) {
+        return location != null && location.startsWith("content://");
+    }
+
+    private void cleanupOldSegments(DashcamStorageManager.Resolution storage,
+            int keepSegments, Set<String> protectedBases) {
+        if (storage.isSaf()) {
+            cleanupOldDocumentSegments(storage.treeUri, keepSegments, protectedBases);
+            return;
+        }
+        File baseDir = storage.baseDir;
+        if (baseDir == null) return;
         File[] files = baseDir.listFiles();
         if (files == null)
             return;
@@ -854,8 +956,44 @@ public class RecordingService extends Service {
         }
     }
 
-    private void trimOldEventDirsLocked(File eventsBaseDir) {
-        if (eventsBaseDir == null) return;
+    private void cleanupOldDocumentSegments(Uri treeUri, int keepSegments, Set<String> protectedBases) {
+        DocumentFile root = DashcamStorageManager.resolveTree(this, treeUri);
+        if (root == null) return;
+        Map<String, List<DocumentFile>> groups = new HashMap<>();
+        try {
+            for (DocumentFile file : root.listFiles()) {
+                String name = file.getName();
+                if (!file.isFile() || name == null || !name.endsWith(".mp4")) continue;
+                int underscore = name.indexOf('_');
+                String base = underscore > 0
+                        ? name.substring(0, underscore)
+                        : name.substring(0, name.length() - 4);
+                groups.computeIfAbsent(base, ignored -> new ArrayList<>()).add(file);
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "Could not list SAF recording segments", t);
+            return;
+        }
+        List<String> bases = new ArrayList<>(groups.keySet());
+        bases.sort(String::compareTo);
+        int toDelete = Math.max(0, bases.size() - keepSegments);
+        int deleted = 0;
+        for (String base : bases) {
+            if (deleted >= toDelete) break;
+            if (protectedBases != null && protectedBases.contains(base)) continue;
+            boolean ok = true;
+            for (DocumentFile file : groups.get(base)) ok &= file.delete();
+            if (ok) deleted++;
+        }
+    }
+
+    private void trimOldEventDirsLocked(String location) {
+        if (isContentLocation(location)) {
+            trimOldDocumentEventDirs(location);
+            return;
+        }
+        File eventsBaseDir = new File(location, "events");
+        if (!eventsBaseDir.isDirectory()) return;
         File[] files = eventsBaseDir.listFiles();
         if (files == null) return;
         List<File> eventDirs = new ArrayList<>();
@@ -900,9 +1038,44 @@ public class RecordingService extends Service {
         return f.delete();
     }
 
-    private File getEventsBaseDir() {
-        File dir = new File(getActiveRecordsBaseDir(), "events");
-        return ensureDirectoryExists(dir, "events base dir") ? dir : null;
+    private void trimOldDocumentEventDirs(String location) {
+        DocumentFile eventsDir = resolveDocumentDirectory(Uri.parse(location), "events", false);
+        if (eventsDir == null) return;
+        List<DocumentFile> eventDirs = new ArrayList<>();
+        try {
+            for (DocumentFile file : eventsDir.listFiles()) {
+                String name = file.getName();
+                if (file.isDirectory() && name != null && name.startsWith("event_")) eventDirs.add(file);
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "Could not list SAF event directories", t);
+            return;
+        }
+        int maxRetained = DashcamStorageManager.getActiveMaxRetainedEventDirs(prefs(), true);
+        if (eventDirs.size() <= maxRetained) return;
+        eventDirs.sort(Comparator.comparing(file -> file.getName() == null ? "" : file.getName()));
+        Set<String> pendingNames = new HashSet<>();
+        for (EventCaptureRequest req : pendingEventRequests) pendingNames.add(req.eventBaseName);
+        int toDelete = eventDirs.size() - maxRetained;
+        int deleted = 0;
+        for (DocumentFile dir : eventDirs) {
+            if (deleted >= toDelete) break;
+            if (pendingNames.contains(dir.getName())) continue;
+            if (deleteDocumentRecursive(dir)) deleted++;
+        }
+    }
+
+    private boolean deleteDocumentRecursive(DocumentFile file) {
+        if (file == null) return false;
+        try {
+            if (file.isDirectory()) {
+                for (DocumentFile child : file.listFiles()) deleteDocumentRecursive(child);
+            }
+            return file.delete();
+        } catch (Throwable t) {
+            Log.w(TAG, "Could not delete SAF document " + file.getUri(), t);
+            return false;
+        }
     }
 
     private void notifyEventStorageFailure() {
@@ -920,20 +1093,28 @@ public class RecordingService extends Service {
      * @param initial true on the first resolution of a recording session — suppresses
      *                the USB↔internal transition banner that only makes sense mid-session.
      */
-    private File resolveActiveBaseDir(boolean initial) {
-        DashcamStorageManager.Resolution res = DashcamStorageManager.resolve(this);
-        if (res.baseDir == null) {
+    private DashcamStorageManager.Resolution resolveActiveStorage(boolean initial) {
+        DashcamStorageManager.Resolution res = DashcamStorageManager.resolve(this, initial);
+        if (!res.isUsable()) {
             DevRuntimeLog.add("RecordingService", "Storage resolve failed: " + res.usbState);
             publishStatus(STATUS_ERROR, 0, TOTAL_CAMERAS, ERROR_USB_STORAGE);
             return null;
         }
-        if (!ensureDirectoryExists(res.baseDir, "records base dir") || !res.baseDir.canWrite()) {
-            publishStatus(STATUS_ERROR, 0, TOTAL_CAMERAS, ERROR_STORAGE_NOT_WRITABLE);
-            return null;
+        if (res.isSaf()) {
+            DocumentFile tree = DashcamStorageManager.resolveTree(this, res.treeUri);
+            if (tree == null || !tree.exists() || !tree.isDirectory() || !tree.canWrite()) {
+                publishStatus(STATUS_ERROR, 0, TOTAL_CAMERAS, ERROR_STORAGE_NOT_WRITABLE);
+                return null;
+            }
+        } else {
+            if (!ensureDirectoryExists(res.baseDir, "records base dir") || !res.baseDir.canWrite()) {
+                publishStatus(STATUS_ERROR, 0, TOTAL_CAMERAS, ERROR_STORAGE_NOT_WRITABLE);
+                return null;
+            }
         }
         boolean wasUsb = activeBaseIsUsb;
-        boolean hadPrevious = activeBaseDir != null;
-        activeBaseDir = res.baseDir;
+        boolean hadPrevious = activeStorage != null;
+        activeStorage = res;
         activeBaseIsUsb = res.usingUsb;
         if (!initial && hadPrevious) {
             if (wasUsb && !res.usingUsb) {
@@ -947,7 +1128,7 @@ public class RecordingService extends Service {
                 DevRuntimeLog.add("RecordingService", "USB storage available again => switching back to USB");
             }
         }
-        return res.baseDir;
+        return res;
     }
 
     /**
@@ -959,7 +1140,7 @@ public class RecordingService extends Service {
         if (!activeBaseIsUsb) {
             return false;
         }
-        if (DashcamStorageManager.isUsbStillWritable(activeBaseDir)) {
+        if (DashcamStorageManager.isUsbStillWritable(this, activeStorage)) {
             // Storage is fine — this is a genuine camera/encoder failure.
             return false;
         }
@@ -973,9 +1154,11 @@ public class RecordingService extends Service {
         return true;
     }
 
-    private File getActiveRecordsBaseDir() {
-        File dir = activeBaseDir;
-        return dir != null ? dir : DashcamSettingsController.getRecordsBaseDir(this);
+    private String getActiveLocationKey() {
+        DashcamStorageManager.Resolution storage = activeStorage;
+        return storage != null
+                ? storage.locationKey()
+                : DashcamSettingsController.getRecordsBaseDir(this).getAbsolutePath();
     }
 
     private boolean ensureDirectoryExists(File dir, String label) {
@@ -1058,6 +1241,7 @@ public class RecordingService extends Service {
 
     private void broadcastUsbEjectReady(boolean safeToRemove, int messageRes) {
         Intent intent = new Intent(ACTION_USB_EJECT_READY);
+        intent.setPackage(getPackageName());
         intent.putExtra(EXTRA_USB_EJECT_SAFE_TO_REMOVE, safeToRemove);
         intent.putExtra(EXTRA_USB_EJECT_MESSAGE_RES, messageRes);
         sendBroadcast(intent);
@@ -1295,11 +1479,13 @@ public class RecordingService extends Service {
                     String eventBaseName = obj.optString("eventBaseName", "");
                     long firstSegmentOrdinal = obj.optLong("firstSegmentOrdinal", -1L);
                     long lastSegmentOrdinal = obj.optLong("lastSegmentOrdinal", -1L);
+                    String targetLocation = obj.optString("targetLocation", "");
                     if (eventBaseName.isEmpty() || firstSegmentOrdinal <= 0L || lastSegmentOrdinal < firstSegmentOrdinal) {
                         continue;
                     }
                     EventCaptureRequest request =
-                            new EventCaptureRequest(eventBaseName, firstSegmentOrdinal, lastSegmentOrdinal);
+                            new EventCaptureRequest(eventBaseName, firstSegmentOrdinal,
+                                    lastSegmentOrdinal, targetLocation);
                     JSONArray copiedJson = obj.optJSONArray("copiedBaseNames");
                     if (copiedJson != null) {
                         for (int j = 0; j < copiedJson.length(); j++) {
@@ -1343,6 +1529,7 @@ public class RecordingService extends Service {
                 obj.put("eventBaseName", request.eventBaseName);
                 obj.put("firstSegmentOrdinal", request.firstSegmentOrdinal);
                 obj.put("lastSegmentOrdinal", request.lastSegmentOrdinal);
+                obj.put("targetLocation", request.targetLocation);
                 JSONArray copiedJson = new JSONArray();
                 for (String copiedBaseName : request.copiedBaseNames) {
                     copiedJson.put(copiedBaseName);
@@ -1394,9 +1581,8 @@ public class RecordingService extends Service {
         final String baseName;
         final long startMs;
         final long endMs;
-        // Absolute path of the records root this segment was written into. Segments recorded
-        // before a USB→internal fallback live in a different root than the currently active
-        // one, so event copies must read from here, not from the active dir.
+        // Absolute path or persisted content:// tree URI of the records root. Segments recorded
+        // before a USB→internal fallback can live in a different root than the active one.
         final String sourceDirPath;
 
         SegmentInfo(long ordinal, String baseName, long startMs, long endMs, String sourceDirPath) {
@@ -1422,22 +1608,27 @@ public class RecordingService extends Service {
         final String eventBaseName;
         final long firstSegmentOrdinal;
         final long lastSegmentOrdinal;
+        final String targetLocation;
         final Set<String> copiedBaseNames = new HashSet<>();
         final Set<String> inFlightBaseNames = new HashSet<>();
 
-        EventCaptureRequest(String eventBaseName, long firstSegmentOrdinal, long lastSegmentOrdinal) {
+        EventCaptureRequest(String eventBaseName, long firstSegmentOrdinal,
+                long lastSegmentOrdinal, String targetLocation) {
             this.eventBaseName = eventBaseName;
             this.firstSegmentOrdinal = firstSegmentOrdinal;
             this.lastSegmentOrdinal = lastSegmentOrdinal;
+            this.targetLocation = targetLocation == null ? "" : targetLocation;
         }
     }
 
     private static final class EventCopyJob {
         final String eventBaseName;
+        final String targetLocation;
         final List<SegmentCopyRef> segments;
 
-        EventCopyJob(String eventBaseName, List<SegmentCopyRef> segments) {
+        EventCopyJob(String eventBaseName, String targetLocation, List<SegmentCopyRef> segments) {
             this.eventBaseName = eventBaseName;
+            this.targetLocation = targetLocation == null ? "" : targetLocation;
             this.segments = segments;
         }
 

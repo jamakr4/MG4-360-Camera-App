@@ -15,6 +15,7 @@ import com.drivehub.kamera.signal.SignalService;
 import com.drivehub.kamera.settings.SegmentedControl;
 
 import android.app.Dialog;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
@@ -103,6 +104,10 @@ public final class SettingsDialogController {
             views.tvDashcamRecordingStatus.setText(text);
         }
         refreshDevStatusSection(status, activeCameras, totalCameras, lastError);
+    }
+
+    public boolean onActivityResult(int requestCode, int resultCode, Intent data) {
+        return dashcam.onActivityResult(requestCode, resultCode, data);
     }
 
     @SuppressWarnings("deprecation")
@@ -203,21 +208,14 @@ public final class SettingsDialogController {
         v.swDashcamCameraRear = dialog.findViewById(R.id.switchDashcamCameraRear);
         v.swDashcamTestRecordEnabled = dialog.findViewById(R.id.switchDashcamTestRecordEnabled);
         v.etDashcamTestRecordDuration = dialog.findViewById(R.id.etDashcamTestRecordDuration);
-        // Temporarily disabled storage UI:
-        // v.segDashcamStorageTarget = dialog.findViewById(R.id.segDashcamStorageTarget);
-        // v.tvDashcamStorageStatus = dialog.findViewById(R.id.tvDashcamStorageStatus);
-        // v.tvDashcamStorageActivePath = dialog.findViewById(R.id.tvDashcamStorageActivePath);
-        // v.btnDashcamStorageEjectUsb = dialog.findViewById(R.id.btnDashcamStorageEjectUsb);
-        // v.tvDashcamStorageInternalWarning = dialog.findViewById(R.id.tvDashcamStorageInternalWarning);
-        // v.etDashcamUsbClipCount = dialog.findViewById(R.id.etDashcamUsbClipCount);
-        // v.etDashcamUsbEventDirs = dialog.findViewById(R.id.etDashcamUsbEventDirs);
-        v.segDashcamStorageTarget = null;
-        v.tvDashcamStorageStatus = null;
-        v.tvDashcamStorageActivePath = null;
-        v.btnDashcamStorageEjectUsb = null;
-        v.tvDashcamStorageInternalWarning = null;
-        v.etDashcamUsbClipCount = null;
-        v.etDashcamUsbEventDirs = null;
+        v.segDashcamStorageTarget = dialog.findViewById(R.id.segDashcamStorageTarget);
+        v.tvDashcamStorageStatus = dialog.findViewById(R.id.tvDashcamStorageStatus);
+        v.tvDashcamStorageActivePath = dialog.findViewById(R.id.tvDashcamStorageActivePath);
+        v.btnDashcamStorageSelectUsb = dialog.findViewById(R.id.btnDashcamStorageSelectUsb);
+        v.btnDashcamStorageEjectUsb = dialog.findViewById(R.id.btnDashcamStorageEjectUsb);
+        v.tvDashcamStorageInternalWarning = dialog.findViewById(R.id.tvDashcamStorageInternalWarning);
+        v.etDashcamUsbClipCount = dialog.findViewById(R.id.etDashcamUsbClipCount);
+        v.etDashcamUsbEventDirs = dialog.findViewById(R.id.etDashcamUsbEventDirs);
         v.swBannerEvent = dialog.findViewById(R.id.switchBannerEvent);
         v.segBannerEventSize = dialog.findViewById(R.id.segBannerEventSize);
         v.seekBannerEventVolume = dialog.findViewById(R.id.seekBannerEventVolume);
@@ -353,16 +351,15 @@ public final class SettingsDialogController {
                 views.swDashcamCameraRear,
                 views.swDashcamTestRecordEnabled,
                 views.etDashcamTestRecordDuration,
-                // Re-enable this block when the storage section comes back:
-                // new DashcamSettingsController.StorageViews(
-                //         views.segDashcamStorageTarget,
-                //         views.tvDashcamStorageStatus,
-                //         views.tvDashcamStorageActivePath,
-                //         views.btnDashcamStorageEjectUsb,
-                //         views.tvDashcamStorageInternalWarning,
-                //         views.etDashcamUsbClipCount,
-                //         views.etDashcamUsbEventDirs),
-                null,
+                new DashcamSettingsController.StorageViews(
+                        views.segDashcamStorageTarget,
+                        views.tvDashcamStorageStatus,
+                        views.tvDashcamStorageActivePath,
+                        views.btnDashcamStorageSelectUsb,
+                        views.btnDashcamStorageEjectUsb,
+                        views.tvDashcamStorageInternalWarning,
+                        views.etDashcamUsbClipCount,
+                        views.etDashcamUsbEventDirs),
                 new DashcamSettingsController.BannerGroupViews(
                         views.swBannerEvent,
                         views.segBannerEventSize,
@@ -691,6 +688,7 @@ public final class SettingsDialogController {
         TextView tvDashcamStorageStatus;
         TextView tvDashcamStorageActivePath;
         Button btnDashcamStorageEjectUsb;
+        Button btnDashcamStorageSelectUsb;
         TextView tvDashcamStorageInternalWarning;
         EditText etDashcamUsbClipCount;
         EditText etDashcamUsbEventDirs;

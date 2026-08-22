@@ -5,6 +5,10 @@ on:
   release:
     types: [published]
 
+concurrency:
+  group: gitlab-mirror
+  cancel-in-progress: false
+
 jobs:
   mirror:
     runs-on: ubuntu-latest
@@ -26,6 +30,7 @@ jobs:
           git push gitlab --tags --force
 
   mirror-release:
+    needs: mirror
     runs-on: ubuntu-latest
     if: github.event_name == 'release'
     env:
@@ -77,4 +82,3 @@ jobs:
                 --header "Content-Type: application/json" \
                 --data @-
           done
-

@@ -611,9 +611,11 @@ namespace camera_stream_manager
         class CombinedRecordingSink : public std::enable_shared_from_this<CombinedRecordingSink>
         {
         public:
-            CombinedRecordingSink(std::string outputPath, int cellWidth, int cellHeight, int fps, int bitrate,
+            CombinedRecordingSink(std::string outputPath, int providedOutputFd,
+                                  int cellWidth, int cellHeight, int fps, int bitrate,
                                   std::string signature, bool showSpeed)
                 : outputPath_(std::move(outputPath)),
+                  providedOutputFd_(providedOutputFd),
                   cellWidth_(cellWidth),
                   cellHeight_(cellHeight),
                   sideWidth_(cellHeight),
@@ -648,7 +650,21 @@ namespace camera_stream_manager
                     return false;
                 }
 
-                outFd_ = open(outputPath_.c_str(), O_CREAT | O_RDWR | O_TRUNC, 0644);
+                if (providedOutputFd_ >= 0)
+                {
+                    outFd_ = dup(providedOutputFd_);
+                    if (outFd_ >= 0
+                        && (ftruncate(outFd_, 0) != 0 || lseek(outFd_, 0, SEEK_SET) < 0))
+                    {
+                        loge("combined SAF descriptor is not writable/seekable: %s", errnoStr().c_str());
+                        close(outFd_);
+                        outFd_ = -1;
+                    }
+                }
+                else
+                {
+                    outFd_ = open(outputPath_.c_str(), O_CREAT | O_RDWR | O_TRUNC, 0644);
+                }
                 if (outFd_ < 0)
                 {
                     loge("combined output open failed: %s", errnoStr().c_str());
@@ -693,6 +709,11 @@ namespace camera_stream_manager
             bool isFinalized() const
             {
                 return finalized_.load();
+            }
+
+            bool hasFailed() const
+            {
+                return ioFailed_.load();
             }
 
             bool waitUntilStopped(int timeoutMs)
@@ -802,7 +823,11 @@ namespace camera_stream_manager
                 {
                     if (muxerStarted_)
                     {
-                        AMediaMuxer_stop(muxer_);
+                        if (AMediaMuxer_stop(muxer_) != AMEDIA_OK)
+                        {
+                            loge("combined AMediaMuxer_stop failed");
+                            ioFailed_.store(true);
+                        }
                     }
                     AMediaMuxer_delete(muxer_);
                     muxer_ = nullptr;
@@ -810,6 +835,11 @@ namespace camera_stream_manager
 
                 if (outFd_ >= 0)
                 {
+                    if (fsync(outFd_) != 0)
+                    {
+                        loge("combined output fsync failed: %s", errnoStr().c_str());
+                        ioFailed_.store(true);
+                    }
                     close(outFd_);
                     outFd_ = -1;
                 }
@@ -1027,8 +1057,16 @@ namespace camera_stream_manager
                             AMediaFormat_delete(outputFormat);
                             if (trackIndex_ >= 0)
                             {
-                                AMediaMuxer_start(muxer_);
-                                muxerStarted_ = true;
+                                if (AMediaMuxer_start(muxer_) == AMEDIA_OK)
+                                {
+                                    muxerStarted_ = true;
+                                }
+                                else
+                                {
+                                    loge("combined AMediaMuxer_start failed");
+                                    ioFailed_.store(true);
+                                    requestStop();
+                                }
                             }
                         }
                         continue;
@@ -1045,7 +1083,13 @@ namespace camera_stream_manager
                             AMediaCodec_getOutputBuffer(codec_, static_cast<size_t>(outputIndex), &outputSize);
                         if (outputBuffer != nullptr)
                         {
-                            AMediaMuxer_writeSampleData(muxer_, static_cast<size_t>(trackIndex_), outputBuffer, &info);
+                            if (AMediaMuxer_writeSampleData(
+                                    muxer_, static_cast<size_t>(trackIndex_), outputBuffer, &info) != AMEDIA_OK)
+                            {
+                                loge("combined AMediaMuxer_writeSampleData failed");
+                                ioFailed_.store(true);
+                                requestStop();
+                            }
                         }
                     }
 
@@ -1059,6 +1103,7 @@ namespace camera_stream_manager
             }
 
             const std::string outputPath_;
+            const int providedOutputFd_;
             const int cellWidth_;
             const int cellHeight_;
             const int sideWidth_;
@@ -1097,6 +1142,7 @@ namespace camera_stream_manager
 
             std::atomic<bool> stopRequested_{false};
             std::atomic<bool> finalized_{false};
+            std::atomic<bool> ioFailed_{false};
             std::mutex waitMutex_;
             std::condition_variable waitCv_;
             bool stopped_ = false;
@@ -1846,7 +1892,7 @@ namespace camera_stream_manager
         return true;
     }
 
-    bool startCombinedRecording(JNIEnv * /*env*/, const std::string &outputPath,
+    bool startCombinedRecording(JNIEnv * /*env*/, const std::string &outputPath, int outputFd,
                                 int cellWidth, int cellHeight, int fps, int bitrate,
                                 const std::string &signature, bool showSpeed, int cameraMask)
     {
@@ -1865,6 +1911,7 @@ namespace camera_stream_manager
 
         sink = std::make_shared<CombinedRecordingSink>(
             outputPath,
+            outputFd,
             cellWidth,
             cellHeight,
             fps,
@@ -1959,7 +2006,7 @@ namespace camera_stream_manager
         }
 
         const bool sinkStopped = sink->waitUntilStopped(STOP_WAIT_MS);
-        return allConsumersStopped && sinkStopped;
+        return allConsumersStopped && sinkStopped && !sink->hasFailed();
     }
 
     void updateCombinedRecordingSpeed(int speedKmh)

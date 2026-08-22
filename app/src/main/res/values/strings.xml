@@ -44,7 +44,11 @@
     <string name="settings_dashcam_storage_status_internal_active">✓ Internal storage active</string>
     <string name="settings_dashcam_storage_status_usb_required_missing">✗ USB-only mode active, but no usable USB medium</string>
     <string name="settings_dashcam_storage_status_multiple_media">✗ Multiple external media detected — please connect only one</string>
+    <string name="settings_dashcam_storage_status_usb_not_selected">✗ Select a USB recording folder</string>
     <string name="settings_dashcam_storage_active_path">Active folder: %1$s</string>
+    <string name="settings_dashcam_storage_select_folder">Select USB folder</string>
+    <string name="settings_dashcam_storage_folder_selected">USB recording folder selected</string>
+    <string name="settings_dashcam_storage_folder_select_failed">The USB folder could not be authorized</string>
     <string name="settings_dashcam_storage_eject_button">Eject USB</string>
     <string name="settings_dashcam_storage_eject_title">USB storage</string>
     <string name="settings_dashcam_storage_eject_confirm_message">Finish the current clip and prepare the USB storage for safe removal?</string>

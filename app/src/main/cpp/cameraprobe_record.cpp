@@ -79,6 +79,45 @@ Java_com_drivehub_kamera_CameraProbe_startCombinedMp4Record(JNIEnv* env, jclass 
     return camera_stream_manager::startCombinedRecording(
             env,
             output,
+            -1,
+            static_cast<int>(cellWidth),
+            static_cast<int>(cellHeight),
+            static_cast<int>(fps),
+            static_cast<int>(bitrate),
+            signatureText,
+            showSpeed == JNI_TRUE,
+            static_cast<int>(cameraMask)
+    ) ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C"
+JNIEXPORT jboolean JNICALL
+Java_com_drivehub_kamera_CameraProbe_startCombinedMp4RecordFd(JNIEnv* env, jclass /*clazz*/,
+                                                              jint outputFd,
+                                                              jint cellWidth,
+                                                              jint cellHeight,
+                                                              jint fps,
+                                                              jint bitrate,
+                                                              jstring signature,
+                                                              jboolean showSpeed,
+                                                              jint cameraMask) {
+    if (outputFd < 0) {
+        return JNI_FALSE;
+    }
+
+    std::string signatureText;
+    if (signature != nullptr) {
+        const char* signatureChars = env->GetStringUTFChars(signature, nullptr);
+        if (signatureChars != nullptr) {
+            signatureText.assign(signatureChars);
+            env->ReleaseStringUTFChars(signature, signatureChars);
+        }
+    }
+
+    return camera_stream_manager::startCombinedRecording(
+            env,
+            std::string(),
+            static_cast<int>(outputFd),
             static_cast<int>(cellWidth),
             static_cast<int>(cellHeight),
             static_cast<int>(fps),

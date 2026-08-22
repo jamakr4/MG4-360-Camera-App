@@ -40,6 +40,18 @@ public final class CameraProbe {
             boolean showSpeed,
             int cameraMask);
 
+    /**
+     * Starts a grid MP4 recording on an already opened, seekable file descriptor. The native
+     * layer duplicates the descriptor before this call returns, so the Java owner may close its
+     * ParcelFileDescriptor immediately afterwards.
+     */
+    public static native boolean startCombinedMp4RecordFd(int outputFd,
+            int cellWidth, int cellHeight,
+            int fps, int bitrate,
+            String signature,
+            boolean showSpeed,
+            int cameraMask);
+
     /** Stops the currently running combined grid recording. */
     public static native boolean stopCombinedMp4Record();
 

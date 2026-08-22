@@ -7,6 +7,7 @@ import com.drivehub.kamera.settings.SegmentedControl;
 import com.drivehub.kamera.settings.SimpleTextWatcher;
 import com.drivehub.kamera.settings.UiPrefs;
 
+import android.annotation.SuppressLint;
 import android.Manifest;
 import android.app.Dialog;
 import android.content.BroadcastReceiver;
@@ -19,6 +20,7 @@ import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.GradientDrawable;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.Editable;
@@ -59,6 +61,7 @@ public final class DashcamSettingsController {
     private static final String KEY_RETENTION_CLIP_COUNT = "devRetentionClipCount";
     private static final String KEY_MAX_RETAINED_EVENT_DIRS = "devMaxRetainedEventDirs";
     private static final int REQ_STORAGE = 1337;
+    public static final int REQ_USB_RECORDING_FOLDER = 1338;
     private static final int DEFAULT_RECORDING_FPS = 25;
     private static final int MIN_RECORDING_FPS = 1;
     private static final int MAX_RECORDING_FPS = 60;
@@ -116,17 +119,19 @@ public final class DashcamSettingsController {
         public final SegmentedControl targetGroup;
         public final TextView statusText;
         public final TextView activePathText;
+        public final Button selectFolderButton;
         public final Button ejectButton;
         public final TextView internalWarningText;
         public final EditText usbClipCount;
         public final EditText usbEventDirs;
 
         public StorageViews(SegmentedControl targetGroup, TextView statusText,
-                TextView activePathText, Button ejectButton, TextView internalWarningText,
+                TextView activePathText, Button selectFolderButton, Button ejectButton, TextView internalWarningText,
                 EditText usbClipCount, EditText usbEventDirs) {
             this.targetGroup = targetGroup;
             this.statusText = statusText;
             this.activePathText = activePathText;
+            this.selectFolderButton = selectFolderButton;
             this.ejectButton = ejectButton;
             this.internalWarningText = internalWarningText;
             this.usbClipCount = usbClipCount;
@@ -159,6 +164,8 @@ public final class DashcamSettingsController {
     private boolean syncingEnabled;
     private boolean syncingCameraSelection;
     private BroadcastReceiver usbEjectReceiver;
+    private StorageViews boundStorageViews;
+    private SharedPreferences boundStoragePrefs;
 
     public DashcamSettingsController(MainActivity activity) {
         this.activity = activity;
@@ -329,6 +336,8 @@ public final class DashcamSettingsController {
         if (views == null) {
             return;
         }
+        boundStorageViews = views;
+        boundStoragePrefs = prefs;
         if (views.targetGroup != null && views.targetGroup.getChildCount() >= 3) {
             int initialTarget = DashcamStorageManager.getStorageTarget(prefs);
             views.targetGroup.check(views.targetGroup.getChildAt(initialTarget).getId());
@@ -337,6 +346,10 @@ public final class DashcamSettingsController {
                 for (int i = 0; i < g.getChildCount(); i++) {
                     if (g.getChildAt(i).getId() == checkedId) {
                         DashcamStorageManager.setStorageTarget(prefs, i);
+                        if (i == DashcamStorageManager.TARGET_USB_ONLY
+                                && DashcamStorageManager.getUsbTreeUri(activity) == null) {
+                            launchUsbFolderPicker();
+                        }
                         refreshStorageStatus(prefs, views);
                         // USB-only without USB makes the recording loop end with a fatal error
                         // and stopSelf(); the service is then gone until the user toggles the
@@ -349,6 +362,9 @@ public final class DashcamSettingsController {
                     }
                 }
             });
+        }
+        if (views.selectFolderButton != null) {
+            views.selectFolderButton.setOnClickListener(v -> launchUsbFolderPicker());
         }
         if (views.usbClipCount != null) {
             views.usbClipCount.setText(String.valueOf(DashcamStorageManager.getUsbRetentionClipCount(prefs)));
@@ -382,6 +398,58 @@ public final class DashcamSettingsController {
         refreshStorageStatus(prefs, views);
     }
 
+    private void launchUsbFolderPicker() {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
+                | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+                | Intent.FLAG_GRANT_PREFIX_URI_PERMISSION);
+        try {
+            activity.startActivityForResult(intent, REQ_USB_RECORDING_FOLDER);
+        } catch (Throwable t) {
+            Log.e(TAG, "Could not open USB recording folder picker", t);
+            Toast.makeText(activity, R.string.settings_dashcam_storage_folder_select_failed,
+                    Toast.LENGTH_LONG).show();
+        }
+    }
+
+    @SuppressLint("WrongConstant")
+    public boolean onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode != REQ_USB_RECORDING_FOLDER) return false;
+        if (resultCode != android.app.Activity.RESULT_OK || data == null || data.getData() == null) {
+            return true;
+        }
+        Uri treeUri = data.getData();
+        int takeFlags = data.getFlags()
+                & (Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+        try {
+            if ((takeFlags & Intent.FLAG_GRANT_WRITE_URI_PERMISSION) == 0) {
+                throw new SecurityException("Selected folder did not grant write access");
+            }
+            activity.getContentResolver().takePersistableUriPermission(treeUri, takeFlags);
+            DashcamStorageManager.setUsbTreeUri(activity, treeUri);
+            if (boundStoragePrefs != null) {
+                DashcamStorageManager.setStorageTarget(boundStoragePrefs,
+                        DashcamStorageManager.TARGET_USB_ONLY);
+            }
+            Toast.makeText(activity, R.string.settings_dashcam_storage_folder_selected,
+                    Toast.LENGTH_SHORT).show();
+            if (boundStorageViews != null && boundStoragePrefs != null) {
+                if (boundStorageViews.targetGroup != null
+                        && boundStorageViews.targetGroup.getChildCount() >= 3) {
+                    boundStorageViews.targetGroup.check(
+                            boundStorageViews.targetGroup.getChildAt(DashcamStorageManager.TARGET_USB_ONLY).getId());
+                }
+                refreshStorageStatus(boundStoragePrefs, boundStorageViews);
+            }
+        } catch (Throwable t) {
+            Log.e(TAG, "Could not persist USB recording folder permission", t);
+            Toast.makeText(activity, R.string.settings_dashcam_storage_folder_select_failed,
+                    Toast.LENGTH_LONG).show();
+        }
+        return true;
+    }
+
     // ---------- Storage status ----------
 
     // Runs a USB write test on a worker thread and updates the status label + active path.
@@ -394,6 +462,10 @@ public final class DashcamSettingsController {
             views.internalWarningText.setVisibility(
                     target == DashcamStorageManager.TARGET_INTERNAL_ONLY ? android.view.View.VISIBLE
                             : android.view.View.GONE);
+        }
+        if (views.selectFolderButton != null) {
+            views.selectFolderButton.setVisibility(
+                    target == DashcamStorageManager.TARGET_INTERNAL_ONLY ? View.GONE : View.VISIBLE);
         }
         views.statusText.setText(R.string.settings_dashcam_storage_status_checking);
         if (views.activePathText != null) {
@@ -420,6 +492,8 @@ public final class DashcamSettingsController {
             statusRes = R.string.settings_dashcam_storage_status_multiple_media;
         } else if (res.target == DashcamStorageManager.TARGET_INTERNAL_ONLY) {
             statusRes = R.string.settings_dashcam_storage_status_internal_active;
+        } else if (res.usbState == DashcamStorageManager.UsbState.NOT_SELECTED) {
+            statusRes = R.string.settings_dashcam_storage_status_usb_not_selected;
         } else if (res.target == DashcamStorageManager.TARGET_USB_ONLY) {
             statusRes = R.string.settings_dashcam_storage_status_usb_required_missing;
         } else {
@@ -438,10 +512,12 @@ public final class DashcamSettingsController {
         }
         views.statusText.setText(colorizeStatusIcon(activity.getString(statusRes)));
         if (views.activePathText != null) {
-            views.activePathText.setText(res.baseDir == null
+            String path = res.treeUri != null
+                    ? res.treeUri.toString()
+                    : res.baseDir == null ? "" : res.baseDir.getAbsolutePath();
+            views.activePathText.setText(path.isEmpty()
                     ? ""
-                    : activity.getString(R.string.settings_dashcam_storage_active_path,
-                            res.baseDir.getAbsolutePath()));
+                    : activity.getString(R.string.settings_dashcam_storage_active_path, path));
         }
         if (views.ejectButton != null) {
             views.ejectButton.setVisibility(res.usingUsb ? View.VISIBLE : View.GONE);
@@ -493,6 +569,8 @@ public final class DashcamSettingsController {
     // Called when the settings dialog closes — unregisters the USB eject receiver if still pending.
     public void onDismiss() {
         unregisterUsbEjectReceiver();
+        boundStorageViews = null;
+        boundStoragePrefs = null;
     }
 
     private void unregisterUsbEjectReceiver() {

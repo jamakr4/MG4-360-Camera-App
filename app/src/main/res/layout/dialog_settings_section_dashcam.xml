@@ -336,7 +336,6 @@
     </LinearLayout>
 
     <!-- ============ STORAGE ============ -->
-    <!--
     <TextView
         style="@style/DrivehubSettingsCardLabel"
         android:layout_width="wrap_content"
@@ -414,6 +413,14 @@
             android:layout_marginTop="4dp" />
 
         <Button
+            android:id="@+id/btnDashcamStorageSelectUsb"
+            style="@style/DrivehubDialogButtonSecondary"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="@string/settings_dashcam_storage_select_folder" />
+
+        <Button
             android:id="@+id/btnDashcamStorageEjectUsb"
             style="@style/DrivehubDialogButtonSecondary"
             android:layout_width="wrap_content"
@@ -489,7 +496,6 @@
             android:text="@string/settings_dashcam_storage_usb_limits_hint" />
 
     </LinearLayout>
-    -->
 
     <!-- ============ ADVANCED ============ -->
     <TextView
