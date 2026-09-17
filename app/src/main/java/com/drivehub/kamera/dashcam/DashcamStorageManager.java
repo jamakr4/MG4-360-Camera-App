@@ -434,20 +434,25 @@ public final class DashcamStorageManager {
 
     /** Returns null when the probe wrote and read back, otherwise why it did not. */
     private static String writeProbeError(File dir) {
-        File probe = new File(dir, WRITE_PROBE_FILE_NAME);
+        File probe = null;
         try {
+            // resolve() can run concurrently from the settings screen and the recording loop.
+            // A fixed probe name lets one caller delete the other's file and creates a false
+            // WRITE_TEST_FAILED result, so every invocation needs its own temporary file.
+            probe = File.createTempFile(WRITE_PROBE_FILE_NAME + ".", ".tmp", dir);
             try (FileOutputStream out = new FileOutputStream(probe)) {
                 out.write("dashcam".getBytes());
                 out.getFD().sync();
             }
             boolean ok = probe.isFile() && probe.length() > 0;
-            // noinspection ResultOfMethodCallIgnored
-            probe.delete();
             return ok ? null : "file missing or empty after write";
         } catch (Throwable t) {
-            // noinspection ResultOfMethodCallIgnored
-            probe.delete();
             return String.valueOf(t);
+        } finally {
+            if (probe != null) {
+                // noinspection ResultOfMethodCallIgnored
+                probe.delete();
+            }
         }
     }
 

@@ -203,18 +203,15 @@ public class RecordingService extends Service {
             // Decide on the worker thread: resolve() touches the filesystem for every target
             // except INTERNAL_ONLY. That was harmless while the preference was pinned to
             // internal storage; now that it is honoured, this would be main-thread IO.
-            usbEjectInProgress = true;
-            shutdownRecordingServiceWithoutStopSelf();
             new Thread(() -> {
                 boolean usingUsb = activeBaseIsUsb || DashcamStorageManager.resolve(this).usingUsb;
                 if (!usingUsb) {
-                    usbEjectInProgress = false;
                     broadcastUsbEjectReady(
                             false, R.string.settings_dashcam_storage_eject_unavailable_message);
-                    stopForeground(true);
-                    stopSelf();
                     return;
                 }
+                usbEjectInProgress = true;
+                shutdownRecordingServiceWithoutStopSelf();
                 boolean safeToRemove = awaitShutdownQuiescence();
                 broadcastUsbEjectReady(
                         safeToRemove,
