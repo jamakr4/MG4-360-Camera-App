@@ -45,6 +45,10 @@
     <string name="settings_dashcam_storage_status_usb_required_missing">✗ Nur-USB-Modus aktiv, aber kein nutzbares USB-Medium</string>
     <string name="settings_dashcam_storage_status_multiple_media">✗ Mehrere externe Speichermedien erkannt — bitte nur eines anschließen</string>
     <string name="settings_dashcam_storage_active_path">Aktiver Ordner: %1$s</string>
+    <string name="settings_dashcam_storage_select_button">USB-Stick auswählen</string>
+    <string name="settings_dashcam_storage_select_success">USB-Speicherort ausgewählt</string>
+    <string name="settings_dashcam_storage_select_failed">Dieser Speicherort konnte nicht ausgewählt werden</string>
+    <string name="settings_dashcam_storage_select_usb_required">Bitte einen Ordner auf einem USB-Stick auswählen</string>
     <string name="settings_dashcam_storage_eject_button">USB auswerfen</string>
     <string name="settings_dashcam_storage_eject_title">USB-Speicher</string>
     <string name="settings_dashcam_storage_eject_confirm_message">Aktuellen Clip abschließen und den USB-Speicher für sicheres Entfernen vorbereiten?</string>

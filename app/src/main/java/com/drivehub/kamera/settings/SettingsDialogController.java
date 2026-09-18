@@ -18,6 +18,7 @@ import android.app.Dialog;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
+import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.View;
@@ -103,6 +104,10 @@ public final class SettingsDialogController {
             views.tvDashcamRecordingStatus.setText(text);
         }
         refreshDevStatusSection(status, activeCameras, totalCameras, lastError);
+    }
+
+    public void onDashcamUsbTreeSelected(Uri treeUri) {
+        dashcam.onUsbTreeSelected(treeUri);
     }
 
     @SuppressWarnings("deprecation")
@@ -206,6 +211,7 @@ public final class SettingsDialogController {
         v.segDashcamStorageTarget = dialog.findViewById(R.id.segDashcamStorageTarget);
         v.tvDashcamStorageStatus = dialog.findViewById(R.id.tvDashcamStorageStatus);
         v.tvDashcamStorageActivePath = dialog.findViewById(R.id.tvDashcamStorageActivePath);
+        v.btnDashcamStorageSelectUsb = dialog.findViewById(R.id.btnDashcamStorageSelectUsb);
         v.btnDashcamStorageEjectUsb = dialog.findViewById(R.id.btnDashcamStorageEjectUsb);
         v.tvDashcamStorageInternalWarning = dialog.findViewById(R.id.tvDashcamStorageInternalWarning);
         v.etDashcamUsbClipCount = dialog.findViewById(R.id.etDashcamUsbClipCount);
@@ -349,6 +355,7 @@ public final class SettingsDialogController {
                         views.segDashcamStorageTarget,
                         views.tvDashcamStorageStatus,
                         views.tvDashcamStorageActivePath,
+                        views.btnDashcamStorageSelectUsb,
                         views.btnDashcamStorageEjectUsb,
                         views.tvDashcamStorageInternalWarning,
                         views.etDashcamUsbClipCount,
@@ -680,6 +687,7 @@ public final class SettingsDialogController {
         SegmentedControl segDashcamStorageTarget;
         TextView tvDashcamStorageStatus;
         TextView tvDashcamStorageActivePath;
+        Button btnDashcamStorageSelectUsb;
         Button btnDashcamStorageEjectUsb;
         TextView tvDashcamStorageInternalWarning;
         EditText etDashcamUsbClipCount;

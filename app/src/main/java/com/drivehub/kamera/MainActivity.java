@@ -16,6 +16,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.net.Uri;
 import android.os.Bundle;
 import android.view.MotionEvent;
 import android.view.SurfaceHolder;
@@ -24,6 +25,7 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
@@ -35,6 +37,7 @@ import androidx.core.view.WindowInsetsCompat;
 public class MainActivity extends AppCompatActivity implements SurfaceHolder.Callback {
 
     private static final int SWIPE_THRESHOLD_PX = 140;
+    private static final int REQ_DASHCAM_USB_FOLDER = 1842;
 
     private SurfaceHolder surfaceHolder;
     private TextView tvStatus;
@@ -99,6 +102,47 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
     public static boolean shouldBlockOverlay() {
         return sMainVisible && !sSettingsDialogOpen;
+    }
+
+    @SuppressWarnings("deprecation")
+    public void openDashcamUsbFolderPicker() {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
+                | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+                | Intent.FLAG_GRANT_PREFIX_URI_PERMISSION);
+        try {
+            startActivityForResult(intent, REQ_DASHCAM_USB_FOLDER);
+        } catch (Throwable t) {
+            Toast.makeText(this, R.string.settings_dashcam_storage_select_failed, Toast.LENGTH_LONG).show();
+        }
+    }
+
+    @Override
+    @SuppressWarnings("deprecation")
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != REQ_DASHCAM_USB_FOLDER
+                || resultCode != RESULT_OK
+                || data == null) {
+            return;
+        }
+        Uri treeUri = data.getData();
+        if (treeUri == null) {
+            Toast.makeText(this, R.string.settings_dashcam_storage_select_failed, Toast.LENGTH_LONG).show();
+            return;
+        }
+        int takeFlags = data.getFlags()
+                & (Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+        if (takeFlags != 0) {
+            try {
+                getContentResolver().takePersistableUriPermission(treeUri, takeFlags);
+            } catch (SecurityException ignored) {
+                // The selected mount is used through its native file path. Persisting the URI
+                // permission is helpful on stock Android but not required on the system image.
+            }
+        }
+        settingsDialog.onDashcamUsbTreeSelected(treeUri);
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -198,6 +242,9 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     protected void onStart() {
         super.onStart();
         sMainVisible = true;
+        if (settingsDialog.isOpen()) {
+            sSettingsDialogOpen = true;
+        }
         try {
             ContextCompat.registerReceiver(
                     this,
