@@ -25,8 +25,7 @@ import java.util.Map;
  *  - USB_ONLY:      USB or nothing (resolution.baseDir == null when no usable medium).
  *  - INTERNAL_ONLY: internal storage, USB is never probed.
  *
- * The current app build temporarily forces INTERNAL_ONLY from prefs/UI so storage switching can
- * stay dormant until the target-selection flow is revisited.
+ * The stored preference is honoured: AUTO and USB_ONLY reach the USB paths below.
  *
  * "Internal" is whatever {@link DashcamSettingsController#getRecordsBaseDir} resolves to
  * (default Downloads/dashcam or the dev-mode override path).
@@ -51,6 +50,8 @@ public final class DashcamStorageManager {
     private static final String USB_RECORDS_DIR_NAME = "dashcam";
     private static final String WRITE_PROBE_FILE_NAME = ".dashcam_write_probe";
     private static final File LEGACY_STORAGE_ROOT = new File("/storage");
+    /** Where vold mounts removable media, under the per-app FUSE view layered on top. */
+    private static final File MEDIA_RW_ROOT = new File("/mnt/media_rw");
 
     public enum UsbState {
         NOT_CHECKED,        // INTERNAL_ONLY mode: USB is deliberately ignored
@@ -83,17 +84,14 @@ public final class DashcamStorageManager {
     // ---------- Preferences ----------
 
     public static int getStorageTarget(SharedPreferences prefs) {
-        if (prefs != null) {
-            int stored = clampTarget(prefs.getInt(KEY_STORAGE_TARGET, TARGET_INTERNAL_ONLY));
-            if (stored != TARGET_INTERNAL_ONLY) {
-                prefs.edit().putInt(KEY_STORAGE_TARGET, TARGET_INTERNAL_ONLY).apply();
-            }
+        if (prefs == null) {
+            return TARGET_INTERNAL_ONLY;
         }
-        return TARGET_INTERNAL_ONLY;
+        return clampTarget(prefs.getInt(KEY_STORAGE_TARGET, TARGET_INTERNAL_ONLY));
     }
 
     public static void setStorageTarget(SharedPreferences prefs, int target) {
-        prefs.edit().putInt(KEY_STORAGE_TARGET, TARGET_INTERNAL_ONLY).apply();
+        prefs.edit().putInt(KEY_STORAGE_TARGET, clampTarget(target)).apply();
     }
 
     public static int clampTarget(int target) {
@@ -186,12 +184,47 @@ public final class DashcamStorageManager {
         final File rootDir;
         final String description;
         final boolean usbLike;
+        /** Volume uuid, e.g. "9EFB-89C8": the name vold gives the raw mount. */
+        final String volumeId;
+        /** This app's sandbox on the volume, the one place the FUSE view always allows. */
+        final File appPrivateDir;
 
-        UsbCandidate(File rootDir, String description, boolean usbLike) {
+        UsbCandidate(File rootDir, String description, boolean usbLike,
+                String volumeId, File appPrivateDir) {
             this.rootDir = rootDir;
             this.description = description;
             this.usbLike = usbLike;
+            this.volumeId = volumeId == null ? "" : volumeId;
+            this.appPrivateDir = appPrivateDir;
         }
+    }
+
+    /**
+     * Where to try writing on one volume, best first.
+     *
+     * Android has refused general write access at the root of a secondary volume since KitKat,
+     * whatever permissions an app holds, so probing only <volume>/dashcam can never succeed.
+     * Measured on an MG4 (mediatek/mt2712_saic_eh32, Android 9) with a 32 GB stick, from inside
+     * the app process:
+     *
+     *   /storage/9EFB-89C8                           r=true  w=false
+     *   /mnt/media_rw/9EFB-89C8                      r=true  w=true
+     *   /storage/9EFB-89C8/Android/data/<pkg>/files  r=true  w=true
+     *
+     * The raw mount is reachable because this app runs as uid 1000, and it is the one that puts
+     * clips at the root of the stick where a person plugging it into a computer will look. The
+     * sandbox is the fallback that always works, at the cost of being deleted on uninstall.
+     */
+    private static List<File> recordsDirCandidates(UsbCandidate candidate) {
+        List<File> dirs = new ArrayList<>();
+        if (!candidate.volumeId.isEmpty()) {
+            dirs.add(new File(new File(MEDIA_RW_ROOT, candidate.volumeId), USB_RECORDS_DIR_NAME));
+        }
+        dirs.add(new File(candidate.rootDir, USB_RECORDS_DIR_NAME));
+        if (candidate.appPrivateDir != null) {
+            dirs.add(new File(candidate.appPrivateDir, USB_RECORDS_DIR_NAME));
+        }
+        return dirs;
     }
 
     /**
@@ -221,16 +254,38 @@ public final class DashcamStorageManager {
         List<File> usable = new ArrayList<>();
         boolean anyWriteTestFailed = false;
         for (UsbCandidate candidate : prioritized) {
-            File recordsDir = new File(candidate.rootDir, USB_RECORDS_DIR_NAME);
-            if ((!recordsDir.isDirectory() && !recordsDir.mkdirs() && !recordsDir.isDirectory())
-                    || !recordsDir.canWrite()) {
+            File accepted = null;
+            for (File recordsDir : recordsDirCandidates(candidate)) {
+                boolean existed = recordsDir.isDirectory();
+                if (!existed && !recordsDir.mkdirs() && !recordsDir.isDirectory()) {
+                    // Logged rather than skipped silently: without this a NOT_WRITABLE verdict
+                    // cannot be told apart from a missing medium afterwards.
+                    Log.i(TAG, "no: cannot create " + recordsDir.getAbsolutePath()
+                            + " (parent " + describeFile(recordsDir.getParentFile()) + ")");
+                    continue;
+                }
+                if (!recordsDir.canWrite()) {
+                    Log.i(TAG, "no: not writable " + recordsDir.getAbsolutePath()
+                            + " (existed=" + existed + " " + describeFile(recordsDir) + ")");
+                    continue;
+                }
+                String probeError = writeProbeError(recordsDir);
+                if (probeError != null) {
+                    anyWriteTestFailed = true;
+                    Log.w(TAG, "no: write probe failed in " + recordsDir.getAbsolutePath()
+                            + ": " + probeError);
+                    continue;
+                }
+                accepted = recordsDir;
+                break;
+            }
+            if (accepted == null) {
+                Log.w(TAG, "rejected volume: " + candidate.rootDir.getAbsolutePath()
+                        + " (no writable location)");
                 continue;
             }
-            if (!runWriteProbe(recordsDir)) {
-                anyWriteTestFailed = true;
-                continue;
-            }
-            usable.add(recordsDir);
+            Log.i(TAG, "accepted: " + accepted.getAbsolutePath());
+            usable.add(accepted);
         }
         if (usable.size() == 1) {
             return new UsbProbe(UsbState.OK, usable.get(0));
@@ -273,7 +328,14 @@ public final class DashcamStorageManager {
                 continue;
             }
             String description = safeDescription(volume, context);
-            deduped.put(key, new UsbCandidate(rootDir, description, looksLikeUsb(rootDir, description)));
+            // getUuid() is the volume's FAT serial, which is also the directory name vold gives
+            // the raw mount: /mnt/media_rw/9EFB-89C8.
+            String volumeId = volume.getUuid();
+            if (volumeId == null || volumeId.isEmpty()) {
+                volumeId = rootDir.getName();
+            }
+            deduped.put(key, new UsbCandidate(rootDir, description,
+                    looksLikeUsb(rootDir, description), volumeId, appExternalDir));
         }
         return new ArrayList<>(deduped.values());
     }
@@ -294,7 +356,9 @@ public final class DashcamStorageManager {
             String name = child.getName();
             if (name.isEmpty() || "emulated".equals(name) || "self".equals(name)) continue;
             if (!child.canRead()) continue;
-            candidates.add(new UsbCandidate(child, name, looksLikeUsb(child, name)));
+            // The /storage scan has no framework metadata: the directory name is the uuid,
+            // and there is no app sandbox to fall back on.
+            candidates.add(new UsbCandidate(child, name, looksLikeUsb(child, name), name, null));
         }
         return candidates;
     }
@@ -365,6 +429,11 @@ public final class DashcamStorageManager {
     }
 
     private static boolean runWriteProbe(File dir) {
+        return writeProbeError(dir) == null;
+    }
+
+    /** Returns null when the probe wrote and read back, otherwise why it did not. */
+    private static String writeProbeError(File dir) {
         File probe = new File(dir, WRITE_PROBE_FILE_NAME);
         try {
             try (FileOutputStream out = new FileOutputStream(probe)) {
@@ -374,12 +443,25 @@ public final class DashcamStorageManager {
             boolean ok = probe.isFile() && probe.length() > 0;
             // noinspection ResultOfMethodCallIgnored
             probe.delete();
-            return ok;
+            return ok ? null : "file missing or empty after write";
         } catch (Throwable t) {
-            Log.w(TAG, "USB write probe failed in " + dir.getAbsolutePath() + ": " + t);
             // noinspection ResultOfMethodCallIgnored
             probe.delete();
-            return false;
+            return String.valueOf(t);
         }
+    }
+
+    /** Permissions as this process sees them, which is the only view that decides anything. */
+    private static String describeFile(File file) {
+        if (file == null) {
+            return "null";
+        }
+        if (!file.exists()) {
+            return "missing";
+        }
+        // A directory this process may not stat reports isDirectory() == false, so calling it a
+        // file would assert something unknown.
+        String kind = file.isDirectory() ? "dir" : (file.isFile() ? "file" : "exists(kind unknown)");
+        return kind + " r=" + file.canRead() + " w=" + file.canWrite();
     }
 }
