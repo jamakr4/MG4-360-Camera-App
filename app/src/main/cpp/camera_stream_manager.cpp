@@ -1504,6 +1504,16 @@ namespace camera_stream_manager
                 }
                 stopRequested_.store(false);
                 running_.store(true);
+                if (worker_.joinable())
+                {
+                    // The previous loop usually ended on its own: once the last consumer is gone,
+                    // cleanupStoppedConsumers() sets stopRequested_ from inside the loop,
+                    // threadLoop() breaks out and clears running_ - and nothing joins worker_.
+                    //
+                    // Move-assigning onto a joinable std::thread calls std::terminate() by the
+                    // standard. The thread has already finished, so this join returns at once.
+                    worker_.join();
+                }
                 auto self = shared_from_this();
                 worker_ = std::thread([self]()
                                       { self->threadLoop(); });
@@ -1694,7 +1704,28 @@ namespace camera_stream_manager
 
                 if (worker.joinable())
                 {
-                    worker.join();
+                    if (worker.get_id() == std::this_thread::get_id())
+                    {
+                        // We are the capture thread, tearing down the session we belong to.
+                        //
+                        // The thread holds a shared_ptr to its own session, so eraseSessionIfIdle()
+                        // can drop the map's reference in the window between threadLoop() clearing
+                        // running_ and the lambda being destroyed. The last reference is then ours,
+                        // and ~CameraSession() runs here, on this thread.
+                        //
+                        // pthread_join on yourself returns EDEADLK, join() throws, and the local
+                        // std::thread is destroyed during unwinding while still joinable - which is
+                        // std::terminate(), with no exception caught yet, so the abort message is a
+                        // bare "terminating".
+                        //
+                        // Detaching is correct and not merely safe: this thread is one statement
+                        // from returning and there is nothing left to wait for.
+                        worker.detach();
+                    }
+                    else
+                    {
+                        worker.join();
+                    }
                 }
 
                 {
