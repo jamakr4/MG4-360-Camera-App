@@ -336,7 +336,6 @@
     </LinearLayout>
 
     <!-- ============ STORAGE ============ -->
-    <!--
     <TextView
         style="@style/DrivehubSettingsCardLabel"
         android:layout_width="wrap_content"
@@ -489,7 +488,6 @@
             android:text="@string/settings_dashcam_storage_usb_limits_hint" />
 
     </LinearLayout>
-    -->
 
     <!-- ============ ADVANCED ============ -->
     <TextView
