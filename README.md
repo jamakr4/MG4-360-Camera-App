@@ -48,7 +48,7 @@ Community mod for the MG4 EV (AAOS 9, pre-2026 facelift) that replaces the stock
 - **Turn signal overlay**: opens automatically when the indicator is activated, without the original speed-based auto-close behavior.
 - **Digital rearview mirror**: keeps the factory rear camera visible as a persistent floating mirror for situations where the rear window is blocked by cargo, while still yielding to turn-signal cameras and then restoring the rear view afterwards.
 - **Tesla-style tile view**: replaces the launcher-like OEM overlay, also known as the fullscreen takeover, with a cleaner presentation.
-- **Native 4-camera dashcam**: records all four factory cameras into a single 720x240 grid clip with a footer including time, speed, and a custom signature.
+- **Native 4-camera dashcam**: records the factory cameras into a single 720x240 grid clip with a footer including time, speed, and a custom signature.
 - **Event capture**: saves a pre- and post-trigger recording window into a separate `events/` folder.
 - **Flexible overlay feedback**: pause, resume, event, and error banners with adjustable size and volume.
 - **OEM 360 AVM coexistence**: can briefly yield camera access so the stock reverse/360 view still opens when needed.
@@ -193,6 +193,12 @@ Notes:
 - The companion app can trigger an event save externally via `com.drivehub.kamera.action.TRIGGER_DASHCAM_EVENT`.
 - If the dashcam is currently off and you still trigger an event, the app can switch into future-only recording so at least the post-trigger window is captured.
 
+**Storage use and flash wear**
+
+At the default 25 FPS and fixed 9 Mbit/s bitrate, recordings use about **67 MB per minute** or **4 GB per hour**. The default rolling buffer of ten 30-second clips therefore occupies only about **340 MB**. Available capacity is usually not the main concern when recording to the head unit; the continuous rewriting is. Recording for one hour every day writes roughly **1.5 TB of video data per year**, so a USB drive is recommended for continuous use.
+
+The output canvas and bitrate stay the same regardless of how many cameras are selected. For example, recording only the front camera still creates a full 1200x800 frame at 9 Mbit/s, with the unused camera areas left black. Selecting fewer cameras reduces camera-processing bandwidth, but it does not reduce the recording's storage use.
+
 **On-demand recording without loop mode**
 
 You do not need to run the dashcam in continuous loop mode to capture video. Two lighter alternatives are available:
@@ -308,6 +314,7 @@ This is an independent community project and is **not affiliated with SAIC, MG M
 
 - Analysis based on community research from [XDA Forums: MG4 Electric AAOS 9](https://xdaforums.com/t/mg4-electric-aaos-9-playing-and-possibly-other-mg-models.4697712/)
 - Tile view inspired by [merth4n on XDA](https://xdaforums.com/m/merth4n.13350648/) and the original [merthankaraman/DriveHub_Kamera](https://github.com/merthankaraman/DriveHub_Kamera) project
+- Thanks to [Tommasov](https://github.com/Tommasov) for helping with and contributing to the project
 - OpenCV 4.9.0 - Apache License 2.0
 - AndroidX AppCompat 1.7.1 - Apache License 2.0
 - AndroidX Activity 1.12.4 - Apache License 2.0
