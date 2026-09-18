@@ -108,6 +108,17 @@
     <string name="settings_dev_dashcam_retention_clip_count">Rolling clips kept</string>
     <string name="settings_dev_dashcam_max_event_dirs">Saved events kept</string>
     <string name="settings_dev_dashcam_capacity_warning">⚠ Raising these values can fill storage quickly. Each 30 s clip is ~33 MB; each saved event keeps ~5 clips. The app does not check free space — too-high values can lead to storage overflow or other unpredictable issues.</string>
+    <string name="settings_dev_performance_overlay">Performance display</string>
+    <string name="settings_dev_performance_overlay_enabled">Show system performance</string>
+    <string name="settings_dev_performance_overlay_hint">Permanently shows system and app CPU/RAM, load and temperature in the top-left corner until switched off here.</string>
+    <string name="performance_temperature_unavailable">Temp –</string>
+    <string name="performance_thermal_normal">Thermal normal</string>
+    <string name="performance_thermal_light">Thermal light</string>
+    <string name="performance_thermal_moderate">Thermal moderate</string>
+    <string name="performance_thermal_severe">Thermal severe</string>
+    <string name="performance_thermal_critical">Thermal critical</string>
+    <string name="performance_thermal_emergency">Thermal emergency</string>
+    <string name="performance_thermal_shutdown">Thermal shutdown</string>
     <string name="settings_dev_polling_rates">Polling rates</string>
     <string name="settings_dev_default_poll">Default polling (ms)</string>
     <string name="settings_dev_signal_off_poll">Signal-off detection (ms)</string>

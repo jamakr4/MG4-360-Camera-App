@@ -36,6 +36,7 @@ public final class UiPrefs {
     public static final String KEY_DEV_DEFAULT_POLL_MS = "devDefaultPollMs";
     public static final String KEY_DEV_SIGNAL_OFF_POLL_MS = "devSignalOffPollMs";
     public static final String KEY_DEV_OEM_AVM_MAX_SPEED_KMH = "devOemAvmMaxSpeedKmh";
+    public static final String KEY_DEV_PERFORMANCE_OVERLAY_ENABLED = "devPerformanceOverlayEnabled";
     public static final String KEY_SAFETY_WARNING = "safetyWarning";
     public static final String KEY_OEM_AVM_COEXIST = "oemCoexist";
     public static final String KEY_OEM_AVM_ACTIVE = "oemAvmActive";
@@ -249,6 +250,14 @@ public final class UiPrefs {
     public static int getDevOemAvmMaxSpeedKmh(SharedPreferences prefs) {
         return clampDevOemAvmMaxSpeedKmh(
                 prefs.getInt(KEY_DEV_OEM_AVM_MAX_SPEED_KMH, DEFAULT_DEV_OEM_AVM_MAX_SPEED_KMH));
+    }
+
+    public static boolean isDevPerformanceOverlayEnabled(SharedPreferences prefs) {
+        return prefs.getBoolean(KEY_DEV_PERFORMANCE_OVERLAY_ENABLED, false);
+    }
+
+    public static void setDevPerformanceOverlayEnabled(SharedPreferences prefs, boolean enabled) {
+        prefs.edit().putBoolean(KEY_DEV_PERFORMANCE_OVERLAY_ENABLED, enabled).apply();
     }
 
     public static float getCornerRadiusFraction(SharedPreferences prefs) {

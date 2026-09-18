@@ -9,6 +9,7 @@ import com.drivehub.kamera.camera.TileViewActivity;
 import com.drivehub.kamera.dashcam.DashcamSettingsController;
 import com.drivehub.kamera.dashcam.RecordingService;
 import com.drivehub.kamera.dev.DevRuntimeLog;
+import com.drivehub.kamera.dev.SystemPerformanceOverlay;
 import com.drivehub.kamera.helper.app.NotificationChannelHelper;
 import com.drivehub.kamera.helper.vehiclesensors.SystemPropertiesHelper;
 import com.drivehub.kamera.helper.vehiclesensors.VehicleSpeedReader;
@@ -88,6 +89,7 @@ public class SignalService extends Service {
     private volatile boolean oemLifecycleMonitoring;
     private volatile String lastOemLifecycle = "";
     private SharedPreferences.OnSharedPreferenceChangeListener oemCoexistPrefListener;
+    private SystemPerformanceOverlay systemPerformanceOverlay;
     private int lastLamp = Integer.MIN_VALUE;
     private int currentLamp = 0;
     private int currentGear = 0;
@@ -142,6 +144,21 @@ public class SignalService extends Service {
 
     public static boolean isRunning() {
         return sInstance != null;
+    }
+
+    public static void setPerformanceOverlayEnabled(Context context, boolean enabled) {
+        Context appContext = context.getApplicationContext();
+        UiPrefs.setDevPerformanceOverlayEnabled(UiPrefs.getPrefs(appContext), enabled);
+        SignalService instance = sInstance;
+        if (instance != null) {
+            instance.mainHandler.post(instance::syncPerformanceOverlayState);
+        } else if (enabled) {
+            try {
+                start(appContext);
+            } catch (Throwable t) {
+                Log.w(TAG, "Failed to start service for performance overlay", t);
+            }
+        }
     }
 
     public static void setOemAvmActive(Context context, boolean active) {
@@ -277,6 +294,7 @@ public class SignalService extends Service {
     public void onCreate() {
         super.onCreate();
         sInstance = this;
+        systemPerformanceOverlay = new SystemPerformanceOverlay(this);
         NotificationChannelHelper.ensureChannel(this, CHANNEL_ID, "MG4 Signal");
         registerDebugBroadcastSniffer();
     }
@@ -292,6 +310,8 @@ public class SignalService extends Service {
                 .build();
         startForeground(NOTIF_ID, n);
 
+        syncPerformanceOverlayState();
+
         boolean carOk = tryStartCarApiListener();
         if (!carOk) {
             Log.w(TAG, "Car API listener unavailable, falling back to system property polling.");
@@ -300,6 +320,15 @@ public class SignalService extends Service {
         registerOemCoexistListener();
         applyOemCoexistState();
         return START_STICKY;
+    }
+
+    private void syncPerformanceOverlayState() {
+        if (systemPerformanceOverlay == null) return;
+        if (UiPrefs.isDevPerformanceOverlayEnabled(UiPrefs.getPrefs(this))) {
+            systemPerformanceOverlay.start();
+        } else {
+            systemPerformanceOverlay.stop();
+        }
     }
 
     private boolean tryStartCarApiListener() {
@@ -879,6 +908,10 @@ public class SignalService extends Service {
     @Override
     public void onDestroy() {
         super.onDestroy();
+        if (systemPerformanceOverlay != null) {
+            systemPerformanceOverlay.stop();
+            systemPerformanceOverlay = null;
+        }
         if (debugBroadcastReceiver != null) {
             try {
                 unregisterReceiver(debugBroadcastReceiver);

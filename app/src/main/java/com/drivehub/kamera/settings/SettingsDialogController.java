@@ -232,6 +232,7 @@ public final class SettingsDialogController {
         v.tvBannerErrorRecoveredVolumeValue = dialog.findViewById(R.id.tvBannerErrorRecoveredVolumeValue);
         v.btnBannerErrorRecoveredTest = dialog.findViewById(R.id.btnBannerErrorRecoveredTest);
         v.tvDashcamRecordingStatus = dialog.findViewById(R.id.tvDashcamRecordingStatus);
+        v.swDevPerformanceOverlay = dialog.findViewById(R.id.switchDevPerformanceOverlay);
         v.etDevDefaultPollMs = dialog.findViewById(R.id.etDevDefaultPollMs);
         v.etDevSignalOffPollMs = dialog.findViewById(R.id.etDevSignalOffPollMs);
         v.etDevForegroundModePollMs = dialog.findViewById(R.id.etDevForegroundModePollMs);
@@ -381,6 +382,7 @@ public final class SettingsDialogController {
         );
         dev.bind(
                 prefs,
+                views.swDevPerformanceOverlay,
                 views.seekDevOverlayTopInsetPx,
                 views.etDevOverlayTopInsetPx,
                 views.etDevForegroundModePollMs,
@@ -421,6 +423,7 @@ public final class SettingsDialogController {
                         views.swSmoothEntry,
                         views.swLockTileResizing,
                         views.swLockTileMoving,
+                        views.swDevPerformanceOverlay,
                         views.swAllowBetaUpdates
                 },
                 views.dialogClose,
@@ -708,6 +711,7 @@ public final class SettingsDialogController {
         TextView tvBannerErrorRecoveredVolumeValue;
         Button btnBannerErrorRecoveredTest;
         TextView tvDashcamRecordingStatus;
+        Switch swDevPerformanceOverlay;
         EditText etDevDefaultPollMs;
         EditText etDevSignalOffPollMs;
         EditText etDevForegroundModePollMs;

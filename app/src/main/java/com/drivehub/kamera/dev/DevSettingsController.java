@@ -13,6 +13,7 @@ import android.text.Editable;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.SeekBar;
+import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -26,6 +27,7 @@ public final class DevSettingsController {
 
     public void bind(
             SharedPreferences prefs,
+            Switch swPerformanceOverlay,
             SeekBar seekOverlayTopInsetPx,
             EditText etOverlayTopInsetPx,
             EditText etForegroundModePollMs,
@@ -39,6 +41,7 @@ public final class DevSettingsController {
             Button btnBrowseFolder,
             Button btnResetDefaults
     ) {
+        bindPerformanceOverlay(prefs, swPerformanceOverlay);
         bindIntSlider(
                 prefs,
                 seekOverlayTopInsetPx,
@@ -100,6 +103,13 @@ public final class DevSettingsController {
                 etDashcamRetentionClipCount,
                 etDashcamMaxEventDirs,
                 btnResetDefaults);
+    }
+
+    private void bindPerformanceOverlay(SharedPreferences prefs, Switch performanceOverlaySwitch) {
+        if (performanceOverlaySwitch == null) return;
+        performanceOverlaySwitch.setChecked(UiPrefs.isDevPerformanceOverlayEnabled(prefs));
+        performanceOverlaySwitch.setOnCheckedChangeListener((buttonView, checked) ->
+                SignalService.setPerformanceOverlayEnabled(buttonView.getContext(), checked));
     }
 
     private interface CapacityWriter {
