@@ -2830,11 +2830,14 @@ namespace camera_stream_manager
 
             void configurePreviewWindowLocked()
             {
-                if (previewWindow_ == nullptr || cropWidth_ <= 0 || cropHeight_ <= 0)
+                if (previewWindow_ == nullptr || cropWidth_ <= 0 || fieldHeight_ <= 0)
                 {
                     return;
                 }
-                ANativeWindow_setBuffersGeometry(previewWindow_, cropWidth_, cropHeight_,
+                // Per-camera previews render one field (720x240), while recording consumes
+                // both fields (720x480). The window must match the pixels actually copied by
+                // renderPreviewLocked, otherwise its lower half remains unwritten/black.
+                ANativeWindow_setBuffersGeometry(previewWindow_, cropWidth_, fieldHeight_,
                                                  AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM);
             }
 
