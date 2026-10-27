@@ -309,4 +309,6 @@
     <string name="dashcam_status_icon">Dashcam status indicator (optional)</string>
     <string name="dashcam_oem_captures">Factory camera recordings</string>
     <string name="dashcam_oem_export">Export copies</string>
+    <string name="settings_dashcam_storage_eject_failed_message">Not ready to remove: writes or synchronization did not finish successfully. See the runtime log.</string>
+    <string name="settings_credits_tommasov">Tommaso Vietina — MG4_Dashcam: native four-camera recording, deinterlacing and cadence, FAT storage fixes, OEM handoff, status indicator and OEM capture access. Adapted from stable 1.4.3.&#10;https://github.com/Tommasov/MG4_Dashcam</string>
 </resources>

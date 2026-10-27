@@ -976,7 +976,8 @@ public class SignalService extends Service {
             }
         };
         try {
-            registerReceiver(debugBroadcastReceiver, filter);
+            androidx.core.content.ContextCompat.registerReceiver(this, debugBroadcastReceiver, filter,
+                    androidx.core.content.ContextCompat.RECEIVER_EXPORTED);
             DevRuntimeLog.add("SignalService", "debug sniffer registered for OEM actions");
         } catch (Throwable t) {
             DevRuntimeLog.add("SignalService", "debug sniffer failed: " + t.getClass().getSimpleName());

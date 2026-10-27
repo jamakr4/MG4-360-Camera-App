@@ -309,4 +309,6 @@
     <string name="dashcam_status_icon">Dashcam-Statusindikator (optional)</string>
     <string name="dashcam_oem_captures">Aufnahmen der Werkskamera</string>
     <string name="dashcam_oem_export">Kopien exportieren</string>
+    <string name="settings_dashcam_storage_eject_failed_message">Nicht zum Entfernen freigegeben: Schreibvorgänge oder Synchronisierung wurden nicht erfolgreich beendet. Details stehen im Laufzeitprotokoll.</string>
+    <string name="settings_credits_tommasov">Tommaso Vietina — MG4_Dashcam: native Vierkamera-Aufnahme, Halbbildverarbeitung und Zeitraster, FAT-Speicherkorrekturen, OEM-Übergabe, Statusindikator und OEM-Aufnahmezugriff. Adaptiert aus stable 1.4.3.&#10;https://github.com/Tommasov/MG4_Dashcam</string>
 </resources>

@@ -558,6 +558,7 @@ namespace camera_stream_manager
             int dirFd = open(path.substr(0, cut).c_str(), O_RDONLY | O_DIRECTORY);
             if (dirFd < 0)
             {
+                gFlushFailed = true;
                 return;
             }
             if (fsync(dirFd) != 0) gFlushFailed = true;
@@ -2350,7 +2351,7 @@ namespace camera_stream_manager
                         if (outputBuffer != nullptr)
                         {
                             if (AMediaMuxer_writeSampleData(muxer_, static_cast<size_t>(trackIndex_), outputBuffer, &info) == AMEDIA_OK) {
-                                gWrittenSamples++;
+                                if (!(info.flags & AMEDIACODEC_BUFFER_FLAG_CODEC_CONFIG)) gWrittenSamples++;
                             } else {
                                 gWriteFailed = true;
                             }

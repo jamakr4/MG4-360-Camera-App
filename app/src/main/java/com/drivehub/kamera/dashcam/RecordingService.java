@@ -118,6 +118,7 @@ public class RecordingService extends Service {
     private volatile boolean usbEjectInProgress = false;
     private volatile boolean futureOnlyEventSession = false;
     private volatile long lastSegmentAt;
+    private volatile long expectedSegmentMs = 30_000;
     private volatile long usbRetryAfter;
     private volatile long oemAskedAt;
     private volatile long oemGoneAt;
@@ -218,7 +219,7 @@ public class RecordingService extends Service {
             resumeAfterOemRequest(this);
         }
         if (lastSegmentAt > 0 && RecordingHealth.segmentOverdue(now - lastSegmentAt,
-                DashcamSettingsController.getSegmentDurationSec() * 1000L, oemPauseRequested)) {
+                expectedSegmentMs, oemPauseRequested)) {
             watchdogFailed = true;
             stopRequested = true;
             segmentStopRequested = true;
@@ -278,7 +279,8 @@ public class RecordingService extends Service {
 
     public static void pauseForOemRequest(Context context) {
         SharedPreferences prefs = UiPrefs.getPrefs(context);
-        if (!prefs.getBoolean(DashcamSettingsController.KEY_ENABLED, false) || !isRunning()) {
+        if ((!prefs.getBoolean(DashcamSettingsController.KEY_ENABLED, false)
+                && !(instance != null && instance.futureOnlyEventSession)) || !isRunning()) {
             return;
         }
         RecordingService live = instance;
@@ -296,7 +298,8 @@ public class RecordingService extends Service {
 
     public static void resumeAfterOemRequest(Context context) {
         SharedPreferences prefs = UiPrefs.getPrefs(context);
-        if (!prefs.getBoolean(DashcamSettingsController.KEY_ENABLED, false) || !isRunning()) {
+        if ((!prefs.getBoolean(DashcamSettingsController.KEY_ENABLED, false)
+                && !(instance != null && instance.futureOnlyEventSession)) || !isRunning()) {
             return;
         }
         Intent i = new Intent(context, RecordingService.class);
@@ -348,10 +351,10 @@ public class RecordingService extends Service {
             intent = new Intent(this, RecordingService.class).setAction(ACTION_START);
         }
         String action = intent.getAction();
+        if (usbEjectInProgress) return START_NOT_STICKY;
 
         if (ACTION_STOP.equals(action)) {
             DevRuntimeLog.add("RecordingService", "ACTION_STOP");
-            usbEjectInProgress = false;
             shutdownRecordingService();
             return START_NOT_STICKY;
         }
@@ -378,7 +381,7 @@ public class RecordingService extends Service {
                         safeToRemove,
                         safeToRemove
                                 ? R.string.settings_dashcam_storage_eject_ready_message
-                                : R.string.settings_dashcam_storage_eject_unavailable_message);
+                                : R.string.settings_dashcam_storage_eject_failed_message);
                 stopForeground(true);
                 stopSelf();
             }, "RecordingServiceUsbEject").start();
@@ -387,7 +390,7 @@ public class RecordingService extends Service {
 
         if (ACTION_PAUSE_FOR_OEM_REQUEST.equals(action)) {
             DevRuntimeLog.add("RecordingService", "ACTION_PAUSE_FOR_OEM_REQUEST");
-            boolean enabled = prefs().getBoolean(DashcamSettingsController.KEY_ENABLED, false);
+            boolean enabled = prefs().getBoolean(DashcamSettingsController.KEY_ENABLED, false) || futureOnlyEventSession;
             boolean changed = !oemPauseRequested;
             if (changed) oemAskedAt = SystemClock.elapsedRealtime();
             oemPauseRequested = true;
@@ -421,7 +424,7 @@ public class RecordingService extends Service {
             synchronized (stateLock) {
                 stateLock.notifyAll();
             }
-            boolean enabled = prefs().getBoolean(DashcamSettingsController.KEY_ENABLED, false);
+            boolean enabled = prefs().getBoolean(DashcamSettingsController.KEY_ENABLED, false) || futureOnlyEventSession;
             if (!enabled) {
                 if (worker == null) {
                     publishStatus(STATUS_OFF, 0, TOTAL_CAMERAS, "");
@@ -571,7 +574,8 @@ public class RecordingService extends Service {
                 endedWithFatalError = true;
                 break;
             }
-            onSegmentCompleted(baseDir, baseName, segmentStartWallMs, System.currentTimeMillis(), keepSegments);
+            if (new File(baseDir, baseName + ".mp4").isFile())
+                onSegmentCompleted(baseDir, baseName, segmentStartWallMs, System.currentTimeMillis(), keepSegments);
 
             // Check whether recording has been disabled in prefs.
             enabled = prefs.getBoolean(DashcamSettingsController.KEY_ENABLED, false);
@@ -606,6 +610,7 @@ public class RecordingService extends Service {
         int remainingSegments = FUTURE_ONLY_EVENT_SEGMENTS;
 
         while (!stopRequested && remainingSegments > 0) {
+            if (!waitForOemPauseToClear(prefs())) break;
             File resolved = resolveActiveBaseDir(false);
             if (resolved == null) {
                 endedWithFatalError = true;
@@ -624,8 +629,9 @@ public class RecordingService extends Service {
                 endedWithFatalError = true;
                 break;
             }
-            onSegmentCompleted(baseDir, baseName, segmentStartWallMs, System.currentTimeMillis(), keepSegments);
-            remainingSegments--;
+            if (new File(baseDir, baseName + ".mp4").isFile())
+                onSegmentCompleted(baseDir, baseName, segmentStartWallMs, System.currentTimeMillis(), keepSegments);
+            if (new File(baseDir, baseName + ".mp4").isFile()) remainingSegments--;
         }
 
         futureOnlyEventSession = false;
@@ -636,6 +642,7 @@ public class RecordingService extends Service {
     }
 
     private boolean recordClip(File baseDir, long durationMs, String baseName, int keepSegments) {
+        expectedSegmentMs = Math.max(1000, durationMs);
         SharedPreferences prefs = prefs();
         int recordingFps = DashcamSettingsController.getRecordingFps(prefs);
         String signature = DashcamSettingsController.getRecordingSignature(prefs);
@@ -708,6 +715,10 @@ public class RecordingService extends Service {
         if (!stopped || watchdogFailed || !isReadableClip(outputFile)) {
             discardClip(outputFile);
             recordingFile = null;
+            if (urgent && stopped && !watchdogFailed) {
+                publishStatus(STATUS_PAUSED_OEM, 0, TOTAL_CAMERAS, "");
+                return true; // An OEM interruption before the first frame is not a recorder failure.
+            }
             publishStatus(STATUS_ERROR, 0, TOTAL_CAMERAS, ERROR_GRID_STOP_TIMEOUT);
             return false;
         }
@@ -720,7 +731,7 @@ public class RecordingService extends Service {
     private boolean waitForOemPauseToClear(SharedPreferences prefs) {
         boolean announcedPause = false;
         while (!stopRequested
-                && prefs.getBoolean(DashcamSettingsController.KEY_ENABLED, false)
+                && (prefs.getBoolean(DashcamSettingsController.KEY_ENABLED, false) || futureOnlyEventSession)
                 && oemPauseRequested) {
             segmentStopRequested = true;
             if (!announcedPause) {
@@ -735,7 +746,7 @@ public class RecordingService extends Service {
                 }
             }
         }
-        if (stopRequested || !prefs.getBoolean(DashcamSettingsController.KEY_ENABLED, false)) {
+        if (stopRequested || (!prefs.getBoolean(DashcamSettingsController.KEY_ENABLED, false) && !futureOnlyEventSession)) {
             return false;
         }
         segmentStopRequested = false;
@@ -1165,9 +1176,19 @@ public class RecordingService extends Service {
     }
 
     private void shutdownRecordingService() {
+        usbEjectInProgress = true; // Keep the instance alive until its writer has released ownership.
         shutdownRecordingServiceWithoutStopSelf();
-        stopForeground(true);
-        stopSelf();
+        new Thread(() -> {
+            boolean quiet = awaitShutdownQuiescence();
+            DevRuntimeLog.add(TAG, "stop drained=" + quiet);
+            Thread current = worker;
+            if (!quiet && current != null && current.isAlive()) {
+                publishStatus(STATUS_ERROR, 0, TOTAL_CAMERAS, "Recorder still stopping; writes not quiescent");
+                return; // Do not allow a second worker to acquire the same native recorder.
+            }
+            stopForeground(true);
+            stopSelf();
+        }, "RecordingServiceStop").start();
     }
 
     private void shutdownRecordingServiceWithoutStopSelf() {

@@ -120,6 +120,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
     @Override
     @SuppressWarnings("deprecation")
+    @android.annotation.SuppressLint("WrongConstant") // takeFlags is masked to the two allowed URI grant flags below.
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode != REQ_DASHCAM_USB_FOLDER
