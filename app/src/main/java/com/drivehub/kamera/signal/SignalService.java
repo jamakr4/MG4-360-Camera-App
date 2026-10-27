@@ -880,7 +880,7 @@ public class SignalService extends Service {
 
     private void reconcileOemAvmState() {
         // RecordingService supervises both broadcasts and foreground state while recording.
-        if (RecordingService.isRunning()) return;
+        if (RecordingService.isSupervisingOem()) return;
         if (!isOemCoexistActive()) {
             lastObservedOemForeground = false;
             return;

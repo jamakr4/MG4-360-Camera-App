@@ -231,6 +231,11 @@ public class RecordingService extends Service {
 
     private long completedSegmentCount = 0L;
 
+    public static boolean isSupervisingOem() {
+        RecordingService live = instance;
+        return live != null && live.worker != null && !live.stopRequested;
+    }
+
     public static boolean isRunning() {
         return sServiceRunning;
     }
@@ -366,7 +371,12 @@ public class RecordingService extends Service {
             // internal storage; now that it is honoured, this would be main-thread IO.
             usbEjectInProgress = true;
             new Thread(() -> {
-                boolean usingUsb = activeBaseIsUsb || DashcamStorageManager.resolve(this).usingUsb;
+                if (activeBaseDir == null) {
+                    DashcamStorageManager.Resolution resolution = DashcamStorageManager.resolve(this);
+                    activeBaseDir = resolution.baseDir;
+                    activeBaseIsUsb = resolution.usingUsb;
+                }
+                boolean usingUsb = activeBaseIsUsb;
                 if (!usingUsb) {
                     usbEjectInProgress = false;
                     broadcastUsbEjectReady(
@@ -516,7 +526,7 @@ public class RecordingService extends Service {
             return;
         }
         boolean startedAnyCamera = recordClip(testDir, durationMs,
-                makeTimestampBase(System.currentTimeMillis(), "yyMMddHHmmss"), -1);
+                makeTimestampBase(System.currentTimeMillis(), "yyMMddHHmmssSSS"), -1);
         if (startedAnyCamera) {
             publishStatus(STATUS_OFF, 0, TOTAL_CAMERAS, "");
         }
@@ -563,7 +573,7 @@ public class RecordingService extends Service {
             // internal storage carry separate retention limits.
             int keepSegments = DashcamStorageManager.getActiveRetentionClipCount(prefs, activeBaseIsUsb);
             long segmentStartWallMs = System.currentTimeMillis();
-            String baseName = makeTimestampBase(segmentStartWallMs, "yyMMddHHmmss");
+            String baseName = makeTimestampBase(segmentStartWallMs, "yyMMddHHmmssSSS");
             boolean startedAnyCamera = recordClip(baseDir, segmentMs, baseName, keepSegments);
             if (!startedAnyCamera) {
                 if (isRecoverableUsbFailure()) {
@@ -620,7 +630,7 @@ public class RecordingService extends Service {
 
             int keepSegments = DashcamStorageManager.getActiveRetentionClipCount(prefs(), activeBaseIsUsb);
             long segmentStartWallMs = System.currentTimeMillis();
-            String baseName = makeTimestampBase(segmentStartWallMs, "yyMMddHHmmss");
+            String baseName = makeTimestampBase(segmentStartWallMs, "yyMMddHHmmssSSS");
             boolean startedAnyCamera = recordClip(baseDir, segmentMs, baseName, keepSegments);
             if (!startedAnyCamera) {
                 if (isRecoverableUsbFailure()) {
