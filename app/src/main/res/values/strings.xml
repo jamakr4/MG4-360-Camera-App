@@ -306,4 +306,7 @@
     <string name="dashcam_recording_error_overlay_subtitle_stop_failed">Recording stopped unexpectedly.</string>
     <string name="dashcam_recording_recovered_overlay_title">Dashcam active again</string>
     <string name="dashcam_recording_recovered_overlay_subtitle">Recording has resumed automatically.</string>
+    <string name="dashcam_status_icon">Dashcam status indicator (optional)</string>
+    <string name="dashcam_oem_captures">Factory camera recordings</string>
+    <string name="dashcam_oem_export">Export copies</string>
 </resources>

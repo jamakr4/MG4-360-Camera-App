@@ -1816,6 +1816,10 @@ namespace camera_stream_manager
                         std::this_thread::sleep_for(std::chrono::microseconds(owedUs));
                         countSleep(owedUs, nowUs() - beforeUs);
                     }
+                    {
+                        std::lock_guard<std::mutex> lock(canvasMutex_);
+                        if ((cellsFreshMask_ & cameraMask_) != cameraMask_) continue;
+                    }
                     encodeOneFrame();
                 }
             }
@@ -3272,6 +3276,12 @@ namespace camera_stream_manager
                         }
                         const int64_t workStartUs = nowUs();
 
+                        if (buffer.index >= buffers_.size()
+                            || srcStrideBytes_ < srcWidth_ * 2
+                            || buffers_[buffer.index].length < static_cast<size_t>(srcStrideBytes_) * srcHeight_) {
+                            loge("invalid camera buffer bounds on /dev/video%d", videoIndex_);
+                            break;
+                        }
                         cv::Mat packedFrame(srcHeight_, srcWidth_, CV_8UC2, buffers_[buffer.index].start, srcStrideBytes_);
                         cv::Mat packedCrop = packedFrame(cv::Rect(0, 0, cropWidth_, cropHeight_));
                         countFrame(videoIndex_, nowUs(), buffer.sequence);
@@ -3322,7 +3332,12 @@ namespace camera_stream_manager
                             }
                             if (consumer->wantsPackedFrame())
                             {
-                                consumer->processPackedFrame(packedCrop);
+                                if (packedFormat_ != PackedFormat::UYVY) {
+                                    loge("combined capture requires UYVY on /dev/video%d", videoIndex_);
+                                    consumer->requestStop();
+                                } else {
+                                    consumer->processPackedFrame(packedCrop);
+                                }
                             }
                             else
                             {

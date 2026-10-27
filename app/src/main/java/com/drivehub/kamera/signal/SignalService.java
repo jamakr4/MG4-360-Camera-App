@@ -879,6 +879,8 @@ public class SignalService extends Service {
     }
 
     private void reconcileOemAvmState() {
+        // RecordingService supervises both broadcasts and foreground state while recording.
+        if (RecordingService.isRunning()) return;
         if (!isOemCoexistActive()) {
             lastObservedOemForeground = false;
             return;
@@ -888,7 +890,7 @@ public class SignalService extends Service {
 
         if (foreground) {
             lastObservedOemForeground = true;
-            if (!latched) {
+            if (!latched && VehicleSpeedReader.readSpeedKmh() <= UiPrefs.getDevOemAvmMaxSpeedKmh(UiPrefs.getPrefs(this))) {
                 DevRuntimeLog.add("SignalService", "OEM foreground fallback => pause");
                 setOemAvmActive(this, true);
                 RecordingService.pauseForOemRequest(this);

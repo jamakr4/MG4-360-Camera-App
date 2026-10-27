@@ -190,6 +190,17 @@ public final class DashcamSettingsController {
             BannerGroupViews eventBanner,
             BannerGroupViews pauseResumeBanner,
             BannerGroupViews errorRecoveredBanner) {
+        if (swEnabled != null) {
+            View root = swEnabled.getRootView();
+            Switch indicator = root.findViewById(R.id.switchDashcamStatusIcon);
+            if (indicator != null) {
+                indicator.setChecked(prefs.getBoolean("dashcamStatusIcon", false));
+                indicator.setOnCheckedChangeListener((button, checked) -> prefs.edit()
+                        .putBoolean("dashcamStatusIcon", checked).apply());
+            }
+            View captures = root.findViewById(R.id.btnOemCaptures);
+            if (captures != null) captures.setOnClickListener(v -> showOemCaptures());
+        }
         int recordingFps = getRecordingFps(prefs);
         String signature = getRecordingSignature(prefs);
         int testRecordDurationSec = getTestRecordDurationSec(prefs);
@@ -419,6 +430,25 @@ public final class DashcamSettingsController {
                 Toast.LENGTH_SHORT).show();
     }
 
+    private void showOemCaptures() {
+        new Thread(() -> {
+            String report = com.drivehub.kamera.dev.OemCaptures.describe();
+            mainHandler.post(() -> new android.app.AlertDialog.Builder(activity)
+                    .setTitle(R.string.dashcam_oem_captures)
+                    .setMessage(report)
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .setPositiveButton(R.string.dashcam_oem_export, (dialog, which) -> {
+                        new Thread(() -> {
+                            DashcamStorageManager.Resolution resolution = DashcamStorageManager.resolve(activity);
+                            String result = resolution.baseDir == null ? "Storage unavailable"
+                                    : com.drivehub.kamera.dev.OemCaptures.copyTo(resolution.baseDir);
+                            mainHandler.post(() -> new android.app.AlertDialog.Builder(activity)
+                                    .setMessage(result).setPositiveButton(android.R.string.ok, null).show());
+                        }, "OemCaptureExport").start();
+                    }).show());
+        }, "OemCaptureList").start();
+    }
+
     // ---------- Storage status ----------
 
     // Runs a USB write test on a worker thread and updates the status label + active path.
@@ -449,7 +479,9 @@ public final class DashcamSettingsController {
             return;
         }
         int statusRes;
-        if (res.usingUsb) {
+        if (res.baseDir == null || res.usbState == DashcamStorageManager.UsbState.OUT_OF_SPACE) {
+            statusRes = R.string.settings_dashcam_storage_status_usb_write_test_failed;
+        } else if (res.usingUsb) {
             statusRes = R.string.settings_dashcam_storage_status_usb_active;
         } else if (res.usbState == DashcamStorageManager.UsbState.MULTIPLE_MEDIA) {
             // Applies to AUTO (falls back to internal) and USB_ONLY (no recording) alike —
@@ -473,12 +505,15 @@ public final class DashcamSettingsController {
                     break;
             }
         }
-        views.statusText.setText(colorizeStatusIcon(activity.getString(statusRes)));
+        views.statusText.setText(colorizeStatusIcon(activity.getString(statusRes) + " [" + res.usbState + "]"
+                + (RecordingService.isRunning() ? "\n" + RecordingService.readPersistedStatus(UiPrefs.getPrefs(activity)).lastError : "")));
         if (views.activePathText != null) {
             views.activePathText.setText(res.baseDir == null
                     ? ""
                     : activity.getString(R.string.settings_dashcam_storage_active_path,
-                            res.baseDir.getAbsolutePath()));
+                            RecordingService.isRunning()
+                                    ? UiPrefs.getPrefs(activity).getString("dashcamActualPath", res.baseDir.getAbsolutePath())
+                                    : res.baseDir.getAbsolutePath()));
         }
         if (views.ejectButton != null) {
             views.ejectButton.setVisibility(res.usingUsb ? View.VISIBLE : View.GONE);

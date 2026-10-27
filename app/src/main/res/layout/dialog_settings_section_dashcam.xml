@@ -60,6 +60,18 @@
 
     </LinearLayout>
 
+    <Switch
+        android:id="@+id/switchDashcamStatusIcon"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:minHeight="48dp"
+        android:text="@string/dashcam_status_icon" />
+    <Button
+        android:id="@+id/btnOemCaptures"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/dashcam_oem_captures" />
+
     <!-- ============ RECORDING ============ -->
     <TextView
         style="@style/DrivehubSettingsCardLabel"
