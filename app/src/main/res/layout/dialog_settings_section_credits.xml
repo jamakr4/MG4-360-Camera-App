@@ -60,6 +60,15 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="14dp"
+            android:autoLink="web"
+            android:linksClickable="true"
+            android:text="@string/settings_credits_tommasov" />
+
+        <TextView
+            style="@style/DrivehubSettingsCreditsBody"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
             android:text="@string/settings_credits_sound_body" />
 
     </LinearLayout>

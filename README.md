@@ -327,3 +327,11 @@ This is an independent community project and is **not affiliated with SAIC, MG M
 ## License
 
 GPL-3.0 - see [LICENSE](LICENSE) for details.
+
+
+### Dashcam integration credits
+
+The native recording, storage and OEM-coexistence improvements incorporate work by
+[Tommaso Vietina / MG4_Dashcam](https://github.com/Tommasov/MG4_Dashcam), stable 1.4.3.
+See [integration notes, validation and pending vehicle tests](docs/dashcam-integration.md).
+Existing tile, turn-signal, rearview and event features are retained in this integration.
