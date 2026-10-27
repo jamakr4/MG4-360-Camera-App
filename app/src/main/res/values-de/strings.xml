@@ -63,6 +63,7 @@
     <string name="settings_oem_avm_coexist">OEM-360°-App weiter nutzen</string>
     <string name="settings_oem_avm_coexist_hint">Globale Einstellung für die werkseitige 360°-Kamera-App. Wenn aktiv, gibt die App bei Bedarf den Kamerazugriff frei, damit die OEM-Rueckfahr-/360°-Ansicht weiter starten kann. Wenn deaktiviert, haben die Custom-Features immer Vorrang und die OEM-360°-App wird parallel bewusst nicht unterstuetzt.</string>
     <string name="settings_smooth_entry">Smooth Entry</string>
+    <string name="settings_smooth_entry_hint">Blendet die Blinkerkamera sanft ein und aus, statt sie abrupt anzuzeigen oder zu schließen.</string>
     <string name="settings_lock_tile_resizing">Tile-Größe sperren</string>
     <string name="settings_lock_tile_moving">Tile-Position sperren</string>
     <string name="settings_dashcam_banners_section">Benachrichtigungs-Banner</string>

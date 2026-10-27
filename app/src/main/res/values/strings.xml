@@ -63,6 +63,7 @@
     <string name="settings_oem_avm_coexist">Allow OEM 360° camera app</string>
     <string name="settings_oem_avm_coexist_hint">Global setting for the stock 360° camera app. When enabled, the app yields camera ownership where needed so the OEM reverse/360 view can still open. When disabled, all custom features keep priority and the OEM 360° app is intentionally not supported in parallel.</string>
     <string name="settings_smooth_entry">Smooth Entry</string>
+    <string name="settings_smooth_entry_hint">Gently fades the turn-signal camera in and out instead of showing or hiding it abruptly.</string>
     <string name="settings_lock_tile_resizing">Lock tile resizing</string>
     <string name="settings_lock_tile_moving">Lock tile moving</string>
     <string name="settings_dashcam_banners_section">Notification banners</string>
