@@ -198,8 +198,6 @@ public final class DashcamSettingsController {
                 indicator.setOnCheckedChangeListener((button, checked) -> prefs.edit()
                         .putBoolean("dashcamStatusIcon", checked).apply());
             }
-            View captures = root.findViewById(R.id.btnOemCaptures);
-            if (captures != null) captures.setOnClickListener(v -> showOemCaptures());
         }
         int recordingFps = getRecordingFps(prefs);
         String signature = getRecordingSignature(prefs);
@@ -428,25 +426,6 @@ public final class DashcamSettingsController {
         }
         Toast.makeText(activity, R.string.settings_dashcam_storage_select_success,
                 Toast.LENGTH_SHORT).show();
-    }
-
-    private void showOemCaptures() {
-        new Thread(() -> {
-            String report = com.drivehub.kamera.dev.OemCaptures.describe();
-            mainHandler.post(() -> new android.app.AlertDialog.Builder(activity)
-                    .setTitle(R.string.dashcam_oem_captures)
-                    .setMessage(report)
-                    .setNegativeButton(android.R.string.cancel, null)
-                    .setPositiveButton(R.string.dashcam_oem_export, (dialog, which) -> {
-                        new Thread(() -> {
-                            DashcamStorageManager.Resolution resolution = DashcamStorageManager.resolve(activity);
-                            String result = resolution.baseDir == null ? "Storage unavailable"
-                                    : com.drivehub.kamera.dev.OemCaptures.copyTo(resolution.baseDir);
-                            mainHandler.post(() -> new android.app.AlertDialog.Builder(activity)
-                                    .setMessage(result).setPositiveButton(android.R.string.ok, null).show());
-                        }, "OemCaptureExport").start();
-                    }).show());
-        }, "OemCaptureList").start();
     }
 
     // ---------- Storage status ----------

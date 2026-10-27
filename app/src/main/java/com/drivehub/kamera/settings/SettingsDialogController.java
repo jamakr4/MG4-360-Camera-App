@@ -244,6 +244,8 @@ public final class SettingsDialogController {
         v.etDevDashcamRecordsPath = dialog.findViewById(R.id.etDevDashcamRecordsPath);
         v.tvDevDashcamRecordsPath = dialog.findViewById(R.id.tvDevDashcamRecordsPath);
         v.btnDevDashcamBrowseFolder = dialog.findViewById(R.id.btnDevDashcamBrowseFolder);
+        v.btnDevOemCaptures = dialog.findViewById(R.id.btnDevOemCaptures);
+        v.swDashcamStatusIcon = dialog.findViewById(R.id.switchDashcamStatusIcon);
         v.btnDevResetDefaults = dialog.findViewById(R.id.btnDevResetDefaults);
         v.seekCorner = dialog.findViewById(R.id.seekCornerRadius);
         v.etCorner = dialog.findViewById(R.id.etCornerRadius);
@@ -396,6 +398,7 @@ public final class SettingsDialogController {
                 views.btnDevDashcamBrowseFolder,
                 views.btnDevResetDefaults
         );
+        views.btnDevOemCaptures.setOnClickListener(v -> com.drivehub.kamera.dev.OemCapturesDialog.show(activity));
     }
 
     private void wireAppearance(SharedPreferences prefs) {
@@ -409,6 +412,7 @@ public final class SettingsDialogController {
                         views.swSignalTapToHide,
                         views.swRotateToDrivingDirection,
                         views.swDashcamEnabled,
+                        views.swDashcamStatusIcon,
                         views.swDashcamShowSpeed,
                         views.swDashcamCameraFront,
                         views.swDashcamCameraRight,
@@ -723,6 +727,8 @@ public final class SettingsDialogController {
         EditText etDevDashcamRecordsPath;
         TextView tvDevDashcamRecordsPath;
         Button btnDevDashcamBrowseFolder;
+        Button btnDevOemCaptures;
+        Switch swDashcamStatusIcon;
         Button btnDevResetDefaults;
         SeekBar seekCorner;
         EditText etCorner;

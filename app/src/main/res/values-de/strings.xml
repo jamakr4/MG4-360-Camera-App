@@ -306,9 +306,11 @@
     <string name="dashcam_recording_error_overlay_subtitle_stop_failed">Die Aufnahme wurde unerwartet beendet.</string>
     <string name="dashcam_recording_recovered_overlay_title">Dashcam wieder aktiv</string>
     <string name="dashcam_recording_recovered_overlay_subtitle">Die Aufnahme wurde automatisch fortgesetzt.</string>
-    <string name="dashcam_status_icon">Dashcam-Statusindikator (optional)</string>
+    <string name="dashcam_status_icon">Aufnahmestatus in der Statusleiste</string>
     <string name="dashcam_oem_captures">Aufnahmen der Werkskamera</string>
     <string name="dashcam_oem_export">Kopien exportieren</string>
     <string name="settings_dashcam_storage_eject_failed_message">Nicht zum Entfernen freigegeben: Schreibvorgänge oder Synchronisierung wurden nicht erfolgreich beendet. Details stehen im Laufzeitprotokoll.</string>
     <string name="settings_credits_tommasov">Tommaso Vietina — MG4_Dashcam: native Vierkamera-Aufnahme, Halbbildverarbeitung und Zeitraster, FAT-Speicherkorrekturen, OEM-Übergabe, Statusindikator und OEM-Aufnahmezugriff. Adaptiert aus stable 1.4.3.&#10;https://github.com/Tommasov/MG4_Dashcam</string>
+    <string name="dashcam_status_icon_hint">Zeigt den Dashcam-Zustand (REC, 360-Pause oder Fehler) am oberen Bildschirmrand. Standardmäßig aus; unabhängig von Werksaufnahmen.</string>
+    <string name="dashcam_oem_captures_hint">Vorhandene Aufnahmen der MG-Werkskamera anzeigen und exportieren. Diese Aktion startet den Werksrecorder nicht.</string>
 </resources>

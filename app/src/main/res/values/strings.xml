@@ -306,9 +306,11 @@
     <string name="dashcam_recording_error_overlay_subtitle_stop_failed">Recording stopped unexpectedly.</string>
     <string name="dashcam_recording_recovered_overlay_title">Dashcam active again</string>
     <string name="dashcam_recording_recovered_overlay_subtitle">Recording has resumed automatically.</string>
-    <string name="dashcam_status_icon">Dashcam status indicator (optional)</string>
+    <string name="dashcam_status_icon">Recording status in the status bar</string>
     <string name="dashcam_oem_captures">Factory camera recordings</string>
     <string name="dashcam_oem_export">Export copies</string>
     <string name="settings_dashcam_storage_eject_failed_message">Not ready to remove: writes or synchronization did not finish successfully. See the runtime log.</string>
     <string name="settings_credits_tommasov">Tommaso Vietina — MG4_Dashcam: native four-camera recording, deinterlacing and cadence, FAT storage fixes, OEM handoff, status indicator and OEM capture access. Adapted from stable 1.4.3.&#10;https://github.com/Tommasov/MG4_Dashcam</string>
+    <string name="dashcam_status_icon_hint">Shows the dashcam state (REC, 360 pause or error) above the screen. Off by default; independent of factory recordings.</string>
+    <string name="dashcam_oem_captures_hint">View and export recordings already saved by the factory MG camera app. This does not start the factory recorder.</string>
 </resources>

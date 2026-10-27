@@ -131,3 +131,24 @@ mit kleinen separaten Korrekturen behoben. Verbleibende Warnungen sind im Lint-B
    Auswerfen während Export und Android-Shutdown unter langsamen USB-Schreibzugriffen prüfen.
 6. Sichtbarkeit/Position des optionalen Indikators und OEM-Dateirechte mit der tatsächlichen
    Plattformsignatur/SELinux-Policy prüfen. Keine gemessenen Fahrwerte liegen für diesen Build vor.
+
+## Nachtrag: Fahrzeugmeldung zur Vorschau und Engineering-Bedienung
+
+Der Fahrzeugtest des Nutzers mit 0.8.10 zeigte ein Kamerabild nur in der oberen
+Hälfte der Vorschau. Ursache in der Integration: `configurePreviewWindowLocked`
+reservierte 720×480, während `renderPreviewLocked` weiterhin ein Halbbild mit
+720×240 kopierte. Die untere Hälfte blieb unbeschrieben. Die Surface-Geometrie
+verwendet jetzt dieselbe Halbbildhöhe wie die Vorschau-Konvertierung. Das betrifft
+den gemeinsamen Vorschaupfad für Hauptansicht, Blinker, Kacheln und Rückspiegel;
+der kombinierte Dashcam-Recorder bleibt bei 720×480 pro Kamera / 1440×1040 gesamt.
+
+Der OEM-Aufnahmezugriff ist jetzt im Engineering Mode, mit dem vorhandenen
+sekundären Button-Stil. Der unabhängige Statusindikator bleibt standardmäßig aus
+in den Dashcam-Einstellungen; Schalter-Stil, Akzentfarbe und Erklärung sind an die
+bestehende Oberfläche angepasst. Die OEM-Aktion listet/exportiert vorhandene
+Aufnahmen und startet keinen Werksrecorder.
+
+Nach der Korrektur: Debug-/Release-Build erfolgreich, 31 Unit-Tests bestanden,
+Lint 0 Fehler / 201 Warnungen, Layout-Zuordnung und gemeinsame Styles überprüft.
+Die native Bibliothek wurde neu gebaut. Version bleibt 0.8.10 / Code 21 / Beta.
+Ein erneuter Fahrzeugtest der korrigierten Vorschau und der Bedienung ist offen.
