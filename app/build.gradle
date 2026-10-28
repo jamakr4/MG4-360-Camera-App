@@ -14,7 +14,7 @@ android {
         applicationId "com.drivehub.kamera"
         minSdk 28
         targetSdk 36
-        versionCode 22
+        versionCode 23
         versionName "0.8.10"
         buildConfigField "boolean", "IS_BETA", "true"
 
