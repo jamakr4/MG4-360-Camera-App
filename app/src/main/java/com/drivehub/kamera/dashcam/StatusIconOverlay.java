@@ -104,6 +104,8 @@ public final class StatusIconOverlay {
                         | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
                 PixelFormat.TRANSLUCENT);
         lp.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
+        // Place the dot just to the right of the factory climate status panel.
+        lp.x = Math.round(barHeight * 1.6f);
         lp.y = 0;
         for (int type : WINDOW_TYPES) {
             lp.type = type;
