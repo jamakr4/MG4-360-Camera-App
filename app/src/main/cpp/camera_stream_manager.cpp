@@ -2521,7 +2521,7 @@ namespace camera_stream_manager
                 requestStopAndJoin();
             }
 
-            bool attachPreview(JNIEnv *env, jobject surface)
+            bool attachPreview(JNIEnv *env, jobject surface, bool enhanced)
             {
                 if (surface == nullptr)
                 {
@@ -2543,6 +2543,8 @@ namespace camera_stream_manager
                         ANativeWindow_release(previewWindow_);
                     }
                     previewWindow_ = window;
+                    enhancedPreview_ = enhanced;
+                    lumaTopPrev_.release();
                     stopRequested_.store(false);
                     started = ensureStartedLocked();
                     if (started)
@@ -2834,10 +2836,8 @@ namespace camera_stream_manager
                 {
                     return;
                 }
-                // Per-camera previews render one field (720x240), while recording consumes
-                // both fields (720x480). The window must match the pixels actually copied by
-                // renderPreviewLocked, otherwise its lower half remains unwritten/black.
-                ANativeWindow_setBuffersGeometry(previewWindow_, cropWidth_, fieldHeight_,
+                // Match the window to the selected preview resolution.
+                ANativeWindow_setBuffersGeometry(previewWindow_, cropWidth_, enhancedPreview_ ? cropHeight_ : fieldHeight_,
                                                  AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM);
             }
 
@@ -3311,20 +3311,19 @@ namespace camera_stream_manager
 
                         if (needRgba)
                         {
-                            // One field for the preview, not the whole buffer. What arrives now
-                            // is two fields stacked, and converting that as if it were a picture
-                            // shows the top half of the scene above the top half of the scene
-                            // again - which looks far more broken than the combing it would be
-                            // mistaken for. The preview is a picture to glance at, not the
-                            // recording: a field stretched by the display is enough for it, and
-                            // it costs one pass instead of a weave per frame per camera.
-                            const cv::Mat previewSrc =
-                                    packedCrop.rows > fieldHeight_
-                                            ? packedCrop(cv::Rect(0, 0, cropWidth_, fieldHeight_))
-                                            : packedCrop;
-                            rgbaScratch_.create(previewSrc.rows, cropWidth_, CV_8UC4);
-                            cv::cvtColor(previewSrc, rgbaScratch_, rgbaConversionCode(packedFormat_));
                             std::lock_guard<std::mutex> lock(mutex_);
+                            if (hasPreviewLocked() && enhancedPreview_ && packedCrop.rows == fieldHeight_ * 2)
+                            {
+                                deinterlaceLocked(packedCrop);
+                            }
+                            else
+                            {
+                                const cv::Mat previewSrc = packedCrop.rows > fieldHeight_
+                                        ? packedCrop(cv::Rect(0, 0, cropWidth_, fieldHeight_))
+                                        : packedCrop;
+                                rgbaScratch_.create(previewSrc.rows, cropWidth_, CV_8UC4);
+                                cv::cvtColor(previewSrc, rgbaScratch_, rgbaConversionCode(packedFormat_));
+                            }
                             renderPreviewLocked(rgbaScratch_);
                         }
 
@@ -3481,6 +3480,7 @@ namespace camera_stream_manager
             int fieldHeight_ = 0;
             std::vector<MappedBuffer> buffers_;
             ANativeWindow *previewWindow_ = nullptr;
+            bool enhancedPreview_ = false;
             std::unordered_map<int, std::shared_ptr<FrameConsumer>> consumers_;
             std::atomic<bool> running_{false};
             std::atomic<bool> stopRequested_{false};
@@ -3568,10 +3568,10 @@ namespace camera_stream_manager
 
     } // namespace
 
-    bool attachPreview(JNIEnv *env, int videoIndex, jobject surface)
+    bool attachPreview(JNIEnv *env, int videoIndex, jobject surface, bool enhanced)
     {
         auto session = getOrCreateSession(videoIndex);
-        const bool ok = session->attachPreview(env, surface);
+        const bool ok = session->attachPreview(env, surface, enhanced);
         if (!ok)
         {
             eraseSessionIfIdle(videoIndex, session);

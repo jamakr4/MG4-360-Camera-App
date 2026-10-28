@@ -126,7 +126,11 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
     private android.content.SharedPreferences uiPrefs;
     private final android.content.SharedPreferences.OnSharedPreferenceChangeListener prefListener =
             (sharedPreferences, key) -> {
-                if (UiPrefs.KEY_TILE_CORNER_RADIUS.equals(key)) {
+                if (UiPrefs.KEY_SIGNAL_ENHANCED_PREVIEW.equals(key)
+                        && OVERLAY_REASON_SIGNAL.equals(overlayReason)) {
+                    stopPreview();
+                    startPreview();
+                } else if (UiPrefs.KEY_TILE_CORNER_RADIUS.equals(key)) {
                     applyOverlayCornerRadius();
                 } else if (UiPrefs.KEY_OVERLAY_ROTATE_TO_DRIVING_DIRECTION.equals(key)) {
                     updateOverlayPresentation(true);
@@ -881,7 +885,10 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
         if (attachedPreviewCameraIndex == cameraIndex) {
             return;
         }
-        if (CameraProbe.attachPreview(cameraIndex, textureSurface)) {
+        boolean enhanced = OVERLAY_REASON_SIGNAL.equals(overlayReason) && uiPrefs != null
+                && uiPrefs.getBoolean(UiPrefs.KEY_SIGNAL_ENHANCED_PREVIEW, false);
+        if (enhanced ? CameraProbe.attachEnhancedPreview(cameraIndex, textureSurface)
+                : CameraProbe.attachPreview(cameraIndex, textureSurface)) {
             attachedPreviewCameraIndex = cameraIndex;
         }
     }

@@ -173,6 +173,7 @@ public final class SettingsDialogController {
     private Views bindViews(SharedPreferences prefs) {
         Views v = new Views();
         v.swOverlay = dialog.findViewById(R.id.switchOverlayOnSignal);
+        v.segSignalPreviewQuality = dialog.findViewById(R.id.segSignalPreviewQuality);
         v.swLaneChangesOnly = dialog.findViewById(R.id.switchLaneChangesOnly);
         v.seekLaneChangeMinSpeed = dialog.findViewById(R.id.seekLaneChangeMinSpeed);
         v.etLaneChangeMinSpeedValue = dialog.findViewById(R.id.etLaneChangeMinSpeedValue);
@@ -326,6 +327,7 @@ public final class SettingsDialogController {
         signalCam.bind(
                 prefs,
                 views.swOverlay,
+                views.segSignalPreviewQuality,
                 views.swLaneChangesOnly,
                 views.seekLaneChangeMinSpeed,
                 views.etLaneChangeMinSpeedValue,
@@ -656,6 +658,7 @@ public final class SettingsDialogController {
 
     private static final class Views {
         Switch swOverlay;
+        SegmentedControl segSignalPreviewQuality;
         Switch swLaneChangesOnly;
         SeekBar seekLaneChangeMinSpeed;
         EditText etLaneChangeMinSpeedValue;

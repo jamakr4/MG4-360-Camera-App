@@ -14,6 +14,8 @@ public final class CameraProbe {
     /** Attaches a preview consumer to the given /dev/video index. */
     public static native boolean attachPreview(int videoIndex, android.view.Surface surface);
 
+    public static native boolean attachEnhancedPreview(int videoIndex, android.view.Surface surface);
+
     /** Detaches the preview consumer from the given /dev/video index. */
     public static native void detachPreview(int videoIndex);
 

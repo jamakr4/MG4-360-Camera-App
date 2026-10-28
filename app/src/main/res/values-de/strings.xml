@@ -314,4 +314,8 @@
     <string name="settings_credits_tommasov">Tommaso Vietina — MG4_Dashcam: native Vierkamera-Aufnahme, Halbbildverarbeitung und Zeitraster, FAT-Speicherkorrekturen, OEM-Übergabe, Statusindikator und OEM-Aufnahmezugriff. Adaptiert aus stable 1.4.3.&#10;https://github.com/Tommasov/MG4_Dashcam</string>
     <string name="dashcam_status_icon_hint">Statuspunkt: Grün = Aufnahme, Blau = Starten oder 360-Pause, Orange = Fehler, Grau = aus. Unabhängig von Werksaufnahmen.</string>
     <string name="dashcam_oem_captures_hint">Vorhandene Aufnahmen der MG-Werkskamera anzeigen und exportieren. Diese Aktion startet den Werksrecorder nicht.</string>
+    <string name="settings_signal_preview_quality">Bildqualität</string>
+    <string name="settings_signal_preview_standard">Schnell</string>
+    <string name="settings_signal_preview_enhanced">Verbessert</string>
+    <string name="settings_signal_preview_enhanced_hint">Verbessert nutzt beide Kamerahalbbilder für ein schärferes Bild und benötigt möglicherweise mehr Rechenleistung.</string>
 </resources>

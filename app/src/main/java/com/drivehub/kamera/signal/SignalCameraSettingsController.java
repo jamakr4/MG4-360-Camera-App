@@ -1,6 +1,8 @@
 package com.drivehub.kamera.signal;
 
 import com.drivehub.kamera.MainActivity;
+import com.drivehub.kamera.R;
+import com.drivehub.kamera.settings.SegmentedControl;
 import com.drivehub.kamera.settings.SimpleTextWatcher;
 import com.drivehub.kamera.settings.UiPrefs;
 
@@ -23,6 +25,7 @@ public final class SignalCameraSettingsController {
     public void bind(
             SharedPreferences prefs,
             Switch swOverlay,
+            SegmentedControl previewQuality,
             Switch swLaneChangesOnly,
             SeekBar seekLaneChangeMinSpeed,
             EditText etLaneChangeMinSpeedValue,
@@ -37,6 +40,16 @@ public final class SignalCameraSettingsController {
             SeekBar seekOverlayMinShow,
             EditText etOverlayMinShowValue
     ) {
+        if (previewQuality != null) {
+            previewQuality.check(prefs.getBoolean(UiPrefs.KEY_SIGNAL_ENHANCED_PREVIEW, false)
+                    ? R.id.segSignalPreviewEnhanced : R.id.segSignalPreviewStandard);
+            previewQuality.addOnButtonCheckedListener((group, id, checked) -> {
+                if (checked) {
+                    prefs.edit().putBoolean(UiPrefs.KEY_SIGNAL_ENHANCED_PREVIEW,
+                            id == R.id.segSignalPreviewEnhanced).apply();
+                }
+            });
+        }
         if (swOverlay != null) {
             swOverlay.setChecked(UiPrefs.isOverlayOnSignalEnabled(prefs));
             swOverlay.setOnCheckedChangeListener((btn, checked) -> {

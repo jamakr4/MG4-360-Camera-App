@@ -56,6 +56,45 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
+                android:text="@string/settings_signal_preview_quality" />
+
+            <com.drivehub.kamera.settings.SegmentedControl
+                android:id="@+id/segSignalPreviewQuality"
+                style="@style/DrivehubSettingsSegmentGroup">
+                <TextView
+                    android:id="@+id/segSignalPreviewStandard"
+                    style="@style/DrivehubSettingsSegmentItem"
+                    android:layout_width="92dp"
+                    android:background="@drawable/bg_settings_segment_start"
+                    android:text="@string/settings_signal_preview_standard" />
+                <TextView
+                    android:id="@+id/segSignalPreviewEnhanced"
+                    style="@style/DrivehubSettingsSegmentItem"
+                    android:layout_width="92dp"
+                    android:background="@drawable/bg_settings_segment_end"
+                    android:text="@string/settings_signal_preview_enhanced" />
+            </com.drivehub.kamera.settings.SegmentedControl>
+        </LinearLayout>
+
+        <TextView
+            style="@style/DrivehubSettingsBodyMuted"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:text="@string/settings_signal_preview_enhanced_hint" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:minHeight="56dp"
+            android:orientation="horizontal">
+
+            <TextView
+                style="@style/DrivehubSettingsCardRowLabel"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
                 android:text="@string/settings_overlay_rotate_to_driving_direction" />
 
             <Switch

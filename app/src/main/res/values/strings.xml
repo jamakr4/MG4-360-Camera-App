@@ -314,4 +314,8 @@
     <string name="settings_credits_tommasov">Tommaso Vietina — MG4_Dashcam: native four-camera recording, deinterlacing and cadence, FAT storage fixes, OEM handoff, status indicator and OEM capture access. Adapted from stable 1.4.3.&#10;https://github.com/Tommasov/MG4_Dashcam</string>
     <string name="dashcam_status_icon_hint">Status dot: green = recording, blue = starting or 360 pause, orange = error, gray = off. Independent of factory recordings.</string>
     <string name="dashcam_oem_captures_hint">View and export recordings already saved by the factory MG camera app. This does not start the factory recorder.</string>
+    <string name="settings_signal_preview_quality">Preview quality</string>
+    <string name="settings_signal_preview_standard">Fast</string>
+    <string name="settings_signal_preview_enhanced">Enhanced</string>
+    <string name="settings_signal_preview_enhanced_hint">Enhanced uses both camera fields for a sharper image and may require more processing power.</string>
 </resources>
