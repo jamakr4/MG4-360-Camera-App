@@ -15,6 +15,8 @@ import android.view.WindowManager;
 import androidx.annotation.Nullable;
 
 import com.drivehub.kamera.dev.DevRuntimeLog;
+import com.drivehub.kamera.camera.ProjectionForeground;
+import com.drivehub.kamera.settings.UiPrefs;
 
 /** Optional, non-interactive status dot above the factory status bar. */
 public final class StatusIconOverlay {
@@ -31,8 +33,24 @@ public final class StatusIconOverlay {
     private final Context context;
     private final Handler main = new Handler(Looper.getMainLooper());
     private WindowManager windowManager;
+    private WindowManager.LayoutParams params;
     private DotView view;
     private String shownStatus;
+    private final Runnable positionPoll = new Runnable() {
+        @Override public void run() {
+            if (view == null || windowManager == null || params == null) return;
+            int x = horizontalOffset(statusBarHeightPx());
+            if (params.x != x) {
+                params.x = x;
+                try {
+                    windowManager.updateViewLayout(view, params);
+                } catch (RuntimeException e) {
+                    Log.w(TAG, "Could not reposition status dot", e);
+                }
+            }
+            main.postDelayed(this, UiPrefs.getDevForegroundModePollMs(UiPrefs.getPrefs(context)));
+        }
+    };
 
     public StatusIconOverlay(Context context) {
         this.context = context.getApplicationContext();
@@ -53,6 +71,7 @@ public final class StatusIconOverlay {
     }
 
     private void removeNow() {
+        main.removeCallbacks(positionPoll);
         if (windowManager != null && view != null) {
             try {
                 windowManager.removeView(view);
@@ -62,6 +81,7 @@ public final class StatusIconOverlay {
         }
         view = null;
         windowManager = null;
+        params = null;
         shownStatus = null;
     }
 
@@ -105,7 +125,7 @@ public final class StatusIconOverlay {
                 PixelFormat.TRANSLUCENT);
         lp.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
         // Place the dot just to the right of the factory climate status panel.
-        lp.x = Math.round(barHeight * 1.6f);
+        lp.x = horizontalOffset(barHeight);
         lp.y = 0;
         for (int type : WINDOW_TYPES) {
             lp.type = type;
@@ -113,7 +133,9 @@ public final class StatusIconOverlay {
                 wm.addView(dot, lp);
                 windowManager = wm;
                 view = dot;
+                params = lp;
                 shownStatus = status;
+                main.postDelayed(positionPoll, UiPrefs.getDevForegroundModePollMs(UiPrefs.getPrefs(context)));
                 DevRuntimeLog.add(TAG, "status dot=" + status + " windowType=" + type
                         + " size=" + lp.width + "x" + lp.height);
                 return;
@@ -121,6 +143,13 @@ public final class StatusIconOverlay {
                 DevRuntimeLog.add(TAG, "status dot windowType=" + type + " refused: " + e);
             }
         }
+    }
+
+    private int horizontalOffset(int barHeight) {
+        // Center gravity moves by half the launcher width when the work area changes.
+        int projectionCorrection = ProjectionForeground.isActive(context)
+                ? ProjectionForeground.LAUNCHER_BAR_WIDTH_PX / 2 : 0;
+        return Math.round(barHeight * 1.8f) + projectionCorrection;
     }
 
     private int statusBarHeightPx() {

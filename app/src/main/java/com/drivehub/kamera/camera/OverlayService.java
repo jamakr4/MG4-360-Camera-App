@@ -60,15 +60,13 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
     private static final int OVERLAY_MAX_WIDTH_PX = 3840;
     private static final int MG4_DISPLAY_WIDTH_PX = 1920;
     private static final int MG4_DISPLAY_HEIGHT_PX = 720;
-    private static final int MG4_LAUNCHER_BAR_WIDTH_PX = 142;
+    private static final int MG4_LAUNCHER_BAR_WIDTH_PX = ProjectionForeground.LAUNCHER_BAR_WIDTH_PX;
     private static final int MG4_SAIC_WORK_AREA_WIDTH_PX = MG4_DISPLAY_WIDTH_PX - MG4_LAUNCHER_BAR_WIDTH_PX;
     private static final int OVERLAY_MODE_SAIC = 0;
     private static final int OVERLAY_MODE_FULLSCREEN = 1;
     private static final long SIGNAL_FADE_IN_MS = 110L;
     private static final long SIGNAL_FADE_OUT_MS = 90L;
     private static final float SIGNAL_FADE_IN_START_ALPHA = 0.18f;
-    private static final String ANDROID_AUTO_PACKAGE = "com.allgo.app.androidauto";
-    private static final String CARPLAY_PACKAGE = "com.allgo.remoteui.mediabrowserservice";
 
     private static final String PREFS_NAME = "overlay_prefs";
     private static final String KEY_LAST_X = "last_x";
@@ -715,7 +713,7 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
     }
 
     private int resolveOverlayMode() {
-        return isProjectionAppInForeground() ? OVERLAY_MODE_FULLSCREEN : OVERLAY_MODE_SAIC;
+        return ProjectionForeground.isActive(this) ? OVERLAY_MODE_FULLSCREEN : OVERLAY_MODE_SAIC;
     }
 
     private void refreshOverlayMode(boolean persist) {
@@ -757,25 +755,6 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
 
     private int getVisualLeftInsetForMode(int mode) {
         return mode == OVERLAY_MODE_FULLSCREEN ? 0 : MG4_LAUNCHER_BAR_WIDTH_PX;
-    }
-
-    private boolean isProjectionAppInForeground() {
-        try {
-            ActivityManager am = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
-            if (am == null) return false;
-            // NOTE: getRunningTasks() returns foreign tasks only because this APK
-            // is signed with platform keys. Deprecated since API 21 but functional
-            // on privileged installs. Would break on a non-privileged install.
-            java.util.List<ActivityManager.RunningTaskInfo> tasks = am.getRunningTasks(1);
-            if (tasks == null || tasks.isEmpty()) return false;
-            ActivityManager.RunningTaskInfo task = tasks.get(0);
-            ComponentName topActivity = task.topActivity;
-            if (topActivity == null) return false;
-            String packageName = topActivity.getPackageName();
-            return ANDROID_AUTO_PACKAGE.equals(packageName) || CARPLAY_PACKAGE.equals(packageName);
-        } catch (Throwable ignored) {
-            return false;
-        }
     }
 
     private void restartForegroundModePolling() {
