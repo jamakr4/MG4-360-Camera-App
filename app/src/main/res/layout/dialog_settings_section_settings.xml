@@ -62,6 +62,13 @@
 
         </LinearLayout>
 
+        <TextView
+            style="@style/DrivehubSettingsCaption"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="10dp"
+            android:text="@string/settings_smooth_entry_hint" />
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

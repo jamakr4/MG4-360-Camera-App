@@ -45,6 +45,10 @@
     <string name="settings_dashcam_storage_status_usb_required_missing">✗ USB-only mode active, but no usable USB medium</string>
     <string name="settings_dashcam_storage_status_multiple_media">✗ Multiple external media detected — please connect only one</string>
     <string name="settings_dashcam_storage_active_path">Active folder: %1$s</string>
+    <string name="settings_dashcam_storage_select_button">Select USB drive</string>
+    <string name="settings_dashcam_storage_select_success">USB storage location selected</string>
+    <string name="settings_dashcam_storage_select_failed">Could not select this storage location</string>
+    <string name="settings_dashcam_storage_select_usb_required">Please select a folder on a USB drive</string>
     <string name="settings_dashcam_storage_eject_button">Eject USB</string>
     <string name="settings_dashcam_storage_eject_title">USB storage</string>
     <string name="settings_dashcam_storage_eject_confirm_message">Finish the current clip and prepare the USB storage for safe removal?</string>
@@ -59,6 +63,7 @@
     <string name="settings_oem_avm_coexist">Allow OEM 360° camera app</string>
     <string name="settings_oem_avm_coexist_hint">Global setting for the stock 360° camera app. When enabled, the app yields camera ownership where needed so the OEM reverse/360 view can still open. When disabled, all custom features keep priority and the OEM 360° app is intentionally not supported in parallel.</string>
     <string name="settings_smooth_entry">Smooth Entry</string>
+    <string name="settings_smooth_entry_hint">Gently fades the turn-signal camera in and out instead of showing or hiding it abruptly.</string>
     <string name="settings_lock_tile_resizing">Lock tile resizing</string>
     <string name="settings_lock_tile_moving">Lock tile moving</string>
     <string name="settings_dashcam_banners_section">Notification banners</string>
@@ -104,6 +109,17 @@
     <string name="settings_dev_dashcam_retention_clip_count">Rolling clips kept</string>
     <string name="settings_dev_dashcam_max_event_dirs">Saved events kept</string>
     <string name="settings_dev_dashcam_capacity_warning">⚠ Raising these values can fill storage quickly. Each 30 s clip is ~33 MB; each saved event keeps ~5 clips. The app does not check free space — too-high values can lead to storage overflow or other unpredictable issues.</string>
+    <string name="settings_dev_performance_overlay">Performance display</string>
+    <string name="settings_dev_performance_overlay_enabled">Show system performance</string>
+    <string name="settings_dev_performance_overlay_hint">Permanently shows system and app CPU/RAM, load and temperature in the top-left corner until switched off here.</string>
+    <string name="performance_temperature_unavailable">Temp –</string>
+    <string name="performance_thermal_normal">Thermal normal</string>
+    <string name="performance_thermal_light">Thermal light</string>
+    <string name="performance_thermal_moderate">Thermal moderate</string>
+    <string name="performance_thermal_severe">Thermal severe</string>
+    <string name="performance_thermal_critical">Thermal critical</string>
+    <string name="performance_thermal_emergency">Thermal emergency</string>
+    <string name="performance_thermal_shutdown">Thermal shutdown</string>
     <string name="settings_dev_polling_rates">Polling rates</string>
     <string name="settings_dev_default_poll">Default polling (ms)</string>
     <string name="settings_dev_signal_off_poll">Signal-off detection (ms)</string>
@@ -291,4 +307,15 @@
     <string name="dashcam_recording_error_overlay_subtitle_stop_failed">Recording stopped unexpectedly.</string>
     <string name="dashcam_recording_recovered_overlay_title">Dashcam active again</string>
     <string name="dashcam_recording_recovered_overlay_subtitle">Recording has resumed automatically.</string>
+    <string name="dashcam_status_icon">Recording status in the status bar</string>
+    <string name="dashcam_oem_captures">Factory camera recordings</string>
+    <string name="dashcam_oem_export">Export copies</string>
+    <string name="settings_dashcam_storage_eject_failed_message">Not ready to remove: writes or synchronization did not finish successfully. See the runtime log.</string>
+    <string name="settings_credits_tommasov">Tommaso Vietina — MG4_Dashcam: native four-camera recording, deinterlacing and cadence, FAT storage fixes, OEM handoff, status indicator and OEM capture access. Adapted from stable 1.4.3.&#10;https://github.com/Tommasov/MG4_Dashcam</string>
+    <string name="dashcam_status_icon_hint">Status dot: green = recording, blue = starting or 360 pause, orange = error, gray = off. Independent of factory recordings.</string>
+    <string name="dashcam_oem_captures_hint">View and export recordings already saved by the factory MG camera app. This does not start the factory recorder.</string>
+    <string name="settings_signal_preview_quality">Preview quality</string>
+    <string name="settings_signal_preview_standard">Fast</string>
+    <string name="settings_signal_preview_enhanced">Enhanced</string>
+    <string name="settings_signal_preview_enhanced_hint">Enhanced uses both camera fields for a sharper image and may require more processing power.</string>
 </resources>

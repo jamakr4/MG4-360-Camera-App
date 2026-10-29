@@ -9,6 +9,13 @@ import com.drivehub.kamera.helper.vehiclesensors.VehicleSpeedReader;
 import com.drivehub.kamera.settings.UiPrefs;
 
 import android.app.Notification;
+import android.app.ActivityManager;
+import android.content.BroadcastReceiver;
+import android.content.IntentFilter;
+import android.media.MediaExtractor;
+import com.drivehub.kamera.signal.SignalService;
+import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicBoolean;
 import android.app.NotificationManager;
 import android.app.Service;
 import android.content.Context;
@@ -92,6 +99,7 @@ public class RecordingService extends Service {
     private static final long ERROR_OVERLAY_DELAY_MS = 5_000L;
 
     private static volatile boolean sServiceRunning = false;
+    private static volatile RecordingService instance;
 
     private final Object eventLock = new Object();
     private final Object stateLock = new Object();
@@ -109,7 +117,124 @@ public class RecordingService extends Service {
     private volatile boolean activeBaseIsUsb;
     private volatile boolean usbEjectInProgress = false;
     private volatile boolean futureOnlyEventSession = false;
+    private volatile long lastSegmentAt;
+    private volatile long expectedSegmentMs = 30_000;
+    private volatile long usbRetryAfter;
+    private volatile long oemAskedAt;
+    private volatile long oemGoneAt;
+    private volatile long oemSeenAt;
+    private volatile boolean watchdogFailed;
+    private volatile File recordingFile;
+    private final ExecutorService supervisor = Executors.newSingleThreadExecutor();
+    private final AtomicBoolean supervising = new AtomicBoolean();
+    private BroadcastReceiver shutdownReceiver;
+    private StatusIconOverlay statusIcon;
+    private final SharedPreferences.OnSharedPreferenceChangeListener iconPreferenceListener = (prefs, key) -> {
+        if ("dashcamStatusIcon".equals(key) && statusIcon != null)
+            statusIcon.update(prefs.getBoolean(key, false) ? prefs.getString(KEY_STATUS, STATUS_OFF) : null);
+    };
+    private long remaining(long deadline) { return Math.max(0, deadline - SystemClock.elapsedRealtime()); }
+
+    private Thread recordingWorker(Runnable work, String name) {
+        lastSegmentAt = SystemClock.elapsedRealtime();
+        watchdogFailed = false;
+        return new Thread(() -> {
+            try { work.run(); }
+            catch (Throwable error) {
+                DevRuntimeLog.add(TAG, "worker failed: " + error);
+                publishStatus(STATUS_ERROR, 0, TOTAL_CAMERAS, error.toString());
+            } finally {
+                try { CameraProbe.stopCombinedMp4Record(false, oemPauseRequested); }
+                catch (Throwable error) { DevRuntimeLog.add(TAG, "stop failed: " + error); }
+                CameraProbe.releaseCombinedCameras();
+                File unfinished = recordingFile;
+                if (unfinished != null && !isReadableClip(unfinished)) discardClip(unfinished);
+                recordingFile = null;
+                worker = null;
+                stopServiceIfNotEjecting();
+            }
+        }, name);
+    }
+
+    private boolean isReadableClip(File file) {
+        MediaExtractor extractor = new MediaExtractor();
+        try {
+            extractor.setDataSource(file.getAbsolutePath());
+            for (int i = 0; i < extractor.getTrackCount(); i++) {
+                String mime = extractor.getTrackFormat(i).getString("mime");
+                if (mime != null && mime.startsWith("video/")) {
+                    extractor.selectTrack(i);
+                    return extractor.getSampleTime() >= 0;
+                }
+            }
+        } catch (Exception e) { DevRuntimeLog.add(TAG, "unreadable " + file + ": " + e); }
+        finally { extractor.release(); }
+        return false;
+    }
+
+    private void discardClip(File file) {
+        if (file.exists()) DashcamStorageManager.deleteFreeingSpace(file);
+    }
+
+    private final Runnable superviseTick = new Runnable() {
+        @Override public void run() {
+            if (!sServiceRunning) return;
+            if (supervising.compareAndSet(false, true)) supervisor.execute(() -> {
+                try { supervise(); }
+                catch (Throwable e) { DevRuntimeLog.add(TAG, "supervisor: " + e); }
+                finally { supervising.set(false); }
+            });
+            mainHandler.postDelayed(this, 250);
+        }
+    };
+
+    private void supervise() {
+        if (worker == null || stopRequested) return;
+        long now = SystemClock.elapsedRealtime();
+        if (UiPrefs.isOemAvmCoexistEnabled(prefs())) {
+            Boolean foreground = null;
+            try {
+                ActivityManager am = (ActivityManager) getSystemService(ACTIVITY_SERVICE);
+                List<ActivityManager.RunningTaskInfo> tasks = am.getRunningTasks(1);
+                if (!tasks.isEmpty() && tasks.get(0).topActivity != null)
+                    foreground = "com.saicmotor.hmi.aroundview".equals(tasks.get(0).topActivity.getPackageName());
+            } catch (Exception e) { /* Unknown is different from definitely absent. */ }
+            if (Boolean.TRUE.equals(foreground)) {
+                oemGoneAt = 0;
+                if (oemSeenAt == 0) oemSeenAt = now;
+                if (!oemPauseRequested && VehicleSpeedReader.readSpeedKmh() <= UiPrefs.getDevOemAvmMaxSpeedKmh(prefs())) {
+                    SignalService.setOemAvmActive(this, true);
+                    pauseForOemRequest(this);
+                }
+            } else if (oemPauseRequested) {
+                if (oemGoneAt == 0) oemGoneAt = now;
+                long grace = oemSeenAt == 0 || oemGoneAt - oemSeenAt < 1500 ? 8000 : 2000;
+                if (OemPausePolicy.shouldResume(foreground, now, oemAskedAt, oemGoneAt, grace)) {
+                    SignalService.setOemAvmActive(this, false);
+                    resumeAfterOemRequest(this);
+                }
+            }
+        } else if (oemPauseRequested) {
+            SignalService.setOemAvmActive(this, false);
+            resumeAfterOemRequest(this);
+        }
+        if (lastSegmentAt > 0 && RecordingHealth.segmentOverdue(now - lastSegmentAt,
+                expectedSegmentMs, oemPauseRequested)) {
+            watchdogFailed = true;
+            stopRequested = true;
+            segmentStopRequested = true;
+            publishStatus(STATUS_ERROR, 0, TOTAL_CAMERAS, "watchdog: no completed segment");
+            Thread current = worker;
+            if (current != null) current.interrupt();
+        }
+    }
+
     private long completedSegmentCount = 0L;
+
+    public static boolean isSupervisingOem() {
+        RecordingService live = instance;
+        return live != null && live.worker != null && !live.stopRequested;
+    }
 
     public static boolean isRunning() {
         return sServiceRunning;
@@ -159,8 +284,17 @@ public class RecordingService extends Service {
 
     public static void pauseForOemRequest(Context context) {
         SharedPreferences prefs = UiPrefs.getPrefs(context);
-        if (!prefs.getBoolean(DashcamSettingsController.KEY_ENABLED, false) || !isRunning()) {
+        if ((!prefs.getBoolean(DashcamSettingsController.KEY_ENABLED, false)
+                && !(instance != null && instance.futureOnlyEventSession)) || !isRunning()) {
             return;
+        }
+        RecordingService live = instance;
+        if (live != null) {
+            if (!live.oemPauseRequested) live.oemAskedAt = SystemClock.elapsedRealtime();
+            live.oemPauseRequested = true;
+            live.segmentStopRequested = true;
+            Thread current = live.worker;
+            if (current != null) current.interrupt();
         }
         Intent i = new Intent(context, RecordingService.class);
         i.setAction(ACTION_PAUSE_FOR_OEM_REQUEST);
@@ -169,7 +303,8 @@ public class RecordingService extends Service {
 
     public static void resumeAfterOemRequest(Context context) {
         SharedPreferences prefs = UiPrefs.getPrefs(context);
-        if (!prefs.getBoolean(DashcamSettingsController.KEY_ENABLED, false) || !isRunning()) {
+        if ((!prefs.getBoolean(DashcamSettingsController.KEY_ENABLED, false)
+                && !(instance != null && instance.futureOnlyEventSession)) || !isRunning()) {
             return;
         }
         Intent i = new Intent(context, RecordingService.class);
@@ -181,19 +316,50 @@ public class RecordingService extends Service {
     public void onCreate() {
         super.onCreate();
         sServiceRunning = true;
+        instance = this;
         NotificationChannelHelper.ensureChannel(this, CHANNEL_ID, R.string.notification_channel_recording);
         restoreEventState();
+        statusIcon = new StatusIconOverlay(this);
+        prefs().registerOnSharedPreferenceChangeListener(iconPreferenceListener);
+        mainHandler.post(superviseTick);
+        shutdownReceiver = new BroadcastReceiver() {
+            @Override public void onReceive(Context context, Intent intent) {
+                PendingResult pending = goAsync();
+                usbEjectInProgress = true;
+                StorageIoGate.close();
+                shutdownRecordingServiceWithoutStopSelf();
+                AtomicBoolean finished = new AtomicBoolean();
+                mainHandler.postDelayed(() -> {
+                    if (finished.compareAndSet(false, true)) {
+                        DevRuntimeLog.add(TAG, "Android shutdown deadline exceeded; durability unknown");
+                        pending.finish();
+                    }
+                }, 8500);
+                new Thread(() -> {
+                    boolean quiet = awaitShutdownQuiescence();
+                    DevRuntimeLog.add(TAG, "Android shutdown drained=" + quiet);
+                    if (finished.compareAndSet(false, true)) pending.finish();
+                }, "DashcamAndroidShutdown").start();
+            }
+        };
+        androidx.core.content.ContextCompat.registerReceiver(this, shutdownReceiver,
+                new IntentFilter(Intent.ACTION_SHUTDOWN), androidx.core.content.ContextCompat.RECEIVER_EXPORTED);
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        if (intent == null)
-            return START_STICKY;
+        if (intent == null) {
+            if (!prefs().getBoolean(DashcamSettingsController.KEY_ENABLED, false)) {
+                stopSelf();
+                return START_NOT_STICKY;
+            }
+            intent = new Intent(this, RecordingService.class).setAction(ACTION_START);
+        }
         String action = intent.getAction();
+        if (usbEjectInProgress) return START_NOT_STICKY;
 
         if (ACTION_STOP.equals(action)) {
             DevRuntimeLog.add("RecordingService", "ACTION_STOP");
-            usbEjectInProgress = false;
             shutdownRecordingService();
             return START_NOT_STICKY;
         }
@@ -204,23 +370,28 @@ public class RecordingService extends Service {
             // except INTERNAL_ONLY. That was harmless while the preference was pinned to
             // internal storage; now that it is honoured, this would be main-thread IO.
             usbEjectInProgress = true;
-            shutdownRecordingServiceWithoutStopSelf();
             new Thread(() -> {
-                boolean usingUsb = activeBaseIsUsb || DashcamStorageManager.resolve(this).usingUsb;
+                if (activeBaseDir == null) {
+                    DashcamStorageManager.Resolution resolution = DashcamStorageManager.resolve(this);
+                    activeBaseDir = resolution.baseDir;
+                    activeBaseIsUsb = resolution.usingUsb;
+                }
+                boolean usingUsb = activeBaseIsUsb;
                 if (!usingUsb) {
                     usbEjectInProgress = false;
                     broadcastUsbEjectReady(
                             false, R.string.settings_dashcam_storage_eject_unavailable_message);
-                    stopForeground(true);
-                    stopSelf();
                     return;
                 }
+                usbEjectInProgress = true;
+                StorageIoGate.close();
+                shutdownRecordingServiceWithoutStopSelf();
                 boolean safeToRemove = awaitShutdownQuiescence();
                 broadcastUsbEjectReady(
                         safeToRemove,
                         safeToRemove
                                 ? R.string.settings_dashcam_storage_eject_ready_message
-                                : R.string.settings_dashcam_storage_eject_unavailable_message);
+                                : R.string.settings_dashcam_storage_eject_failed_message);
                 stopForeground(true);
                 stopSelf();
             }, "RecordingServiceUsbEject").start();
@@ -229,8 +400,9 @@ public class RecordingService extends Service {
 
         if (ACTION_PAUSE_FOR_OEM_REQUEST.equals(action)) {
             DevRuntimeLog.add("RecordingService", "ACTION_PAUSE_FOR_OEM_REQUEST");
-            boolean enabled = prefs().getBoolean(DashcamSettingsController.KEY_ENABLED, false);
+            boolean enabled = prefs().getBoolean(DashcamSettingsController.KEY_ENABLED, false) || futureOnlyEventSession;
             boolean changed = !oemPauseRequested;
+            if (changed) oemAskedAt = SystemClock.elapsedRealtime();
             oemPauseRequested = true;
             segmentStopRequested = true;
             // The worker sleeps in 200 ms ticks inside recordClip; interrupt wakes it instantly
@@ -247,9 +419,7 @@ public class RecordingService extends Service {
                     startForeground(NOTIF_ID, buildNotification(getString(R.string.notification_recording_paused_oem)));
                 }
                 publishStatus(STATUS_PAUSED_OEM, 0, TOTAL_CAMERAS, "");
-                if (changed) {
-                    DashcamEventOverlayService.showOemPause(this);
-                }
+                DashcamEventOverlayService.showOemPause(this);
             }
             return START_STICKY;
         }
@@ -258,11 +428,13 @@ public class RecordingService extends Service {
             DevRuntimeLog.add("RecordingService", "ACTION_RESUME_AFTER_OEM_REQUEST");
             boolean wasPaused = STATUS_PAUSED_OEM.equals(prefs().getString(KEY_STATUS, STATUS_OFF));
             oemPauseRequested = false;
+            oemAskedAt = oemGoneAt = oemSeenAt = 0;
+            lastSegmentAt = SystemClock.elapsedRealtime();
             segmentStopRequested = false;
             synchronized (stateLock) {
                 stateLock.notifyAll();
             }
-            boolean enabled = prefs().getBoolean(DashcamSettingsController.KEY_ENABLED, false);
+            boolean enabled = prefs().getBoolean(DashcamSettingsController.KEY_ENABLED, false) || futureOnlyEventSession;
             if (!enabled) {
                 if (worker == null) {
                     publishStatus(STATUS_OFF, 0, TOTAL_CAMERAS, "");
@@ -278,7 +450,7 @@ public class RecordingService extends Service {
                 if (wasPaused) {
                     DashcamEventOverlayService.showOemResume(this);
                 }
-                worker = new Thread(this::recordLoop, "RecordingServiceWorker");
+                worker = recordingWorker(this::recordLoop, "RecordingServiceWorker");
                 worker.start();
             } else if (wasPaused) {
                 publishStatus(STATUS_STARTING, 0, TOTAL_CAMERAS, "");
@@ -319,6 +491,8 @@ public class RecordingService extends Service {
             return START_STICKY;
         }
 
+        if (usbEjectInProgress) return START_NOT_STICKY;
+        StorageIoGate.reopen();
         stopRequested = false;
         DevRuntimeLog.add("RecordingService", action == null ? "ACTION_START(null)" : action);
         startForeground(NOTIF_ID, buildNotification(getString(R.string.notification_recording_starting)));
@@ -328,9 +502,9 @@ public class RecordingService extends Service {
                     EXTRA_TEST_RECORD_DURATION_SEC,
                     DashcamSettingsController.getTestRecordDurationSec(prefs()));
             long durationMs = Math.max(0L, durationSec * 1000L);
-            worker = new Thread(() -> recordTestClip(durationMs), "RecordingServiceTestWorker");
+            worker = recordingWorker(() -> recordTestClip(durationMs), "RecordingServiceTestWorker");
         } else {
-            worker = new Thread(this::recordLoop, "RecordingServiceWorker");
+            worker = recordingWorker(this::recordLoop, "RecordingServiceWorker");
         }
         worker.start();
         return START_STICKY;
@@ -339,23 +513,20 @@ public class RecordingService extends Service {
     private void recordTestClip(long durationMs) {
         File recordsBase = resolveActiveBaseDir(true);
         if (recordsBase == null) {
-            worker = null;
             stopForeground(true);
-            stopSelf();
+            stopServiceIfNotEjecting();
             return;
         }
         // Write test clips into a separate subdirectory so they never participate
         // in ring-buffer cleanup and don't accumulate as phantom entries there.
         File testDir = new File(recordsBase, "test");
         if (!ensureDirectoryExists(testDir, "test dir")) {
-            worker = null;
             stopForeground(true);
-            stopSelf();
+            stopServiceIfNotEjecting();
             return;
         }
         boolean startedAnyCamera = recordClip(testDir, durationMs,
-                makeTimestampBase(System.currentTimeMillis(), "yyMMddHHmmss"), -1);
-        worker = null;
+                makeTimestampBase(System.currentTimeMillis(), "yyMMddHHmmssSSS"), -1);
         if (startedAnyCamera) {
             publishStatus(STATUS_OFF, 0, TOTAL_CAMERAS, "");
         }
@@ -370,15 +541,13 @@ public class RecordingService extends Service {
 
         if (!enabled || segmentSec <= 0) {
             publishStatus(STATUS_OFF, 0, TOTAL_CAMERAS, "");
-            worker = null;
-            stopSelf();
+            stopServiceIfNotEjecting();
             return;
         }
 
         File baseDir = resolveActiveBaseDir(true);
         if (baseDir == null) {
-            worker = null;
-            stopSelf();
+            stopServiceIfNotEjecting();
             return;
         }
 
@@ -404,7 +573,7 @@ public class RecordingService extends Service {
             // internal storage carry separate retention limits.
             int keepSegments = DashcamStorageManager.getActiveRetentionClipCount(prefs, activeBaseIsUsb);
             long segmentStartWallMs = System.currentTimeMillis();
-            String baseName = makeTimestampBase(segmentStartWallMs, "yyMMddHHmmss");
+            String baseName = makeTimestampBase(segmentStartWallMs, "yyMMddHHmmssSSS");
             boolean startedAnyCamera = recordClip(baseDir, segmentMs, baseName, keepSegments);
             if (!startedAnyCamera) {
                 if (isRecoverableUsbFailure()) {
@@ -415,7 +584,8 @@ public class RecordingService extends Service {
                 endedWithFatalError = true;
                 break;
             }
-            onSegmentCompleted(baseDir, baseName, segmentStartWallMs, System.currentTimeMillis(), keepSegments);
+            if (new File(baseDir, baseName + ".mp4").isFile())
+                onSegmentCompleted(baseDir, baseName, segmentStartWallMs, System.currentTimeMillis(), keepSegments);
 
             // Check whether recording has been disabled in prefs.
             enabled = prefs.getBoolean(DashcamSettingsController.KEY_ENABLED, false);
@@ -423,8 +593,7 @@ public class RecordingService extends Service {
                 break;
         }
 
-        worker = null;
-        if (!endedWithFatalError) {
+        if (!endedWithFatalError && !watchdogFailed) {
             publishStatus(STATUS_OFF, 0, TOTAL_CAMERAS, "");
         }
         stopServiceIfNotEjecting();
@@ -435,16 +604,14 @@ public class RecordingService extends Service {
         if (segmentSec <= 0) {
             publishStatus(STATUS_OFF, 0, TOTAL_CAMERAS, "");
             futureOnlyEventSession = false;
-            worker = null;
-            stopSelf();
+            stopServiceIfNotEjecting();
             return;
         }
 
         File baseDir = resolveActiveBaseDir(true);
         if (baseDir == null) {
             futureOnlyEventSession = false;
-            worker = null;
-            stopSelf();
+            stopServiceIfNotEjecting();
             return;
         }
 
@@ -453,6 +620,7 @@ public class RecordingService extends Service {
         int remainingSegments = FUTURE_ONLY_EVENT_SEGMENTS;
 
         while (!stopRequested && remainingSegments > 0) {
+            if (!waitForOemPauseToClear(prefs())) break;
             File resolved = resolveActiveBaseDir(false);
             if (resolved == null) {
                 endedWithFatalError = true;
@@ -462,7 +630,7 @@ public class RecordingService extends Service {
 
             int keepSegments = DashcamStorageManager.getActiveRetentionClipCount(prefs(), activeBaseIsUsb);
             long segmentStartWallMs = System.currentTimeMillis();
-            String baseName = makeTimestampBase(segmentStartWallMs, "yyMMddHHmmss");
+            String baseName = makeTimestampBase(segmentStartWallMs, "yyMMddHHmmssSSS");
             boolean startedAnyCamera = recordClip(baseDir, segmentMs, baseName, keepSegments);
             if (!startedAnyCamera) {
                 if (isRecoverableUsbFailure()) {
@@ -471,30 +639,38 @@ public class RecordingService extends Service {
                 endedWithFatalError = true;
                 break;
             }
-            onSegmentCompleted(baseDir, baseName, segmentStartWallMs, System.currentTimeMillis(), keepSegments);
-            remainingSegments--;
+            if (new File(baseDir, baseName + ".mp4").isFile())
+                onSegmentCompleted(baseDir, baseName, segmentStartWallMs, System.currentTimeMillis(), keepSegments);
+            if (new File(baseDir, baseName + ".mp4").isFile()) remainingSegments--;
         }
 
         futureOnlyEventSession = false;
-        worker = null;
-        if (!endedWithFatalError) {
+        if (!endedWithFatalError && !watchdogFailed) {
             publishStatus(STATUS_OFF, 0, TOTAL_CAMERAS, "");
         }
         stopServiceIfNotEjecting();
     }
 
     private boolean recordClip(File baseDir, long durationMs, String baseName, int keepSegments) {
+        expectedSegmentMs = Math.max(1000, durationMs);
         SharedPreferences prefs = prefs();
         int recordingFps = DashcamSettingsController.getRecordingFps(prefs);
         String signature = DashcamSettingsController.getRecordingSignature(prefs);
         boolean showSpeed = DashcamSettingsController.shouldShowSpeed(prefs);
         int cameraMask = DashcamSettingsController.getRecordingCameraMask(prefs);
         int selectedCameraCount = DashcamSettingsController.getRecordingCameraCount(cameraMask);
+        if (keepSegments > 0) {
+            synchronized (eventLock) {
+                cleanupOldSegments(baseDir, Math.max(0, keepSegments - 1), collectProtectedBasesLocked());
+            }
+        }
         File outputFile = new File(baseDir, baseName + ".mp4");
+        recordingFile = outputFile;
+        publishStatus(STATUS_STARTING, 0, TOTAL_CAMERAS, "");
         boolean started = CameraProbe.startCombinedMp4Record(
                 outputFile.getAbsolutePath(),
                 720,
-                240,
+                480,
                 recordingFps,
                 9_000_000,
                 signature,
@@ -502,16 +678,34 @@ public class RecordingService extends Service {
                 cameraMask);
 
         if (!started) {
+            discardClip(outputFile);
+            recordingFile = null;
             publishStatus(STATUS_ERROR, 0, TOTAL_CAMERAS, ERROR_GRID_START_FAILED);
             return false;
         }
 
-        publishStatus(STATUS_RECORDING, selectedCameraCount, TOTAL_CAMERAS, "");
+        long lastSamples = 0;
+        long lastProgressAt = SystemClock.elapsedRealtime();
+        boolean announced = false;
 
         long start = SystemClock.elapsedRealtime();
         while (!stopRequested
                 && !segmentStopRequested
                 && (SystemClock.elapsedRealtime() - start) < durationMs) {
+            long samples = CameraProbe.writtenSamples();
+            if (samples > lastSamples) {
+                lastSamples = samples;
+                lastProgressAt = SystemClock.elapsedRealtime();
+                if (!announced && !oemPauseRequested) {
+                    publishStatus(STATUS_RECORDING, selectedCameraCount, TOTAL_CAMERAS, "");
+                    announced = true;
+                }
+            }
+            if (RecordingHealth.evaluate(samples, SystemClock.elapsedRealtime() - lastProgressAt) == RecordingHealth.State.ERROR) {
+                watchdogFailed = true;
+                publishStatus(STATUS_ERROR, 0, TOTAL_CAMERAS, "encoder stalled or write failed");
+                break;
+            }
             if (showSpeed) {
                 CameraProbe.updateCombinedRecordingSpeed(VehicleSpeedReader.readSpeedKmh());
             }
@@ -521,21 +715,37 @@ public class RecordingService extends Service {
             }
         }
 
-        if (!CameraProbe.stopCombinedMp4Record()) {
+        boolean urgent = oemPauseRequested;
+        if (urgent) CameraProbe.detachAllPreviews();
+        long stoppingAt = SystemClock.elapsedRealtime();
+        boolean stopped = CameraProbe.stopCombinedMp4Record(
+                !stopRequested && !segmentStopRequested && !watchdogFailed, urgent);
+        DevRuntimeLog.add(TAG, "segment stop/finalize ms=" + (SystemClock.elapsedRealtime() - stoppingAt)
+                + " oem=" + urgent + "; device release time: " + CameraProbe.describeCameraFormats());
+        if (!stopped || watchdogFailed || !isReadableClip(outputFile)) {
+            discardClip(outputFile);
+            recordingFile = null;
+            if (urgent && stopped && !watchdogFailed) {
+                publishStatus(STATUS_PAUSED_OEM, 0, TOTAL_CAMERAS, "");
+                return true; // An OEM interruption before the first frame is not a recorder failure.
+            }
             publishStatus(STATUS_ERROR, 0, TOTAL_CAMERAS, ERROR_GRID_STOP_TIMEOUT);
             return false;
         }
 
+        recordingFile = null;
+        lastSegmentAt = SystemClock.elapsedRealtime();
         return true;
     }
 
     private boolean waitForOemPauseToClear(SharedPreferences prefs) {
         boolean announcedPause = false;
         while (!stopRequested
-                && prefs.getBoolean(DashcamSettingsController.KEY_ENABLED, false)
+                && (prefs.getBoolean(DashcamSettingsController.KEY_ENABLED, false) || futureOnlyEventSession)
                 && oemPauseRequested) {
             segmentStopRequested = true;
             if (!announcedPause) {
+                CameraProbe.releaseCombinedCameras();
                 publishStatus(STATUS_PAUSED_OEM, 0, TOTAL_CAMERAS, "");
                 announcedPause = true;
             }
@@ -546,7 +756,7 @@ public class RecordingService extends Service {
                 }
             }
         }
-        if (stopRequested || !prefs.getBoolean(DashcamSettingsController.KEY_ENABLED, false)) {
+        if (stopRequested || (!prefs.getBoolean(DashcamSettingsController.KEY_ENABLED, false) && !futureOnlyEventSession)) {
             return false;
         }
         segmentStopRequested = false;
@@ -586,7 +796,7 @@ public class RecordingService extends Service {
         oemPauseRequested = false;
         startForeground(NOTIF_ID, buildNotification(getString(R.string.notification_recording_starting)));
         publishStatus(STATUS_STARTING, 0, TOTAL_CAMERAS, "");
-        worker = new Thread(this::recordFutureOnlyEventLoop, "RecordingServiceFutureEventWorker");
+        worker = recordingWorker(this::recordFutureOnlyEventLoop, "RecordingServiceFutureEventWorker");
         worker.start();
         return true;
     }
@@ -797,6 +1007,7 @@ public class RecordingService extends Service {
             if (!temp.renameTo(target)) {
                 throw new IOException("rename failed: " + temp.getAbsolutePath() + " -> " + target.getAbsolutePath());
             }
+            if (!DashcamStorageManager.syncDirectory(target.getParentFile())) throw new IOException("event directory sync failed");
             return true;
         } catch (Throwable t) {
             Log.e(TAG, "Failed to copy " + source.getAbsolutePath() + " -> " + target.getAbsolutePath(), t);
@@ -807,53 +1018,14 @@ public class RecordingService extends Service {
     }
 
     private void cleanupOldSegments(File baseDir, int keepSegments, Set<String> protectedBases) {
-        File[] files = baseDir.listFiles();
-        if (files == null)
-            return;
-
-        // baseName => earliestModified
-        Map<String, Long> groupTime = new HashMap<>();
-        for (File f : files) {
-            String name = f.getName();
-            if (!name.endsWith(".mp4"))
-                continue;
-            int underscore = name.indexOf('_');
-            String base;
-            if (underscore > 0) {
-                base = name.substring(0, underscore);
-            } else {
-                base = name.substring(0, name.length() - 4);
-            }
-            long t = f.lastModified();
-            groupTime.merge(base, t, Math::min);
+        boolean changed = false;
+        for (File file : RecordingFiles.deletionCandidates(baseDir.listFiles(), keepSegments,
+                protectedBases == null ? java.util.Collections.emptySet() : protectedBases)) {
+            if (DashcamStorageManager.deleteFreeingSpace(file)) changed = true;
+            else publishStatus(STATUS_ERROR, 0, TOTAL_CAMERAS, "Could not delete " + file);
         }
-
-        List<Map.Entry<String, Long>> groups = new ArrayList<>(groupTime.entrySet());
-        groups.sort(Comparator.comparingLong(Map.Entry::getValue));
-
-        if (groups.size() <= keepSegments)
-            return;
-        int deleteCount = groups.size() - keepSegments;
-
-        int deleted = 0;
-        for (int i = 0; i < groups.size() && deleted < deleteCount; i++) {
-            String base = groups.get(i).getKey();
-            if (protectedBases != null && protectedBases.contains(base)) {
-                continue;
-            }
-            File combinedFile = new File(baseDir, base + ".mp4");
-            if (combinedFile.exists()) {
-                // noinspection ResultOfMethodCallIgnored
-                combinedFile.delete();
-            } else {
-                char[] suffixes = new char[] { 'F', 'R', 'X', 'Y' };
-                for (char s : suffixes) {
-                    File f = new File(baseDir, base + "_" + s + ".mp4");
-                    // noinspection ResultOfMethodCallIgnored
-                    f.delete();
-                }
-            }
-            deleted++;
+        if (changed && !DashcamStorageManager.syncDirectory(baseDir)) {
+            publishStatus(STATUS_ERROR, 0, TOTAL_CAMERAS, "Deletion sync failed: " + baseDir);
         }
     }
 
@@ -900,7 +1072,7 @@ public class RecordingService extends Service {
                 }
             }
         }
-        return f.delete();
+        return f.isDirectory() ? f.delete() : DashcamStorageManager.deleteFreeingSpace(f);
     }
 
     private File getEventsBaseDir() {
@@ -924,10 +1096,12 @@ public class RecordingService extends Service {
      *                the USB↔internal transition banner that only makes sense mid-session.
      */
     private File resolveActiveBaseDir(boolean initial) {
-        DashcamStorageManager.Resolution res = DashcamStorageManager.resolve(this);
+        DashcamStorageManager.Resolution res = SystemClock.elapsedRealtime() < usbRetryAfter
+                && DashcamStorageManager.getStorageTarget(prefs()) == DashcamStorageManager.TARGET_AUTO
+                ? DashcamStorageManager.internalAfterWriteFailure(this) : DashcamStorageManager.resolve(this);
         if (res.baseDir == null) {
             DevRuntimeLog.add("RecordingService", "Storage resolve failed: " + res.usbState);
-            publishStatus(STATUS_ERROR, 0, TOTAL_CAMERAS, ERROR_USB_STORAGE);
+            publishStatus(STATUS_ERROR, 0, TOTAL_CAMERAS, ERROR_USB_STORAGE + ": " + res.usbState);
             return null;
         }
         if (!ensureDirectoryExists(res.baseDir, "records base dir") || !res.baseDir.canWrite()) {
@@ -938,6 +1112,9 @@ public class RecordingService extends Service {
         boolean hadPrevious = activeBaseDir != null;
         activeBaseDir = res.baseDir;
         activeBaseIsUsb = res.usingUsb;
+        prefs().edit().putString("dashcamActualPath", res.baseDir.getAbsolutePath())
+                .putString("dashcamStorageDiagnostic", res.usbState.toString())
+                .putBoolean("dashcamActualUsb", res.usingUsb).apply();
         if (!initial && hadPrevious) {
             if (wasUsb && !res.usingUsb) {
                 DevRuntimeLog.add("RecordingService",
@@ -962,7 +1139,7 @@ public class RecordingService extends Service {
         if (!activeBaseIsUsb) {
             return false;
         }
-        if (DashcamStorageManager.isUsbStillWritable(activeBaseDir)) {
+        if (CameraProbe.writtenSamples() >= 0 && DashcamStorageManager.isUsbStillWritable(activeBaseDir)) {
             // Storage is fine — this is a genuine camera/encoder failure.
             return false;
         }
@@ -972,7 +1149,9 @@ public class RecordingService extends Service {
             publishStatus(STATUS_ERROR, 0, TOTAL_CAMERAS, ERROR_USB_STORAGE);
             return false;
         }
-        DevRuntimeLog.add("RecordingService", "USB storage failed in auto mode => retry on internal");
+        usbRetryAfter = SystemClock.elapsedRealtime() + 60_000;
+        watchdogFailed = false;
+        DevRuntimeLog.add("RecordingService", "USB storage failed in auto mode => internal; retry USB in 60s");
         return true;
     }
 
@@ -1007,9 +1186,19 @@ public class RecordingService extends Service {
     }
 
     private void shutdownRecordingService() {
+        usbEjectInProgress = true; // Keep the instance alive until its writer has released ownership.
         shutdownRecordingServiceWithoutStopSelf();
-        stopForeground(true);
-        stopSelf();
+        new Thread(() -> {
+            boolean quiet = awaitShutdownQuiescence();
+            DevRuntimeLog.add(TAG, "stop drained=" + quiet);
+            Thread current = worker;
+            if (!quiet && current != null && current.isAlive()) {
+                publishStatus(STATUS_ERROR, 0, TOTAL_CAMERAS, "Recorder still stopping; writes not quiescent");
+                return; // Do not allow a second worker to acquire the same native recorder.
+            }
+            stopForeground(true);
+            stopSelf();
+        }, "RecordingServiceStop").start();
     }
 
     private void shutdownRecordingServiceWithoutStopSelf() {
@@ -1020,39 +1209,34 @@ public class RecordingService extends Service {
             stateLock.notifyAll();
         }
         publishStatus(STATUS_OFF, 0, TOTAL_CAMERAS, "");
-        try {
-            for (int s = 0; s < 4; s++) {
-                CameraProbe.stopMp4Record(s);
-            }
-            CameraProbe.stopCombinedMp4Record();
-        } catch (Throwable ignored) {
-        }
         if (worker != null) {
             worker.interrupt();
         }
     }
 
     private boolean awaitShutdownQuiescence() {
-        Thread workerThread = worker;
-        if (workerThread != null) {
-            try {
-                workerThread.join(2000);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                return false;
-            }
-        }
-        eventCopyExecutor.shutdown();
+        long deadline = SystemClock.elapsedRealtime() + 7500;
+        Thread current = worker;
         try {
-            return eventCopyExecutor.awaitTermination(5000, TimeUnit.MILLISECONDS);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
+            if (current != null) current.join(Math.max(1, remaining(deadline)));
+            if (current != null && current.isAlive()) return false;
+            eventCopyExecutor.shutdown();
+            if (!eventCopyExecutor.awaitTermination(remaining(deadline), TimeUnit.MILLISECONDS)) return false;
+            if (!StorageIoGate.awaitIdle(remaining(deadline))) return false;
+            if (!CameraProbe.awaitPendingFlushes((int) remaining(deadline))) return false;
+            ExecutorService sync = Executors.newSingleThreadExecutor();
+            try {
+                Future<Boolean> result = sync.submit(() -> DashcamStorageManager.syncDirectory(activeBaseDir));
+                return result.get(Math.max(1, remaining(deadline)), TimeUnit.MILLISECONDS);
+            } finally { sync.shutdown(); }
+        } catch (Exception e) {
+            DevRuntimeLog.add(TAG, "drain incomplete: " + e);
             return false;
         }
     }
 
     private void stopServiceIfNotEjecting() {
-        if (usbEjectInProgress) {
+        if (usbEjectInProgress || (!stopRequested && STATUS_ERROR.equals(prefs().getString(KEY_STATUS, STATUS_OFF)))) {
             return;
         }
         stopForeground(true);
@@ -1060,7 +1244,7 @@ public class RecordingService extends Service {
     }
 
     private void broadcastUsbEjectReady(boolean safeToRemove, int messageRes) {
-        Intent intent = new Intent(ACTION_USB_EJECT_READY);
+        Intent intent = new Intent(ACTION_USB_EJECT_READY).setPackage(getPackageName());
         intent.putExtra(EXTRA_USB_EJECT_SAFE_TO_REMOVE, safeToRemove);
         intent.putExtra(EXTRA_USB_EJECT_MESSAGE_RES, messageRes);
         sendBroadcast(intent);
@@ -1168,6 +1352,7 @@ public class RecordingService extends Service {
         }
 
         updateDashcamOverlayState(status, lastError);
+        if (statusIcon != null) statusIcon.update(prefs().getBoolean("dashcamStatusIcon", false) ? status : null);
 
         Intent intent = new Intent(ACTION_STATUS_CHANGED);
         intent.setPackage(getPackageName());
@@ -1372,6 +1557,12 @@ public class RecordingService extends Service {
     @Override
     public void onDestroy() {
         sServiceRunning = false;
+        instance = null;
+        mainHandler.removeCallbacks(superviseTick);
+        supervisor.shutdown();
+        prefs().unregisterOnSharedPreferenceChangeListener(iconPreferenceListener);
+        if (statusIcon != null) statusIcon.hide();
+        if (shutdownReceiver != null) unregisterReceiver(shutdownReceiver);
         stopRequested = true;
         cancelPendingErrorOverlay();
         eventCopyExecutor.shutdown();

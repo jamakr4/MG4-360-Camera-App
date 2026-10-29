@@ -4,13 +4,18 @@ import com.drivehub.kamera.settings.UiPrefs;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.net.Uri;
 import android.os.Build;
 import android.os.storage.StorageManager;
 import android.os.storage.StorageVolume;
+import android.provider.DocumentsContract;
 import android.util.Log;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.FileInputStream;
+import com.drivehub.kamera.CameraProbe;
+import com.drivehub.kamera.dev.DevRuntimeLog;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -39,6 +44,8 @@ public final class DashcamStorageManager {
     public static final int TARGET_INTERNAL_ONLY = 2;
 
     public static final String KEY_STORAGE_TARGET = "dashcamStorageTarget";
+    private static final String KEY_USB_VOLUME_ID = "dashcamUsbVolumeId";
+    private static final String KEY_USB_RELATIVE_PATH = "dashcamUsbRelativePath";
     private static final String KEY_USB_RETENTION_CLIP_COUNT = "dashcamUsbRetentionClipCount";
     private static final String KEY_USB_MAX_RETAINED_EVENT_DIRS = "dashcamUsbMaxRetainedEventDirs";
 
@@ -59,6 +66,7 @@ public final class DashcamStorageManager {
         NO_MEDIUM,          // no removable volume mounted under /storage
         NOT_WRITABLE,       // volume(s) found but the dashcam dir cannot be created/written
         WRITE_TEST_FAILED,  // dir exists but the actual write probe failed
+        OUT_OF_SPACE,
         MULTIPLE_MEDIA      // more than one usable medium — refusing to pick one silently
     }
 
@@ -92,6 +100,32 @@ public final class DashcamStorageManager {
 
     public static void setStorageTarget(SharedPreferences prefs, int target) {
         prefs.edit().putInt(KEY_STORAGE_TARGET, clampTarget(target)).apply();
+    }
+
+    /**
+     * Remembers a USB folder selected through Android's document-tree UI. Recording continues to
+     * use the native file path; the URI is only translated into the volume id and relative path.
+     */
+    public static boolean setSelectedUsbTree(Context context, Uri treeUri) {
+        if (context == null || treeUri == null) {
+            return false;
+        }
+        final String documentId;
+        try {
+            documentId = DocumentsContract.getTreeDocumentId(treeUri);
+        } catch (Throwable t) {
+            Log.w(TAG, "Could not read selected USB document id", t);
+            return false;
+        }
+        SelectedUsbLocation location = parseSelectedUsbLocation(documentId);
+        if (location == null) {
+            return false;
+        }
+        UiPrefs.getPrefs(context).edit()
+                .putString(KEY_USB_VOLUME_ID, location.volumeId)
+                .putString(KEY_USB_RELATIVE_PATH, location.relativePath)
+                .apply();
+        return true;
     }
 
     public static int clampTarget(int target) {
@@ -139,26 +173,61 @@ public final class DashcamStorageManager {
      * unless the mode is INTERNAL_ONLY — do not call on the main thread.
      */
     public static Resolution resolve(Context context) {
+        if (!StorageIoGate.begin()) return new Resolution(null, false,
+                getStorageTarget(UiPrefs.getPrefs(context)), UsbState.NOT_CHECKED);
+        try { return resolveWritable(context); } finally { StorageIoGate.end(); }
+    }
+
+    private static Resolution resolveWritable(Context context) {
         SharedPreferences prefs = UiPrefs.getPrefs(context);
         int target = getStorageTarget(prefs);
 
-        if (target == TARGET_INTERNAL_ONLY) {
-            return new Resolution(
-                    DashcamSettingsController.getRecordsBaseDir(context),
-                    false, target, UsbState.NOT_CHECKED);
-        }
+        UsbProbe probe = target == TARGET_INTERNAL_ONLY
+                ? new UsbProbe(UsbState.NOT_CHECKED, null) : probeUsb(context);
+        File internal = target != TARGET_USB_ONLY && probe.state != UsbState.OK ? writableInternal(context) : null;
+        int chosen = StorageTargetPolicy.choose(target, probe.state == UsbState.OK, internal != null);
+        return new Resolution(chosen == StorageTargetPolicy.USB ? probe.recordsDir
+                : chosen == StorageTargetPolicy.INTERNAL ? internal : null,
+                chosen == StorageTargetPolicy.USB, target, probe.state);
+    }
 
-        UsbProbe probe = probeUsb(context);
-        if (probe.state == UsbState.OK) {
-            return new Resolution(probe.recordsDir, true, target, UsbState.OK);
+    static Resolution internalAfterWriteFailure(Context context) {
+        if (!StorageIoGate.begin()) return new Resolution(null, false, TARGET_AUTO, UsbState.WRITE_TEST_FAILED);
+        try { return new Resolution(writableInternal(context), false, TARGET_AUTO, UsbState.WRITE_TEST_FAILED); }
+        finally { StorageIoGate.end(); }
+    }
+
+    private static File writableInternal(Context context) {
+        File preferred = DashcamSettingsController.getRecordsBaseDir(context);
+        if ((preferred.isDirectory() || preferred.mkdirs()) && runWriteProbe(preferred)) return preferred;
+        File fallback = new File(context.getFilesDir(), "dashcam");
+        return (fallback.isDirectory() || fallback.mkdirs()) && runWriteProbe(fallback) ? fallback : null;
+    }
+
+    public static boolean syncDirectory(File dir) {
+        if (dir == null) return false;
+        try {
+            boolean ok = CameraProbe.syncFilesystem(dir.getAbsolutePath());
+            DevRuntimeLog.add(TAG, "syncfs " + dir + " success=" + ok);
+            return ok;
+        } catch (Throwable e) {
+            DevRuntimeLog.add(TAG, "syncfs failed: " + e);
+            return false;
         }
-        if (target == TARGET_USB_ONLY) {
-            return new Resolution(null, false, target, probe.state);
+    }
+
+    static boolean deleteFreeingSpace(File file) {
+        long before = file.getParentFile().getUsableSpace();
+        long bytes = file.length();
+        try {
+            boolean removed = RecordingFiles.deleteFreeingSpace(file);
+            DevRuntimeLog.add(TAG, "delete " + file + " bytes=" + bytes + " success=" + removed
+                    + " freeBefore=" + before + " freeAfter=" + file.getParentFile().getUsableSpace());
+            return removed;
+        } catch (java.io.IOException e) {
+            DevRuntimeLog.add(TAG, "truncate/sync/delete failed " + file + ": " + e);
+            return false;
         }
-        // AUTO: fall back to internal, but keep the probe result so callers can surface it.
-        return new Resolution(
-                DashcamSettingsController.getRecordsBaseDir(context),
-                false, target, probe.state);
     }
 
     /**
@@ -199,6 +268,74 @@ public final class DashcamStorageManager {
         }
     }
 
+    private static final class SelectedUsbLocation {
+        final String volumeId;
+        final String relativePath;
+
+        SelectedUsbLocation(String volumeId, String relativePath) {
+            this.volumeId = volumeId;
+            this.relativePath = relativePath;
+        }
+    }
+
+    private static SelectedUsbLocation getSelectedUsbLocation(SharedPreferences prefs) {
+        if (prefs == null) {
+            return null;
+        }
+        String volumeId = prefs.getString(KEY_USB_VOLUME_ID, null);
+        if (volumeId == null || volumeId.trim().isEmpty()) {
+            return null;
+        }
+        String relativePath = prefs.getString(KEY_USB_RELATIVE_PATH, "");
+        return parseSelectedUsbLocation(volumeId.trim() + ":"
+                + (relativePath == null ? "" : relativePath));
+    }
+
+    private static SelectedUsbLocation parseSelectedUsbLocation(String documentId) {
+        if (documentId == null) {
+            return null;
+        }
+        int separator = documentId.indexOf(':');
+        String volumeId = (separator >= 0 ? documentId.substring(0, separator) : documentId).trim();
+        String relativePath = separator >= 0 ? documentId.substring(separator + 1).trim() : "";
+        if (volumeId.isEmpty()
+                || "primary".equalsIgnoreCase(volumeId)
+                || "home".equalsIgnoreCase(volumeId)
+                || volumeId.contains("/")
+                || volumeId.contains("\\")
+                || ".".equals(volumeId)
+                || "..".equals(volumeId)) {
+            return null;
+        }
+        relativePath = normalizeRelativePath(relativePath);
+        if (relativePath == null) {
+            return null;
+        }
+        return new SelectedUsbLocation(volumeId, relativePath);
+    }
+
+    private static String normalizeRelativePath(String path) {
+        if (path == null || path.isEmpty()) {
+            return "";
+        }
+        String normalized = path.replace('\\', '/');
+        while (normalized.startsWith("/")) {
+            normalized = normalized.substring(1);
+        }
+        while (normalized.endsWith("/")) {
+            normalized = normalized.substring(0, normalized.length() - 1);
+        }
+        if (normalized.isEmpty()) {
+            return "";
+        }
+        for (String segment : normalized.split("/")) {
+            if (segment.isEmpty() || ".".equals(segment) || "..".equals(segment)) {
+                return null;
+            }
+        }
+        return normalized;
+    }
+
     /**
      * Where to try writing on one volume, best first.
      *
@@ -215,8 +352,21 @@ public final class DashcamStorageManager {
      * clips at the root of the stick where a person plugging it into a computer will look. The
      * sandbox is the fallback that always works, at the cost of being deleted on uninstall.
      */
-    private static List<File> recordsDirCandidates(UsbCandidate candidate) {
+    private static List<File> recordsDirCandidates(
+            UsbCandidate candidate, SelectedUsbLocation selectedLocation) {
         List<File> dirs = new ArrayList<>();
+        if (selectedLocation != null) {
+            File rawBase = new File(MEDIA_RW_ROOT, selectedLocation.volumeId);
+            File exposedBase = candidate.rootDir;
+            if (!selectedLocation.relativePath.isEmpty()) {
+                rawBase = new File(rawBase, selectedLocation.relativePath);
+                exposedBase = new File(exposedBase, selectedLocation.relativePath);
+            }
+            dirs.add(new File(rawBase, USB_RECORDS_DIR_NAME));
+            dirs.add(new File(exposedBase, USB_RECORDS_DIR_NAME));
+            if (candidate.appPrivateDir != null) dirs.add(new File(candidate.appPrivateDir, USB_RECORDS_DIR_NAME));
+            return dirs;
+        }
         if (!candidate.volumeId.isEmpty()) {
             dirs.add(new File(new File(MEDIA_RW_ROOT, candidate.volumeId), USB_RECORDS_DIR_NAME));
         }
@@ -234,14 +384,25 @@ public final class DashcamStorageManager {
      * there is exactly one such candidate.
      */
     private static UsbProbe probeUsb(Context context) {
+        SelectedUsbLocation selectedLocation = getSelectedUsbLocation(UiPrefs.getPrefs(context));
         List<UsbCandidate> candidates = findUsbCandidates(context);
-        if (candidates.isEmpty()) {
+        if (selectedLocation != null) {
+            candidates = filterSelectedVolume(candidates, selectedLocation.volumeId);
+            if (candidates.isEmpty()) {
+                candidates = filterSelectedVolume(
+                        findLegacyStorageCandidates(context), selectedLocation.volumeId);
+            }
+            if (candidates.isEmpty()) {
+                Log.i(TAG, "Selected USB volume is not mounted: " + selectedLocation.volumeId);
+                return new UsbProbe(UsbState.NO_MEDIUM, null);
+            }
+        } else if (candidates.isEmpty()) {
             // AAOS 9 head units typically don't surface OTG/USB volumes via StorageManager:
             // the OS mounts them under /mnt/media_rw/... without registering them with the
             // MediaProvider, so getExternalFilesDirs() returns nothing usable. Fall back to a
             // direct /storage scan, which is how every dashcam-style automotive app has to
             // handle this in practice.
-            candidates = findLegacyStorageCandidates();
+            candidates = findLegacyStorageCandidates(context);
             if (!candidates.isEmpty()) {
                 Log.i(TAG, "StorageManager exposed no removable volumes; using /storage scan ("
                         + candidates.size() + " candidate(s))");
@@ -250,12 +411,15 @@ public final class DashcamStorageManager {
         if (candidates.isEmpty()) {
             return new UsbProbe(UsbState.NO_MEDIUM, null);
         }
-        List<UsbCandidate> prioritized = prioritizeUsbCandidates(candidates);
+        List<UsbCandidate> prioritized = selectedLocation == null
+                ? prioritizeUsbCandidates(candidates)
+                : candidates;
         List<File> usable = new ArrayList<>();
         boolean anyWriteTestFailed = false;
+        boolean outOfSpace = false;
         for (UsbCandidate candidate : prioritized) {
             File accepted = null;
-            for (File recordsDir : recordsDirCandidates(candidate)) {
+            for (File recordsDir : recordsDirCandidates(candidate, selectedLocation)) {
                 boolean existed = recordsDir.isDirectory();
                 if (!existed && !recordsDir.mkdirs() && !recordsDir.isDirectory()) {
                     // Logged rather than skipped silently: without this a NOT_WRITABLE verdict
@@ -272,6 +436,8 @@ public final class DashcamStorageManager {
                 String probeError = writeProbeError(recordsDir);
                 if (probeError != null) {
                     anyWriteTestFailed = true;
+                    outOfSpace |= probeError.toLowerCase(Locale.US).contains("no space left")
+                            || probeError.toLowerCase(Locale.US).contains("enospc");
                     Log.w(TAG, "no: write probe failed in " + recordsDir.getAbsolutePath()
                             + ": " + probeError);
                     continue;
@@ -296,7 +462,19 @@ public final class DashcamStorageManager {
             return new UsbProbe(UsbState.MULTIPLE_MEDIA, null);
         }
         return new UsbProbe(
-                anyWriteTestFailed ? UsbState.WRITE_TEST_FAILED : UsbState.NOT_WRITABLE, null);
+                outOfSpace ? UsbState.OUT_OF_SPACE : anyWriteTestFailed ? UsbState.WRITE_TEST_FAILED : UsbState.NOT_WRITABLE, null);
+    }
+
+    private static List<UsbCandidate> filterSelectedVolume(
+            List<UsbCandidate> candidates, String selectedVolumeId) {
+        List<UsbCandidate> selected = new ArrayList<>();
+        for (UsbCandidate candidate : candidates) {
+            if (candidate.volumeId.equalsIgnoreCase(selectedVolumeId)
+                    || candidate.rootDir.getName().equalsIgnoreCase(selectedVolumeId)) {
+                selected.add(candidate);
+            }
+        }
+        return selected;
     }
 
     /**
@@ -345,22 +523,19 @@ public final class DashcamStorageManager {
      * primary volume or the "self" symlink. No StorageManager metadata, no isRemovable hints,
      * just whatever the user can mount and read. Suitability is decided by the write probe.
      */
-    private static List<UsbCandidate> findLegacyStorageCandidates() {
-        List<UsbCandidate> candidates = new ArrayList<>();
-        File[] children = LEGACY_STORAGE_ROOT.listFiles();
-        if (children == null) {
-            return candidates;
+    private static List<UsbCandidate> findLegacyStorageCandidates(Context context) {
+        Map<String, UsbCandidate> found = new LinkedHashMap<>();
+        for (File parent : new File[] {MEDIA_RW_ROOT, LEGACY_STORAGE_ROOT}) {
+            File[] children = parent.listFiles();
+            if (children == null) continue;
+            for (File child : children) {
+                String name = child.getName();
+                if (!child.isDirectory() || name.isEmpty() || "emulated".equals(name) || "self".equals(name)) continue;
+                found.putIfAbsent(name, new UsbCandidate(child, name, looksLikeUsb(child, name), name,
+                        new File(child, "Android/data/" + context.getPackageName() + "/files")));
+            }
         }
-        for (File child : children) {
-            if (child == null || !child.isDirectory()) continue;
-            String name = child.getName();
-            if (name.isEmpty() || "emulated".equals(name) || "self".equals(name)) continue;
-            if (!child.canRead()) continue;
-            // The /storage scan has no framework metadata: the directory name is the uuid,
-            // and there is no app sandbox to fall back on.
-            candidates.add(new UsbCandidate(child, name, looksLikeUsb(child, name), name, null));
-        }
-        return candidates;
+        return new ArrayList<>(found.values());
     }
 
     private static List<UsbCandidate> prioritizeUsbCandidates(List<UsbCandidate> candidates) {
@@ -434,20 +609,28 @@ public final class DashcamStorageManager {
 
     /** Returns null when the probe wrote and read back, otherwise why it did not. */
     private static String writeProbeError(File dir) {
-        File probe = new File(dir, WRITE_PROBE_FILE_NAME);
+        File probe = null;
         try {
+            // resolve() can run concurrently from the settings screen and the recording loop.
+            // A fixed probe name lets one caller delete the other's file and creates a false
+            // WRITE_TEST_FAILED result, so every invocation needs its own temporary file.
+            probe = File.createTempFile(WRITE_PROBE_FILE_NAME + ".", ".tmp", dir);
             try (FileOutputStream out = new FileOutputStream(probe)) {
                 out.write("dashcam".getBytes());
                 out.getFD().sync();
             }
-            boolean ok = probe.isFile() && probe.length() > 0;
-            // noinspection ResultOfMethodCallIgnored
-            probe.delete();
+            boolean ok;
+            try (FileInputStream in = new FileInputStream(probe)) {
+                ok = probe.length() == 7 && in.read() == 'd';
+            }
             return ok ? null : "file missing or empty after write";
         } catch (Throwable t) {
-            // noinspection ResultOfMethodCallIgnored
-            probe.delete();
             return String.valueOf(t);
+        } finally {
+            if (probe != null) {
+                // noinspection ResultOfMethodCallIgnored
+                probe.delete();
+            }
         }
     }
 

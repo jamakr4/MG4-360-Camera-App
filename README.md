@@ -48,9 +48,9 @@ Community mod for the MG4 EV (AAOS 9, pre-2026 facelift) that replaces the stock
 - **Turn signal overlay**: opens automatically when the indicator is activated, without the original speed-based auto-close behavior.
 - **Digital rearview mirror**: keeps the factory rear camera visible as a persistent floating mirror for situations where the rear window is blocked by cargo, while still yielding to turn-signal cameras and then restoring the rear view afterwards.
 - **Tesla-style tile view**: replaces the launcher-like OEM overlay, also known as the fullscreen takeover, with a cleaner presentation.
-- **Native 4-camera dashcam**: records all four factory cameras into a single 720x240 grid clip with a footer including time, speed, and a custom signature.
+- **Native 4-camera dashcam**: records the factory cameras in a single 1440x1040 grid clip, with up to 720x480 per camera and a footer including time, speed, and a custom signature.
 - **Event capture**: saves a pre- and post-trigger recording window into a separate `events/` folder.
-- **Flexible overlay feedback**: pause, resume, event, and error banners with adjustable size and volume.
+- **Flexible overlay feedback**: pause, resume, event, and error banners with adjustable size and volume, plus an optional persistent status dot in the status bar.
 - **OEM 360 AVM coexistence**: can briefly yield camera access so the stock reverse/360 view still opens when needed.
 - **External trigger support**: send `com.drivehub.kamera.action.TRIGGER_DASHCAM_EVENT` from ADB or another app to save an event clip.
 - **Auto language selection**: English and German are selected automatically from the vehicle language.
@@ -193,6 +193,12 @@ Notes:
 - The companion app can trigger an event save externally via `com.drivehub.kamera.action.TRIGGER_DASHCAM_EVENT`.
 - If the dashcam is currently off and you still trigger an event, the app can switch into future-only recording so at least the post-trigger window is captured.
 
+**Storage use and flash wear**
+
+At the default 25 FPS and fixed 9 Mbit/s bitrate, recordings use about **67 MB per minute** or **4 GB per hour**. The default rolling buffer of ten 30-second clips therefore occupies only about **340 MB**. Available capacity is usually not the main concern when recording to the head unit; the continuous rewriting is. Recording for one hour every day writes roughly **1.5 TB of video data per year**, so a USB drive is recommended for continuous use.
+
+The output canvas and bitrate stay the same regardless of how many cameras are selected. For example, recording only the front camera still creates a full 1440x1040 frame at 9 Mbit/s, with the unused camera areas left black. Selecting fewer cameras reduces camera-processing bandwidth, but it does not reduce the recording's storage use.
+
 **On-demand recording without loop mode**
 
 You do not need to run the dashcam in continuous loop mode to capture video. Two lighter alternatives are available:
@@ -200,6 +206,17 @@ You do not need to run the dashcam in continuous loop mode to capture video. Two
 - **Test clip** — a button on the home screen starts a single recording for a configurable duration (default 30 s, adjustable in Settings up to 120 s). Useful for quickly capturing something without enabling the full ring buffer. Test clips are saved to a separate `test/` subfolder and do not participate in the ring-buffer cleanup cycle.
 - **Future-only event recording** — if continuous recording is off but you still trigger an event save (via the home screen button or the companion app broadcast `com.drivehub.kamera.action.TRIGGER_DASHCAM_EVENT`), the app automatically starts a short recording from that moment forward and saves it as an event. The pre-trigger window is lost since no loop was running, but at least the next few clips are captured.
 </details>
+
+**Recording status indicator**
+
+Enable `Recording status in the status bar` in the Dashcam settings to show a dot indicating the app's dashcam status. The dot is independent of factory recordings.
+
+| Color | Meaning |
+|---|---|
+| 🟢 Green | Recording |
+| 🔵 Blue | Starting or paused while the OEM 360 camera is active |
+| 🟠 Orange | Error or partial recording |
+| ⚪ Gray | Dashcam inactive |
 
 > [!CAUTION]
 > Continuous loop recording writes constantly to internal storage. This can accelerate flash wear over time. Use at your own risk. Test clips and event-only recording are not affected since they only record on demand.
@@ -251,9 +268,12 @@ The notification sound is licensed under CC-BY-NC-4.0 and is therefore not track
 
 A hidden Dev tab exposes lower-level tuning knobs. To unlock it, open Settings and tap the version label at the bottom **5 times**.
 
-What you can tweak:
+Available tools and settings:
 
+- **Performance overlay** shows system and app CPU and RAM usage, system load, and temperature in the top-left corner until disabled.
+- **Factory camera recordings** lists and exports existing captures from the SAIC 360 camera app to the `avm/` folder in the selected dashcam storage location. The factory app's hidden recorder can produce raw camera images and H.264 video; this tool only reads and exports existing files and does not start the recorder.
 - **Polling rates** for idle, turn-signal-active, and Android Auto / CarPlay foreground scenarios.
+- **OEM 360 speed limit** controls above which speed OEM camera launch requests are ignored; `0` limits coexistence to standstill.
 - **Overlay safe area** so the tile overlay cannot be dragged into the top system region.
 - **Dashcam retention** for rolling clips and saved event counts.
 - **Storage override** to record somewhere other than `Downloads/dashcam/`.
@@ -308,6 +328,7 @@ This is an independent community project and is **not affiliated with SAIC, MG M
 
 - Analysis based on community research from [XDA Forums: MG4 Electric AAOS 9](https://xdaforums.com/t/mg4-electric-aaos-9-playing-and-possibly-other-mg-models.4697712/)
 - Tile view inspired by [merth4n on XDA](https://xdaforums.com/m/merth4n.13350648/) and the original [merthankaraman/DriveHub_Kamera](https://github.com/merthankaraman/DriveHub_Kamera) project
+- Thanks to [Tommasov](https://github.com/Tommasov) for helping with and contributing to the project
 - OpenCV 4.9.0 - Apache License 2.0
 - AndroidX AppCompat 1.7.1 - Apache License 2.0
 - AndroidX Activity 1.12.4 - Apache License 2.0
@@ -320,3 +341,11 @@ This is an independent community project and is **not affiliated with SAIC, MG M
 ## License
 
 GPL-3.0 - see [LICENSE](LICENSE) for details.
+
+
+### Dashcam integration credits
+
+The native recording, storage and OEM-coexistence improvements incorporate work by
+[Tommaso Vietina / MG4_Dashcam](https://github.com/Tommasov/MG4_Dashcam), stable 1.4.3.
+See [integration notes, validation and pending vehicle tests](docs/dashcam-integration.md).
+Existing tile, turn-signal, rearview and event features are retained in this integration.

@@ -113,7 +113,7 @@
         android:padding="24dp"
         android:scaleType="fitCenter"
         android:src="@drawable/ic_settings_material"
-        android:tint="@color/settings_accent"
+        app:tint="@color/settings_accent"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent" />
 
@@ -160,7 +160,7 @@
         android:padding="34dp"
         android:scaleType="fitCenter"
         android:src="@drawable/ic_close"
-        android:tint="#FFFFFF"
+        app:tint="#FFFFFF"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent" />
 

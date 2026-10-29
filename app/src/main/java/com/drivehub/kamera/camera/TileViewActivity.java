@@ -38,6 +38,7 @@ public class TileViewActivity extends AppCompatActivity {
     private android.content.SharedPreferences prefs;
     private final android.content.SharedPreferences.OnSharedPreferenceChangeListener prefListener = (sharedPreferences,
             key) -> {
+        if (UiPrefs.KEY_OEM_AVM_ACTIVE.equals(key)) runOnUiThread(this::refreshPreviews);
         if (UiPrefs.KEY_TILE_CORNER_RADIUS.equals(key)) {
             applyCornerRadius();
         }
@@ -60,7 +61,7 @@ public class TileViewActivity extends AppCompatActivity {
             callbacks[i] = new SurfaceHolder.Callback() {
                 @Override
                 public void surfaceCreated(SurfaceHolder h) {
-                    CameraProbe.attachPreview(cameraIndex, h.getSurface());
+                    if (!UiPrefs.isOemAvmActive(prefs)) CameraProbe.attachPreview(cameraIndex, h.getSurface());
                 }
 
                 @Override
@@ -73,6 +74,14 @@ public class TileViewActivity extends AppCompatActivity {
                 }
             };
             holder.addCallback(callbacks[i]);
+        }
+    }
+
+    private void refreshPreviews() {
+        for (int i = 0; i < holders.length; i++) {
+            if (UiPrefs.isOemAvmActive(prefs)) CameraProbe.detachPreview(CAMERA_INDICES[i]);
+            else if (sTileViewVisible && holders[i] != null && holders[i].getSurface().isValid())
+                CameraProbe.attachPreview(CAMERA_INDICES[i], holders[i].getSurface());
         }
     }
 
@@ -105,6 +114,7 @@ public class TileViewActivity extends AppCompatActivity {
         // and the later onStop() recheck can actually re-evaluate.
         SignalService.requestRecheck();
         prefs.registerOnSharedPreferenceChangeListener(prefListener);
+        refreshPreviews();
     }
 
     @Override
