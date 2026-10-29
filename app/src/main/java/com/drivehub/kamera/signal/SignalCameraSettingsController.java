@@ -35,6 +35,11 @@ public final class SignalCameraSettingsController {
             Switch swSignalTapToHide,
             EditText etSignalTapToHideDurationSec,
             Switch swRotateToDrivingDirection,
+            Switch swSignalCompact,
+            SeekBar seekSignalCompactLeft,
+            SeekBar seekSignalCompactRight,
+            EditText etSignalCompactLeft,
+            EditText etSignalCompactRight,
             SeekBar seekOverlayHideDelay,
             EditText etOverlayHideDelayValue,
             SeekBar seekOverlayMinShow,
@@ -152,6 +157,26 @@ public final class SignalCameraSettingsController {
             );
         }
 
+        bindCompactSlider(prefs, seekSignalCompactLeft, etSignalCompactLeft,
+                UiPrefs.KEY_SIGNAL_COMPACT_LEFT, UiPrefs::getSignalCompactLeft);
+        bindCompactSlider(prefs, seekSignalCompactRight, etSignalCompactRight,
+                UiPrefs.KEY_SIGNAL_COMPACT_RIGHT, UiPrefs::getSignalCompactRight);
+        if (swSignalCompact != null) {
+            boolean enabled = prefs.getBoolean(UiPrefs.KEY_SIGNAL_COMPACT_ENABLED, false);
+            swSignalCompact.setChecked(enabled);
+            seekSignalCompactLeft.setEnabled(enabled);
+            seekSignalCompactRight.setEnabled(enabled);
+            etSignalCompactLeft.setEnabled(enabled);
+            etSignalCompactRight.setEnabled(enabled);
+            swSignalCompact.setOnCheckedChangeListener((button, checked) -> {
+                seekSignalCompactLeft.setEnabled(checked);
+                seekSignalCompactRight.setEnabled(checked);
+                etSignalCompactLeft.setEnabled(checked);
+                etSignalCompactRight.setEnabled(checked);
+                prefs.edit().putBoolean(UiPrefs.KEY_SIGNAL_COMPACT_ENABLED, checked).apply();
+            });
+        }
+
         bindMsSlider(
                 prefs,
                 seekOverlayHideDelay,
@@ -172,6 +197,44 @@ public final class SignalCameraSettingsController {
                 UiPrefs::getOverlayMinShowMs,
                 UiPrefs::clampOverlayMinShowMs
         );
+    }
+
+    private void bindCompactSlider(SharedPreferences prefs, SeekBar seek, EditText edit,
+                                   String key, ToIntFunction<SharedPreferences> getter) {
+        final boolean[] syncing = {false};
+        int crop = getter.applyAsInt(prefs);
+        seek.setProgress(crop);
+        edit.setText(String.valueOf(45 - crop));
+        edit.addTextChangedListener(new SimpleTextWatcher() {
+            @Override public void afterTextChanged(android.text.Editable text) {
+                if (syncing[0] || text == null || text.length() == 0) return;
+                try {
+                    int value = Math.max(0, Math.min(45, Integer.parseInt(text.toString())));
+                    int crop = 45 - value;
+                    prefs.edit().putInt(key, crop).apply();
+                    seek.setProgress(crop);
+                } catch (NumberFormatException ignored) { }
+            }
+        });
+        edit.setOnFocusChangeListener((view, hasFocus) -> {
+            if (hasFocus) return;
+            syncing[0] = true;
+            edit.setText(String.valueOf(45 - getter.applyAsInt(prefs)));
+            edit.setSelection(edit.getText().length());
+            syncing[0] = false;
+        });
+        seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
+                if (!fromUser) return;
+                prefs.edit().putInt(key, progress).apply();
+                syncing[0] = true;
+                edit.setText(String.valueOf(45 - progress));
+                edit.setSelection(edit.getText().length());
+                syncing[0] = false;
+            }
+            @Override public void onStartTrackingTouch(SeekBar bar) { }
+            @Override public void onStopTrackingTouch(SeekBar bar) { }
+        });
     }
 
     private void bindLaneChangeMode(

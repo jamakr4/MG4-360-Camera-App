@@ -14,6 +14,18 @@ public final class UiPrefs {
     public static final String KEY_SMOOTH_ENTRY = "smoothEntry";
     public static final String KEY_OVERLAY_RESIZE_LOCKED = "overlayResizeLocked";
     public static final String KEY_OVERLAY_MOVE_LOCKED = "overlayMoveLocked";
+    public static final String KEY_SIGNAL_COMPACT_ENABLED = "signalCompactEnabled";
+    public static final String KEY_SIGNAL_COMPACT_LEFT = "signalCompactLeft";
+    public static final String KEY_SIGNAL_COMPACT_RIGHT = "signalCompactRight";
+
+    public static int getSignalCompactLeft(SharedPreferences prefs) {
+        return Math.max(0, Math.min(45, prefs.getInt(KEY_SIGNAL_COMPACT_LEFT, 0)));
+    }
+
+    public static int getSignalCompactRight(SharedPreferences prefs) {
+        return Math.max(0, Math.min(45, prefs.getInt(KEY_SIGNAL_COMPACT_RIGHT, 25)));
+    }
+
     public static final String KEY_SIGNAL_ENHANCED_PREVIEW = "signalEnhancedPreview";
     public static final String KEY_OVERLAY_ON_SIGNAL = "overlayOnSignal";
     public static final String KEY_LANE_CHANGES_ONLY = "laneChangesOnly";

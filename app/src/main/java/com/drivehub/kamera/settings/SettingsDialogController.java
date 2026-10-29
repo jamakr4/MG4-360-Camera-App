@@ -181,6 +181,11 @@ public final class SettingsDialogController {
         v.swRearviewTapToHide = dialog.findViewById(R.id.switchRearviewTapToHide);
         v.etRearviewTapToHideDurationSec = dialog.findViewById(R.id.etRearviewTapToHideDurationSec);
         v.swRotateToDrivingDirection = dialog.findViewById(R.id.switchOverlayRotateToDrivingDirection);
+        v.swSignalCompact = dialog.findViewById(R.id.switchSignalCompact);
+        v.seekSignalCompactLeft = dialog.findViewById(R.id.seekSignalCompactLeft);
+        v.seekSignalCompactRight = dialog.findViewById(R.id.seekSignalCompactRight);
+        v.etSignalCompactLeft = dialog.findViewById(R.id.etSignalCompactLeft);
+        v.etSignalCompactRight = dialog.findViewById(R.id.etSignalCompactRight);
         v.swDashcamEnabled = dialog.findViewById(R.id.switchDashcamEnabled);
         v.swSafetyWarning = dialog.findViewById(R.id.switchSafetyWarning);
         v.swSmoothEntry = dialog.findViewById(R.id.switchSmoothEntry);
@@ -337,6 +342,11 @@ public final class SettingsDialogController {
                 views.swSignalTapToHide,
                 views.etSignalTapToHideDurationSec,
                 views.swRotateToDrivingDirection,
+                views.swSignalCompact,
+                views.seekSignalCompactLeft,
+                views.seekSignalCompactRight,
+                views.etSignalCompactLeft,
+                views.etSignalCompactRight,
                 views.seekOverlayHideDelay,
                 views.etOverlayHideDelayValue,
                 views.seekOverlayMinShow,
@@ -413,6 +423,7 @@ public final class SettingsDialogController {
                         views.swRearviewTapToHide,
                         views.swSignalTapToHide,
                         views.swRotateToDrivingDirection,
+                        views.swSignalCompact,
                         views.swDashcamEnabled,
                         views.swDashcamStatusIcon,
                         views.swDashcamShowSpeed,
@@ -435,6 +446,8 @@ public final class SettingsDialogController {
                 views.dialogClose,
                 new SeekBar[]{
                         views.seekCorner,
+                        views.seekSignalCompactLeft,
+                        views.seekSignalCompactRight,
                         views.seekLaneChangeMinSpeed,
                         views.seekOverlayHideDelay,
                         views.seekOverlayMinShow,
@@ -668,6 +681,11 @@ public final class SettingsDialogController {
         Switch swSignalTapToHide;
         EditText etSignalTapToHideDurationSec;
         Switch swRotateToDrivingDirection;
+        Switch swSignalCompact;
+        SeekBar seekSignalCompactLeft;
+        SeekBar seekSignalCompactRight;
+        EditText etSignalCompactLeft;
+        EditText etSignalCompactRight;
         Switch swDashcamEnabled;
         Switch swSafetyWarning;
         Switch swSmoothEntry;

@@ -318,4 +318,8 @@
     <string name="settings_signal_preview_standard">Schnell</string>
     <string name="settings_signal_preview_enhanced">Verbessert</string>
     <string name="settings_signal_preview_enhanced_hint">Verbessert nutzt beide Kamerahalbbilder für ein schärferes Bild und benötigt möglicherweise mehr Rechenleistung.</string>
+    <string name="settings_signal_compact">Kompaktansicht</string>
+    <string name="settings_signal_compact_hint">Beide Bildränder lassen sich unabhängig einstellen, um die Kameraansicht schmaler zu machen.</string>
+    <string name="settings_signal_compact_left">Linken Rand abschneiden (nach links ziehen)</string>
+    <string name="settings_signal_compact_right">Rechten Rand abschneiden (nach rechts ziehen)</string>
 </resources>

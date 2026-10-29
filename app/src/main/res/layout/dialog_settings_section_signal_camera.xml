@@ -103,6 +103,68 @@
 
         </LinearLayout>
 
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:minHeight="56dp"
+            android:orientation="horizontal">
+            <TextView
+                style="@style/DrivehubSettingsCardRowLabel"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/settings_signal_compact" />
+            <Switch
+                android:id="@+id/switchSignalCompact"
+                style="@style/DrivehubSettingsSwitch" />
+        </LinearLayout>
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+            <EditText
+                android:id="@+id/etSignalCompactLeft"
+                style="@style/DrivehubSettingsSliderValue"
+                android:layout_width="48dp"
+                android:layout_marginStart="0dp"
+                android:layout_marginEnd="10dp"
+                android:gravity="start|center_vertical"
+                android:maxLength="3"
+                android:contentDescription="@string/settings_signal_compact_left" />
+            <SeekBar
+                android:id="@+id/seekSignalCompactLeft"
+                style="@style/DrivehubSettingsSlider"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:rotation="180"
+                android:max="45"
+                android:progress="0"
+                android:contentDescription="@string/settings_signal_compact_left" />
+            <SeekBar
+                android:id="@+id/seekSignalCompactRight"
+                style="@style/DrivehubSettingsSlider"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:max="45"
+                android:progress="25"
+                android:contentDescription="@string/settings_signal_compact_right" />
+            <EditText
+                android:id="@+id/etSignalCompactRight"
+                style="@style/DrivehubSettingsSliderValue"
+                android:layout_width="48dp"
+                android:maxLength="3"
+                android:contentDescription="@string/settings_signal_compact_right" />
+        </LinearLayout>
+
+        <TextView
+            style="@style/DrivehubSettingsBodyMuted"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/settings_signal_compact_hint" />
+
     </LinearLayout>
 
     <!-- ============ LANE CHANGES ONLY ============ -->

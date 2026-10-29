@@ -318,4 +318,8 @@
     <string name="settings_signal_preview_standard">Fast</string>
     <string name="settings_signal_preview_enhanced">Enhanced</string>
     <string name="settings_signal_preview_enhanced_hint">Enhanced uses both camera fields for a sharper image and may require more processing power.</string>
+    <string name="settings_signal_compact">Compact view</string>
+    <string name="settings_signal_compact_hint">Adjust each edge independently to make the camera view narrower.</string>
+    <string name="settings_signal_compact_left">Crop left edge (move left)</string>
+    <string name="settings_signal_compact_right">Crop right edge (move right)</string>
 </resources>
