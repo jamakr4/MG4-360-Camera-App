@@ -40,6 +40,7 @@ Community mod for the MG4 EV (AAOS 9, pre-2026 facelift) that replaces the stock
 
 <p align="center">
   <a href="https://github.com/jamakr4/MG4-360-Camera-App/releases/latest"><img alt="Download latest APK" src="https://img.shields.io/badge/Download%20Latest%20APK-1F6FEB?style=for-the-badge&logo=android&logoColor=white&logoWidth=24"></a>
+  <a href="https://github.com/jamakr4/MG4-360-Camera-App/releases/tag/v0.8.10"><img alt="Download latest beta" src="https://img.shields.io/badge/Download%20Latest%20Beta-8B5CF6?style=for-the-badge&logo=android&logoColor=white&logoWidth=24"></a>
 </p>
 
 
@@ -54,6 +55,9 @@ Community mod for the MG4 EV (AAOS 9, pre-2026 facelift) that replaces the stock
 - **OEM 360 AVM coexistence**: can briefly yield camera access so the stock reverse/360 view still opens when needed.
 - **External trigger support**: send `com.drivehub.kamera.action.TRIGGER_DASHCAM_EVENT` from ADB or another app to save an event clip.
 - **Auto language selection**: English and German are selected automatically from the vehicle language.
+
+> [!NOTE]
+> Some features may only be available in the latest beta version.
 
 ## Preview
 
