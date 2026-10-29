@@ -22,6 +22,9 @@
     <uses-permission
         android:name="android.car.permission.CAR_VENDOR_EXTENSION"
         tools:ignore="ProtectedPermissions" />
+    <uses-permission
+        android:name="android.car.permission.CAR_DIAGNOSTICS"
+        tools:ignore="ProtectedPermissions" />
 
     <application
         android:allowBackup="false"
@@ -32,6 +35,7 @@
         android:roundIcon="@mipmap/drivehub_kamera"
         android:supportsRtl="true"
         android:theme="@style/Theme.DrivehubKamera">
+        <uses-library android:name="android.car" android:required="false" />
         <activity
             android:name=".MainActivity"
             android:exported="true">
