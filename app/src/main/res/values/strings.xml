@@ -326,4 +326,6 @@
     <string name="dashcam_status_position_vertical">Vertical position</string>
     <string name="dashcam_status_position_value">%1$d px</string>
     <string name="dashcam_status_position_hint">Move the status dot anywhere on the screen. Its position is saved and kept within the screen edges.</string>
+    <string name="dashcam_status_position_expand">Show position sliders</string>
+    <string name="dashcam_status_position_collapse">Hide position sliders</string>
 </resources>

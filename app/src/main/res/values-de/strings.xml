@@ -326,4 +326,6 @@
     <string name="dashcam_status_position_vertical">Vertikale Position</string>
     <string name="dashcam_status_position_value">%1$d px</string>
     <string name="dashcam_status_position_hint">Verschiebe den Statuspunkt auf dem gesamten Bildschirm. Die Position wird gespeichert und auf die Bildschirmränder begrenzt.</string>
+    <string name="dashcam_status_position_expand">Positionsregler einblenden</string>
+    <string name="dashcam_status_position_collapse">Positionsregler ausblenden</string>
 </resources>

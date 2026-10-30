@@ -208,6 +208,18 @@ public final class DashcamSettingsController {
             BannerGroupViews errorRecoveredBanner) {
         if (swEnabled != null) {
             View root = swEnabled.getRootView();
+            View positionPanel = root.findViewById(R.id.layoutDashcamStatusPosition);
+            View positionExpand = root.findViewById(R.id.btnDashcamStatusPositionExpand);
+            positionPanel.setVisibility(View.GONE);
+            positionExpand.setRotation(0f);
+            positionExpand.setOnClickListener(button -> {
+                boolean expanded = positionPanel.getVisibility() != View.VISIBLE;
+                positionPanel.setVisibility(expanded ? View.VISIBLE : View.GONE);
+                button.setRotation(expanded ? 180f : 0f);
+                button.setContentDescription(activity.getString(expanded
+                        ? R.string.dashcam_status_position_collapse
+                        : R.string.dashcam_status_position_expand));
+            });
             Switch indicator = root.findViewById(R.id.switchDashcamStatusIcon);
             SeekBar positionX = root.findViewById(R.id.seekDashcamStatusIconX);
             SeekBar positionY = root.findViewById(R.id.seekDashcamStatusIconY);
