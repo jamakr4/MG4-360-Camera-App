@@ -266,7 +266,7 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
 
         overlayParams = new WindowManager.LayoutParams(
                 getVisibleOverlayWidth(),
-                overlayHeightPx,
+                getVisibleOverlayHeight(),
                 layoutType,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
                         | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
@@ -446,7 +446,7 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
         overlayWidthPx = wh[0];
         overlayHeightPx = wh[1];
         overlayParams.width = getVisibleOverlayWidth();
-        overlayParams.height = overlayHeightPx;
+        overlayParams.height = getVisibleOverlayHeight();
         clampOverlayPositionToScreen();
         windowManager.updateViewLayout(overlayView, overlayParams);
         applyPreviewTransform();
@@ -644,7 +644,7 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
         normalizeOverlaySizeForCurrentMode();
         if (overlayParams != null) {
             overlayParams.width = getVisibleOverlayWidth();
-            overlayParams.height = overlayHeightPx;
+            overlayParams.height = getVisibleOverlayHeight();
             clampOverlayPositionToScreen();
             if (windowManager != null && overlayView != null) {
                 windowManager.updateViewLayout(overlayView, overlayParams);
@@ -672,9 +672,19 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
     }
 
     private int getVisibleOverlayWidth() {
-        int crop = isCompactEnabled()
-                ? UiPrefs.getSignalCompactLeft(uiPrefs) + UiPrefs.getSignalCompactRight(uiPrefs) : 0;
-        return Math.max(1, Math.round(overlayWidthPx * (1f - crop / 100f)));
+        return getCompactGeometry().visibleWidth;
+    }
+
+    private int getVisibleOverlayHeight() {
+        return getCompactGeometry().visibleHeight;
+    }
+
+    private OverlayCompactGeometry getCompactGeometry() {
+        int left = isCompactEnabled() ? UiPrefs.getSignalCompactLeft(uiPrefs) : 0;
+        int right = isCompactEnabled() ? UiPrefs.getSignalCompactRight(uiPrefs) : 0;
+        return OverlayCompactGeometry.calculate(overlayWidthPx, overlayHeightPx,
+                CameraIndex.fromVideoIndex(cameraIndex) == CameraIndex.LEFT,
+                shouldRotatePreviewToDrivingDirection(), left, right);
     }
 
     private void applyPreviewTransformTo(TextureView tv) {
@@ -697,9 +707,9 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
         if (tv.getScaleX() != 1f) tv.setScaleX(1f);
         if (tv.getScaleY() != 1f) tv.setScaleY(1f);
         if (tv.getRotation() != desiredRotation) tv.setRotation(desiredRotation);
-        int left = isCompactEnabled() ? UiPrefs.getSignalCompactLeft(uiPrefs) : 0;
-        int right = isCompactEnabled() ? UiPrefs.getSignalCompactRight(uiPrefs) : 0;
-        tv.setTranslationX(overlayWidthPx * (right - left) / -200f);
+        OverlayCompactGeometry compact = getCompactGeometry();
+        tv.setTranslationX(compact.translationX);
+        tv.setTranslationY(compact.translationY);
     }
 
     private void clampOverlayPositionToScreen() {
@@ -752,7 +762,7 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
         overlayWidthPx = clampedSize[0];
         overlayHeightPx = clampedSize[1];
         overlayParams.width = getVisibleOverlayWidth();
-        overlayParams.height = overlayHeightPx;
+        overlayParams.height = getVisibleOverlayHeight();
         clampOverlayPositionToBounds(newBounds);
         if (windowManager != null && overlayView != null) {
             windowManager.updateViewLayout(overlayView, overlayParams);
