@@ -18,7 +18,7 @@ import com.drivehub.kamera.dev.DevRuntimeLog;
 import com.drivehub.kamera.camera.ProjectionForeground;
 import com.drivehub.kamera.settings.UiPrefs;
 
-/** Optional, non-interactive status dot above the factory status bar. */
+/** Optional, non-interactive status dot positioned on the full MG4 display. */
 public final class StatusIconOverlay {
     private static final String TAG = "StatusIcon";
     private static final float DOT_RADIUS = 0.14f;
@@ -39,15 +39,7 @@ public final class StatusIconOverlay {
     private final Runnable positionPoll = new Runnable() {
         @Override public void run() {
             if (view == null || windowManager == null || params == null) return;
-            int x = horizontalOffset(statusBarHeightPx());
-            if (params.x != x) {
-                params.x = x;
-                try {
-                    windowManager.updateViewLayout(view, params);
-                } catch (RuntimeException e) {
-                    Log.w(TAG, "Could not reposition status dot", e);
-                }
-            }
+            repositionNow();
             main.postDelayed(this, UiPrefs.getDevForegroundModePollMs(UiPrefs.getPrefs(context)));
         }
     };
@@ -68,6 +60,24 @@ public final class StatusIconOverlay {
 
     public void hide() {
         main.post(this::removeNow);
+    }
+
+    public void reposition() {
+        main.post(this::repositionNow);
+    }
+
+    private void repositionNow() {
+        if (view == null || windowManager == null || params == null) return;
+        int x = horizontalOffset(params.width);
+        int y = getPositionY(context);
+        if (params.x == x && params.y == y) return;
+        params.x = x;
+        params.y = y;
+        try {
+            windowManager.updateViewLayout(view, params);
+        } catch (RuntimeException e) {
+            Log.w(TAG, "Could not reposition status dot", e);
+        }
     }
 
     private void removeNow() {
@@ -114,9 +124,9 @@ public final class StatusIconOverlay {
         if (wm == null) return;
         DotView dot = new DotView(context);
         dot.setColour(colour);
-        int barHeight = statusBarHeightPx();
+        int barHeight = statusBarHeightPx(context);
         WindowManager.LayoutParams lp = new WindowManager.LayoutParams(
-                Math.max(1, Math.round(barHeight * (2 * SIDE_PAD + 2 * DOT_RADIUS))),
+                iconWidthPx(context),
                 barHeight, WINDOW_TYPES[0],
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
                         | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
@@ -124,9 +134,8 @@ public final class StatusIconOverlay {
                         | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
                 PixelFormat.TRANSLUCENT);
         lp.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
-        // Place the dot just to the right of the factory climate status panel.
-        lp.x = horizontalOffset(barHeight);
-        lp.y = 0;
+        lp.x = horizontalOffset(lp.width);
+        lp.y = getPositionY(context);
         for (int type : WINDOW_TYPES) {
             lp.type = type;
             try {
@@ -145,14 +154,40 @@ public final class StatusIconOverlay {
         }
     }
 
-    private int horizontalOffset(int barHeight) {
-        // Center gravity moves by half the launcher width when the work area changes.
-        int projectionCorrection = ProjectionForeground.isActive(context)
-                ? ProjectionForeground.LAUNCHER_BAR_WIDTH_PX / 2 : 0;
-        return Math.round(barHeight * 1.8f) + projectionCorrection;
+    private int horizontalOffset(int iconWidth) {
+        int launcherWidth = ProjectionForeground.isActive(context)
+                ? 0 : ProjectionForeground.LAUNCHER_BAR_WIDTH_PX;
+        return StatusIconPosition.windowX(getPositionX(context), iconWidth, launcherWidth);
     }
 
-    private int statusBarHeightPx() {
+    static int iconWidthPx(Context context) {
+        return Math.max(1, Math.round(statusBarHeightPx(context)
+                * (2 * SIDE_PAD + 2 * DOT_RADIUS)));
+    }
+
+    static int maxPositionX(Context context) {
+        return Math.max(0, StatusIconPosition.SCREEN_WIDTH - iconWidthPx(context));
+    }
+
+    static int maxPositionY(Context context) {
+        return Math.max(0, StatusIconPosition.SCREEN_HEIGHT - statusBarHeightPx(context));
+    }
+
+    static int getPositionX(Context context) {
+        int defaultX = (StatusIconPosition.SCREEN_WIDTH + ProjectionForeground.LAUNCHER_BAR_WIDTH_PX
+                - iconWidthPx(context)) / 2 + Math.round(statusBarHeightPx(context) * 1.8f);
+        return StatusIconPosition.clamp(UiPrefs.getPrefs(context).getInt(
+                UiPrefs.KEY_DASHCAM_STATUS_ICON_X, defaultX),
+                StatusIconPosition.SCREEN_WIDTH, iconWidthPx(context));
+    }
+
+    static int getPositionY(Context context) {
+        return StatusIconPosition.clamp(UiPrefs.getPrefs(context).getInt(
+                UiPrefs.KEY_DASHCAM_STATUS_ICON_Y, 0),
+                StatusIconPosition.SCREEN_HEIGHT, statusBarHeightPx(context));
+    }
+
+    private static int statusBarHeightPx(Context context) {
         int id = context.getResources().getIdentifier("status_bar_height", "dimen", "android");
         int height = id > 0 ? context.getResources().getDimensionPixelSize(id) : 0;
         return height > 0 ? height : Math.round(28 * context.getResources().getDisplayMetrics().density);

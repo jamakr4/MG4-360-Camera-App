@@ -169,6 +169,22 @@ public final class DashcamSettingsController {
         this.activity = activity;
     }
 
+    private void bindStatusIconPosition(SharedPreferences prefs, SeekBar seek, TextView value,
+            String key, int maximum, int position) {
+        seek.setMax(maximum);
+        seek.setProgress(position);
+        value.setText(activity.getString(R.string.dashcam_status_position_value, position));
+        seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
+                if (!fromUser) return;
+                value.setText(activity.getString(R.string.dashcam_status_position_value, progress));
+                prefs.edit().putInt(key, progress).apply();
+            }
+            @Override public void onStartTrackingTouch(SeekBar bar) {}
+            @Override public void onStopTrackingTouch(SeekBar bar) {}
+        });
+    }
+
     // ---------- View binding ----------
 
     // Wires all settings views; starts/stops RecordingService via the enabled toggle.
@@ -193,10 +209,23 @@ public final class DashcamSettingsController {
         if (swEnabled != null) {
             View root = swEnabled.getRootView();
             Switch indicator = root.findViewById(R.id.switchDashcamStatusIcon);
+            SeekBar positionX = root.findViewById(R.id.seekDashcamStatusIconX);
+            SeekBar positionY = root.findViewById(R.id.seekDashcamStatusIconY);
+            bindStatusIconPosition(prefs, positionX, root.findViewById(R.id.tvDashcamStatusIconX),
+                    UiPrefs.KEY_DASHCAM_STATUS_ICON_X, StatusIconOverlay.maxPositionX(activity),
+                    StatusIconOverlay.getPositionX(activity));
+            bindStatusIconPosition(prefs, positionY, root.findViewById(R.id.tvDashcamStatusIconY),
+                    UiPrefs.KEY_DASHCAM_STATUS_ICON_Y, StatusIconOverlay.maxPositionY(activity),
+                    StatusIconOverlay.getPositionY(activity));
             if (indicator != null) {
                 indicator.setChecked(prefs.getBoolean("dashcamStatusIcon", false));
-                indicator.setOnCheckedChangeListener((button, checked) -> prefs.edit()
-                        .putBoolean("dashcamStatusIcon", checked).apply());
+                positionX.setEnabled(indicator.isChecked());
+                positionY.setEnabled(indicator.isChecked());
+                indicator.setOnCheckedChangeListener((button, checked) -> {
+                    positionX.setEnabled(checked);
+                    positionY.setEnabled(checked);
+                    prefs.edit().putBoolean("dashcamStatusIcon", checked).apply();
+                });
             }
         }
         int recordingFps = getRecordingFps(prefs);

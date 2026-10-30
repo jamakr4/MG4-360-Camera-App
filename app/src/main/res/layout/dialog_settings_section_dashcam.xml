@@ -91,11 +91,69 @@
         </LinearLayout>
 
         <TextView
+            style="@style/DrivehubSettingsCardRowLabel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="@string/dashcam_status_position_horizontal" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+            <SeekBar
+                android:id="@+id/seekDashcamStatusIconX"
+                style="@style/DrivehubSettingsSlider"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:contentDescription="@string/dashcam_status_position_horizontal" />
+            <TextView
+                android:id="@+id/tvDashcamStatusIconX"
+                style="@style/DrivehubSettingsCaption"
+                android:layout_width="80dp"
+                android:layout_height="wrap_content"
+                android:gravity="end" />
+        </LinearLayout>
+
+        <TextView
+            style="@style/DrivehubSettingsCardRowLabel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="@string/dashcam_status_position_vertical" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+            <SeekBar
+                android:id="@+id/seekDashcamStatusIconY"
+                style="@style/DrivehubSettingsSlider"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:contentDescription="@string/dashcam_status_position_vertical" />
+            <TextView
+                android:id="@+id/tvDashcamStatusIconY"
+                style="@style/DrivehubSettingsCaption"
+                android:layout_width="80dp"
+                android:layout_height="wrap_content"
+                android:gravity="end" />
+        </LinearLayout>
+
+        <TextView
             style="@style/DrivehubSettingsCaption"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="10dp"
             android:text="@string/dashcam_status_icon_hint" />
+        <TextView
+            style="@style/DrivehubSettingsCaption"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/dashcam_status_position_hint" />
     </LinearLayout>
 
     <!-- ============ RECORDING ============ -->

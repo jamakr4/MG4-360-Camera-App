@@ -251,6 +251,8 @@ public final class SettingsDialogController {
         v.tvDevDashcamRecordsPath = dialog.findViewById(R.id.tvDevDashcamRecordsPath);
         v.btnDevDashcamBrowseFolder = dialog.findViewById(R.id.btnDevDashcamBrowseFolder);
         v.btnDevOemCaptures = dialog.findViewById(R.id.btnDevOemCaptures);
+        v.seekDashcamStatusIconX = dialog.findViewById(R.id.seekDashcamStatusIconX);
+        v.seekDashcamStatusIconY = dialog.findViewById(R.id.seekDashcamStatusIconY);
         v.swDashcamStatusIcon = dialog.findViewById(R.id.switchDashcamStatusIcon);
         v.btnDevResetDefaults = dialog.findViewById(R.id.btnDevResetDefaults);
         v.seekCorner = dialog.findViewById(R.id.seekCornerRadius);
@@ -445,6 +447,8 @@ public final class SettingsDialogController {
                 },
                 views.dialogClose,
                 new SeekBar[]{
+                        views.seekDashcamStatusIconX,
+                        views.seekDashcamStatusIconY,
                         views.seekCorner,
                         views.seekSignalCompactLeft,
                         views.seekSignalCompactRight,
@@ -750,6 +754,8 @@ public final class SettingsDialogController {
         Button btnDevDashcamBrowseFolder;
         Button btnDevOemCaptures;
         Switch swDashcamStatusIcon;
+        SeekBar seekDashcamStatusIconX;
+        SeekBar seekDashcamStatusIconY;
         Button btnDevResetDefaults;
         SeekBar seekCorner;
         EditText etCorner;

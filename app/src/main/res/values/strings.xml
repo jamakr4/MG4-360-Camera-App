@@ -322,4 +322,8 @@
     <string name="settings_signal_compact_hint">Adjust each edge independently to make the camera view narrower.</string>
     <string name="settings_signal_compact_left">Crop left edge (move left)</string>
     <string name="settings_signal_compact_right">Crop right edge (move right)</string>
+    <string name="dashcam_status_position_horizontal">Horizontal position</string>
+    <string name="dashcam_status_position_vertical">Vertical position</string>
+    <string name="dashcam_status_position_value">%1$d px</string>
+    <string name="dashcam_status_position_hint">Move the status dot anywhere on the screen. Its position is saved and kept within the screen edges.</string>
 </resources>

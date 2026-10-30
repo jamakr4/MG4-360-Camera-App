@@ -14,6 +14,8 @@ public final class UiPrefs {
     public static final String KEY_SMOOTH_ENTRY = "smoothEntry";
     public static final String KEY_OVERLAY_RESIZE_LOCKED = "overlayResizeLocked";
     public static final String KEY_OVERLAY_MOVE_LOCKED = "overlayMoveLocked";
+    public static final String KEY_DASHCAM_STATUS_ICON_X = "dashcamStatusIconX";
+    public static final String KEY_DASHCAM_STATUS_ICON_Y = "dashcamStatusIconY";
     public static final String KEY_SIGNAL_COMPACT_ENABLED = "signalCompactEnabled";
     public static final String KEY_SIGNAL_COMPACT_LEFT = "signalCompactLeft";
     public static final String KEY_SIGNAL_COMPACT_RIGHT = "signalCompactRight";
