@@ -578,33 +578,16 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
 
     /** Keeps the active overlay aspect ratio while clamping size to screen and min/max bounds. */
     private int[] clampOverlaySize(int w) {
-        float aspect = getActiveOverlayAspect();
-        int maxW = OVERLAY_MAX_WIDTH_PX;
-        int maxH = OVERLAY_MAX_WIDTH_PX;
         Rect bounds = getAvailableOverlayBoundsPx();
-        if (bounds != null) {
-            maxW = Math.min(maxW, bounds.width());
-            maxH = Math.min(maxH, bounds.height());
-        }
-        if (w < OVERLAY_MIN_WIDTH_PX) {
-            w = OVERLAY_MIN_WIDTH_PX;
-        }
-        if (w > maxW) {
-            w = maxW;
-        }
-        int h = Math.round(w / aspect);
-        if (h > maxH) {
-            h = maxH;
-            w = Math.round(h * aspect);
-            if (w < OVERLAY_MIN_WIDTH_PX) {
-                w = OVERLAY_MIN_WIDTH_PX;
-            }
-            if (w > maxW) {
-                w = maxW;
-            }
-            h = Math.round(w / aspect);
-        }
-        return new int[]{w, h};
+        int crop = isCompactEnabled()
+                ? UiPrefs.getSignalCompactLeft(uiPrefs) + UiPrefs.getSignalCompactRight(uiPrefs) : 0;
+        float visibleFraction = 1f - crop / 100f;
+        boolean rotated = shouldRotatePreviewToDrivingDirection();
+        return OverlayResizeMath.clampSize(w, getActiveOverlayAspect(),
+                OVERLAY_MIN_WIDTH_PX, OVERLAY_MAX_WIDTH_PX,
+                bounds != null ? bounds.width() : OVERLAY_MAX_WIDTH_PX,
+                bounds != null ? bounds.height() : OVERLAY_MAX_WIDTH_PX,
+                rotated ? 1f : visibleFraction, rotated ? visibleFraction : 1f);
     }
 
     private void normalizeOverlaySizeForCurrentMode() {

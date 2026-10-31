@@ -10,6 +10,72 @@ public class OverlayResizeMathTest {
     private static final float DELTA = 0.001f;
 
     @Test
+    public void rotatedCompactViewCanGrowBeyondUncroppedScreenHeight() {
+        int[] size = OverlayResizeMath.clampSize(3840, 480f / 1000f,
+                240, 3840, 1920, 720, 1f, 0.75f);
+        OverlayCompactGeometry visible = OverlayCompactGeometry.calculate(
+                size[0], size[1], false, true, 0, 25);
+
+        assertTrue(size[1] > 720);
+        assertEquals(720, visible.visibleHeight);
+        assertTrue(visible.visibleWidth <= 1920);
+    }
+
+    @Test
+    public void unrotatedCompactViewCanGrowBeyondUncroppedScreenWidth() {
+        int[] size = OverlayResizeMath.clampSize(3840, 1000f / 480f,
+                240, 3840, 1000, 720, 0.75f, 1f);
+        OverlayCompactGeometry visible = OverlayCompactGeometry.calculate(
+                size[0], size[1], false, false, 0, 25);
+
+        assertTrue(size[0] > 1000);
+        assertEquals(1000, visible.visibleWidth);
+        assertTrue(visible.visibleHeight <= 720);
+    }
+
+    @Test
+    public void visibleWindowFitsAcrossRotationCropAndScreenModes() {
+        for (boolean rotated : new boolean[]{false, true}) {
+            for (int crop : new int[]{0, 25, 45, 90}) {
+                for (int availableWidth : new int[]{1000, 1778, 1920}) {
+                    for (int availableHeight : new int[]{520, 720}) {
+                        float fraction = 1f - crop / 100f;
+                        int[] size = OverlayResizeMath.clampSize(10000,
+                                rotated ? 480f / 1000f : 1000f / 480f,
+                                240, 3840, availableWidth, availableHeight,
+                                rotated ? 1f : fraction, rotated ? fraction : 1f);
+                        OverlayCompactGeometry visible = OverlayCompactGeometry.calculate(
+                                size[0], size[1], true, rotated,
+                                Math.min(45, crop), Math.max(0, crop - 45));
+                        assertTrue(visible.visibleWidth <= availableWidth);
+                        assertTrue(visible.visibleHeight <= availableHeight);
+                        assertTrue(size[0] <= 3840 && size[1] <= 3840);
+                        // Reapplying layout constraints must not shrink a valid size.
+                        int[] repeated = OverlayResizeMath.clampSize(size[0],
+                                rotated ? 480f / 1000f : 1000f / 480f,
+                                240, 3840, availableWidth, availableHeight,
+                                rotated ? 1f : fraction, rotated ? fraction : 1f);
+                        assertEquals(size[0], repeated[0]);
+                        assertEquals(size[1], repeated[1]);
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    public void zeroCropStillLimitsFullPreviewToScreen() {
+        int[] landscape = OverlayResizeMath.clampSize(3840, 1000f / 480f,
+                240, 3840, 1920, 720, 1f, 1f);
+        int[] portrait = OverlayResizeMath.clampSize(3840, 480f / 1000f,
+                240, 3840, 1920, 720, 1f, 1f);
+        assertEquals(720, landscape[1]);
+        assertTrue(portrait[1] >= 718 && portrait[1] <= 720);
+        assertTrue(landscape[0] <= 1920);
+        assertTrue(portrait[0] <= 1920);
+    }
+
+    @Test
     public void increasesOutwardScaleFactorByConfiguredSensitivity() {
         float result = OverlayResizeMath.updateTargetWidth(1000f, 1.1f, 240f, 1800f);
 
