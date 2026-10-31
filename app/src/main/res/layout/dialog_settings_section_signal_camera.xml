@@ -140,7 +140,7 @@
                 android:layout_weight="1"
                 android:rotation="180"
                 android:max="45"
-                android:progress="0"
+                android:progress="9"
                 android:contentDescription="@string/settings_signal_compact_left" />
             <SeekBar
                 android:id="@+id/seekSignalCompactRight"
@@ -148,7 +148,7 @@
                 android:layout_width="0dp"
                 android:layout_weight="1"
                 android:max="45"
-                android:progress="25"
+                android:progress="20"
                 android:contentDescription="@string/settings_signal_compact_right" />
             <EditText
                 android:id="@+id/etSignalCompactRight"
