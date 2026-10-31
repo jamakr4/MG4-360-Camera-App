@@ -53,6 +53,73 @@
 
     </LinearLayout>
 
+    <!-- ============ COMPACT SIGNAL CAMERA TUNING ============ -->
+    <TextView
+        style="@style/DrivehubSettingsCardLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="22dp"
+        android:layout_marginBottom="8dp"
+        android:text="@string/settings_signal_compact" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_settings_inline_card"
+        android:orientation="vertical"
+        android:paddingStart="18dp"
+        android:paddingTop="14dp"
+        android:paddingEnd="18dp"
+        android:paddingBottom="16dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+            <EditText
+                android:id="@+id/etSignalCompactLeft"
+                style="@style/DrivehubSettingsSliderValue"
+                android:layout_width="48dp"
+                android:layout_marginStart="0dp"
+                android:layout_marginEnd="10dp"
+                android:gravity="start|center_vertical"
+                android:maxLength="3"
+                android:contentDescription="@string/settings_signal_compact_left" />
+            <SeekBar
+                android:id="@+id/seekSignalCompactLeft"
+                style="@style/DrivehubSettingsSlider"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:rotation="180"
+                android:max="45"
+                android:progress="9"
+                android:contentDescription="@string/settings_signal_compact_left" />
+            <SeekBar
+                android:id="@+id/seekSignalCompactRight"
+                style="@style/DrivehubSettingsSlider"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:max="45"
+                android:progress="20"
+                android:contentDescription="@string/settings_signal_compact_right" />
+            <EditText
+                android:id="@+id/etSignalCompactRight"
+                style="@style/DrivehubSettingsSliderValue"
+                android:layout_width="48dp"
+                android:maxLength="3"
+                android:contentDescription="@string/settings_signal_compact_right" />
+        </LinearLayout>
+
+        <TextView
+            style="@style/DrivehubSettingsBodyMuted"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/settings_signal_compact_hint" />
+
+    </LinearLayout>
+
     <!-- ============ POLLING RATES ============ -->
     <TextView
         style="@style/DrivehubSettingsCardLabel"
