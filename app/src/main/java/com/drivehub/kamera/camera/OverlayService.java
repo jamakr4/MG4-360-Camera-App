@@ -15,6 +15,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Rect;
+import android.graphics.Matrix;
 import android.graphics.SurfaceTexture;
 import android.graphics.PixelFormat;
 import android.os.Handler;
@@ -672,9 +673,16 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
 
     private void applyPreviewTransformTo(TextureView tv) {
         boolean rotated = shouldRotatePreviewToDrivingDirection();
-        int desiredWidth = rotated ? overlayHeightPx : overlayWidthPx;
-        int desiredHeight = rotated ? overlayWidthPx : overlayHeightPx;
-        float desiredRotation = getPreviewRotationDegrees();
+        OverlayCompactGeometry compact = getCompactGeometry();
+        boolean rotateCompactContent = rotated && isCompactEnabled();
+        // A rotated, oversized TextureView can be clipped by its window before
+        // the turn. Keep this view inside the visible window and rotate its
+        // content instead, mapping the same full image behind the same crop.
+        int desiredWidth = rotateCompactContent ? compact.visibleWidth
+                : rotated ? overlayHeightPx : overlayWidthPx;
+        int desiredHeight = rotateCompactContent ? compact.visibleHeight
+                : rotated ? overlayWidthPx : overlayHeightPx;
+        float desiredRotation = rotateCompactContent ? 0f : getPreviewRotationDegrees();
 
         ViewGroup.LayoutParams currentParams = tv.getLayoutParams();
         if (!(currentParams instanceof FrameLayout.LayoutParams)
@@ -690,9 +698,21 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
         if (tv.getScaleX() != 1f) tv.setScaleX(1f);
         if (tv.getScaleY() != 1f) tv.setScaleY(1f);
         if (tv.getRotation() != desiredRotation) tv.setRotation(desiredRotation);
-        OverlayCompactGeometry compact = getCompactGeometry();
-        tv.setTranslationX(compact.translationX);
-        tv.setTranslationY(compact.translationY);
+        if (rotateCompactContent) {
+            float[] source = {0f, 0f, desiredWidth, 0f,
+                    desiredWidth, desiredHeight, 0f, desiredHeight};
+            float[] destination = compact.rotatedContentCorners(overlayWidthPx, overlayHeightPx,
+                    CameraIndex.fromVideoIndex(cameraIndex) == CameraIndex.LEFT);
+            Matrix transform = new Matrix();
+            transform.setPolyToPoly(source, 0, destination, 0, 4);
+            tv.setTransform(transform);
+            tv.setTranslationX(0f);
+            tv.setTranslationY(0f);
+        } else {
+            tv.setTransform(null);
+            tv.setTranslationX(compact.translationX);
+            tv.setTranslationY(compact.translationY);
+        }
     }
 
     private void clampOverlayPositionToScreen() {

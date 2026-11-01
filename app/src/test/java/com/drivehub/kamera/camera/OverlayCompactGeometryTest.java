@@ -8,6 +8,52 @@ public class OverlayCompactGeometryTest {
     private static final float DELTA = 0.001f;
 
     @Test
+    public void rotatedContentShowsExactlyTheUnrotatedCompactCrop() {
+        for (boolean leftCamera : new boolean[]{false, true}) {
+            for (int[] crop : new int[][]{{9, 20}, {0, 25}, {25, 0}, {45, 45}, {0, 0}}) {
+                for (int scale : new int[]{1, 2}) {
+                    int width = 1000 * scale;
+                    int height = 480 * scale;
+                    OverlayCompactGeometry flat = OverlayCompactGeometry.calculate(
+                            width, height, leftCamera, false, crop[0], crop[1]);
+                    OverlayCompactGeometry turned = OverlayCompactGeometry.calculate(
+                            height, width, leftCamera, true, crop[0], crop[1]);
+                    float[] corners = turned.rotatedContentCorners(height, width, leftCamera);
+                    assertEquals(flat.visibleHeight, turned.visibleWidth);
+                    assertEquals(flat.visibleWidth, turned.visibleHeight);
+
+                    // The entire original camera height spans the viewport width:
+                    // there must be no extra side crop or squeeze after turning.
+                    assertEquals(height, Math.abs(corners[6] - corners[0]), DELTA);
+                    assertEquals(width, Math.abs(corners[3] - corners[1]), DELTA);
+                    float flatLeft = ((width - flat.visibleWidth) / 2f - flat.translationX) / width;
+                    float flatRight = flatLeft + flat.visibleWidth / (float) width;
+                    float[] topLeft = cameraPoint(corners, 0, 0);
+                    float[] bottomRight = cameraPoint(corners,
+                            turned.visibleWidth, turned.visibleHeight);
+                    assertEquals(leftCamera ? flatRight : flatLeft, topLeft[0], DELTA);
+                    assertEquals(leftCamera ? flatLeft : flatRight, bottomRight[0], DELTA);
+                    assertEquals(leftCamera ? 0f : 1f, topLeft[1], DELTA);
+                    assertEquals(leftCamera ? 1f : 0f, bottomRight[1], DELTA);
+                }
+            }
+        }
+    }
+
+    /** Inverts the corner mapping to locate a viewport point in the full camera image. */
+    private float[] cameraPoint(float[] corners, float x, float y) {
+        float ux = corners[2] - corners[0];
+        float uy = corners[3] - corners[1];
+        float vx = corners[6] - corners[0];
+        float vy = corners[7] - corners[1];
+        float dx = x - corners[0];
+        float dy = y - corners[1];
+        float determinant = ux * vy - uy * vx;
+        return new float[]{(dx * vy - dy * vx) / determinant,
+                (ux * dy - uy * dx) / determinant};
+    }
+
+    @Test
     public void rightCameraKeepsExistingSliderMapping() {
         assertHorizontalEdges(false, 0, 25, 250f, 0f);
         assertHorizontalEdges(false, 25, 0, 0f, 250f);
