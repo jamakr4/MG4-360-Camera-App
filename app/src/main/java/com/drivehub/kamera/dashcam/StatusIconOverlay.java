@@ -174,10 +174,8 @@ public final class StatusIconOverlay {
     }
 
     static int getPositionX(Context context) {
-        int defaultX = (StatusIconPosition.SCREEN_WIDTH + ProjectionForeground.LAUNCHER_BAR_WIDTH_PX
-                - iconWidthPx(context)) / 2 + Math.round(statusBarHeightPx(context) * 1.8f);
         return StatusIconPosition.clamp(UiPrefs.getPrefs(context).getInt(
-                UiPrefs.KEY_DASHCAM_STATUS_ICON_X, defaultX),
+                UiPrefs.KEY_DASHCAM_STATUS_ICON_X, 1166),
                 StatusIconPosition.SCREEN_WIDTH, iconWidthPx(context));
     }
 
