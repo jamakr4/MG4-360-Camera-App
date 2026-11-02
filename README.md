@@ -49,9 +49,10 @@ Community mod for the MG4 EV (AAOS 9, pre-2026 facelift) that replaces the stock
 - **Turn signal overlay**: opens automatically when the indicator is activated, without the original speed-based auto-close behavior.
 - **Digital rearview mirror**: keeps the factory rear camera visible as a persistent floating mirror for situations where the rear window is blocked by cargo, while still yielding to turn-signal cameras and then restoring the rear view afterwards.
 - **Tesla-style tile view**: replaces the launcher-like OEM overlay, also known as the fullscreen takeover, with a cleaner presentation.
+- **Compact View**: makes the turn-signal camera overlay narrower with independently adjustable left and right crop edges.
 - **Native 4-camera dashcam**: records the factory cameras in a single 1440x1040 grid clip, with up to 720x480 per camera and a footer including time, speed, and a custom signature.
 - **Event capture**: saves a pre- and post-trigger recording window into a separate `events/` folder.
-- **Flexible overlay feedback**: pause, resume, event, and error banners with adjustable size and volume, plus an optional persistent status dot in the status bar.
+- **Flexible overlay feedback**: pause, resume, event, and error banners with adjustable size and volume, plus an optional persistent recording status dot with freely adjustable horizontal and vertical position anywhere on the screen.
 - **OEM 360 AVM coexistence**: can briefly yield camera access so the stock reverse/360 view still opens when needed.
 - **External trigger support**: send `com.drivehub.kamera.action.TRIGGER_DASHCAM_EVENT` from ADB or another app to save an event clip.
 - **Auto language selection**: English and German are selected automatically from the vehicle language.
@@ -161,8 +162,9 @@ To use it:
 2. Enable `Overlay on signal`.
 3. Optional: enable `Lane changes only` to show the signal camera only at or above the selected speed (15 km/h by default).
 4. Optional: enable `Rotate side cameras to driving direction` if you prefer the side cameras to match the direction of travel.
-5. Optional: tune `Overlay hide delay` and `Minimum on-time` so the camera does not disappear too abruptly.
-6. `Tap to hide` is enabled by default (2 seconds) – one tap dismisses the overlay temporarily; it reappears afterwards if the signal is still active.
+5. Optional enable `Compact view` and adjust `Crop left edge (move left)` and `Crop right edge (move right)` independently using the sliders or numeric fields in developer mode to make the overlay narrower.
+6. Optional: tune `Overlay hide delay` and `Minimum on-time` so the camera does not disappear too abruptly.
+7. `Tap to hide` is enabled by default (2 seconds) – one tap dismisses the overlay temporarily; it reappears afterwards if the signal is still active.
 
 Important:
 
@@ -214,6 +216,8 @@ You do not need to run the dashcam in continuous loop mode to capture video. Two
 **Recording status indicator**
 
 Enable `Recording status in the status bar` in the Dashcam settings to show a dot indicating the app's dashcam status. The dot is independent of factory recordings.
+
+You can position the dot anywhere on the screen. Expand the position controls below the toggle and adjust the `Horizontal position` and `Vertical position` sliders. The position is saved automatically and kept within the screen edges.
 
 | Color | Meaning |
 |---|---|
