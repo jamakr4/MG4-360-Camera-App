@@ -295,7 +295,7 @@ Available tools and settings:
 >
 > If something gets weird after tuning, use **Reset defaults** first. If that does not help, clear the app data.
 
-## Insights
+## Insights & Donations
 
 <a href="https://www.star-history.com/#jamakr4/MG4-360-Camera-App&Date">
   <picture>
