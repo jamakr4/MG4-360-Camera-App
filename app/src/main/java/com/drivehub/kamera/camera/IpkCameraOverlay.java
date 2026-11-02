@@ -6,6 +6,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.graphics.Color;
+import android.graphics.Matrix;
 import android.graphics.PixelFormat;
 import android.graphics.Point;
 import android.graphics.SurfaceTexture;
@@ -168,6 +169,13 @@ public final class IpkCameraOverlay implements AutoCloseable {
                 retryAfter = 0;
                 scheduleNow();
             });
+        } else if (UiPrefs.KEY_SIGNAL_COMPACT_ENABLED.equals(key)
+                || UiPrefs.KEY_SIGNAL_COMPACT_LEFT.equals(key)
+                || UiPrefs.KEY_SIGNAL_COMPACT_RIGHT.equals(key)) {
+            main.post(() -> {
+                if (!closed && root != null && texture != null)
+                    applyPreviewFraming(texture, root.getLayoutParams().width);
+            });
         }
     };
 
@@ -309,15 +317,8 @@ public final class IpkCameraOverlay implements AutoCloseable {
             view.setAlpha(0f);
             TextureView preview = new TextureView(displayContext);
             preview.setOpaque(false);
-            // Preserve the full logical 720x480 camera view. Fast preview has half
-            // the vertical samples; its display aspect is still 3:2.
-            int w = bounds[2], h = Math.round(w * 2f / 3f);
-            boolean rotate = UiPrefs.isOverlayRotationToDrivingDirectionEnabled(prefs);
-            if (rotate) { h = bounds[2]; w = Math.round(h * 2f / 3f); }
-            FrameLayout.LayoutParams image = new FrameLayout.LayoutParams(
-                    rotate ? h : w, rotate ? w : h, Gravity.CENTER);
-            preview.setRotation(rotate ? (desiredCamera == CameraIndex.LEFT.getVideoIndex() ? -90f : 90f) : 0f);
-            view.addView(preview, image);
+            applyPreviewFraming(preview, bounds[2]);
+            view.addView(preview);
             preview.setSurfaceTextureListener(new TextureView.SurfaceTextureListener() {
                 @Override public void onSurfaceTextureAvailable(SurfaceTexture st, int w, int h) {
                     if (texture != preview || token != generation) return;
@@ -373,6 +374,22 @@ public final class IpkCameraOverlay implements AutoCloseable {
             retryAfter = SystemClock.elapsedRealtime() + 3000;
             destroyWindow();
         }
+    }
+
+    private void applyPreviewFraming(TextureView preview, int side) {
+        boolean compact = prefs.getBoolean(UiPrefs.KEY_SIGNAL_COMPACT_ENABLED, false);
+        IpkPreviewGeometry image = IpkPreviewGeometry.calculate(side,
+                desiredCamera == CameraIndex.LEFT.getVideoIndex(),
+                UiPrefs.isOverlayRotationToDrivingDirectionEnabled(prefs),
+                compact ? UiPrefs.getSignalCompactLeft(prefs) : 0,
+                compact ? UiPrefs.getSignalCompactRight(prefs) : 0);
+        preview.setLayoutParams(new FrameLayout.LayoutParams(image.width, image.height, Gravity.CENTER));
+        float[] source = {0f, 0f, image.width, 0f, image.width, image.height, 0f, image.height};
+        Matrix transform = new Matrix();
+        transform.setPolyToPoly(source, 0, image.contentCorners, 0, 4);
+        // Rotate/crop the content inside its viewport, so Android cannot clip an
+        // oversized TextureView before its quarter turn (same approach as the main overlay).
+        preview.setTransform(transform);
     }
 
     private final Runnable checkFrames = new Runnable() {

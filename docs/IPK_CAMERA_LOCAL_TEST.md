@@ -1,7 +1,7 @@
 # Lokaler IPK-Kameratest
 
 Branch: `codex/ipk-camera-auto-route`, Basis `90fb90c7dfae2087dd27ff4e569a6d21734c062d`.
-Aktuelle Test-APK: `0.8.14-ipk3`, VersionCode 32, gleicher Paketname und vorhandenes Projektzertifikat. Der erweiterte Diagnosestatus trägt weiterhin die Kennzeichnung `IPK2`.
+Aktuelle Test-APK: `0.8.15-ipk4`, VersionCode 33, gleicher Paketname und vorhandenes Projektzertifikat. Der erweiterte Diagnosestatus trägt weiterhin die Kennzeichnung `IPK2`.
 
 Der erste Fahrzeugtest bestätigt die parallele Kameraausgabe. Auf der Verbrauchsseite blieb der sichtbare Inhalt bei der automatischen Anforderung unverändert. Ob der neue Anforderungsweg dort funktioniert, ist noch im Fahrzeug zu prüfen.
 
@@ -9,13 +9,15 @@ Der erste Fahrzeugtest bestätigt die parallele Kameraausgabe. Auf der Verbrauch
 
 1. Die signierte lokale Release-APK als Update der Kamera-App installieren.
 2. Einstellungen → Blinker-Kamera: „Kamera beim Blinken anzeigen“ und „Blinker-Kamera zusätzlich im Fahrerdisplay“ aktivieren. Die neue IPK-Funktion ist zunächst ausgeschaltet. Für einen Test im Stand muss „Nur Spurwechsel“ ausgeschaltet sein.
-3. Im IPK Musik oder Navigation auswählen. Links, rechts und Blinker aus prüfen. Hauptbildschirm und IPK sollen dieselbe Seitenkamera parallel anzeigen. Die IPK-Ausgabe greift nicht auf das Vorschauziel des Hauptbildschirms zu.
+3. Im IPK Musik oder Navigation auswählen. Links, rechts und Blinker aus prüfen. Hauptbildschirm und IPK sollen dieselbe Seitenkamera parallel anzeigen. Kompaktansicht ein-/ausschalten und beide Ausschnittregler vergleichen, jeweils mit und ohne Drehung in Fahrtrichtung. Der sichtbare Kameraausschnitt muss auf beiden Displays übereinstimmen. Die IPK-Ausgabe greift nicht auf das Vorschauziel des Hauptbildschirms zu.
 4. Für den Vergleich von Startzeit und Flüssigkeit etwa fünf Sekunden auf Musik oder Navigation blinken. Der Status zeigt anschließend die gemessenen Vorschau-FPS und die Zeit bis zur Freigabe des ersten Bildes.
 5. „Navigationsseite automatisch anfordern“ aktivieren, im IPK den Bordcomputer wählen und mindestens fünf Sekunden blinken. Zuerst wird der vorhandene SAIC-MapService verwendet, bei fehlender Bestätigung folgen direkt dieselben zwei OEM-Property-Schreibwerte. Erst wenn der gelesene Tab 1 oder 2 ist, wird die Kamera im IPK eingeblendet.
 6. Falls der Wechsel nicht erfolgt: Den vollständigen `IPK2`-Status in den Blinker-Kamera-Einstellungen festhalten. Er aktualisiert sich bei geöffnetem Dialog alle 500 ms und bleibt nach dem Ausblenden sowie nach einem Dienstneustart erhalten. Detaillierte Ereignisse stehen außerdem im vorhandenen Entwickler-Ereignisprotokoll mit Quelle `IpkCamera` beziehungsweise in `adb logcat -s IpkCamera CameraStreamManager`.
 7. Rückwärtsgang/OEM-360, Wechsel links → rechts, Wechsel einer IPK-Seite während der Anzeige und Standby/Wiederaufwachen prüfen. Die IPK-Kamera muss mit den bestehenden OEM-AVM- und Blinkerprioritäten verschwinden. Mit laufender Dashcam außerdem kontrollieren, dass die Aufnahme weiterläuft.
 
-Die vorhandene Einstellung zur Drehung in Fahrtrichtung gilt auch für das IPK. Das vollständige Bild wird in das 260-px-Quadrat eingepasst. Die freien Flächen seitlich beziehungsweise oberhalb/unterhalb des Bildes sind transparent und lassen den darunterliegenden Clusterinhalt sichtbar. Der bisher ausdrücklich schwarze Containerhintergrund wurde entfernt; die TextureView verwendet Alpha. Schwarze Pixel im Kamerabild selbst bleiben erhalten. Die Kompakt-Beschneidung des Hauptbildschirms wird nicht zusätzlich auf das IPK angewendet.
+Die vorhandenen Einstellungen für Kompaktansicht, beide Ausschnittregler und Drehung in Fahrtrichtung gelten auch für das IPK. Die gemeinsame `OverlayCompactGeometry` bestimmt den Ausschnitt einschließlich der unterschiedlichen Reglerzuordnung für linke und rechte Kamera. `IpkPreviewGeometry` passt diesen Ausschnitt proportional in das 260-px-Quadrat ein. Die frühere IPK-Ausgabe berücksichtigte nur die Drehung und zeigte auch bei aktivierter Kompaktansicht das vollständige Bild.
+
+Änderungen am Kompakt-Schalter oder den Reglern aktualisieren die bestehende TextureView ohne erneutes Kamera-Attach. Bei ausgeschalteter Kompaktansicht erscheint wieder das vollständige 3:2-Bild. Freie Flächen um das Bild bleiben transparent; schwarze Pixel im Kamerabild selbst bleiben erhalten. Durch das Einpassen des beschnittenen Bildes kann die Darstellung die verfügbare IPK-Fläche besser ausnutzen.
 
 ## Verhalten der automatischen Seitenanforderung
 
@@ -63,8 +65,8 @@ c++ -std=c++17 -pthread app/src/test/cpp/latest_preview_frame_test.cpp -o /tmp/m
 
 Signierung wie im vorhandenen `tools/build_sign_release.sh` mit dem bereits im Projekt enthaltenen Plattform-Zertifikat. Keine automatische Installation oder Veröffentlichung.
 
-Für die aktuelle Test-APK wurde ausschließlich während des Builds `versionCode 32` und `versionName "0.8.14-ipk3"` gesetzt und anschließend der ursprüngliche Inhalt von `app/build.gradle` wiederhergestellt. Die Versionsdatei ist daher kein Teil dieses Folgecommits; die bereits vorhandene lokale Versionsänderung im anderen Checkout bleibt beim Aktualisieren des Branches erhalten. Ein normaler eigener Build verwendet die Versionswerte seines Checkouts.
+Für die aktuelle Test-APK wurde ausschließlich während des Builds `versionCode 33` und `versionName "0.8.15-ipk4"` gesetzt und anschließend der ursprüngliche Inhalt von `app/build.gradle` wiederhergestellt. Die Versionsdatei ist daher kein Teil dieses Folgecommits; die bereits vorhandene lokale Versionsänderung im anderen Checkout bleibt beim Aktualisieren des Branches erhalten. Ein normaler eigener Build verwendet die Versionswerte seines Checkouts.
 
-Die lokalen Tests prüfen Tab-Freigabe, Prioritäten, begrenzte Wiederholungen, manuelle Seitenwahl nach Bestätigung, Positionierung und die Unabhängigkeit der Vorschau-Mailboxen. Das Verhalten des physischen IPK und die Annahme der Seitenanforderung bleiben der Fahrzeugtest.
+Die lokalen Tests prüfen Tab-Freigabe, Prioritäten, begrenzte Wiederholungen, manuelle Seitenwahl nach Bestätigung, Positionierung und die Unabhängigkeit der Vorschau-Mailboxen. Die IPK-Geometrietests bilden die Viewportecken zurück auf das ursprüngliche Kamerabild ab: Der Ausschnitt muss für beide Kameras, beide Drehungen, asymmetrische und maximale Beschnitte sowie mehrere Displaygrößen stimmen und proportional in die Fläche passen. Das Verhalten des physischen IPK und die Annahme der Seitenanforderung bleiben der Fahrzeugtest.
 
-Prüfstand 02.11.2026: Für den Diagnose-/Performance-Folgebuild waren Debug- und Release-Build, 53 Java-Tests sowie der native Mailbox-Test inklusive ungedrosselter 25-FPS-Zuführung erfolgreich. Für die anschließende Transparenzkorrektur wurde die Release-APK erneut gebaut und ihre Signatur mit `apksigner verify` geprüft. Transparenz, Startzeit, Flüssigkeit und automatisches Routing sind noch im Fahrzeug zu bestätigen.
+Prüfstand 02.11.2026: Debug- und Release-Build des Kompakt-Folgebuilds erfolgreich; 55 Java-Tests ohne Fehler oder übersprungene Tests. Die signierte Release-APK wurde mit `apksigner verify` geprüft. Der native Mailbox-Test inklusive ungedrosselter 25-FPS-Zuführung war beim vorherigen Diagnose-/Performance-Build erfolgreich. Kameraausschnitt, Transparenz, Startzeit, Flüssigkeit und automatisches Routing sind noch im Fahrzeug zu bestätigen.
