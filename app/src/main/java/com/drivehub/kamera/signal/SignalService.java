@@ -79,9 +79,10 @@ public class SignalService extends Service {
 
     private IpkCameraOverlay ipkCamera;
 
-    public static String getIpkStatus() {
+    public static String getIpkStatus(Context context) {
         SignalService service = sInstance;
-        return service == null || service.ipkCamera == null ? "IPK listener not running" : service.ipkCamera.status();
+        return service == null || service.ipkCamera == null
+                ? IpkCameraOverlay.savedStatus(context) + " · Dienst nicht aktiv" : service.ipkCamera.status();
     }
 
     private void hideCameraOverlays() {

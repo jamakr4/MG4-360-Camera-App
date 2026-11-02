@@ -22,16 +22,16 @@ public class IpkRoutePolicyTest {
 
     @Test public void retriesAreSpacedAndBoundedEvenIfTabNeverChanges() {
         IpkRoutePolicy policy = new IpkRoutePolicy();
-        policy.requested(0);
+        policy.completed(IpkRoutePolicy.RequestResult.SENT, 0);
         assertFalse(policy.shouldRequest(0, true, 1499));
         assertTrue(policy.shouldRequest(0, true, 1500));
-        policy.requested(1500);
+        policy.completed(IpkRoutePolicy.RequestResult.FAILED, 1500);
         assertFalse(policy.shouldRequest(0, true, 10000));
     }
 
     @Test public void aConfirmedPageStopsRequestsIfDriverLaterChangesTheirMind() {
         IpkRoutePolicy policy = new IpkRoutePolicy();
-        policy.requested(0);
+        policy.completed(IpkRoutePolicy.RequestResult.SENT, 0);
         policy.observeTab(1);
         assertFalse(policy.shouldRequest(0, true, 5000));
         assertFalse(policy.shouldRequest(5, true, 5000));
@@ -40,5 +40,26 @@ public class IpkRoutePolicyTest {
     @Test public void placementAccountsForConstraintMarginsAndFitsSmallDisplays() {
         assertArrayEquals(new int[]{482, 126, 260}, IpkRoutePolicy.bounds(800, 480));
         assertArrayEquals(new int[]{10, 0, 180}, IpkRoutePolicy.bounds(200, 180));
+    }
+
+    @Test public void connectingDoesNotSpendTheTwoRealAttempts() {
+        IpkRoutePolicy policy = new IpkRoutePolicy();
+        for (int i = 0; i < 20; i++) {
+            policy.completed(IpkRoutePolicy.RequestResult.WAITING, i * 100);
+            assertTrue(policy.shouldRequest(0, true, i * 100));
+        }
+        assertEquals(0, policy.requests());
+        policy.completed(IpkRoutePolicy.RequestResult.SENT, 2000);
+        assertFalse(policy.shouldRequest(0, true, 3499));
+        assertTrue(policy.shouldRequest(0, true, 3500));
+        policy.completed(IpkRoutePolicy.RequestResult.SENT, 3500);
+        assertFalse(policy.shouldRequest(0, true, 10000));
+    }
+
+    @Test public void cancelledWorkFromAnOldSignalDoesNotSpendANewSessionAttempt() {
+        IpkRoutePolicy policy = new IpkRoutePolicy();
+        policy.completed(IpkRoutePolicy.RequestResult.CANCELLED, 1000);
+        assertEquals(0, policy.requests());
+        assertTrue(policy.shouldRequest(0, true, 1000));
     }
 }

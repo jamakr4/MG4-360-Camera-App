@@ -62,6 +62,14 @@ public final class SettingsDialogController {
     private final DevSettingsController dev = new DevSettingsController();
 
     private final Handler devStatusHandler = new Handler(Looper.getMainLooper());
+    private final Runnable ipkStatusRefreshRunnable = new Runnable() {
+        @Override public void run() {
+            if (dialog == null) return;
+            TextView status = dialog.findViewById(R.id.textIpkCameraStatus);
+            if (status != null) status.setText(SignalService.getIpkStatus(activity));
+            devStatusHandler.postDelayed(this, 500);
+        }
+    };
     private final Runnable devStatusRefreshRunnable = new Runnable() {
         @Override
         public void run() {
@@ -144,12 +152,14 @@ public final class SettingsDialogController {
         onRecordingStatusChanged(s.status, s.activeCameras, s.totalCameras, s.lastError);
 
         dialog.show();
+        devStatusHandler.post(ipkStatusRefreshRunnable);
         applyDialogWindowSize(dialog);
     }
 
     private void handleDismiss() {
         MainActivity.setSettingsDialogOpen(false);
         devStatusHandler.removeCallbacks(devStatusRefreshRunnable);
+        devStatusHandler.removeCallbacks(ipkStatusRefreshRunnable);
         dashcam.onDismiss();
         views = null;
         dialog = null;
@@ -182,7 +192,7 @@ public final class SettingsDialogController {
         ipkRoute.setOnCheckedChangeListener((button, checked) ->
                 prefs.edit().putBoolean(UiPrefs.KEY_IPK_AUTO_ROUTE, checked).apply());
         TextView ipkStatus = dialog.findViewById(R.id.textIpkCameraStatus);
-        Runnable refreshIpkStatus = () -> ipkStatus.setText(SignalService.getIpkStatus());
+        Runnable refreshIpkStatus = () -> ipkStatus.setText(SignalService.getIpkStatus(activity));
         refreshIpkStatus.run();
         dialog.findViewById(R.id.buttonIpkCameraStatus).setOnClickListener(button -> refreshIpkStatus.run());
         v.segSignalPreviewQuality = dialog.findViewById(R.id.segSignalPreviewQuality);

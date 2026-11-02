@@ -22,22 +22,25 @@ import android.view.Surface;
 import android.view.TextureView;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
+import java.util.Locale;
 
 import androidx.core.content.ContextCompat;
 import com.drivehub.kamera.CameraProbe;
 import com.drivehub.kamera.dev.DevRuntimeLog;
 import com.drivehub.kamera.settings.UiPrefs;
 
-/** Owned by SignalService. Main-thread window state; camera/Binder work on a serial IO handler. */
+/** Main-thread window state, with independent preview and vehicle IO handlers. */
 public final class IpkCameraOverlay implements AutoCloseable {
     private static final String TAG = "IpkCamera";
-    private static final long POLL_MS = 250;
+    private static final long POLL_MS = 100;
     private static final long FRAME_TIMEOUT_MS = 1500;
     private final Context context;
     private final SharedPreferences prefs;
     private final Handler main = new Handler(Looper.getMainLooper());
-    private final HandlerThread thread = new HandlerThread("ipk-camera-io");
+    private final HandlerThread thread = new HandlerThread("ipk-preview-io");
+    private final HandlerThread carThread = new HandlerThread("ipk-car-io");
     private final Handler io;
+    private final Handler carIo;
     private final DisplayManager displays;
     private final IpkCarClient car;
     private FrameLayout root;
@@ -49,19 +52,21 @@ public final class IpkCameraOverlay implements AutoCloseable {
     private volatile int generation;
     private volatile int sessionGeneration;
     private boolean closed, readPending, routePending, healthPending;
-    private boolean screenOn;
+    private volatile boolean screenOn;
     private Integer tab;
     private IpkRoutePolicy routing = new IpkRoutePolicy();
-    private long lastTabRead, retryAfter, windowCreated, lastFreshFrame;
-    private String detail = "idle";
-    private volatile String status = "IPK idle";
-    private String lastSessionStatus = "no signal yet";
+    private long lastTabRead, tabObservedAt, retryAfter, windowCreated, lastFreshFrame, signalStarted, lastPersist;
+    private String detail = "bereit", routeDetail = "keine Anforderung";
+    private final IpkStatusState statusState;
+    private volatile String status;
     private Output output;
 
     private static final class Output {
         final int camera, sink;
         final Surface surface;
         boolean attached;
+        long sampledAt, sampledFrames, firstFrameMs = -1;
+        double fps = -1;
         Output(int camera, int sink, Surface surface) {
             this.camera = camera; this.sink = sink; this.surface = surface;
         }
@@ -70,24 +75,38 @@ public final class IpkCameraOverlay implements AutoCloseable {
     public IpkCameraOverlay(Context context) {
         this.context = context.getApplicationContext();
         prefs = UiPrefs.getPrefs(context);
+        statusState = new IpkStatusState(prefs.getString(UiPrefs.KEY_IPK_LAST_SESSION, null));
+        status = statusState.snapshot();
         displays = (DisplayManager) context.getSystemService(Context.DISPLAY_SERVICE);
         PowerManager power = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
         screenOn = power == null || power.isInteractive();
         thread.start();
+        carThread.start();
         io = new Handler(thread.getLooper());
-        car = new IpkCarClient(this.context, io, new IpkCarClient.Listener() {
+        carIo = new Handler(carThread.getLooper());
+        car = new IpkCarClient(this.context, carIo, new IpkCarClient.Listener() {
             @Override public void onTab(Integer value, String message) {
                 main.post(() -> {
                     readPending = false;
-                    if (closed || desiredCamera < 0) return;
+                    if (closed) return;
                     if (value == null ? tab != null : !value.equals(tab)) event(message);
                     tab = value;
-                    routing.observeTab(value);
-                    if (root == null || value == null) detail = message;
+                    tabObservedAt = SystemClock.elapsedRealtime();
+                    if (desiredCamera >= 0) {
+                        routing.observeTab(value);
+                        if (IpkRoutePolicy.supportsCamera(value) && routing.requests() > 0)
+                            routeDetail = "Wechsel bestätigt: Seite " + value;
+                        if (root == null || value == null) detail = message;
+                    }
+                    scheduleNow();
                 });
             }
             @Override public void onMessage(String message) {
-                main.post(() -> { if (!closed && desiredCamera >= 0) { detail = message; event(message); } });
+                main.post(() -> {
+                    if (closed) return;
+                    event(message);
+                    if (desiredCamera >= 0) { routeDetail = message; publish(false); }
+                });
             }
         });
         if (displays != null) displays.registerDisplayListener(displayListener, main);
@@ -95,9 +114,15 @@ public final class IpkCameraOverlay implements AutoCloseable {
         IntentFilter filter = new IntentFilter(Intent.ACTION_SCREEN_OFF);
         filter.addAction(Intent.ACTION_SCREEN_ON);
         ContextCompat.registerReceiver(this.context, screenReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED);
+        scheduleNow();
     }
 
     public String status() { return status; }
+
+    public static String savedStatus(Context context) {
+        return new IpkStatusState(UiPrefs.getPrefs(context)
+                .getString(UiPrefs.KEY_IPK_LAST_SESSION, null)).snapshot();
+    }
 
     public void show(int camera) {
         if (closed) return;
@@ -111,20 +136,26 @@ public final class IpkCameraOverlay implements AutoCloseable {
             if (freshSignal) {
                 sessionGeneration++;
                 routing = new IpkRoutePolicy();
-                tab = null;
-                lastTabRead = 0;
-                detail = "reading current IPK tab";
+                signalStarted = SystemClock.elapsedRealtime();
+                if (signalStarted - tabObservedAt > 750) { tab = null; lastTabRead = 0; }
+                routing.observeTab(tab);
+                detail = "Kamera startet";
+                routeDetail = "keine Anforderung";
             }
+            publish(true);
         }
         scheduleNow();
     }
 
     public void hide() {
+        if (desiredCamera >= 0) publish(true);
         sessionGeneration++;
         desiredCamera = -1;
         main.removeCallbacks(tick);
         destroyWindow();
-        status = "IPK idle · " + lastSessionStatus;
+        statusState.idle();
+        status = statusState.snapshot();
+        scheduleNow();
         // Deliberately do not send guidance-finish or fabricate a tab restore: a
         // real navigation session may be running, and no generic restore is verified.
     }
@@ -160,43 +191,49 @@ public final class IpkCameraOverlay implements AutoCloseable {
 
     private void scheduleNow() {
         main.removeCallbacks(tick);
-        if (!closed && desiredCamera >= 0) main.post(tick);
+        if (!closed && (desiredCamera >= 0 || (screenOn
+                && prefs.getBoolean(UiPrefs.KEY_IPK_CAMERA_ENABLED, false)))) main.post(tick);
     }
 
     private final Runnable tick = new Runnable() {
         @Override public void run() {
-            if (closed || desiredCamera < 0) return;
+            if (closed) return;
             long now = SystemClock.elapsedRealtime();
-            if (!prefs.getBoolean(UiPrefs.KEY_IPK_CAMERA_ENABLED, false) || !screenOn
+            boolean enabled = prefs.getBoolean(UiPrefs.KEY_IPK_CAMERA_ENABLED, false);
+            boolean active = desiredCamera >= 0;
+            if (enabled && screenOn && !readPending
+                    && (lastTabRead == 0 || now - lastTabRead >= (active ? 250 : 500))) {
+                readPending = true;
+                lastTabRead = now;
+                boolean autoRoute = prefs.getBoolean(UiPrefs.KEY_IPK_AUTO_ROUTE, true);
+                carIo.post(() -> car.prepare(autoRoute));
+            }
+            if (!active) {
+                if (enabled && screenOn) main.postDelayed(this, 500);
+                return;
+            }
+            if (!enabled || !screenOn
                     || UiPrefs.isOemAvmActive(prefs)) {
                 destroyWindow();
-                status = "IPK " + (!screenOn ? "screen off" : "disabled / OEM AVM");
+                detail = !screenOn ? "Bildschirm aus" : "deaktiviert / OEM AVM";
             } else {
                 // Main-thread watchdog still removes a frozen image if an IO call
                 // stalls and no health callback can get back to us.
-                if (root != null && root.getAlpha() > 0f && now - lastFreshFrame > FRAME_TIMEOUT_MS) {
+                if (root != null && now - lastFreshFrame > FRAME_TIMEOUT_MS) {
                     detail = "camera watchdog expired; overlay released";
                     event(detail);
                     retryAfter = now + 2000;
                     destroyWindow();
                 }
-                if (!readPending && (lastTabRead == 0 || now - lastTabRead >= 500)) {
-                    readPending = true;
-                    lastTabRead = now;
-                    io.post(car::readTab);
-                }
+                if (now - tabObservedAt > 1000) tab = null;
                 if (IpkRoutePolicy.supportsCamera(tab)) {
                     if (root == null && now >= retryAfter) createWindow();
-                    checkFrames();
                 } else {
                     destroyWindow();
                     maybeRequestProjection(now);
                 }
-                status = "display=" + displayId + " · tab=" + (tab == null ? "?" : tab)
-                        + " · route=" + routing.requests() + "/" + IpkRoutePolicy.MAX_REQUESTS
-                        + " · " + detail;
             }
-            lastSessionStatus = status;
+            publish(false);
             main.postDelayed(this, POLL_MS);
         }
     };
@@ -204,20 +241,40 @@ public final class IpkCameraOverlay implements AutoCloseable {
     private void maybeRequestProjection(long now) {
         if (routePending || !routing.shouldRequest(tab,
                 prefs.getBoolean(UiPrefs.KEY_IPK_AUTO_ROUTE, true), now)) return;
-        // Count the entire attempt, including a refused bind, to keep retries bounded.
-        routing.requested(now);
         routePending = true;
         final int token = sessionGeneration;
-        event("request navigation from tab=" + tab + " attempt=" + routing.requests());
-        io.post(() -> {
-            boolean sent = token == sessionGeneration && desiredCamera >= 0
-                    && prefs.getBoolean(UiPrefs.KEY_IPK_AUTO_ROUTE, true) && car.requestProjection();
+        final boolean fallback = routing.requests() > 0;
+        carIo.post(() -> {
+            IpkRoutePolicy.RequestResult result = car.requestProjection(fallback,
+                    () -> token == sessionGeneration && desiredCamera >= 0 && screenOn
+                            && prefs.getBoolean(UiPrefs.KEY_IPK_CAMERA_ENABLED, false)
+                            && prefs.getBoolean(UiPrefs.KEY_IPK_AUTO_ROUTE, true) && !UiPrefs.isOemAvmActive(prefs));
             main.post(() -> {
                 routePending = false;
-                if (!closed && desiredCamera >= 0 && token == sessionGeneration)
-                    detail = sent ? "request sent; waiting for tab 1/2" : "projection not sent; see IPK log";
+                if (closed || desiredCamera < 0 || token != sessionGeneration) return;
+                routing.completed(result, SystemClock.elapsedRealtime());
+                if (result == IpkRoutePolicy.RequestResult.WAITING)
+                    routeDetail = "MapService verbindet; noch keine Anforderung gesendet";
+                else if (result != IpkRoutePolicy.RequestResult.CANCELLED)
+                    event("route=" + routing.requests() + "/2 result=" + result + " direct=" + fallback);
+                publish(true);
             });
         });
+    }
+
+    private void publish(boolean force) {
+        if (desiredCamera < 0) return;
+        String route = routeDetail;
+        if (!IpkRoutePolicy.supportsCamera(tab) && routing.requests() >= IpkRoutePolicy.MAX_REQUESTS)
+            route += " · Wechsel noch unbestätigt";
+        statusState.update("display=" + displayId + " · tab=" + (tab == null ? "?" : tab)
+                + " · route=" + routing.requests() + "/2 · " + route + " · " + detail);
+        status = statusState.snapshot();
+        long now = SystemClock.elapsedRealtime();
+        if (force || now - lastPersist >= 500) {
+            prefs.edit().putString(UiPrefs.KEY_IPK_LAST_SESSION, statusState.lastSession()).apply();
+            lastPersist = now;
+        }
     }
 
     private Display clusterDisplay() {
@@ -272,6 +329,8 @@ public final class IpkCameraOverlay implements AutoCloseable {
                             sink.attached = ok;
                             detail = ok ? "waiting for first camera frame" : "camera attach failed";
                             if (!ok) { event(detail); retryAfter = SystemClock.elapsedRealtime() + 2000; destroyWindow(); }
+                            else main.post(checkFrames);
+                            publish(true);
                         });
                     });
                 }
@@ -314,30 +373,51 @@ public final class IpkCameraOverlay implements AutoCloseable {
         }
     }
 
-    private void checkFrames() {
-        if (root == null || output == null || !output.attached || healthPending) return;
-        Output sink = output;
-        healthPending = true;
-        io.post(() -> {
-            long age = CameraProbe.previewSinkFrameAgeMs(sink.camera, sink.sink);
-            main.post(() -> {
-                healthPending = false;
-                if (output != sink || root == null) return;
-                long now = SystemClock.elapsedRealtime();
-                if (age >= 0 && age <= FRAME_TIMEOUT_MS) {
-                    if (root.getAlpha() == 0f) event("camera visible on IPK, tab=" + tab);
-                    root.setAlpha(1f);
-                    lastFreshFrame = now - age;
-                    detail = "camera live (" + age + " ms)";
-                } else if (now - windowCreated > FRAME_TIMEOUT_MS) {
-                    detail = "no fresh camera frame; overlay released";
-                    event(detail);
-                    retryAfter = now + 2000;
-                    destroyWindow();
-                }
+    private final Runnable checkFrames = new Runnable() {
+        @Override public void run() {
+            if (closed || root == null || output == null || !output.attached || healthPending) return;
+            Output sink = output;
+            healthPending = true;
+            io.post(() -> {
+                long[] stats = CameraProbe.previewSinkStats(sink.camera, sink.sink);
+                main.post(() -> {
+                    healthPending = false;
+                    if (closed || output != sink || root == null) {
+                        if (!closed && output != null) main.post(this);
+                        return;
+                    }
+                    long now = SystemClock.elapsedRealtime();
+                    long age = stats == null ? -1 : stats[0];
+                    if (age >= 0 && age <= FRAME_TIMEOUT_MS) {
+                        if (root.getAlpha() == 0f) {
+                            sink.firstFrameMs = now - signalStarted;
+                            event("camera visible on IPK, tab=" + tab + " start=" + sink.firstFrameMs + " ms");
+                        }
+                        root.setAlpha(1f);
+                        lastFreshFrame = now - age;
+                        if (sink.sampledAt == 0) {
+                            sink.sampledAt = now;
+                            sink.sampledFrames = stats[1];
+                        } else if (now - sink.sampledAt >= 500) {
+                            sink.fps = (stats[1] - sink.sampledFrames) * 1000.0 / (now - sink.sampledAt);
+                            sink.sampledAt = now;
+                            sink.sampledFrames = stats[1];
+                        }
+                        detail = "live · " + (sink.fps < 0 ? "FPS misst…" : String.format(Locale.ROOT, "%.1f FPS", sink.fps))
+                                + " · Start " + sink.firstFrameMs + " ms · Alter " + age
+                                + " ms · Ausgabe " + stats[2] + "/" + stats[3] + " ms";
+                    } else if (now - windowCreated > FRAME_TIMEOUT_MS) {
+                        detail = "no fresh camera frame; overlay released";
+                        event(detail);
+                        retryAfter = now + 2000;
+                        destroyWindow();
+                    }
+                    publish(false);
+                    if (root != null) main.postDelayed(this, root.getAlpha() == 0f ? 40 : 250);
+                });
             });
-        });
-    }
+        }
+    };
 
     private void detachOutput() {
         Output sink = output;
@@ -350,6 +430,7 @@ public final class IpkCameraOverlay implements AutoCloseable {
 
     private void destroyWindow() {
         generation++;
+        main.removeCallbacks(checkFrames);
         detachOutput();
         FrameLayout view = root;
         root = null; texture = null; displayId = -1;
@@ -368,9 +449,11 @@ public final class IpkCameraOverlay implements AutoCloseable {
         if (closed) return;
         hide();
         closed = true;
+        main.removeCallbacks(tick);
         prefs.unregisterOnSharedPreferenceChangeListener(preferenceListener);
         if (displays != null) displays.unregisterDisplayListener(displayListener);
         context.unregisterReceiver(screenReceiver);
-        io.post(() -> { car.close(); thread.quitSafely(); });
+        io.post(thread::quitSafely);
+        carIo.post(() -> { car.close(); carThread.quitSafely(); });
     }
 }

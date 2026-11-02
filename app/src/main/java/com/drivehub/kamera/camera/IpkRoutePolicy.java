@@ -2,6 +2,7 @@ package com.drivehub.kamera.camera;
 
 /** Tab values come from IPK_CLUSTER_TAB_BTN_STS, not the cluster app's internal enum. */
 public final class IpkRoutePolicy {
+    public enum RequestResult { WAITING, SENT, FAILED, CANCELLED }
     public static final int TAB_PROPERTY = 0x21407b18;
     public static final int MAX_REQUESTS = 2;
     public static final long RETRY_MS = 1500;
@@ -22,7 +23,12 @@ public final class IpkRoutePolicy {
                 && (requests == 0 || nowMs - lastRequestMs >= RETRY_MS);
     }
 
-    public void requested(long nowMs) { requests++; lastRequestMs = nowMs; }
+    public void completed(RequestResult result, long nowMs) {
+        if (result == RequestResult.SENT || result == RequestResult.FAILED) {
+            requests++;
+            lastRequestMs = nowMs;
+        }
+    }
     public int requests() { return requests; }
     public void observeTab(Integer tab) { if (supportsCamera(tab)) confirmed = true; }
 
