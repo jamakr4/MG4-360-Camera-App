@@ -317,6 +317,9 @@ Financial support sounds nice in theory, but German tax overhead makes donation 
 
 <br clear="left">
 
+If this app has been useful to you and you'd like to show your appreciation for the time I spend on it, please consider donating directly to [DigestScience](https://www.digestscience.com/en/donate-online), a French foundation supporting research into Crohn's disease, ulcerative colitis, and other digestive diseases.
+
+Crohn's disease and ulcerative colitis receive little public attention, yet can cause immense suffering and profoundly affect everyday life. Your donation can help advance research and improve care for people living with these conditions.
 
 ## Safety and Disclaimer
 
