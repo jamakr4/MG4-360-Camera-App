@@ -8,6 +8,7 @@ Community mod for the MG4 EV (AAOS 9, pre-2026 facelift) that replaces the stock
 
 <p align="center">
   <img alt="Latest release" src="https://img.shields.io/github/v/release/jamakr4/MG4-360-Camera-App?label=release&color=1f6feb">
+  <a href="https://github.com/jamakr4/MG4-360-Camera-App/releases"><img alt="Latest version including beta releases" src="https://img.shields.io/github/v/release/jamakr4/MG4-360-Camera-App?include_prereleases&sort=date&label=beta&color=8b5cf6"></a>
   <img alt="Platform" src="https://img.shields.io/badge/platform-MG4%20AAOS%209-0a7f5a">
   <img alt="Downloads" src="https://img.shields.io/github/downloads/jamakr4/MG4-360-Camera-App/total?color=5e9f3a">
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-GPL--3.0-bd2c00"></a>
