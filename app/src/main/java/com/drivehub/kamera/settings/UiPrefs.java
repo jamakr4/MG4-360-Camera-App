@@ -14,6 +14,25 @@ public final class UiPrefs {
     public static final String KEY_SMOOTH_ENTRY = "smoothEntry";
     public static final String KEY_OVERLAY_RESIZE_LOCKED = "overlayResizeLocked";
     public static final String KEY_OVERLAY_MOVE_LOCKED = "overlayMoveLocked";
+    public static final String KEY_DASHCAM_STATUS_ICON_X = "dashcamStatusIconX";
+    public static final String KEY_DASHCAM_STATUS_ICON_Y = "dashcamStatusIconY";
+    public static final String KEY_SIGNAL_COMPACT_ENABLED = "signalCompactEnabled";
+    public static final String KEY_SIGNAL_COMPACT_LEFT = "signalCompactLeft";
+    public static final String KEY_SIGNAL_COMPACT_RIGHT = "signalCompactRight";
+    // The settings display 45 - crop: these defaults show left 36 and right 25.
+    private static final int DEFAULT_SIGNAL_COMPACT_LEFT_CROP = 45 - 36;
+    private static final int DEFAULT_SIGNAL_COMPACT_RIGHT_CROP = 45 - 25;
+
+    public static int getSignalCompactLeft(SharedPreferences prefs) {
+        return Math.max(0, Math.min(45, prefs.getInt(KEY_SIGNAL_COMPACT_LEFT,
+                DEFAULT_SIGNAL_COMPACT_LEFT_CROP)));
+    }
+
+    public static int getSignalCompactRight(SharedPreferences prefs) {
+        return Math.max(0, Math.min(45, prefs.getInt(KEY_SIGNAL_COMPACT_RIGHT,
+                DEFAULT_SIGNAL_COMPACT_RIGHT_CROP)));
+    }
+
     public static final String KEY_SIGNAL_ENHANCED_PREVIEW = "signalEnhancedPreview";
     public static final String KEY_OVERLAY_ON_SIGNAL = "overlayOnSignal";
     public static final String KEY_LANE_CHANGES_ONLY = "laneChangesOnly";

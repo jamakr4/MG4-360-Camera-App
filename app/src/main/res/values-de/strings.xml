@@ -318,4 +318,14 @@
     <string name="settings_signal_preview_standard">Schnell</string>
     <string name="settings_signal_preview_enhanced">Verbessert</string>
     <string name="settings_signal_preview_enhanced_hint">Verbessert nutzt beide Kamerahalbbilder für ein schärferes Bild und benötigt möglicherweise mehr Rechenleistung.</string>
+    <string name="settings_signal_compact">Kompaktansicht</string>
+    <string name="settings_signal_compact_hint">Beide Bildränder lassen sich unabhängig einstellen, um die Kameraansicht schmaler zu machen.</string>
+    <string name="settings_signal_compact_left">Linken Rand abschneiden (nach links ziehen)</string>
+    <string name="settings_signal_compact_right">Rechten Rand abschneiden (nach rechts ziehen)</string>
+    <string name="dashcam_status_position_horizontal">Horizontale Position</string>
+    <string name="dashcam_status_position_vertical">Vertikale Position</string>
+    <string name="dashcam_status_position_value">%1$d px</string>
+    <string name="dashcam_status_position_hint">Verschiebe den Statuspunkt auf dem gesamten Bildschirm. Die Position wird gespeichert und auf die Bildschirmränder begrenzt.</string>
+    <string name="dashcam_status_position_expand">Positionsregler einblenden</string>
+    <string name="dashcam_status_position_collapse">Positionsregler ausblenden</string>
 </resources>

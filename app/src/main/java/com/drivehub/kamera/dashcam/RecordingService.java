@@ -132,6 +132,9 @@ public class RecordingService extends Service {
     private final SharedPreferences.OnSharedPreferenceChangeListener iconPreferenceListener = (prefs, key) -> {
         if ("dashcamStatusIcon".equals(key) && statusIcon != null)
             statusIcon.update(prefs.getBoolean(key, false) ? prefs.getString(KEY_STATUS, STATUS_OFF) : null);
+        if ((UiPrefs.KEY_DASHCAM_STATUS_ICON_X.equals(key)
+                || UiPrefs.KEY_DASHCAM_STATUS_ICON_Y.equals(key)) && statusIcon != null)
+            statusIcon.reposition();
     };
     private long remaining(long deadline) { return Math.max(0, deadline - SystemClock.elapsedRealtime()); }
 

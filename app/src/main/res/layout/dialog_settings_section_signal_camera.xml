@@ -103,6 +103,23 @@
 
         </LinearLayout>
 
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:minHeight="56dp"
+            android:orientation="horizontal">
+            <TextView
+                style="@style/DrivehubSettingsCardRowLabel"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/settings_signal_compact" />
+            <Switch
+                android:id="@+id/switchSignalCompact"
+                style="@style/DrivehubSettingsSwitch" />
+        </LinearLayout>
+
     </LinearLayout>
 
     <!-- ============ LANE CHANGES ONLY ============ -->

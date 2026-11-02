@@ -15,6 +15,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Rect;
+import android.graphics.Matrix;
 import android.graphics.SurfaceTexture;
 import android.graphics.PixelFormat;
 import android.os.Handler;
@@ -128,6 +129,10 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
                         && OVERLAY_REASON_SIGNAL.equals(overlayReason)) {
                     stopPreview();
                     startPreview();
+                } else if (UiPrefs.KEY_SIGNAL_COMPACT_ENABLED.equals(key)
+                        || UiPrefs.KEY_SIGNAL_COMPACT_LEFT.equals(key)
+                        || UiPrefs.KEY_SIGNAL_COMPACT_RIGHT.equals(key)) {
+                    updateOverlayPresentation(false);
                 } else if (UiPrefs.KEY_TILE_CORNER_RADIUS.equals(key)) {
                     applyOverlayCornerRadius();
                 } else if (UiPrefs.KEY_OVERLAY_ROTATE_TO_DRIVING_DIRECTION.equals(key)) {
@@ -261,8 +266,8 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
         normalizeOverlaySizeForCurrentMode();
 
         overlayParams = new WindowManager.LayoutParams(
-                overlayWidthPx,
-                overlayHeightPx,
+                getVisibleOverlayWidth(),
+                getVisibleOverlayHeight(),
                 layoutType,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
                         | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
@@ -441,8 +446,8 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
 
         overlayWidthPx = wh[0];
         overlayHeightPx = wh[1];
-        overlayParams.width = overlayWidthPx;
-        overlayParams.height = overlayHeightPx;
+        overlayParams.width = getVisibleOverlayWidth();
+        overlayParams.height = getVisibleOverlayHeight();
         clampOverlayPositionToScreen();
         windowManager.updateViewLayout(overlayView, overlayParams);
         applyPreviewTransform();
@@ -574,33 +579,16 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
 
     /** Keeps the active overlay aspect ratio while clamping size to screen and min/max bounds. */
     private int[] clampOverlaySize(int w) {
-        float aspect = getActiveOverlayAspect();
-        int maxW = OVERLAY_MAX_WIDTH_PX;
-        int maxH = OVERLAY_MAX_WIDTH_PX;
         Rect bounds = getAvailableOverlayBoundsPx();
-        if (bounds != null) {
-            maxW = Math.min(maxW, bounds.width());
-            maxH = Math.min(maxH, bounds.height());
-        }
-        if (w < OVERLAY_MIN_WIDTH_PX) {
-            w = OVERLAY_MIN_WIDTH_PX;
-        }
-        if (w > maxW) {
-            w = maxW;
-        }
-        int h = Math.round(w / aspect);
-        if (h > maxH) {
-            h = maxH;
-            w = Math.round(h * aspect);
-            if (w < OVERLAY_MIN_WIDTH_PX) {
-                w = OVERLAY_MIN_WIDTH_PX;
-            }
-            if (w > maxW) {
-                w = maxW;
-            }
-            h = Math.round(w / aspect);
-        }
-        return new int[]{w, h};
+        int crop = isCompactEnabled()
+                ? UiPrefs.getSignalCompactLeft(uiPrefs) + UiPrefs.getSignalCompactRight(uiPrefs) : 0;
+        float visibleFraction = 1f - crop / 100f;
+        boolean rotated = shouldRotatePreviewToDrivingDirection();
+        return OverlayResizeMath.clampSize(w, getActiveOverlayAspect(),
+                OVERLAY_MIN_WIDTH_PX, OVERLAY_MAX_WIDTH_PX,
+                bounds != null ? bounds.width() : OVERLAY_MAX_WIDTH_PX,
+                bounds != null ? bounds.height() : OVERLAY_MAX_WIDTH_PX,
+                rotated ? 1f : visibleFraction, rotated ? visibleFraction : 1f);
     }
 
     private void normalizeOverlaySizeForCurrentMode() {
@@ -639,8 +627,8 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
     private void updateOverlayPresentation(boolean persist) {
         normalizeOverlaySizeForCurrentMode();
         if (overlayParams != null) {
-            overlayParams.width = overlayWidthPx;
-            overlayParams.height = overlayHeightPx;
+            overlayParams.width = getVisibleOverlayWidth();
+            overlayParams.height = getVisibleOverlayHeight();
             clampOverlayPositionToScreen();
             if (windowManager != null && overlayView != null) {
                 windowManager.updateViewLayout(overlayView, overlayParams);
@@ -662,11 +650,39 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
         applyPreviewTransformTo(tv);
     }
 
+    private boolean isCompactEnabled() {
+        return uiPrefs != null && OVERLAY_REASON_SIGNAL.equals(overlayReason)
+                && uiPrefs.getBoolean(UiPrefs.KEY_SIGNAL_COMPACT_ENABLED, false);
+    }
+
+    private int getVisibleOverlayWidth() {
+        return getCompactGeometry().visibleWidth;
+    }
+
+    private int getVisibleOverlayHeight() {
+        return getCompactGeometry().visibleHeight;
+    }
+
+    private OverlayCompactGeometry getCompactGeometry() {
+        int left = isCompactEnabled() ? UiPrefs.getSignalCompactLeft(uiPrefs) : 0;
+        int right = isCompactEnabled() ? UiPrefs.getSignalCompactRight(uiPrefs) : 0;
+        return OverlayCompactGeometry.calculate(overlayWidthPx, overlayHeightPx,
+                CameraIndex.fromVideoIndex(cameraIndex) == CameraIndex.LEFT,
+                shouldRotatePreviewToDrivingDirection(), left, right);
+    }
+
     private void applyPreviewTransformTo(TextureView tv) {
         boolean rotated = shouldRotatePreviewToDrivingDirection();
-        int desiredWidth = rotated ? overlayHeightPx : ViewGroup.LayoutParams.MATCH_PARENT;
-        int desiredHeight = rotated ? overlayWidthPx : ViewGroup.LayoutParams.MATCH_PARENT;
-        float desiredRotation = getPreviewRotationDegrees();
+        OverlayCompactGeometry compact = getCompactGeometry();
+        boolean rotateCompactContent = rotated && isCompactEnabled();
+        // A rotated, oversized TextureView can be clipped by its window before
+        // the turn. Keep this view inside the visible window and rotate its
+        // content instead, mapping the same full image behind the same crop.
+        int desiredWidth = rotateCompactContent ? compact.visibleWidth
+                : rotated ? overlayHeightPx : overlayWidthPx;
+        int desiredHeight = rotateCompactContent ? compact.visibleHeight
+                : rotated ? overlayWidthPx : overlayHeightPx;
+        float desiredRotation = rotateCompactContent ? 0f : getPreviewRotationDegrees();
 
         ViewGroup.LayoutParams currentParams = tv.getLayoutParams();
         if (!(currentParams instanceof FrameLayout.LayoutParams)
@@ -682,6 +698,21 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
         if (tv.getScaleX() != 1f) tv.setScaleX(1f);
         if (tv.getScaleY() != 1f) tv.setScaleY(1f);
         if (tv.getRotation() != desiredRotation) tv.setRotation(desiredRotation);
+        if (rotateCompactContent) {
+            float[] source = {0f, 0f, desiredWidth, 0f,
+                    desiredWidth, desiredHeight, 0f, desiredHeight};
+            float[] destination = compact.rotatedContentCorners(overlayWidthPx, overlayHeightPx,
+                    CameraIndex.fromVideoIndex(cameraIndex) == CameraIndex.LEFT);
+            Matrix transform = new Matrix();
+            transform.setPolyToPoly(source, 0, destination, 0, 4);
+            tv.setTransform(transform);
+            tv.setTranslationX(0f);
+            tv.setTranslationY(0f);
+        } else {
+            tv.setTransform(null);
+            tv.setTranslationX(compact.translationX);
+            tv.setTranslationY(compact.translationY);
+        }
     }
 
     private void clampOverlayPositionToScreen() {
@@ -733,8 +764,8 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
         int[] clampedSize = clampOverlaySize(overlayWidthPx);
         overlayWidthPx = clampedSize[0];
         overlayHeightPx = clampedSize[1];
-        overlayParams.width = overlayWidthPx;
-        overlayParams.height = overlayHeightPx;
+        overlayParams.width = getVisibleOverlayWidth();
+        overlayParams.height = getVisibleOverlayHeight();
         clampOverlayPositionToBounds(newBounds);
         if (windowManager != null && overlayView != null) {
             windowManager.updateViewLayout(overlayView, overlayParams);
