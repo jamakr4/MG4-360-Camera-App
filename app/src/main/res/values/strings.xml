@@ -1,4 +1,8 @@
 <resources>
+    <string name="settings_ipk_camera">Also show signal camera in driver display</string>
+    <string name="settings_ipk_auto_route">Automatically request navigation page</string>
+    <string name="settings_ipk_camera_hint">Shows the camera on the Music and Navigation pages alongside the main screen. From trip or settings, the app can try to switch to Navigation. Calls, warnings and assistance take priority. The driver display may remain on Navigation afterwards.</string>
+    <string name="settings_ipk_status">Refresh driver display status</string>
     <string name="app_name">360 Cam</string>
     <string name="settings_tab_update">Update</string>
     <string name="settings_tab_settings">Settings</string>

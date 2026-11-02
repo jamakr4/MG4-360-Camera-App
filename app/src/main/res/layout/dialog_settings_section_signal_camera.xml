@@ -30,6 +30,58 @@
             android:gravity="center_vertical"
             android:minHeight="56dp"
             android:orientation="horizontal">
+            <TextView
+                style="@style/DrivehubSettingsCardRowLabel"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/settings_ipk_camera" />
+            <Switch
+                android:id="@+id/switchIpkCamera"
+                style="@style/DrivehubSettingsSwitch" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:minHeight="56dp"
+            android:orientation="horizontal">
+            <TextView
+                style="@style/DrivehubSettingsCardRowLabel"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/settings_ipk_auto_route" />
+            <Switch
+                android:id="@+id/switchIpkAutoRoute"
+                style="@style/DrivehubSettingsSwitch" />
+        </LinearLayout>
+
+        <TextView
+            style="@style/DrivehubSettingsBodyMuted"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/settings_ipk_camera_hint" />
+        <TextView
+            android:id="@+id/textIpkCameraStatus"
+            style="@style/DrivehubSettingsBodyMuted"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingTop="8dp"
+            android:textIsSelectable="true" />
+        <Button
+            android:id="@+id/buttonIpkCameraStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/settings_ipk_status" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:minHeight="56dp"
+            android:orientation="horizontal">
 
             <TextView
                 style="@style/DrivehubSettingsCardRowLabel"

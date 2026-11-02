@@ -10,6 +10,10 @@ namespace camera_stream_manager {
 bool attachPreview(JNIEnv* env, int videoIndex, jobject surface, bool enhanced = false);
 void detachPreview(int videoIndex);
 void detachAllPreviews();
+// Independent preview outputs. Sink IDs do not address the legacy main preview.
+bool attachPreviewSink(JNIEnv* env, int videoIndex, int sinkId, jobject surface);
+void detachPreviewSink(int videoIndex, int sinkId);
+int64_t previewSinkFrameAgeMs(int videoIndex, int sinkId);
 
 bool startRecording(JNIEnv* env, int slot, int videoIndex, const std::string& outputPath,
                     int width, int height, int fps, int bitrate);

@@ -1,4 +1,8 @@
 <resources>
+    <string name="settings_ipk_camera">Blinker-Kamera zusätzlich im Fahrerdisplay</string>
+    <string name="settings_ipk_auto_route">Navigationsseite automatisch anfordern</string>
+    <string name="settings_ipk_camera_hint">Zeigt die Kamera auf Musik und Navigation parallel zum Hauptbildschirm. Aus Bordcomputer oder Einstellungen versucht die App, auf Navigation zu wechseln. Telefon, Warnungen und Assistenz haben Vorrang. Das Fahrerdisplay kann danach auf Navigation bleiben.</string>
+    <string name="settings_ipk_status">Status des Fahrerdisplays aktualisieren</string>
     <string name="app_name">360 Cam</string>
     <string name="settings_tab_update">Update</string>
     <string name="settings_tab_settings">Einstellungen</string>

@@ -173,6 +173,18 @@ public final class SettingsDialogController {
     private Views bindViews(SharedPreferences prefs) {
         Views v = new Views();
         v.swOverlay = dialog.findViewById(R.id.switchOverlayOnSignal);
+        Switch ipkEnabled = v.swIpkCamera = dialog.findViewById(R.id.switchIpkCamera);
+        Switch ipkRoute = v.swIpkAutoRoute = dialog.findViewById(R.id.switchIpkAutoRoute);
+        ipkEnabled.setChecked(prefs.getBoolean(UiPrefs.KEY_IPK_CAMERA_ENABLED, false));
+        ipkRoute.setChecked(prefs.getBoolean(UiPrefs.KEY_IPK_AUTO_ROUTE, true));
+        ipkEnabled.setOnCheckedChangeListener((button, checked) ->
+                prefs.edit().putBoolean(UiPrefs.KEY_IPK_CAMERA_ENABLED, checked).apply());
+        ipkRoute.setOnCheckedChangeListener((button, checked) ->
+                prefs.edit().putBoolean(UiPrefs.KEY_IPK_AUTO_ROUTE, checked).apply());
+        TextView ipkStatus = dialog.findViewById(R.id.textIpkCameraStatus);
+        Runnable refreshIpkStatus = () -> ipkStatus.setText(SignalService.getIpkStatus());
+        refreshIpkStatus.run();
+        dialog.findViewById(R.id.buttonIpkCameraStatus).setOnClickListener(button -> refreshIpkStatus.run());
         v.segSignalPreviewQuality = dialog.findViewById(R.id.segSignalPreviewQuality);
         v.swLaneChangesOnly = dialog.findViewById(R.id.switchLaneChangesOnly);
         v.seekLaneChangeMinSpeed = dialog.findViewById(R.id.seekLaneChangeMinSpeed);
@@ -419,6 +431,8 @@ public final class SettingsDialogController {
         appearance.bindSettingsAppearance(
                 prefs,
                 new Switch[]{
+                        views.swIpkCamera,
+                        views.swIpkAutoRoute,
                         views.swOverlay,
                         views.swLaneChangesOnly,
                         views.swDigitalRearview,
@@ -674,6 +688,8 @@ public final class SettingsDialogController {
     // ---------------------------------------------------------------- view holder
 
     private static final class Views {
+        Switch swIpkCamera;
+        Switch swIpkAutoRoute;
         Switch swOverlay;
         SegmentedControl segSignalPreviewQuality;
         Switch swLaneChangesOnly;

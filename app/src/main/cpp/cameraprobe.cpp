@@ -158,3 +158,20 @@ JNIEXPORT void JNICALL
 Java_com_drivehub_kamera_CameraProbe_detachAllPreviews(JNIEnv* /*env*/, jclass /*clazz*/) {
     camera_stream_manager::detachAllPreviews();
 }
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_drivehub_kamera_CameraProbe_attachPreviewSink(JNIEnv* env, jclass, jint videoIndex,
+                                                     jint sinkId, jobject surface) {
+    return camera_stream_manager::attachPreviewSink(env, videoIndex, sinkId, surface)
+           ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_drivehub_kamera_CameraProbe_detachPreviewSink(JNIEnv*, jclass, jint videoIndex, jint sinkId) {
+    camera_stream_manager::detachPreviewSink(videoIndex, sinkId);
+}
+
+extern "C" JNIEXPORT jlong JNICALL
+Java_com_drivehub_kamera_CameraProbe_previewSinkFrameAgeMs(JNIEnv*, jclass, jint videoIndex, jint sinkId) {
+    return camera_stream_manager::previewSinkFrameAgeMs(videoIndex, sinkId);
+}

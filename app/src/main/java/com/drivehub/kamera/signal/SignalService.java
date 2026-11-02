@@ -4,6 +4,7 @@ import com.drivehub.kamera.R;
 
 import com.drivehub.kamera.MainActivity;
 import com.drivehub.kamera.camera.CameraIndex;
+import com.drivehub.kamera.camera.IpkCameraOverlay;
 import com.drivehub.kamera.camera.OverlayService;
 import com.drivehub.kamera.camera.TileViewActivity;
 import com.drivehub.kamera.dashcam.DashcamSettingsController;
@@ -75,6 +76,18 @@ public class SignalService extends Service {
     public static final String EXTRA_CAMERA_INDEX = "camera_index";
 
     private static volatile SignalService sInstance;
+
+    private IpkCameraOverlay ipkCamera;
+
+    public static String getIpkStatus() {
+        SignalService service = sInstance;
+        return service == null || service.ipkCamera == null ? "IPK listener not running" : service.ipkCamera.status();
+    }
+
+    private void hideCameraOverlays() {
+        if (ipkCamera != null) ipkCamera.hide();
+        OverlayService.hideOverlay(this);
+    }
 
     private Object car;
     private Object lampManager;
@@ -178,11 +191,11 @@ public class SignalService extends Service {
                 inst.waitForSignalSampleAfterOemReleaseAtMs = 0L;
                 inst.mainHandler.removeCallbacks(inst.hideRunnable);
                 inst.clearOverlayShownTimestamp();
-                OverlayService.hideOverlay(inst);
+                inst.hideCameraOverlays();
             } else if (wasActive) {
                 inst.waitForSignalSampleAfterOemReleaseAtMs = SystemClock.elapsedRealtime();
                 inst.clearOverlayShownTimestamp();
-                OverlayService.hideOverlay(inst);
+                inst.hideCameraOverlays();
                 DevRuntimeLog.add("SignalService", "OEM released => waiting for fresh lamp sample");
             }
             inst.lastLamp = Integer.MIN_VALUE;
@@ -294,6 +307,7 @@ public class SignalService extends Service {
     public void onCreate() {
         super.onCreate();
         sInstance = this;
+        ipkCamera = new IpkCameraOverlay(this);
         systemPerformanceOverlay = new SystemPerformanceOverlay(this);
         NotificationChannelHelper.ensureChannel(this, CHANNEL_ID, "MG4 Signal");
         registerDebugBroadcastSniffer();
@@ -637,6 +651,7 @@ public class SignalService extends Service {
             clearOverlayShownTimestamp();
             OverlayService.hideOverlay(this);
             if (nextMode == 4 || nextMode == 0) {
+                ipkCamera.hide();
                 Log.i(TAG, "Main visible => no route (mode " + nextMode + ")");
                 return;
             }
@@ -648,6 +663,10 @@ public class SignalService extends Service {
             i.setPackage(getPackageName());
             i.putExtra(EXTRA_CAMERA_INDEX, targetCamera.getVideoIndex());
             sendBroadcast(i);
+            if ((nextMode == 1 || nextMode == 2) && isOverlayEnabled()
+                    && !isOemAvmLatchedActive() && !isOemAvmInForeground()) {
+                ipkCamera.show(targetCamera.getVideoIndex());
+            } else ipkCamera.hide();
             Log.i(TAG, "Main visible => route camera to main preview: " + targetCamera);
             return;
         }
@@ -657,7 +676,7 @@ public class SignalService extends Service {
             currentMode = nextMode;
             mainHandler.removeCallbacks(hideRunnable);
             clearOverlayShownTimestamp();
-            OverlayService.hideOverlay(this);
+            hideCameraOverlays();
             Log.i(TAG, "TileView visible => suppress overlay (mode " + nextMode + ")");
             return;
         }
@@ -668,7 +687,7 @@ public class SignalService extends Service {
             // Also hide any leftover overlay if the setting is disabled.
             mainHandler.removeCallbacks(hideRunnable);
             clearOverlayShownTimestamp();
-            OverlayService.hideOverlay(this);
+            hideCameraOverlays();
             Log.i(TAG, "Overlay disabled in settings => no overlay, only listening.");
             return;
         }
@@ -678,7 +697,7 @@ public class SignalService extends Service {
             // No overlay is wanted for reverse: hide it if present and leave only OEM/main screen behavior.
             mainHandler.removeCallbacks(hideRunnable);
             clearOverlayShownTimestamp();
-            OverlayService.hideOverlay(this);
+            hideCameraOverlays();
             Log.i(TAG, "Reverse => no overlay (disabled for reverse)");
             return;
         }
@@ -689,7 +708,7 @@ public class SignalService extends Service {
             currentMode = nextMode;
             mainHandler.removeCallbacks(hideRunnable);
             clearOverlayShownTimestamp();
-            OverlayService.hideOverlay(this);
+            hideCameraOverlays();
             Log.i(TAG, "OEM AVM active/visible (turn signal) => skip overlay.");
             return;
         }
@@ -709,23 +728,27 @@ public class SignalService extends Service {
         mainHandler.removeCallbacks(hideRunnable);
         if (nextMode == 1) {
             markOverlayShownNow();
+            ipkCamera.show(CameraIndex.LEFT.getVideoIndex());
             OverlayService.showOverlay(this, CameraIndex.LEFT.getVideoIndex());
             Log.i(TAG, "Left signal => overlay " + CameraIndex.LEFT);
         } else if (nextMode == 2) {
             markOverlayShownNow();
+            ipkCamera.show(CameraIndex.RIGHT.getVideoIndex());
             OverlayService.showOverlay(this, CameraIndex.RIGHT.getVideoIndex());
             Log.i(TAG, "Right signal => overlay " + CameraIndex.RIGHT);
         } else if (nextMode == 4) {
+            ipkCamera.hide();
             clearOverlayShownTimestamp();
             OverlayService.showOverlay(this, CameraIndex.REAR.getVideoIndex(),
                     OverlayService.OVERLAY_REASON_DIGITAL_REARVIEW);
             Log.i(TAG, "Digital rearview => overlay " + CameraIndex.REAR);
         } else {
             clearOverlayShownTimestamp();
+            ipkCamera.hide();
             if (previousMode == -2 && !isSignalTempHidden()) {
                 OverlayService.hideOverlayWithFade(this);
             } else {
-                OverlayService.hideOverlay(this);
+                hideCameraOverlays();
             }
             Log.i(TAG, "No active overlay mode => overlay hide");
         }
@@ -952,7 +975,8 @@ public class SignalService extends Service {
         mainHandler.removeCallbacks(rearviewRestoreRunnable);
         mainHandler.removeCallbacks(signalRestoreRunnable);
         mainHandler.removeCallbacks(laneChangeSpeedRunnable);
-        OverlayService.hideOverlay(this);
+        hideCameraOverlays();
+        if (ipkCamera != null) { ipkCamera.close(); ipkCamera = null; }
         sInstance = null;
     }
 
