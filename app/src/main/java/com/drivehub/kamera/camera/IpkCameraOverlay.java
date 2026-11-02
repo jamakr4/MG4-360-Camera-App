@@ -304,9 +304,11 @@ public final class IpkCameraOverlay implements AutoCloseable {
             Context displayContext = context.createDisplayContext(display);
             windows = (WindowManager) displayContext.getSystemService(Context.WINDOW_SERVICE);
             FrameLayout view = new FrameLayout(displayContext);
-            view.setBackgroundColor(Color.BLACK);
+            // Let the cluster content show through outside the camera rectangle.
+            view.setBackgroundColor(Color.TRANSPARENT);
             view.setAlpha(0f);
             TextureView preview = new TextureView(displayContext);
+            preview.setOpaque(false);
             // Preserve the full logical 720x480 camera view. Fast preview has half
             // the vertical samples; its display aspect is still 3:2.
             int w = bounds[2], h = Math.round(w * 2f / 3f);
