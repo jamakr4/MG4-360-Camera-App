@@ -35,6 +35,7 @@ public final class UiPrefs {
 
     public static final String KEY_SIGNAL_ENHANCED_PREVIEW = "signalEnhancedPreview";
     public static final String KEY_IPK_CAMERA_ENABLED = "ipkCameraEnabled";
+    public static final String KEY_IPK_REARVIEW_ENABLED = "ipkRearviewEnabled";
     public static final String KEY_IPK_AUTO_ROUTE = "ipkAutoRoute";
     public static final String KEY_IPK_LAST_SESSION = "ipkLastSessionV2";
     public static final String KEY_IPK_DIAGNOSTIC_TRACE = "ipkDiagnosticTraceD1";

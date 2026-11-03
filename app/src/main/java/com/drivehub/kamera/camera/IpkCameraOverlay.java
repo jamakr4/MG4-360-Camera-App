@@ -143,13 +143,13 @@ public final class IpkCameraOverlay implements AutoCloseable {
     public void show(int camera) {
         if (closed) return;
         CameraIndex index = CameraIndex.fromVideoIndex(camera);
-        if (index == null || !index.isSide()) { hide(); return; }
+        if (index == null || (!index.isSide() && index != CameraIndex.REAR)) { hide(); return; }
         if (desiredCamera != camera) {
-            boolean freshSignal = desiredCamera < 0;
+            boolean freshSession = IpkCameraSelection.startsNewSession(desiredCamera, camera);
             desiredCamera = camera;
             destroyWindow();
             retryAfter = 0;
-            if (freshSignal) {
+            if (freshSession) {
                 sessionGeneration++;
                 routing = new IpkRoutePolicy();
                 signalStarted = SystemClock.elapsedRealtime();
@@ -177,7 +177,8 @@ public final class IpkCameraOverlay implements AutoCloseable {
     }
 
     private final SharedPreferences.OnSharedPreferenceChangeListener preferenceListener = (p, key) -> {
-        if (UiPrefs.KEY_IPK_CAMERA_ENABLED.equals(key) || UiPrefs.KEY_IPK_AUTO_ROUTE.equals(key)
+        if (UiPrefs.KEY_IPK_CAMERA_ENABLED.equals(key) || UiPrefs.KEY_IPK_REARVIEW_ENABLED.equals(key)
+                || UiPrefs.KEY_IPK_AUTO_ROUTE.equals(key)
                 || UiPrefs.KEY_OVERLAY_ROTATE_TO_DRIVING_DIRECTION.equals(key)) {
             main.post(() -> {
                 destroyWindow();
@@ -219,15 +220,25 @@ public final class IpkCameraOverlay implements AutoCloseable {
     private void scheduleNow() {
         main.removeCallbacks(tick);
         if (!closed && (desiredCamera >= 0 || (screenOn
-                && prefs.getBoolean(UiPrefs.KEY_IPK_CAMERA_ENABLED, false)))) main.post(tick);
+                && anyIpkEnabled()))) main.post(tick);
+    }
+
+    private boolean anyIpkEnabled() {
+        return prefs.getBoolean(UiPrefs.KEY_IPK_CAMERA_ENABLED, false)
+                || prefs.getBoolean(UiPrefs.KEY_IPK_REARVIEW_ENABLED, false);
+    }
+
+    private boolean currentCameraEnabled() {
+        return prefs.getBoolean(desiredCamera == CameraIndex.REAR.getVideoIndex()
+                ? UiPrefs.KEY_IPK_REARVIEW_ENABLED : UiPrefs.KEY_IPK_CAMERA_ENABLED, false);
     }
 
     private final Runnable tick = new Runnable() {
         @Override public void run() {
             if (closed) return;
             long now = SystemClock.elapsedRealtime();
-            boolean enabled = prefs.getBoolean(UiPrefs.KEY_IPK_CAMERA_ENABLED, false);
             boolean active = desiredCamera >= 0;
+            boolean enabled = active ? currentCameraEnabled() : anyIpkEnabled();
             if (enabled && screenOn && !readPending
                     && (lastTabRead == 0 || now - lastTabRead >= (active ? 250 : 500))) {
                 readPending = true;
@@ -274,7 +285,7 @@ public final class IpkCameraOverlay implements AutoCloseable {
         carIo.post(() -> {
             IpkRoutePolicy.RequestResult result = car.requestProjection(fallback,
                     () -> token == sessionGeneration && desiredCamera >= 0 && screenOn
-                            && prefs.getBoolean(UiPrefs.KEY_IPK_CAMERA_ENABLED, false)
+                            && currentCameraEnabled()
                             && prefs.getBoolean(UiPrefs.KEY_IPK_AUTO_ROUTE, true) && !UiPrefs.isOemAvmActive(prefs));
             main.post(() -> {
                 routePending = false;
@@ -405,12 +416,11 @@ public final class IpkCameraOverlay implements AutoCloseable {
     }
 
     private void applyPreviewFraming(TextureView preview, int side) {
-        boolean compact = prefs.getBoolean(UiPrefs.KEY_SIGNAL_COMPACT_ENABLED, false);
-        IpkPreviewGeometry image = IpkPreviewGeometry.calculate(side,
-                desiredCamera == CameraIndex.LEFT.getVideoIndex(),
+        IpkPreviewGeometry image = IpkPreviewGeometry.forCamera(side,
+                CameraIndex.fromVideoIndex(desiredCamera),
                 UiPrefs.isOverlayRotationToDrivingDirectionEnabled(prefs),
-                compact ? UiPrefs.getSignalCompactLeft(prefs) : 0,
-                compact ? UiPrefs.getSignalCompactRight(prefs) : 0);
+                prefs.getBoolean(UiPrefs.KEY_SIGNAL_COMPACT_ENABLED, false),
+                UiPrefs.getSignalCompactLeft(prefs), UiPrefs.getSignalCompactRight(prefs));
         preview.setLayoutParams(new FrameLayout.LayoutParams(image.width, image.height, Gravity.CENTER));
         float[] source = {0f, 0f, image.width, 0f, image.width, image.height, 0f, image.height};
         Matrix transform = new Matrix();

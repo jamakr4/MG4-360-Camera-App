@@ -204,6 +204,10 @@ public final class SettingsDialogController {
         v.seekLaneChangeMinSpeed = dialog.findViewById(R.id.seekLaneChangeMinSpeed);
         v.etLaneChangeMinSpeedValue = dialog.findViewById(R.id.etLaneChangeMinSpeedValue);
         v.swDigitalRearview = dialog.findViewById(R.id.switchDigitalRearview);
+        v.swIpkRearview = dialog.findViewById(R.id.switchIpkRearview);
+        v.swIpkRearview.setChecked(prefs.getBoolean(UiPrefs.KEY_IPK_REARVIEW_ENABLED, false));
+        v.swIpkRearview.setOnCheckedChangeListener((button, checked) ->
+                prefs.edit().putBoolean(UiPrefs.KEY_IPK_REARVIEW_ENABLED, checked).apply());
         v.swRearviewTapToHide = dialog.findViewById(R.id.switchRearviewTapToHide);
         v.etRearviewTapToHideDurationSec = dialog.findViewById(R.id.etRearviewTapToHideDurationSec);
         v.swRotateToDrivingDirection = dialog.findViewById(R.id.switchOverlayRotateToDrivingDirection);
@@ -450,6 +454,7 @@ public final class SettingsDialogController {
                         views.swOverlay,
                         views.swLaneChangesOnly,
                         views.swDigitalRearview,
+                        views.swIpkRearview,
                         views.swRearviewTapToHide,
                         views.swSignalTapToHide,
                         views.swRotateToDrivingDirection,
@@ -710,6 +715,7 @@ public final class SettingsDialogController {
         SeekBar seekLaneChangeMinSpeed;
         EditText etLaneChangeMinSpeedValue;
         Switch swDigitalRearview;
+        Switch swIpkRearview;
         Switch swRearviewTapToHide;
         EditText etRearviewTapToHideDurationSec;
         Switch swSignalTapToHide;
