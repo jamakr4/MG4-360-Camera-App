@@ -33,4 +33,12 @@ int main() {
     assert(copies == 1);
     assert(throttled.submit(150000, [&] { return ++copies; }));
     assert(throttled.take(last) && last == 2);
+
+    // A 50 ms minimum gap on a 25 fps camera (40 ms period) kept only every
+    // second frame. An unthrottled latest-frame mailbox must accept all 25.
+    LatestPreviewFrame<int> camera25fps(0);
+    for (int i = 0; i < 25; ++i) {
+        assert(camera25fps.submit(i * 40000LL, [i] { return i; }));
+        assert(camera25fps.take(last) && last == i);
+    }
 }

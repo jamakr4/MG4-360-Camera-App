@@ -4,6 +4,7 @@
 
 #include <string>
 #include <cstdint>
+#include <array>
 
 namespace camera_stream_manager {
 
@@ -14,6 +15,8 @@ void detachAllPreviews();
 bool attachPreviewSink(JNIEnv* env, int videoIndex, int sinkId, jobject surface);
 void detachPreviewSink(int videoIndex, int sinkId);
 int64_t previewSinkFrameAgeMs(int videoIndex, int sinkId);
+// age ms (-1 until first post), posted frames, last capture-to-post ms, last post cost ms.
+std::array<int64_t, 4> previewSinkStats(int videoIndex, int sinkId);
 
 bool startRecording(JNIEnv* env, int slot, int videoIndex, const std::string& outputPath,
                     int width, int height, int fps, int bitrate);

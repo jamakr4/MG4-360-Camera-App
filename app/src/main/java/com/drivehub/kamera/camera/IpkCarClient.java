@@ -7,29 +7,35 @@ import android.content.ServiceConnection;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Parcel;
+import android.os.SystemClock;
 
 import java.lang.reflect.Method;
+import java.util.function.BooleanSupplier;
+import com.drivehub.kamera.camera.IpkRoutePolicy.RequestResult;
 
-/** Vehicle reads and the existing SAIC projection request; never writes navigation content. */
+/** All methods run on the car IO handler, never on the preview or UI thread. */
 final class IpkCarClient {
     interface Listener {
         void onTab(Integer tab, String detail);
         void onMessage(String detail);
     }
+    private static final String MAP_DESCRIPTOR = "com.saicmotor.adapterservice.IMapService";
+    // The exact two writes performed by the OEM ClusterManager.requestProjection().
+    private static final int FICM_START_UP = 0x21407b00;
+    private static final int FICM_CENTRE_AREA = 0x21407b04;
+    private static final long CONNECT_TIMEOUT_MS = 2000;
     private final Context context;
     private final Handler io;
     private final Listener listener;
-    private Object car;
-    private Object cluster;
-    private Object properties;
+    private Object car, cluster, properties;
     private IBinder map;
-    private boolean carBound, mapBound;
-    private volatile boolean closed;
+    private Integer currentTab;
+    private boolean carBound, mapBound, closed;
+    private long mapBindingAt;
+    private String bindFailure;
 
     IpkCarClient(Context context, Handler io, Listener listener) {
-        this.context = context;
-        this.io = io;
-        this.listener = listener;
+        this.context = context; this.io = io; this.listener = listener;
     }
 
     private final ServiceConnection carConnection = new ServiceConnection() {
@@ -40,29 +46,34 @@ final class IpkCarClient {
             io.post(() -> { cluster = null; properties = null; });
         }
     };
-
     private final ServiceConnection mapConnection = new ServiceConnection() {
         @Override public void onServiceConnected(ComponentName name, IBinder binder) {
             io.post(() -> {
                 if (closed) return;
                 try {
-                    if (!"com.saicmotor.adapterservice.IMapService".equals(binder.getInterfaceDescriptor()))
+                    if (!MAP_DESCRIPTOR.equals(binder.getInterfaceDescriptor()))
                         throw new IllegalStateException("unexpected MapService descriptor");
                     map = binder;
-                    listener.onMessage("MapService connected");
-                } catch (Exception e) { listener.onMessage("MapService: " + e.getMessage()); }
+                    bindFailure = null;
+                    listener.onMessage("MapService verbunden");
+                } catch (Exception e) {
+                    unbindMap();
+                    bindFailure = rootMessage(e);
+                    listener.onMessage("MapService: " + bindFailure);
+                }
             });
         }
-        @Override public void onServiceDisconnected(ComponentName name) {
-            io.post(() -> { map = null; });
-        }
-        @Override public void onBindingDied(ComponentName name) {
-            io.post(IpkCarClient.this::unbindMap);
-        }
+        @Override public void onServiceDisconnected(ComponentName name) { io.post(() -> map = null); }
+        @Override public void onBindingDied(ComponentName name) { io.post(IpkCarClient.this::unbindMap); }
         @Override public void onNullBinding(ComponentName name) {
-            io.post(() -> { unbindMap(); listener.onMessage("MapService returned no Binder"); });
+            io.post(() -> { unbindMap(); bindFailure = "kein Binder"; listener.onMessage(bindFailure); });
         }
     };
+
+    void prepare(boolean autoRoute) {
+        readTab();
+        if (autoRoute && !closed) bindMap();
+    }
 
     void readTab() {
         if (closed) return;
@@ -82,8 +93,10 @@ final class IpkCarClient {
                 if (properties == null) properties = manager.invoke(car, "property");
                 tab = readManager(properties, false);
             }
-            listener.onTab(tab, tab == null ? "IPK tab unavailable" : "tab=" + tab);
+            currentTab = tab;
+            listener.onTab(tab, tab == null ? "IPK-Seite nicht lesbar" : "Seite=" + tab);
         } catch (Exception e) {
+            currentTab = null;
             listener.onTab(null, "Car API: " + rootMessage(e));
         }
     }
@@ -92,14 +105,11 @@ final class IpkCarClient {
         if (manager == null) return null;
         for (int area : vendor ? new int[]{0} : new int[]{0x1000000, 0}) {
             try {
-                Object value;
-                if (vendor) {
-                    value = manager.getClass().getMethod("getGlobalProperty", Class.class, int.class)
-                            .invoke(manager, Integer.class, IpkRoutePolicy.TAB_PROPERTY);
-                } else {
-                    value = manager.getClass().getMethod("getProperty", Class.class, int.class, int.class)
+                Object value = vendor
+                        ? manager.getClass().getMethod("getGlobalProperty", Class.class, int.class)
+                            .invoke(manager, Integer.class, IpkRoutePolicy.TAB_PROPERTY)
+                        : manager.getClass().getMethod("getProperty", Class.class, int.class, int.class)
                             .invoke(manager, Integer.class, IpkRoutePolicy.TAB_PROPERTY, area);
-                }
                 if (value != null && !(value instanceof Integer)) {
                     try {
                         Object status = value.getClass().getMethod("getStatus").invoke(value);
@@ -114,44 +124,76 @@ final class IpkCarClient {
         return null;
     }
 
-    /** Returns true only for an accepted Binder call; caller verifies the actual tab separately. */
-    boolean requestProjection() {
-        if (closed) return false;
+    private void bindMap() {
+        if (mapBound || closed) return;
+        if (mapBindingAt != 0 && SystemClock.elapsedRealtime() - mapBindingAt < 5000) return;
+        bindFailure = null;
+        mapBindingAt = SystemClock.elapsedRealtime();
+        try {
+            Intent intent = new Intent().setComponent(new ComponentName(
+                    "com.saicmotor.adapterservice", "com.saicmotor.adapterservice.services.MapService"));
+            mapBound = context.bindService(intent, mapConnection, Context.BIND_AUTO_CREATE);
+            if (!mapBound) bindFailure = "Bind abgelehnt";
+        } catch (Exception e) { bindFailure = rootMessage(e); }
+        if (bindFailure != null) listener.onMessage("MapService: " + bindFailure);
+    }
+
+    RequestResult requestProjection(boolean directFallback, BooleanSupplier allowed) {
+        if (closed || !allowed.getAsBoolean()) return RequestResult.CANCELLED;
+        // Recheck after any queued Binder work, so a newly selected priority page
+        // does not receive a request based on the main thread's older snapshot.
+        readTab();
+        if (!allowed.getAsBoolean() || currentTab == null || (currentTab != 0 && currentTab != 5))
+            return RequestResult.CANCELLED;
+        if (directFallback) return requestDirect(allowed);
+        bindMap();
         if (map == null) {
-            if (!mapBound) {
-                try {
-                    Intent intent = new Intent().setComponent(new ComponentName(
-                            "com.saicmotor.adapterservice", "com.saicmotor.adapterservice.services.MapService"));
-                    mapBound = context.bindService(intent, mapConnection, Context.BIND_AUTO_CREATE);
-                    if (!mapBound) listener.onMessage("MapService bind refused");
-                } catch (Exception e) { listener.onMessage("MapService bind: " + rootMessage(e)); }
-            }
-            return false;
+            if (bindFailure == null && SystemClock.elapsedRealtime() - mapBindingAt < CONNECT_TIMEOUT_MS)
+                return RequestResult.WAITING;
+            listener.onMessage("MapService nicht bereit: " + (bindFailure == null ? "Zeitlimit" : bindFailure));
+            return RequestResult.FAILED;
         }
         Parcel data = Parcel.obtain(), reply = Parcel.obtain();
         try {
-            data.writeInterfaceToken("com.saicmotor.adapterservice.IMapService");
+            if (!allowed.getAsBoolean()) return RequestResult.CANCELLED;
+            data.writeInterfaceToken(MAP_DESCRIPTOR);
             if (!map.transact(27, data, reply, 0)) throw new IllegalStateException("transaction 27 refused");
             reply.readException();
-            listener.onMessage("projection request accepted; waiting for IPK tab");
-            return true;
+            listener.onMessage("MapService-Anforderung gesendet; warte auf IPK-Seite");
+            return RequestResult.SENT;
         } catch (Exception e) {
             unbindMap();
-            listener.onMessage("projection failed: " + rootMessage(e));
-            return false;
+            listener.onMessage("MapService-Anforderung fehlgeschlagen: " + rootMessage(e));
+            return RequestResult.FAILED;
         } finally { data.recycle(); reply.recycle(); }
+    }
+
+    private RequestResult requestDirect(BooleanSupplier allowed) {
+        try {
+            if (cluster == null && car != null)
+                cluster = car.getClass().getMethod("getCarManager", String.class)
+                        .invoke(car, "vendorinstrumentcluster");
+            if (cluster == null) throw new IllegalStateException("Cluster-Manager nicht bereit");
+            Method set = cluster.getClass().getMethod("setGlobalProperty", Class.class, int.class, Object.class);
+            if (!allowed.getAsBoolean()) return RequestResult.CANCELLED;
+            set.invoke(cluster, Integer.class, FICM_START_UP, 1);
+            set.invoke(cluster, Integer.class, FICM_CENTRE_AREA, 1);
+            listener.onMessage("Direkte OEM-Anforderung gesendet (7b00=1,7b04=1); warte auf IPK-Seite");
+            return RequestResult.SENT;
+        } catch (Exception e) {
+            listener.onMessage("Direkte OEM-Anforderung fehlgeschlagen: " + rootMessage(e));
+            return RequestResult.FAILED;
+        }
     }
 
     void close() {
         closed = true;
-        // Called on the same IO handler as reads/transacts.
         unbindMap();
         if (carBound && car != null) {
             try { car.getClass().getMethod("disconnect").invoke(car); } catch (Exception ignored) { }
         }
-        map = null; car = null; cluster = null; properties = null;
+        car = null; cluster = null; properties = null;
     }
-
     private void unbindMap() {
         map = null;
         if (mapBound) {
@@ -159,7 +201,6 @@ final class IpkCarClient {
             mapBound = false;
         }
     }
-
     private static String rootMessage(Throwable e) {
         while (e.getCause() != null) e = e.getCause();
         return e.getClass().getSimpleName() + ": " + e.getMessage();

@@ -175,3 +175,12 @@ extern "C" JNIEXPORT jlong JNICALL
 Java_com_drivehub_kamera_CameraProbe_previewSinkFrameAgeMs(JNIEnv*, jclass, jint videoIndex, jint sinkId) {
     return camera_stream_manager::previewSinkFrameAgeMs(videoIndex, sinkId);
 }
+
+extern "C" JNIEXPORT jlongArray JNICALL
+Java_com_drivehub_kamera_CameraProbe_previewSinkStats(JNIEnv* env, jclass, jint videoIndex, jint sinkId) {
+    const auto values = camera_stream_manager::previewSinkStats(videoIndex, sinkId);
+    const jlong data[] = {values[0], values[1], values[2], values[3]};
+    jlongArray result = env->NewLongArray(4);
+    if (result != nullptr) env->SetLongArrayRegion(result, 0, 4, data);
+    return result;
+}

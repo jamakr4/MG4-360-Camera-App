@@ -25,6 +25,8 @@ public final class CameraProbe {
     public static native void detachPreviewSink(int videoIndex, int sinkId);
     /** -1 until this output has posted a frame, otherwise its age in milliseconds. */
     public static native long previewSinkFrameAgeMs(int videoIndex, int sinkId);
+    /** Age (ms), posted-frame count, capture-to-post (ms), window-post cost (ms). */
+    public static native long[] previewSinkStats(int videoIndex, int sinkId);
 
     /**
      * What each camera device reported the last time it was opened: pixel format, size, stride

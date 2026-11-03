@@ -1033,6 +1033,7 @@ namespace camera_stream_manager
             virtual void processFrame(const cv::Mat &rgbaFrame) = 0;
             virtual bool isPreview() const { return false; }
             virtual int64_t lastPreviewPostUs() const { return 0; }
+            virtual std::array<int64_t, 4> previewStats() const { return {0, 0, 0, 0}; }
 
             /**
              * Whether this consumer would rather have the camera buffer as it came off the
@@ -1064,7 +1065,7 @@ namespace camera_stream_manager
             struct Frame { cv::Mat rgba; int64_t capturedUs = 0; };
         public:
             explicit ParallelPreviewConsumer(ANativeWindow *window, bool mirror)
-                : window_(window), mirror_(mirror), frames_(50000) {}
+                : window_(window), mirror_(mirror), frames_(0) {}
             ~ParallelPreviewConsumer() override { ANativeWindow_release(window_); }
 
             void start() {
@@ -1073,6 +1074,10 @@ namespace camera_stream_manager
             }
             bool isPreview() const override { return true; }
             int64_t lastPreviewPostUs() const override { return lastPostUs_.load(); }
+            std::array<int64_t, 4> previewStats() const override {
+                return {lastPostUs_.load(), postedFrames_.load(), lastLatencyUs_.load() / 1000,
+                        lastPostCostUs_.load() / 1000};
+            }
             void processFrame(const cv::Mat &rgba) override {
                 const int64_t captured = nowUs();
                 frames_.submit(captured, [&] { return Frame{rgba.clone(), captured}; });
@@ -1104,6 +1109,7 @@ namespace camera_stream_manager
                         }
                         if (mirror_) cv::flip(frame.rgba, frame.rgba, 1);
                         ANativeWindow_Buffer out{};
+                        const int64_t postStart = nowUs();
                         // This can block on a suspended display. Only this output's worker
                         // waits; it owns its window and survives detachment until the call ends.
                         if (ANativeWindow_lock(window_, &out, nullptr) != 0) break;
@@ -1117,8 +1123,13 @@ namespace camera_stream_manager
                                             frame.rgba.ptr(y), bytes);
                         }
                         if (ANativeWindow_unlockAndPost(window_) != 0) break;
-                        if (!stopping_.load() && nowUs() - frame.capturedUs <= 500000)
-                            lastPostUs_.store(nowUs());
+                        const int64_t posted = nowUs();
+                        if (!stopping_.load() && posted - frame.capturedUs <= 500000) {
+                            lastLatencyUs_.store(posted - frame.capturedUs);
+                            lastPostCostUs_.store(posted - postStart);
+                            postedFrames_.fetch_add(1);
+                            lastPostUs_.store(posted);
+                        }
                     }
                 } catch (const std::exception &e) {
                     loge("parallel preview ended: %s", e.what());
@@ -1137,6 +1148,7 @@ namespace camera_stream_manager
             LatestPreviewFrame<Frame> frames_;
             std::atomic<bool> stopping_{false}, finished_{false};
             std::atomic<int64_t> lastPostUs_{0};
+            std::atomic<int64_t> postedFrames_{0}, lastLatencyUs_{0}, lastPostCostUs_{0};
             std::mutex doneMutex_;
             std::condition_variable done_;
         };
@@ -2776,6 +2788,13 @@ namespace camera_stream_manager
                 return it == consumers_.end() ? 0 : it->second->lastPreviewPostUs();
             }
 
+            std::array<int64_t, 4> previewSnapshot(int id) {
+                std::lock_guard<std::mutex> lock(mutex_);
+                auto it = consumers_.find(id);
+                return it == consumers_.end() ? std::array<int64_t, 4>{0, 0, 0, 0}
+                                             : it->second->previewStats();
+            }
+
             void detachExtraPreviews() {
                 std::vector<int> ids;
                 {
@@ -3724,6 +3743,15 @@ namespace camera_stream_manager
         if (session == nullptr) return -1;
         const int64_t posted = session->previewPostUs(PREVIEW_CONSUMER_ID_BASE + sinkId);
         return posted == 0 ? -1 : (nowUs() - posted) / 1000;
+    }
+
+    std::array<int64_t, 4> previewSinkStats(int videoIndex, int sinkId) {
+        if (sinkId < 0 || sinkId > 31) return {-1, 0, 0, 0};
+        auto session = getSession(videoIndex);
+        if (session == nullptr) return {-1, 0, 0, 0};
+        auto stats = session->previewSnapshot(PREVIEW_CONSUMER_ID_BASE + sinkId);
+        stats[0] = stats[0] == 0 ? -1 : (nowUs() - stats[0]) / 1000;
+        return stats;
     }
 
     void detachAllPreviews()
