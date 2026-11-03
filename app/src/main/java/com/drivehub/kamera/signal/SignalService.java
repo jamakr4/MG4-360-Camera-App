@@ -5,6 +5,7 @@ import com.drivehub.kamera.R;
 import com.drivehub.kamera.MainActivity;
 import com.drivehub.kamera.camera.CameraIndex;
 import com.drivehub.kamera.camera.IpkCameraOverlay;
+import com.drivehub.kamera.camera.IpkCameraSelection;
 import com.drivehub.kamera.camera.OverlayService;
 import com.drivehub.kamera.camera.TileViewActivity;
 import com.drivehub.kamera.dashcam.DashcamSettingsController;
@@ -454,6 +455,8 @@ public class SignalService extends Service {
         oemCoexistPrefListener = (sp, key) -> {
             if (UiPrefs.KEY_OEM_AVM_COEXIST.equals(key)) {
                 mainHandler.post(this::applyOemCoexistState);
+            } else if (UiPrefs.KEY_IPK_CAMERA_ENABLED.equals(key) || UiPrefs.KEY_IPK_REARVIEW_ENABLED.equals(key)) {
+                requestRecheck();
             } else if (UiPrefs.KEY_DIGITAL_REARVIEW_ENABLED.equals(key)) {
                 mainHandler.post(() -> {
                     // Any explicit pref change cancels the temp-hide so the new state takes effect immediately.
@@ -652,7 +655,7 @@ public class SignalService extends Service {
             clearOverlayShownTimestamp();
             OverlayService.hideOverlay(this);
             if (nextMode == 4 || nextMode == 0) {
-                ipkCamera.hide();
+                updateIpkCamera(nextMode);
                 Log.i(TAG, "Main visible => no route (mode " + nextMode + ")");
                 return;
             }
@@ -664,10 +667,7 @@ public class SignalService extends Service {
             i.setPackage(getPackageName());
             i.putExtra(EXTRA_CAMERA_INDEX, targetCamera.getVideoIndex());
             sendBroadcast(i);
-            if ((nextMode == 1 || nextMode == 2) && isOverlayEnabled()
-                    && !isOemAvmLatchedActive() && !isOemAvmInForeground()) {
-                ipkCamera.show(targetCamera.getVideoIndex());
-            } else ipkCamera.hide();
+            updateIpkCamera(nextMode);
             Log.i(TAG, "Main visible => route camera to main preview: " + targetCamera);
             return;
         }
@@ -688,7 +688,8 @@ public class SignalService extends Service {
             // Also hide any leftover overlay if the setting is disabled.
             mainHandler.removeCallbacks(hideRunnable);
             clearOverlayShownTimestamp();
-            hideCameraOverlays();
+            OverlayService.hideOverlay(this);
+            updateIpkCamera(nextMode);
             Log.i(TAG, "Overlay disabled in settings => no overlay, only listening.");
             return;
         }
@@ -729,16 +730,16 @@ public class SignalService extends Service {
         mainHandler.removeCallbacks(hideRunnable);
         if (nextMode == 1) {
             markOverlayShownNow();
-            ipkCamera.show(CameraIndex.LEFT.getVideoIndex());
+            updateIpkCamera(nextMode);
             OverlayService.showOverlay(this, CameraIndex.LEFT.getVideoIndex());
             Log.i(TAG, "Left signal => overlay " + CameraIndex.LEFT);
         } else if (nextMode == 2) {
             markOverlayShownNow();
-            ipkCamera.show(CameraIndex.RIGHT.getVideoIndex());
+            updateIpkCamera(nextMode);
             OverlayService.showOverlay(this, CameraIndex.RIGHT.getVideoIndex());
             Log.i(TAG, "Right signal => overlay " + CameraIndex.RIGHT);
         } else if (nextMode == 4) {
-            ipkCamera.hide();
+            updateIpkCamera(nextMode);
             clearOverlayShownTimestamp();
             OverlayService.showOverlay(this, CameraIndex.REAR.getVideoIndex(),
                     OverlayService.OVERLAY_REASON_DIGITAL_REARVIEW);
@@ -753,6 +754,18 @@ public class SignalService extends Service {
             }
             Log.i(TAG, "No active overlay mode => overlay hide");
         }
+    }
+
+    private void updateIpkCamera(int mode) {
+        SharedPreferences prefs = UiPrefs.getPrefs(this);
+        boolean signalEnabled = isOverlayEnabled() && prefs.getBoolean(UiPrefs.KEY_IPK_CAMERA_ENABLED, false);
+        boolean rearviewEnabled = UiPrefs.isDigitalRearviewEnabled(prefs)
+                && prefs.getBoolean(UiPrefs.KEY_IPK_REARVIEW_ENABLED, false)
+                && !isRearviewTempHidden() && !MainActivity.isSettingsDialogOpen();
+        boolean blocked = TileViewActivity.isVisible() || isOemAvmLatchedActive() || isOemAvmInForeground();
+        int video = IpkCameraSelection.selectVideo(mode, signalEnabled, rearviewEnabled, blocked);
+        if (video < 0) ipkCamera.hide();
+        else ipkCamera.show(video);
     }
 
     private void maybeTriggerDashcamEventForHazards(int previousLamp) {

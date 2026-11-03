@@ -12,6 +12,13 @@ final class IpkPreviewGeometry {
         this.contentCorners = contentCorners;
     }
 
+    static IpkPreviewGeometry forCamera(int side, CameraIndex camera, boolean rotated,
+            boolean compact, int leftCrop, int rightCrop) {
+        boolean sideCamera = camera != null && camera.isSide();
+        return calculate(side, camera == CameraIndex.LEFT, sideCamera && rotated,
+                sideCamera && compact ? leftCrop : 0, sideCamera && compact ? rightCrop : 0);
+    }
+
     static IpkPreviewGeometry calculate(int side, boolean leftCamera, boolean rotated,
             int leftCrop, int rightCrop) {
         // Fast capture has fewer vertical samples; the logical image is still 720x480.

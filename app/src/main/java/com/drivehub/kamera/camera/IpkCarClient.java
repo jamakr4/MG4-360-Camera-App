@@ -10,6 +10,10 @@ import android.os.Parcel;
 import android.os.SystemClock;
 
 import java.lang.reflect.Method;
+import java.text.SimpleDateFormat;
+import java.util.ArrayDeque;
+import java.util.Date;
+import java.util.Locale;
 import java.util.function.BooleanSupplier;
 import com.drivehub.kamera.camera.IpkRoutePolicy.RequestResult;
 
@@ -18,6 +22,7 @@ final class IpkCarClient {
     interface Listener {
         void onTab(Integer tab, String detail);
         void onMessage(String detail);
+        void onDiagnostics(String trace);
     }
     private static final String MAP_DESCRIPTOR = "com.saicmotor.adapterservice.IMapService";
     // The exact two writes performed by the OEM ClusterManager.requestProjection().
@@ -33,6 +38,11 @@ final class IpkCarClient {
     private boolean carBound, mapBound, closed;
     private long mapBindingAt;
     private String bindFailure;
+    private final ArrayDeque<String> diagnosticLines = new ArrayDeque<>();
+    private final SimpleDateFormat diagnosticTime = new SimpleDateFormat("HH:mm:ss", Locale.ROOT);
+    private long lastDiagnosticRead;
+    private Integer lastDiagnosticTab;
+    private String lastDiagnosticValues, propertyAccess;
 
     IpkCarClient(Context context, Handler io, Listener listener) {
         this.context = context; this.io = io; this.listener = listener;
@@ -72,7 +82,10 @@ final class IpkCarClient {
 
     void prepare(boolean autoRoute) {
         readTab();
-        if (autoRoute && !closed) bindMap();
+        if (autoRoute && !closed) {
+            captureDiagnostics("Zustand", false);
+            bindMap();
+        }
     }
 
     void readTab() {
@@ -88,11 +101,13 @@ final class IpkCarClient {
             }
             Method manager = car.getClass().getMethod("getCarManager", String.class);
             if (cluster == null) cluster = manager.invoke(car, "vendorinstrumentcluster");
-            Integer tab = readManager(cluster, true);
+            Integer tab = readManager(cluster, true, IpkRoutePolicy.TAB_PROPERTY);
+            if (tab != null && (tab < 0 || tab > 7)) tab = null;
             if (tab == null) {
                 if (properties == null) properties = manager.invoke(car, "property");
-                tab = readManager(properties, false);
+                tab = readManager(properties, false, IpkRoutePolicy.TAB_PROPERTY);
             }
+            if (tab != null && (tab < 0 || tab > 7)) tab = null;
             currentTab = tab;
             listener.onTab(tab, tab == null ? "IPK-Seite nicht lesbar" : "Seite=" + tab);
         } catch (Exception e) {
@@ -101,15 +116,15 @@ final class IpkCarClient {
         }
     }
 
-    private Integer readManager(Object manager, boolean vendor) {
+    private Integer readManager(Object manager, boolean vendor, int property) {
         if (manager == null) return null;
         for (int area : vendor ? new int[]{0} : new int[]{0x1000000, 0}) {
             try {
                 Object value = vendor
                         ? manager.getClass().getMethod("getGlobalProperty", Class.class, int.class)
-                            .invoke(manager, Integer.class, IpkRoutePolicy.TAB_PROPERTY)
+                            .invoke(manager, Integer.class, property)
                         : manager.getClass().getMethod("getProperty", Class.class, int.class, int.class)
-                            .invoke(manager, Integer.class, IpkRoutePolicy.TAB_PROPERTY, area);
+                            .invoke(manager, Integer.class, property, area);
                 if (value != null && !(value instanceof Integer)) {
                     try {
                         Object status = value.getClass().getMethod("getStatus").invoke(value);
@@ -117,11 +132,64 @@ final class IpkCarClient {
                     } catch (NoSuchMethodException ignored) { }
                     value = value.getClass().getMethod("getValue").invoke(value);
                 }
-                if (value instanceof Integer && (Integer) value >= 0 && (Integer) value <= 7)
-                    return (Integer) value;
+                if (value instanceof Integer) return (Integer) value;
             } catch (Exception ignored) { }
         }
         return null;
+    }
+
+    private String readDiagnosticValue(int property) {
+        Integer value = readManager(cluster, true, property);
+        if (value == null) {
+            try {
+                if (properties == null && car != null)
+                    properties = car.getClass().getMethod("getCarManager", String.class).invoke(car, "property");
+                value = readManager(properties, false, property);
+            } catch (Exception ignored) { }
+        }
+        return value == null ? "?" : value.toString();
+    }
+
+    private void captureDiagnostics(String stage, boolean force) {
+        if (closed || cluster == null) return;
+        long now = SystemClock.elapsedRealtime();
+        boolean tabChanged = currentTab == null ? lastDiagnosticTab != null : !currentTab.equals(lastDiagnosticTab);
+        if (!force && !tabChanged && now - lastDiagnosticRead < 2000) return;
+        lastDiagnosticRead = now;
+        lastDiagnosticTab = currentTab;
+        String values = "tab=" + (currentTab == null ? "?" : currentTab)
+                + " focus=" + readDiagnosticValue(0x21407b09)
+                + " centre=" + readDiagnosticValue(0x21407b0a)
+                + " ready(M/N)=" + readDiagnosticValue(0x21407b01) + "/" + readDiagnosticValue(0x21407b16)
+                + " area=" + readDiagnosticValue(FICM_CENTRE_AREA)
+                + " send=" + readDiagnosticValue(0x21407b05);
+        if (!force && values.equals(lastDiagnosticValues)) return;
+        lastDiagnosticValues = values;
+        String line = diagnosticTime.format(new Date()) + " " + stage + ": " + values;
+        diagnosticLines.addLast(line);
+        while (diagnosticLines.size() > 8) diagnosticLines.removeFirst();
+        if (propertyAccess == null) propertyAccess = readPropertyAccess();
+        listener.onDiagnostics("Routing-Diagnose D1 · letzte Messungen\n" + propertyAccess
+                + "\n" + String.join("\n", diagnosticLines));
+    }
+
+    private String readPropertyAccess() {
+        StringBuilder result = new StringBuilder("Zugriff");
+        try {
+            Object configs = cluster.getClass().getMethod("getPropertyList").invoke(cluster);
+            if (!(configs instanceof Iterable)) return "Zugriff: nicht lesbar";
+            for (Object config : (Iterable<?>) configs) {
+                int id = (Integer) config.getClass().getMethod("getPropertyId").invoke(config);
+                if (id != 0x21407b02 && id != 0x21407b04 && id != 0x21407b05
+                        && id != 0x21407b09 && id != 0x21407b0a && id != 0x21407b16
+                        && id != IpkRoutePolicy.TAB_PROPERTY) continue;
+                int access = (Integer) config.getClass().getMethod("getAccess").invoke(config);
+                result.append(' ').append(Integer.toHexString(id & 0xffff)).append(':')
+                        .append((access & 1) != 0 ? "R" : "-")
+                        .append((access & 2) != 0 ? "W" : "-");
+            }
+        } catch (Exception e) { return "Zugriff: " + rootMessage(e); }
+        return result.toString();
     }
 
     private void bindMap() {
@@ -155,10 +223,12 @@ final class IpkCarClient {
         }
         Parcel data = Parcel.obtain(), reply = Parcel.obtain();
         try {
+            captureDiagnostics("vor MapService", true);
             if (!allowed.getAsBoolean()) return RequestResult.CANCELLED;
             data.writeInterfaceToken(MAP_DESCRIPTOR);
             if (!map.transact(27, data, reply, 0)) throw new IllegalStateException("transaction 27 refused");
             reply.readException();
+            captureDiagnostics("nach MapService", true);
             listener.onMessage("MapService-Anforderung gesendet; warte auf IPK-Seite");
             return RequestResult.SENT;
         } catch (Exception e) {
@@ -175,9 +245,11 @@ final class IpkCarClient {
                         .invoke(car, "vendorinstrumentcluster");
             if (cluster == null) throw new IllegalStateException("Cluster-Manager nicht bereit");
             Method set = cluster.getClass().getMethod("setGlobalProperty", Class.class, int.class, Object.class);
+            captureDiagnostics("vor direkt", true);
             if (!allowed.getAsBoolean()) return RequestResult.CANCELLED;
             set.invoke(cluster, Integer.class, FICM_START_UP, 1);
             set.invoke(cluster, Integer.class, FICM_CENTRE_AREA, 1);
+            captureDiagnostics("nach direkt", true);
             listener.onMessage("Direkte OEM-Anforderung gesendet (7b00=1,7b04=1); warte auf IPK-Seite");
             return RequestResult.SENT;
         } catch (Exception e) {

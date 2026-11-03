@@ -1,9 +1,9 @@
 # Lokaler IPK-Kameratest
 
 Branch: `codex/ipk-camera-auto-route`, Basis `90fb90c7dfae2087dd27ff4e569a6d21734c062d`.
-Aktuelle Test-APK: `0.8.15-ipk4`, VersionCode 33, gleicher Paketname und vorhandenes Projektzertifikat. Der erweiterte Diagnosestatus trägt weiterhin die Kennzeichnung `IPK2`.
+Aktuelle Test-APK: `0.8.18-ipk-rearview`, VersionCode 36, gleicher Paketname und vorhandenes Projektzertifikat. Die Routing-Diagnose D1 und abgerundete Ecken sind enthalten. Der Status trägt weiterhin die Kennzeichnung `IPK2` und ergänzt „Routing-Diagnose D1“.
 
-Der erste Fahrzeugtest bestätigt die parallele Kameraausgabe. Auf der Verbrauchsseite blieb der sichtbare Inhalt bei der automatischen Anforderung unverändert. Ob der neue Anforderungsweg dort funktioniert, ist noch im Fahrzeug zu prüfen.
+Der Fahrzeugtest vom 03.11.2026 bestätigt flüssigere parallele Kameraausgabe, transparente Ränder und Kompaktansicht. Die automatische Anforderung bleibt auf der Verbrauchsseite ohne sichtbare Wirkung, auch in beiden Bedienmodi des rechten Lenkradsticks. D1 ergänzt einen Diagnoseverlauf, um die fehlende Voraussetzung für den Seitenwechsel zu ermitteln; siehe [Routing-Diagnose](IPK_ROUTING_DIAGNOSIS.md).
 
 ## Aktivieren und prüfen
 
@@ -19,12 +19,26 @@ Die vorhandenen Einstellungen für Kompaktansicht, beide Ausschnittregler und Dr
 
 Änderungen am Kompakt-Schalter oder den Reglern aktualisieren die bestehende TextureView ohne erneutes Kamera-Attach. Bei ausgeschalteter Kompaktansicht erscheint wieder das vollständige 3:2-Bild. Freie Flächen um das Bild bleiben transparent; schwarze Pixel im Kamerabild selbst bleiben erhalten. Durch das Einpassen des beschnittenen Bildes kann die Darstellung die verfügbare IPK-Fläche besser ausnutzen.
 
+Die Einstellung für abgerundete Ecken gilt ebenfalls für das IPK. Der Radius verwendet wie auf dem Hauptdisplay `UiPrefs.getCornerRadiusPx`: halbe kürzere Bildkante mal eingestellter Radiusanteil. Die Kontur schneidet das sichtbare Kamerarechteck einschließlich Kompaktansicht und Drehung aus; frei bleibende Bereiche bleiben transparent. Radiusänderungen werden direkt übernommen. Beim Test Radius 0 und einen deutlich gerundeten Wert mit beiden Kameras sowie Kompaktansicht ein/aus vergleichen.
+
+## Digitaler Rückspiegel im IPK
+
+Unter Einstellungen → Digital Rearview den digitalen Rückspiegel und den neuen Schalter „Digitalen Rückspiegel zusätzlich im Fahrerdisplay anzeigen“ aktivieren. Der neue Schalter ist standardmäßig aus und unabhängig vom IPK-Blinkerkamera-Schalter.
+
+Das Heckbild verwendet dieselbe CameraSession und die bereits vorhandene horizontale Spiegelung des nativen Vorschau-Sinks. Wie die Dashcam-Ausgabe hat es das logische Format 720 × 480. Es wird vollständig und proportional als etwa 260 × 173 px zentriert in die IPK-Fläche eingepasst; oben und unten bleiben jeweils etwa 43 px transparent. Die Kompaktregler und Drehung für Seitenkameras verändern das Heckbild nicht. Die Eckenrundung gilt auch für den Rückspiegel.
+
+Wenn die IPK-Blinkerkamera aktiviert ist, hat sie Vorrang und wird danach wieder durch den Rückspiegel ersetzt. Ist ausschließlich der IPK-Rückspiegel aktiviert, bleibt er auch während eines Blinkervorgangs sichtbar, während auf dem Hauptdisplay die Seitenkamera erscheinen kann. Beim Wechsel zwischen Rückspiegel und Blinker beginnt jeweils eine neue IPK-Anzeigesitzung mit eigenem Routingbudget; ein Wechsel links → rechts zählt weiterhin zur selben Blinkersitzung.
+
+Die bisherige Rückspiegelsteuerung gilt gemeinsam: ausschalten, schließen, zeitweiliges Ausblenden und Öffnen der Einstellungen pausieren auch den IPK-Rückspiegel. Bei sichtbarer Hauptansicht kann das IPK weiterhin den Rückspiegel anzeigen, ohne die dort manuell ausgewählte Kamera umzustellen. OEM-AVM, Rückwärtsgang und sichtbare Vierkamera-Kachelansicht geben die Kameras wie bisher frei. Die Ausgabe bleibt auf den nativen Seiten Musik/Navigation sichtbar; das automatische Umschalten aus Verbrauch/Einstellungen ist weiterhin ungelöst.
+
+Fahrzeugtest: Musik oder Navigation wählen; Rückspiegel auf beiden Displays und bei paralleler Dashcam-Aufnahme vergleichen. Links/rechts blinken und Rückkehr zum Heckbild prüfen, dann den IPK-Blinkerschalter deaktivieren und prüfen, dass das Heckbild im IPK beim Blinken erhalten bleibt. Anschließend den IPK-Rückspiegel-Schalter bei laufendem Spiegel ein/aus schalten, zeitweiliges Ausblenden testen und OEM-360/Rückwärtsgang sowie Vierkamera-Kachelansicht prüfen.
+
 ## Verhalten der automatischen Seitenanforderung
 
 - Unterstützte Android-Seiten: Navigation = 1, Musik = 2, gelesen aus `0x21407b18`.
 - Navigation wird nur aus Bordcomputer = 0 und Einstellungen = 5 angefordert. Telefon = 3, Warnzentrum = 4, Assistenz = 6 und unbekannte Zustände haben Vorrang.
 - Die Car-API, aktuelle Seite und MapService-Verbindung werden bei aktivierter Funktion bereits ohne Blinker vorbereitet. Dabei wird kein Kameraziel angelegt und keine Seite angefordert.
-- Höchstens zwei abgeschlossene Versuche pro Blinkeranzeige mit mindestens 1,5 Sekunden Abstand. Warten auf die Verbindung verbraucht keinen Versuch; eine abgelehnte oder nach zwei Sekunden nicht verfügbare Verbindung zählt als Fehlschlag.
+- Höchstens zwei abgeschlossene Versuche pro IPK-Anzeigesitzung mit mindestens 1,5 Sekunden Abstand. Warten auf die Verbindung verbraucht keinen Versuch; eine abgelehnte oder nach zwei Sekunden nicht verfügbare Verbindung zählt als Fehlschlag.
 - Erster Versuch: MapService, Transaktion 27 (`requestProjection`). Zweiter Versuch: direkter Aufruf des Vendor-Instrument-Cluster-Managers mit `0x21407b00=1` und `0x21407b04=1`, genau wie im untersuchten OEM-`ClusterManager.requestProjection()`. Damit wird ein fehlender oder noch nicht initialisierter Cluster-Manager im MapService umgangen. Das ist eine Projektionsanforderung und keine verifizierte beliebige Seitenwahl.
 - Ein erfolgreicher Binder-Aufruf ist noch keine Bestätigung des sichtbaren Seitenwechsels. Maßgeblich ist die danach gelesene Tab-Rückmeldung und beim Test das physische IPK.
 - Sobald eine unterstützte Seite bestätigt wurde, wird während derselben Anzeige nicht erneut automatisch umgeschaltet. So wird eine anschließende Seitenwahl des Fahrers nicht zurückgedrängt.
@@ -65,8 +79,12 @@ c++ -std=c++17 -pthread app/src/test/cpp/latest_preview_frame_test.cpp -o /tmp/m
 
 Signierung wie im vorhandenen `tools/build_sign_release.sh` mit dem bereits im Projekt enthaltenen Plattform-Zertifikat. Keine automatische Installation oder Veröffentlichung.
 
-Für die aktuelle Test-APK wurde ausschließlich während des Builds `versionCode 33` und `versionName "0.8.15-ipk4"` gesetzt und anschließend der ursprüngliche Inhalt von `app/build.gradle` wiederhergestellt. Die Versionsdatei ist daher kein Teil dieses Folgecommits; die bereits vorhandene lokale Versionsänderung im anderen Checkout bleibt beim Aktualisieren des Branches erhalten. Ein normaler eigener Build verwendet die Versionswerte seines Checkouts.
+Für die aktuelle Test-APK wurde ausschließlich während des Builds `versionCode 36` und `versionName "0.8.18-ipk-rearview"` gesetzt und anschließend der ursprüngliche Inhalt von `app/build.gradle` wiederhergestellt. Die Versionsdatei ist daher kein Teil dieses Folgecommits; die bereits vorhandene lokale Versionsänderung im anderen Checkout bleibt beim Aktualisieren des Branches erhalten. Ein normaler eigener Build verwendet die Versionswerte seines Checkouts.
 
 Die lokalen Tests prüfen Tab-Freigabe, Prioritäten, begrenzte Wiederholungen, manuelle Seitenwahl nach Bestätigung, Positionierung und die Unabhängigkeit der Vorschau-Mailboxen. Die IPK-Geometrietests bilden die Viewportecken zurück auf das ursprüngliche Kamerabild ab: Der Ausschnitt muss für beide Kameras, beide Drehungen, asymmetrische und maximale Beschnitte sowie mehrere Displaygrößen stimmen und proportional in die Fläche passen. Das Verhalten des physischen IPK und die Annahme der Seitenanforderung bleiben der Fahrzeugtest.
 
-Prüfstand 02.11.2026: Debug- und Release-Build des Kompakt-Folgebuilds erfolgreich; 55 Java-Tests ohne Fehler oder übersprungene Tests. Die signierte Release-APK wurde mit `apksigner verify` geprüft. Der native Mailbox-Test inklusive ungedrosselter 25-FPS-Zuführung war beim vorherigen Diagnose-/Performance-Build erfolgreich. Kameraausschnitt, Transparenz, Startzeit, Flüssigkeit und automatisches Routing sind noch im Fahrzeug zu bestätigen.
+Prüfstand 03.11.2026: Debug- und Release-Build von D1 erfolgreich; 55 Java-Tests ohne Fehler oder übersprungene Tests. Die signierte Release-APK wurde mit `apksigner verify` geprüft. Der native Mailbox-Test inklusive ungedrosselter 25-FPS-Zuführung war beim vorherigen Diagnose-/Performance-Build erfolgreich. Flüssigere Ausgabe, Transparenz und Kompaktansicht wurden im Fahrzeug bestätigt. Automatisches Routing bleibt ungelöst; die zusätzlichen D1-Signale müssen noch im Fahrzeug erfasst werden.
+
+Der anschließende Rundungsbuild wurde als Release erneut erfolgreich gebaut und mit `apksigner verify` geprüft. Die Eckenrundung ist noch im Fahrzeug zu prüfen.
+
+Der Rückspiegel-Folgebuild ist als Debug und Release gebaut; 61 Java-Tests sind ohne Fehler oder übersprungene Tests erfolgreich. Neue Tests prüfen die Priorität und Rückkehr der Bildquellen, unabhängige IPK-Auswahl, Freigabe bei blockierenden Zuständen und den vollständigen ungedrehten 3:2-Heckausschnitt trotz aktiver Seitenkamera-Beschneidung. Signatur und APK-Version wurden geprüft. Der IPK-Rückspiegel benötigt noch den Fahrzeugtest einschließlich paralleler Dashcam-Aufnahme.

@@ -7,6 +7,7 @@ import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.Matrix;
+import android.graphics.Outline;
 import android.graphics.PixelFormat;
 import android.graphics.Point;
 import android.graphics.SurfaceTexture;
@@ -21,6 +22,8 @@ import android.view.Display;
 import android.view.Gravity;
 import android.view.Surface;
 import android.view.TextureView;
+import android.view.View;
+import android.view.ViewOutlineProvider;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
 import java.util.Locale;
@@ -109,6 +112,13 @@ public final class IpkCameraOverlay implements AutoCloseable {
                     if (desiredCamera >= 0) { routeDetail = message; publish(false); }
                 });
             }
+            @Override public void onDiagnostics(String trace) {
+                main.post(() -> {
+                    if (closed) return;
+                    prefs.edit().putString(UiPrefs.KEY_IPK_DIAGNOSTIC_TRACE, trace).apply();
+                    event(trace);
+                });
+            }
         });
         if (displays != null) displays.registerDisplayListener(displayListener, main);
         prefs.registerOnSharedPreferenceChangeListener(preferenceListener);
@@ -118,23 +128,28 @@ public final class IpkCameraOverlay implements AutoCloseable {
         scheduleNow();
     }
 
-    public String status() { return status; }
+    public String status() { return withDiagnostics(status, prefs); }
 
     public static String savedStatus(Context context) {
-        return new IpkStatusState(UiPrefs.getPrefs(context)
-                .getString(UiPrefs.KEY_IPK_LAST_SESSION, null)).snapshot();
+        SharedPreferences prefs = UiPrefs.getPrefs(context);
+        return withDiagnostics(new IpkStatusState(prefs.getString(UiPrefs.KEY_IPK_LAST_SESSION, null)).snapshot(), prefs);
+    }
+
+    private static String withDiagnostics(String status, SharedPreferences prefs) {
+        String trace = prefs.getString(UiPrefs.KEY_IPK_DIAGNOSTIC_TRACE, "");
+        return trace.isEmpty() ? status : status + "\n\n" + trace;
     }
 
     public void show(int camera) {
         if (closed) return;
         CameraIndex index = CameraIndex.fromVideoIndex(camera);
-        if (index == null || !index.isSide()) { hide(); return; }
+        if (index == null || (!index.isSide() && index != CameraIndex.REAR)) { hide(); return; }
         if (desiredCamera != camera) {
-            boolean freshSignal = desiredCamera < 0;
+            boolean freshSession = IpkCameraSelection.startsNewSession(desiredCamera, camera);
             desiredCamera = camera;
             destroyWindow();
             retryAfter = 0;
-            if (freshSignal) {
+            if (freshSession) {
                 sessionGeneration++;
                 routing = new IpkRoutePolicy();
                 signalStarted = SystemClock.elapsedRealtime();
@@ -162,7 +177,8 @@ public final class IpkCameraOverlay implements AutoCloseable {
     }
 
     private final SharedPreferences.OnSharedPreferenceChangeListener preferenceListener = (p, key) -> {
-        if (UiPrefs.KEY_IPK_CAMERA_ENABLED.equals(key) || UiPrefs.KEY_IPK_AUTO_ROUTE.equals(key)
+        if (UiPrefs.KEY_IPK_CAMERA_ENABLED.equals(key) || UiPrefs.KEY_IPK_REARVIEW_ENABLED.equals(key)
+                || UiPrefs.KEY_IPK_AUTO_ROUTE.equals(key)
                 || UiPrefs.KEY_OVERLAY_ROTATE_TO_DRIVING_DIRECTION.equals(key)) {
             main.post(() -> {
                 destroyWindow();
@@ -175,6 +191,10 @@ public final class IpkCameraOverlay implements AutoCloseable {
             main.post(() -> {
                 if (!closed && root != null && texture != null)
                     applyPreviewFraming(texture, root.getLayoutParams().width);
+            });
+        } else if (UiPrefs.KEY_TILE_CORNER_RADIUS.equals(key)) {
+            main.post(() -> {
+                if (!closed && texture != null) texture.invalidateOutline();
             });
         }
     };
@@ -200,15 +220,25 @@ public final class IpkCameraOverlay implements AutoCloseable {
     private void scheduleNow() {
         main.removeCallbacks(tick);
         if (!closed && (desiredCamera >= 0 || (screenOn
-                && prefs.getBoolean(UiPrefs.KEY_IPK_CAMERA_ENABLED, false)))) main.post(tick);
+                && anyIpkEnabled()))) main.post(tick);
+    }
+
+    private boolean anyIpkEnabled() {
+        return prefs.getBoolean(UiPrefs.KEY_IPK_CAMERA_ENABLED, false)
+                || prefs.getBoolean(UiPrefs.KEY_IPK_REARVIEW_ENABLED, false);
+    }
+
+    private boolean currentCameraEnabled() {
+        return prefs.getBoolean(desiredCamera == CameraIndex.REAR.getVideoIndex()
+                ? UiPrefs.KEY_IPK_REARVIEW_ENABLED : UiPrefs.KEY_IPK_CAMERA_ENABLED, false);
     }
 
     private final Runnable tick = new Runnable() {
         @Override public void run() {
             if (closed) return;
             long now = SystemClock.elapsedRealtime();
-            boolean enabled = prefs.getBoolean(UiPrefs.KEY_IPK_CAMERA_ENABLED, false);
             boolean active = desiredCamera >= 0;
+            boolean enabled = active ? currentCameraEnabled() : anyIpkEnabled();
             if (enabled && screenOn && !readPending
                     && (lastTabRead == 0 || now - lastTabRead >= (active ? 250 : 500))) {
                 readPending = true;
@@ -255,7 +285,7 @@ public final class IpkCameraOverlay implements AutoCloseable {
         carIo.post(() -> {
             IpkRoutePolicy.RequestResult result = car.requestProjection(fallback,
                     () -> token == sessionGeneration && desiredCamera >= 0 && screenOn
-                            && prefs.getBoolean(UiPrefs.KEY_IPK_CAMERA_ENABLED, false)
+                            && currentCameraEnabled()
                             && prefs.getBoolean(UiPrefs.KEY_IPK_AUTO_ROUTE, true) && !UiPrefs.isOemAvmActive(prefs));
             main.post(() -> {
                 routePending = false;
@@ -317,6 +347,15 @@ public final class IpkCameraOverlay implements AutoCloseable {
             view.setAlpha(0f);
             TextureView preview = new TextureView(displayContext);
             preview.setOpaque(false);
+            preview.setOutlineProvider(new ViewOutlineProvider() {
+                @Override public void getOutline(View view, Outline outline) {
+                    outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(),
+                            UiPrefs.getCornerRadiusPx(view, prefs));
+                }
+            });
+            preview.setClipToOutline(true);
+            preview.addOnLayoutChangeListener((v, l, t, r, b, oldL, oldT, oldR, oldB) ->
+                    v.invalidateOutline());
             applyPreviewFraming(preview, bounds[2]);
             view.addView(preview);
             preview.setSurfaceTextureListener(new TextureView.SurfaceTextureListener() {
@@ -377,12 +416,11 @@ public final class IpkCameraOverlay implements AutoCloseable {
     }
 
     private void applyPreviewFraming(TextureView preview, int side) {
-        boolean compact = prefs.getBoolean(UiPrefs.KEY_SIGNAL_COMPACT_ENABLED, false);
-        IpkPreviewGeometry image = IpkPreviewGeometry.calculate(side,
-                desiredCamera == CameraIndex.LEFT.getVideoIndex(),
+        IpkPreviewGeometry image = IpkPreviewGeometry.forCamera(side,
+                CameraIndex.fromVideoIndex(desiredCamera),
                 UiPrefs.isOverlayRotationToDrivingDirectionEnabled(prefs),
-                compact ? UiPrefs.getSignalCompactLeft(prefs) : 0,
-                compact ? UiPrefs.getSignalCompactRight(prefs) : 0);
+                prefs.getBoolean(UiPrefs.KEY_SIGNAL_COMPACT_ENABLED, false),
+                UiPrefs.getSignalCompactLeft(prefs), UiPrefs.getSignalCompactRight(prefs));
         preview.setLayoutParams(new FrameLayout.LayoutParams(image.width, image.height, Gravity.CENTER));
         float[] source = {0f, 0f, image.width, 0f, image.width, image.height, 0f, image.height};
         Matrix transform = new Matrix();

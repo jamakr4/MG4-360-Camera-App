@@ -44,6 +44,31 @@ public class IpkPreviewGeometryTest {
         assertArrayEquals(new float[]{1f, 1f}, cameraPoint(full, full.width, full.height), EPS);
     }
 
+    @Test public void rearviewKeepsFullDashcamAspectDespiteSideCameraSettings() {
+        for (boolean compact : new boolean[]{false, true}) {
+            for (boolean rotated : new boolean[]{false, true}) {
+                for (int[] crop : new int[][]{{9, 20}, {45, 45}, {0, 25}}) {
+                    IpkPreviewGeometry rear = IpkPreviewGeometry.forCamera(
+                            260, CameraIndex.REAR, rotated, compact, crop[0], crop[1]);
+                    assertEquals(260, rear.width);
+                    assertEquals(173, rear.height);
+                    // Mirroring belongs to the existing native rear-camera sink;
+                    // geometry must neither flip again nor lose any camera edge.
+                    assertArrayEquals(new float[]{0f, 0f}, cameraPoint(rear, 0, 0), EPS);
+                    assertArrayEquals(new float[]{1f, 1f}, cameraPoint(rear, rear.width, rear.height), EPS);
+                }
+            }
+        }
+    }
+
+    @Test public void selectingASideCameraStillAppliesItsCompactAndRotationSettings() {
+        IpkPreviewGeometry side = IpkPreviewGeometry.forCamera(260, CameraIndex.LEFT, true, true, 10, 30);
+        float[] topLeft = cameraPoint(side, 0, 0);
+        float[] bottomRight = cameraPoint(side, side.width, side.height);
+        assertArrayEquals(new float[]{0.7f, 0f}, topLeft, EPS);
+        assertArrayEquals(new float[]{0.1f, 1f}, bottomRight, EPS);
+    }
+
     private float[] cameraPoint(IpkPreviewGeometry image, float x, float y) {
         float[] corners = image.contentCorners;
         float ux = corners[2] - corners[0], uy = corners[3] - corners[1];
