@@ -1,7 +1,7 @@
 # Lokaler IPK-Kameratest
 
 Branch: `codex/ipk-camera-auto-route`, Basis `90fb90c7dfae2087dd27ff4e569a6d21734c062d`.
-Aktuelle Diagnose-APK: `0.8.16-ipk-d1`, VersionCode 34, gleicher Paketname und vorhandenes Projektzertifikat. Der Status trägt weiterhin die Kennzeichnung `IPK2` und ergänzt „Routing-Diagnose D1“.
+Aktuelle Test-APK: `0.8.17-ipk-rounded`, VersionCode 35, gleicher Paketname und vorhandenes Projektzertifikat. Die Routing-Diagnose D1 ist enthalten. Der Status trägt weiterhin die Kennzeichnung `IPK2` und ergänzt „Routing-Diagnose D1“.
 
 Der Fahrzeugtest vom 03.11.2026 bestätigt flüssigere parallele Kameraausgabe, transparente Ränder und Kompaktansicht. Die automatische Anforderung bleibt auf der Verbrauchsseite ohne sichtbare Wirkung, auch in beiden Bedienmodi des rechten Lenkradsticks. D1 ergänzt einen Diagnoseverlauf, um die fehlende Voraussetzung für den Seitenwechsel zu ermitteln; siehe [Routing-Diagnose](IPK_ROUTING_DIAGNOSIS.md).
 
@@ -18,6 +18,8 @@ Der Fahrzeugtest vom 03.11.2026 bestätigt flüssigere parallele Kameraausgabe, 
 Die vorhandenen Einstellungen für Kompaktansicht, beide Ausschnittregler und Drehung in Fahrtrichtung gelten auch für das IPK. Die gemeinsame `OverlayCompactGeometry` bestimmt den Ausschnitt einschließlich der unterschiedlichen Reglerzuordnung für linke und rechte Kamera. `IpkPreviewGeometry` passt diesen Ausschnitt proportional in das 260-px-Quadrat ein. Die frühere IPK-Ausgabe berücksichtigte nur die Drehung und zeigte auch bei aktivierter Kompaktansicht das vollständige Bild.
 
 Änderungen am Kompakt-Schalter oder den Reglern aktualisieren die bestehende TextureView ohne erneutes Kamera-Attach. Bei ausgeschalteter Kompaktansicht erscheint wieder das vollständige 3:2-Bild. Freie Flächen um das Bild bleiben transparent; schwarze Pixel im Kamerabild selbst bleiben erhalten. Durch das Einpassen des beschnittenen Bildes kann die Darstellung die verfügbare IPK-Fläche besser ausnutzen.
+
+Die Einstellung für abgerundete Ecken gilt ebenfalls für das IPK. Der Radius verwendet wie auf dem Hauptdisplay `UiPrefs.getCornerRadiusPx`: halbe kürzere Bildkante mal eingestellter Radiusanteil. Die Kontur schneidet das sichtbare Kamerarechteck einschließlich Kompaktansicht und Drehung aus; frei bleibende Bereiche bleiben transparent. Radiusänderungen werden direkt übernommen. Beim Test Radius 0 und einen deutlich gerundeten Wert mit beiden Kameras sowie Kompaktansicht ein/aus vergleichen.
 
 ## Verhalten der automatischen Seitenanforderung
 
@@ -65,8 +67,10 @@ c++ -std=c++17 -pthread app/src/test/cpp/latest_preview_frame_test.cpp -o /tmp/m
 
 Signierung wie im vorhandenen `tools/build_sign_release.sh` mit dem bereits im Projekt enthaltenen Plattform-Zertifikat. Keine automatische Installation oder Veröffentlichung.
 
-Für die aktuelle Diagnose-APK wurde ausschließlich während des Builds `versionCode 34` und `versionName "0.8.16-ipk-d1"` gesetzt und anschließend der ursprüngliche Inhalt von `app/build.gradle` wiederhergestellt. Die Versionsdatei ist daher kein Teil dieses Folgecommits; die bereits vorhandene lokale Versionsänderung im anderen Checkout bleibt beim Aktualisieren des Branches erhalten. Ein normaler eigener Build verwendet die Versionswerte seines Checkouts.
+Für die aktuelle Test-APK wurde ausschließlich während des Builds `versionCode 35` und `versionName "0.8.17-ipk-rounded"` gesetzt und anschließend der ursprüngliche Inhalt von `app/build.gradle` wiederhergestellt. Die Versionsdatei ist daher kein Teil dieses Folgecommits; die bereits vorhandene lokale Versionsänderung im anderen Checkout bleibt beim Aktualisieren des Branches erhalten. Ein normaler eigener Build verwendet die Versionswerte seines Checkouts.
 
 Die lokalen Tests prüfen Tab-Freigabe, Prioritäten, begrenzte Wiederholungen, manuelle Seitenwahl nach Bestätigung, Positionierung und die Unabhängigkeit der Vorschau-Mailboxen. Die IPK-Geometrietests bilden die Viewportecken zurück auf das ursprüngliche Kamerabild ab: Der Ausschnitt muss für beide Kameras, beide Drehungen, asymmetrische und maximale Beschnitte sowie mehrere Displaygrößen stimmen und proportional in die Fläche passen. Das Verhalten des physischen IPK und die Annahme der Seitenanforderung bleiben der Fahrzeugtest.
 
 Prüfstand 03.11.2026: Debug- und Release-Build von D1 erfolgreich; 55 Java-Tests ohne Fehler oder übersprungene Tests. Die signierte Release-APK wurde mit `apksigner verify` geprüft. Der native Mailbox-Test inklusive ungedrosselter 25-FPS-Zuführung war beim vorherigen Diagnose-/Performance-Build erfolgreich. Flüssigere Ausgabe, Transparenz und Kompaktansicht wurden im Fahrzeug bestätigt. Automatisches Routing bleibt ungelöst; die zusätzlichen D1-Signale müssen noch im Fahrzeug erfasst werden.
+
+Der anschließende Rundungsbuild wurde als Release erneut erfolgreich gebaut und mit `apksigner verify` geprüft. Die Eckenrundung ist noch im Fahrzeug zu prüfen.

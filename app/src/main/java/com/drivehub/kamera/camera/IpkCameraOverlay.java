@@ -7,6 +7,7 @@ import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.Matrix;
+import android.graphics.Outline;
 import android.graphics.PixelFormat;
 import android.graphics.Point;
 import android.graphics.SurfaceTexture;
@@ -21,6 +22,8 @@ import android.view.Display;
 import android.view.Gravity;
 import android.view.Surface;
 import android.view.TextureView;
+import android.view.View;
+import android.view.ViewOutlineProvider;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
 import java.util.Locale;
@@ -188,6 +191,10 @@ public final class IpkCameraOverlay implements AutoCloseable {
                 if (!closed && root != null && texture != null)
                     applyPreviewFraming(texture, root.getLayoutParams().width);
             });
+        } else if (UiPrefs.KEY_TILE_CORNER_RADIUS.equals(key)) {
+            main.post(() -> {
+                if (!closed && texture != null) texture.invalidateOutline();
+            });
         }
     };
 
@@ -329,6 +336,15 @@ public final class IpkCameraOverlay implements AutoCloseable {
             view.setAlpha(0f);
             TextureView preview = new TextureView(displayContext);
             preview.setOpaque(false);
+            preview.setOutlineProvider(new ViewOutlineProvider() {
+                @Override public void getOutline(View view, Outline outline) {
+                    outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(),
+                            UiPrefs.getCornerRadiusPx(view, prefs));
+                }
+            });
+            preview.setClipToOutline(true);
+            preview.addOnLayoutChangeListener((v, l, t, r, b, oldL, oldT, oldR, oldB) ->
+                    v.invalidateOutline());
             applyPreviewFraming(preview, bounds[2]);
             view.addView(preview);
             preview.setSurfaceTextureListener(new TextureView.SurfaceTextureListener() {
