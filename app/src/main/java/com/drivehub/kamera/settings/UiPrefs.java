@@ -37,6 +37,7 @@ public final class UiPrefs {
     public static final String KEY_IPK_CAMERA_ENABLED = "ipkCameraEnabled";
     public static final String KEY_IPK_AUTO_ROUTE = "ipkAutoRoute";
     public static final String KEY_IPK_LAST_SESSION = "ipkLastSessionV2";
+    public static final String KEY_IPK_DIAGNOSTIC_TRACE = "ipkDiagnosticTraceD1";
     public static final String KEY_OVERLAY_ON_SIGNAL = "overlayOnSignal";
     public static final String KEY_LANE_CHANGES_ONLY = "laneChangesOnly";
     public static final String KEY_LANE_CHANGE_MIN_SPEED_KMH = "laneChangeMinSpeedKmh";

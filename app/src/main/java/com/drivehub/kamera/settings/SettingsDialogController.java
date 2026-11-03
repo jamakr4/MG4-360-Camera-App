@@ -21,6 +21,7 @@ import android.graphics.drawable.ColorDrawable;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.TextUtils;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
@@ -66,7 +67,10 @@ public final class SettingsDialogController {
         @Override public void run() {
             if (dialog == null) return;
             TextView status = dialog.findViewById(R.id.textIpkCameraStatus);
-            if (status != null) status.setText(SignalService.getIpkStatus(activity));
+            if (status != null && !status.hasSelection()) {
+                String text = SignalService.getIpkStatus(activity);
+                if (!TextUtils.equals(status.getText(), text)) status.setText(text);
+            }
             devStatusHandler.postDelayed(this, 500);
         }
     };

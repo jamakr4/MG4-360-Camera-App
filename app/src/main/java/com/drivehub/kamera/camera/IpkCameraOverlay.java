@@ -109,6 +109,13 @@ public final class IpkCameraOverlay implements AutoCloseable {
                     if (desiredCamera >= 0) { routeDetail = message; publish(false); }
                 });
             }
+            @Override public void onDiagnostics(String trace) {
+                main.post(() -> {
+                    if (closed) return;
+                    prefs.edit().putString(UiPrefs.KEY_IPK_DIAGNOSTIC_TRACE, trace).apply();
+                    event(trace);
+                });
+            }
         });
         if (displays != null) displays.registerDisplayListener(displayListener, main);
         prefs.registerOnSharedPreferenceChangeListener(preferenceListener);
@@ -118,11 +125,16 @@ public final class IpkCameraOverlay implements AutoCloseable {
         scheduleNow();
     }
 
-    public String status() { return status; }
+    public String status() { return withDiagnostics(status, prefs); }
 
     public static String savedStatus(Context context) {
-        return new IpkStatusState(UiPrefs.getPrefs(context)
-                .getString(UiPrefs.KEY_IPK_LAST_SESSION, null)).snapshot();
+        SharedPreferences prefs = UiPrefs.getPrefs(context);
+        return withDiagnostics(new IpkStatusState(prefs.getString(UiPrefs.KEY_IPK_LAST_SESSION, null)).snapshot(), prefs);
+    }
+
+    private static String withDiagnostics(String status, SharedPreferences prefs) {
+        String trace = prefs.getString(UiPrefs.KEY_IPK_DIAGNOSTIC_TRACE, "");
+        return trace.isEmpty() ? status : status + "\n\n" + trace;
     }
 
     public void show(int camera) {
