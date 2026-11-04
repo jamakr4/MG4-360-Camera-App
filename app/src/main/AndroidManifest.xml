@@ -89,18 +89,22 @@
         <receiver
             android:name=".dashcam.DashcamEventTriggerReceiver"
             android:enabled="true"
-            android:exported="true">
+            android:exported="true"
+            android:label="@string/shortcut_save_dashcam_event">
             <intent-filter>
                 <action android:name="com.drivehub.kamera.action.TRIGGER_DASHCAM_EVENT" />
+                <action android:name="com.mg4.control.action.SHORTCUT" />
             </intent-filter>
         </receiver>
 
         <receiver
             android:name=".signal.DigitalRearviewTriggerReceiver"
             android:enabled="true"
-            android:exported="true">
+            android:exported="true"
+            android:label="@string/shortcut_toggle_digital_rearview">
             <intent-filter>
                 <action android:name="com.drivehub.kamera.action.SET_DIGITAL_REARVIEW" />
+                <action android:name="com.mg4.control.action.SHORTCUT" />
             </intent-filter>
         </receiver>
     </application>
