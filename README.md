@@ -252,6 +252,20 @@ Behavior:
 
 </details>
 
+<details>
+<summary><strong>MG4Control shortcuts</strong></summary>
+
+With a version of [MG4Control](https://github.com/SliDeeN/MG4Control) that supports `App function` shortcuts, you can assign these two functions from **360 Cam** directly to a custom shortcut:
+
+- **Toggle digital rearview** — switches the digital rearview on or off each time the shortcut is triggered.
+- **Save dashcam event** — saves an event recording. If continuous recording is off, it starts a future-only event recording.
+
+The function names are shown in English or German according to the system language. No extras are needed. The companion trigger apps and existing broadcast actions remain supported; use MG4Control's `Broadcast` option if you want to set rearview explicitly with the Boolean `enabled` extra.
+
+Integration reference: [MG4Control receiver discovery and invocation](https://github.com/SliDeeN/MG4Control/issues/172#issuecomment-6522784068).
+
+</details>
+
 ## Build Setup
 
 <details>

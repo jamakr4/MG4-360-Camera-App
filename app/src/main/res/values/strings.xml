@@ -1,5 +1,7 @@
 <resources>
     <string name="app_name">360 Cam</string>
+    <string name="shortcut_toggle_digital_rearview">Toggle digital rearview</string>
+    <string name="shortcut_save_dashcam_event">Save dashcam event</string>
     <string name="settings_tab_update">Update</string>
     <string name="settings_tab_settings">Settings</string>
     <string name="settings_tab_signal_camera">Signal Cam</string>

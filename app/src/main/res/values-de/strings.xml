@@ -1,5 +1,7 @@
 <resources>
     <string name="app_name">360 Cam</string>
+    <string name="shortcut_toggle_digital_rearview">Digitalen Rückspiegel umschalten</string>
+    <string name="shortcut_save_dashcam_event">Dashcam-Ereignis speichern</string>
     <string name="settings_tab_update">Update</string>
     <string name="settings_tab_settings">Einstellungen</string>
     <string name="settings_tab_signal_camera">Blinker-Kamera</string>
