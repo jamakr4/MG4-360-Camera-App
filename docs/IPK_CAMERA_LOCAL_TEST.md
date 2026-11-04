@@ -1,7 +1,7 @@
 # Lokaler IPK-Kameratest
 
 Branch: `codex/ipk-camera-auto-route`, Basis `90fb90c7dfae2087dd27ff4e569a6d21734c062d`.
-Aktuelle Test-APK: `0.8.18-ipk-rearview`, VersionCode 36, gleicher Paketname und vorhandenes Projektzertifikat. Die Routing-Diagnose D1 und abgerundete Ecken sind enthalten. Der Status trägt weiterhin die Kennzeichnung `IPK2` und ergänzt „Routing-Diagnose D1“.
+Aktuelle Test-APK: `0.8.19-ipk-resume`, VersionCode 37, gleicher Paketname und vorhandenes Projektzertifikat. Die Routing-Diagnose D1, abgerundete Ecken und digitaler Rückspiegel sind enthalten. Der Status trägt weiterhin die Kennzeichnung `IPK2` und ergänzt „Routing-Diagnose D1“.
 
 Der Fahrzeugtest vom 03.11.2026 bestätigt flüssigere parallele Kameraausgabe, transparente Ränder und Kompaktansicht. Die automatische Anforderung bleibt auf der Verbrauchsseite ohne sichtbare Wirkung, auch in beiden Bedienmodi des rechten Lenkradsticks. D1 ergänzt einen Diagnoseverlauf, um die fehlende Voraussetzung für den Seitenwechsel zu ermitteln; siehe [Routing-Diagnose](IPK_ROUTING_DIAGNOSIS.md).
 
@@ -32,6 +32,16 @@ Wenn die IPK-Blinkerkamera aktiviert ist, hat sie Vorrang und wird danach wieder
 Die bisherige Rückspiegelsteuerung gilt gemeinsam: ausschalten, schließen, zeitweiliges Ausblenden und Öffnen der Einstellungen pausieren auch den IPK-Rückspiegel. Bei sichtbarer Hauptansicht kann das IPK weiterhin den Rückspiegel anzeigen, ohne die dort manuell ausgewählte Kamera umzustellen. OEM-AVM, Rückwärtsgang und sichtbare Vierkamera-Kachelansicht geben die Kameras wie bisher frei. Die Ausgabe bleibt auf den nativen Seiten Musik/Navigation sichtbar; das automatische Umschalten aus Verbrauch/Einstellungen ist weiterhin ungelöst.
 
 Fahrzeugtest: Musik oder Navigation wählen; Rückspiegel auf beiden Displays und bei paralleler Dashcam-Aufnahme vergleichen. Links/rechts blinken und Rückkehr zum Heckbild prüfen, dann den IPK-Blinkerschalter deaktivieren und prüfen, dass das Heckbild im IPK beim Blinken erhalten bleibt. Anschließend den IPK-Rückspiegel-Schalter bei laufendem Spiegel ein/aus schalten, zeitweiliges Ausblenden testen und OEM-360/Rückwärtsgang sowie Vierkamera-Kachelansicht prüfen.
+
+## Rückkehr nach OEM-360
+
+Ein OEM-Start entfernt die eigenen Kamerafenster und beendet eine ausstehende Wiederaufnahme. Ein OEM-Stop startet nun einen eigenen Rückkehrlauf auf dem Main-Handler, unabhängig von Blinker- oder Gangänderungen. Bis zur Freigabe bleiben die eigenen Kamerafenster entfernt.
+
+Der Lauf prüft alle 250 ms den Vordergrundzustand. Solange OEM-AVM sichtbar oder der OEM-Latch aktiv ist, wird nichts wieder angezeigt. Erst nach mindestens 250 ms bestätigter Abwesenheit wird die Anzeigeentscheidung erzwungen. Ist der Vordergrundstatus nicht lesbar, muss zusätzlich das unabhängige OEM-Lebenszyklussignal `DestroyEnd` vorliegen. Ein erneuter OEM-Start und das Beenden des Dienstes löschen den Rückkehrlauf.
+
+Vor der erneuten Entscheidung werden Blinker und Gang frisch aus den bereits verwendeten Fahrzeugsignalen gelesen und die alten Entscheidungscaches verworfen. Dadurch kann der digitale Rückspiegel auch bei unverändertem Blinker und Gang wieder erscheinen. Die normale Entscheidung berücksichtigt weiterhin Rückwärtsgang, temporäres Ausblenden, Einstellungen, Kachelansicht und die tatsächlich sichtbare IPK-Seite. Ein vorhandener aktueller Blinker erhält weiterhin Vorrang vor dem Rückspiegel.
+
+Fahrzeugtest: Auf Musik/Navigation den digitalen Rückspiegel einschalten, OEM-360 öffnen und wieder schließen. Danach ohne Betätigung von Blinker oder Gang prüfen, dass das Heckbild zurückkehrt. Mehrfach wiederholen und einmal OEM-360 während der Rückkehr erneut öffnen. Zusätzlich mit paralleler Dashcam-Aufnahme und mit einer noch aktiven Blinkeranzeige testen.
 
 ## Verhalten der automatischen Seitenanforderung
 
@@ -79,7 +89,7 @@ c++ -std=c++17 -pthread app/src/test/cpp/latest_preview_frame_test.cpp -o /tmp/m
 
 Signierung wie im vorhandenen `tools/build_sign_release.sh` mit dem bereits im Projekt enthaltenen Plattform-Zertifikat. Keine automatische Installation oder Veröffentlichung.
 
-Für die aktuelle Test-APK wurde ausschließlich während des Builds `versionCode 36` und `versionName "0.8.18-ipk-rearview"` gesetzt und anschließend der ursprüngliche Inhalt von `app/build.gradle` wiederhergestellt. Die Versionsdatei ist daher kein Teil dieses Folgecommits; die bereits vorhandene lokale Versionsänderung im anderen Checkout bleibt beim Aktualisieren des Branches erhalten. Ein normaler eigener Build verwendet die Versionswerte seines Checkouts.
+Für die aktuelle Test-APK wurde ausschließlich während des Builds `versionCode 37` und `versionName "0.8.19-ipk-resume"` gesetzt und anschließend der ursprüngliche Inhalt von `app/build.gradle` wiederhergestellt. Die Versionsdatei ist daher kein Teil dieses Folgecommits; die bereits vorhandene lokale Versionsänderung im anderen Checkout bleibt beim Aktualisieren des Branches erhalten. Ein normaler eigener Build verwendet die Versionswerte seines Checkouts.
 
 Die lokalen Tests prüfen Tab-Freigabe, Prioritäten, begrenzte Wiederholungen, manuelle Seitenwahl nach Bestätigung, Positionierung und die Unabhängigkeit der Vorschau-Mailboxen. Die IPK-Geometrietests bilden die Viewportecken zurück auf das ursprüngliche Kamerabild ab: Der Ausschnitt muss für beide Kameras, beide Drehungen, asymmetrische und maximale Beschnitte sowie mehrere Displaygrößen stimmen und proportional in die Fläche passen. Das Verhalten des physischen IPK und die Annahme der Seitenanforderung bleiben der Fahrzeugtest.
 
@@ -88,3 +98,5 @@ Prüfstand 03.11.2026: Debug- und Release-Build von D1 erfolgreich; 55 Java-Test
 Der anschließende Rundungsbuild wurde als Release erneut erfolgreich gebaut und mit `apksigner verify` geprüft. Die Eckenrundung ist noch im Fahrzeug zu prüfen.
 
 Der Rückspiegel-Folgebuild ist als Debug und Release gebaut; 61 Java-Tests sind ohne Fehler oder übersprungene Tests erfolgreich. Neue Tests prüfen die Priorität und Rückkehr der Bildquellen, unabhängige IPK-Auswahl, Freigabe bei blockierenden Zuständen und den vollständigen ungedrehten 3:2-Heckausschnitt trotz aktiver Seitenkamera-Beschneidung. Signatur und APK-Version wurden geprüft. Der IPK-Rückspiegel benötigt noch den Fahrzeugtest einschließlich paralleler Dashcam-Aufnahme.
+
+Prüfstand 04.11.2026: OEM-Rückkehrkorrektur als Debug und Release erfolgreich gebaut; 65 Java-Tests ohne Fehler oder übersprungene Tests. Die zusätzlichen Tests prüfen vorzeitigen OEM-Stop, erneutes Auftauchen der OEM-App, unbekannten Vordergrundzustand und Abbruch alter Rückkehrversuche. Signatur und Version der bereitgestellten APK sind geprüft. Der Ablauf nach OEM-360-Ende muss noch im Fahrzeug bestätigt werden.

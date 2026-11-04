@@ -120,6 +120,30 @@ public class SignalService extends Service {
     private long rearviewTempHiddenUntilMs = 0L; // mainHandler only
     private long signalTempHiddenUntilMs = 0L;   // mainHandler only
     private final Handler mainHandler = new Handler();
+    private final OemOverlayRecovery oemOverlayRecovery = new OemOverlayRecovery();
+    private final Runnable oemOverlayRestoreRunnable = new Runnable() {
+        @Override public void run() {
+            if (!oemOverlayRecovery.isPending()) return;
+            Boolean foreground = readOemAvmForegroundState();
+            boolean destroyed = OEM_LIFECYCLE_DESTROYED.equals(
+                    SystemPropertiesHelper.getString(OEM_LIFECYCLE_PROP));
+            if (oemOverlayRecovery.canRestore(foreground, isOemAvmLatchedActive(), destroyed,
+                    SystemClock.elapsedRealtime())) {
+                oemOverlayRecovery.cancel();
+                lastLamp = Integer.MIN_VALUE;
+                lastGear = Integer.MIN_VALUE;
+                currentMode = -1;
+                // CarLampManager may only send changes. Read a fresh sample ourselves
+                // so a stationary car does not need another indicator or gear event.
+                int lamp = SystemPropertiesHelper.getInt("arcsoft.avm.mCurCarTurnLamp", 0);
+                int gear = SystemPropertiesHelper.getInt("arcsoft.avm.mCurCarGear", 0);
+                onVehicleStateSample(lamp, gear, SystemClock.elapsedRealtime());
+                DevRuntimeLog.add("SignalService", "OEM closed => display decision restored with fresh vehicle state");
+                return;
+            }
+            mainHandler.postDelayed(this, OemOverlayRecovery.SETTLE_MS);
+        }
+    };
     private final Runnable hideRunnable = new Runnable() {
         @Override
         public void run() {
@@ -190,12 +214,17 @@ public class SignalService extends Service {
         }
         inst.mainHandler.post(() -> {
             if (active) {
+                inst.mainHandler.removeCallbacks(inst.oemOverlayRestoreRunnable);
+                inst.oemOverlayRecovery.cancel();
                 inst.waitForSignalSampleAfterOemReleaseAtMs = 0L;
                 inst.mainHandler.removeCallbacks(inst.hideRunnable);
                 inst.clearOverlayShownTimestamp();
                 inst.hideCameraOverlays();
             } else if (wasActive) {
                 inst.waitForSignalSampleAfterOemReleaseAtMs = SystemClock.elapsedRealtime();
+                inst.oemOverlayRecovery.start();
+                inst.mainHandler.removeCallbacks(inst.oemOverlayRestoreRunnable);
+                inst.mainHandler.post(inst.oemOverlayRestoreRunnable);
                 inst.clearOverlayShownTimestamp();
                 inst.hideCameraOverlays();
                 DevRuntimeLog.add("SignalService", "OEM released => waiting for fresh lamp sample");
@@ -610,6 +639,12 @@ public class SignalService extends Service {
     }
 
     private void updateOverlayDecision() {
+        if (oemOverlayRecovery.isPending()) {
+            // The OEM stop event can precede Activity removal. Keep all our
+            // outputs released until the recovery task confirms the hand-off;
+            // setOemAvmActive() has already removed the windows.
+            return;
+        }
         final TurnSignal signal = TurnSignal.fromValue(currentLamp);
         refreshLaneChangeSpeedMonitoring(signal);
         final boolean laneChangeSpeedEligible = isSignalAllowedAtCurrentSpeed();
@@ -892,18 +927,22 @@ public class SignalService extends Service {
     }
 
     private boolean isOemAvmInForeground() {
+        return Boolean.TRUE.equals(readOemAvmForegroundState());
+    }
+
+    private Boolean readOemAvmForegroundState() {
         try {
             ActivityManager am = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
-            if (am == null) return false;
+            if (am == null) return null;
             // Because this is a system app, getRunningTasks(1) is usually permitted.
             java.util.List<ActivityManager.RunningTaskInfo> tasks = am.getRunningTasks(1);
-            if (tasks == null || tasks.isEmpty()) return false;
+            if (tasks == null || tasks.isEmpty()) return null;
             ActivityManager.RunningTaskInfo t = tasks.get(0);
-            if (t.topActivity == null) return false;
+            if (t.topActivity == null) return null;
             return OEM_AVM_PACKAGE.equals(t.topActivity.getPackageName());
         } catch (Throwable t) {
             Log.w(TAG, "isOemAvmInForeground failed: " + t);
-            return false;
+            return null;
         }
     }
 
@@ -989,6 +1028,8 @@ public class SignalService extends Service {
         mainHandler.removeCallbacks(rearviewRestoreRunnable);
         mainHandler.removeCallbacks(signalRestoreRunnable);
         mainHandler.removeCallbacks(laneChangeSpeedRunnable);
+        mainHandler.removeCallbacks(oemOverlayRestoreRunnable);
+        oemOverlayRecovery.cancel();
         hideCameraOverlays();
         if (ipkCamera != null) { ipkCamera.close(); ipkCamera = null; }
         sInstance = null;
