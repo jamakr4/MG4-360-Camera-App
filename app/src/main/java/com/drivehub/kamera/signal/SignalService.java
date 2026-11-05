@@ -463,14 +463,6 @@ public class SignalService extends Service {
         }
     }
 
-    private boolean isDigitalRearviewEnabled() {
-        try {
-            return UiPrefs.isDigitalRearviewEnabled(UiPrefs.getPrefs(this));
-        } catch (Throwable ignored) {
-            return false;
-        }
-    }
-
     private void registerOemCoexistListener() {
         if (oemCoexistPrefListener != null) return;
         SharedPreferences prefs = UiPrefs.getPrefs(this);
@@ -633,22 +625,27 @@ public class SignalService extends Service {
         }
     }
 
-    private void updateIpkRearview() {
-        if (ipkRearview == null) return;
+    private DigitalRearviewPolicy.Outputs rearviewOutputs() {
         SharedPreferences prefs = UiPrefs.getPrefs(this);
-        boolean enabled = DigitalRearviewPolicy.showOnIpk(
-                UiPrefs.isDigitalRearviewEnabled(prefs),
-                UiPrefs.getDigitalRearviewDisplayTarget(prefs),
-                currentGear == REVERSE_GEAR_VALUE || TileViewActivity.isVisible()
-                        || MainActivity.isSettingsDialogOpen() || isOemAvmLatchedActive());
-        if (enabled && !isOemAvmInForeground()) ipkRearview.show();
+        boolean enabled = UiPrefs.isDigitalRearviewEnabled(prefs);
+        boolean oemBlocked = enabled && (isOemAvmLatchedActive() || isOemAvmInForeground());
+        return DigitalRearviewPolicy.selectOutputs(enabled,
+                UiPrefs.getDigitalRearviewDisplayTarget(prefs), isRearviewTempHidden(),
+                MainActivity.isMainVisible() || MainActivity.isSettingsDialogOpen(),
+                currentGear == REVERSE_GEAR_VALUE || TileViewActivity.isVisible() || oemBlocked);
+    }
+
+    private void updateIpkRearview(DigitalRearviewPolicy.Outputs outputs) {
+        if (ipkRearview == null) return;
+        if (outputs.ipk) ipkRearview.show();
         else ipkRearview.hide();
     }
 
     private void updateOverlayDecision() {
         if (oemOverlayRecovery.isPending()) return;
-        // Independent of main-screen signal priority and the main-screen tap-to-hide timer.
-        updateIpkRearview();
+        // Update the independent IPK output before applying any main-screen routing or cache.
+        final DigitalRearviewPolicy.Outputs rearview = rearviewOutputs();
+        updateIpkRearview(rearview);
         final TurnSignal signal = TurnSignal.fromValue(currentLamp);
         refreshLaneChangeSpeedMonitoring(signal);
         final boolean laneChangeSpeedEligible = isSignalAllowedAtCurrentSpeed();
@@ -676,9 +673,7 @@ public class SignalService extends Service {
                 && !isWaitingForSignalSampleAfterOemRelease()
                 && laneChangeSpeedEligible) {
             nextMode = 2;
-        } else if (DigitalRearviewPolicy.showOnInfotainment(isDigitalRearviewEnabled(),
-                UiPrefs.getDigitalRearviewDisplayTarget(UiPrefs.getPrefs(this)),
-                isRearviewTempHidden(), MainActivity.isSettingsDialogOpen())) {
+        } else if (rearview.infotainment) {
             nextMode = 4;
         } else {
             nextMode = 0;
@@ -688,7 +683,7 @@ public class SignalService extends Service {
         int previousMode = currentMode;
 
         // If MainActivity is visible, do not use the overlay; route the main preview camera instead.
-        // Digital rearview (nextMode==4) is skipped here — the main preview should stay independent.
+        // The mirror's infotainment output is paused while our app UI is visible.
         if (MainActivity.shouldBlockOverlay()) {
             currentMode = nextMode;
             mainHandler.removeCallbacks(hideRunnable);

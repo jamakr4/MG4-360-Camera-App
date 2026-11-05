@@ -249,7 +249,8 @@ Behavior:
 - `Tap to temporarily hide` is enabled by default (5 seconds). It hides only the infotainment mirror for the configured duration; the IPK mirror stays visible.
 - The "X" in the infotainment preview or switching Digital Rearview off via an external trigger stops the mirror on both displays, including during a temporary hide.
 - The companion trigger app and MG4Control shortcuts toggle the same mirror setting and use the selected display targets.
-- Reverse gear and OEM 360 retain priority. The IPK mirror also pauses while the app settings or four-camera tile view are open, then returns if still enabled and its selected IPK page is visible.
+- Opening the app or its settings hides the infotainment mirror while the IPK mirror stays active on its selected page.
+- Reverse gear, OEM 360 and the four-camera tile view retain priority and pause the IPK mirror. It returns afterwards if still enabled and its selected IPK page is visible.
 
 </details>
 

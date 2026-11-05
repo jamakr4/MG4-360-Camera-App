@@ -5,6 +5,29 @@ import static org.junit.Assert.*;
 import static com.drivehub.kamera.signal.DigitalRearviewPolicy.*;
 
 public class DigitalRearviewPolicyTest {
+    @Test public void openingAppUiHidesOnlyTheInfotainmentMirror() {
+        for (int target : new int[]{DISPLAY_BOTH, DISPLAY_IPK}) {
+            Outputs outputs = selectOutputs(true, target, false, true, false);
+            assertFalse(outputs.infotainment);
+            assertTrue(outputs.ipk);
+        }
+        Outputs closed = selectOutputs(true, DISPLAY_BOTH, false, false, false);
+        assertTrue(closed.infotainment);
+        assertTrue(closed.ipk);
+    }
+
+    @Test public void externalOffStillStopsIpkWhileTheAppIsOpen() {
+        Outputs outputs = selectOutputs(false, DISPLAY_BOTH, true, true, false);
+        assertFalse(outputs.infotainment);
+        assertFalse(outputs.ipk);
+    }
+
+    @Test public void vehicleBlockersStillStopBothOutputsWhileTheAppIsOpen() {
+        Outputs outputs = selectOutputs(true, DISPLAY_BOTH, false, true, true);
+        assertFalse(outputs.infotainment);
+        assertFalse(outputs.ipk);
+    }
+
     @Test public void outputTargetsSelectTheRequestedDisplays() {
         assertOutputs(DISPLAY_INFOTAINMENT, true, false);
         assertOutputs(DISPLAY_IPK, false, true);

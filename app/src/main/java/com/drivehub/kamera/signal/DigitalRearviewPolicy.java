@@ -8,6 +8,24 @@ public final class DigitalRearviewPolicy {
 
     private DigitalRearviewPolicy() { }
 
+    public static final class Outputs {
+        public final boolean infotainment, ipk;
+
+        private Outputs(boolean infotainment, boolean ipk) {
+            this.infotainment = infotainment;
+            this.ipk = ipk;
+        }
+    }
+
+    public static Outputs selectOutputs(boolean enabled, int target, boolean temporarilyHidden,
+            boolean appUiVisible, boolean vehicleBlocked) {
+        // Our own app/settings only replace the infotainment overlay. The IPK
+        // is an independent output and must not be interrupted by those screens.
+        return new Outputs(
+                showOnInfotainment(enabled, target, temporarilyHidden, vehicleBlocked || appUiVisible),
+                showOnIpk(enabled, target, vehicleBlocked));
+    }
+
     public static int normalizeDisplayTarget(int target) {
         return target >= DISPLAY_INFOTAINMENT && target <= DISPLAY_BOTH
                 ? target : DISPLAY_INFOTAINMENT;

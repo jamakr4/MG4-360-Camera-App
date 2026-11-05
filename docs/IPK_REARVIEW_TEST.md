@@ -45,16 +45,19 @@ Fahrzeug-Properties zur Seitenwahl geschrieben und kein Navigationsfokus veränd
    gerundeten Ecken muss der Hintergrund denselben sehr dunklen Farbton wie das
    übrige IPK haben; Texte und Symbole der ursprünglichen Navigation-/Media-Seite
    dürfen dort nicht durchscheinen. Auf sichtbare Kanten der Abdeckfläche achten.
-7. OEM-360 öffnen/schließen, Rückwärtsgang einlegen/verlassen, Kachelansicht und
-   Einstellungen öffnen/schließen sowie Standby/Wiederaufwachen prüfen. Während
-   blockierender Zustände muss die IPK-Ausgabe freigegeben werden und anschließend
-   bei weiter aktiviertem Spiegel zurückkehren. Auch ohne erneutes Blinken testen.
+7. App-Hauptansicht und Einstellungen öffnen/schließen: Der FICM-Spiegel muss
+   ausgeblendet bleiben, während der IPK-Spiegel ohne Unterbrechung weiterläuft.
+   App mehrfach aus dem Hintergrund öffnen und IPK allein sowie Beides prüfen.
+   OEM-360, Rückwärtsgang und Kachelansicht müssen die IPK-Ausgabe weiterhin
+   freigeben; danach muss der aktive Spiegel zurückkehren. Auch ohne erneutes
+   Blinken und nach Standby/Wiederaufwachen testen.
 8. Mit laufender Dashcam wiederholen: Aufnahme und Hauptvorschau müssen weiterlaufen,
    auch wenn die IPK-Seite gewechselt oder die IPK-Ausgabe beendet wird.
 
 ## Lokale Validierung
 
-Erfolgreich ausgeführt: `testDebugUnitTest` (56 Tests ohne Fehler), `assembleDebug`,
+Erfolgreich ausgeführt: `testDebugUnitTest` (63 Tests ohne Fehler, einschließlich
+App-Oberfläche, externem Ausschalten und gemeinsamen Sperren), `assembleDebug`,
 `assembleRelease`, `lintDebug` (keine Fehler) und der native
 `latest_preview_frame_test.cpp`. Die Prüfung am Fahrzeug steht noch aus.
 
