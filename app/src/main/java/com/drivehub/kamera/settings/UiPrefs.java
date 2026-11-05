@@ -1,6 +1,8 @@
 package com.drivehub.kamera.settings;
 
 import com.drivehub.kamera.dashcam.DashcamSettingsController;
+import com.drivehub.kamera.camera.IpkRoutePolicy;
+import com.drivehub.kamera.signal.DigitalRearviewPolicy;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.view.View;
@@ -39,6 +41,8 @@ public final class UiPrefs {
     public static final String KEY_LANE_CHANGE_MIN_SPEED_KMH = "laneChangeMinSpeedKmh";
     public static final String KEY_OVERLAY_ROTATE_TO_DRIVING_DIRECTION = "overlayRotateToDrivingDirection";
     public static final String KEY_DIGITAL_REARVIEW_ENABLED = "digitalRearviewEnabled";
+    public static final String KEY_DIGITAL_REARVIEW_DISPLAY_TARGET = "digitalRearviewDisplayTarget";
+    public static final String KEY_DIGITAL_REARVIEW_IPK_SCREEN = "digitalRearviewIpkScreen";
     public static final String KEY_DIGITAL_REARVIEW_TAP_TO_HIDE_ENABLED = "digitalRearviewTapToHideEnabled";
     public static final String KEY_DIGITAL_REARVIEW_TAP_TO_HIDE_DURATION_SEC = "digitalRearviewTapToHideDurationSec";
     public static final int DEFAULT_DIGITAL_REARVIEW_TAP_TO_HIDE_DURATION_SEC = 5;
@@ -144,6 +148,26 @@ public final class UiPrefs {
 
     public static void setDigitalRearviewEnabled(SharedPreferences prefs, boolean enabled) {
         prefs.edit().putBoolean(KEY_DIGITAL_REARVIEW_ENABLED, enabled).apply();
+    }
+
+    public static int getDigitalRearviewDisplayTarget(SharedPreferences prefs) {
+        return DigitalRearviewPolicy.normalizeDisplayTarget(prefs.getInt(
+                KEY_DIGITAL_REARVIEW_DISPLAY_TARGET, DigitalRearviewPolicy.DISPLAY_INFOTAINMENT));
+    }
+
+    public static void setDigitalRearviewDisplayTarget(SharedPreferences prefs, int target) {
+        prefs.edit().putInt(KEY_DIGITAL_REARVIEW_DISPLAY_TARGET,
+                DigitalRearviewPolicy.normalizeDisplayTarget(target)).apply();
+    }
+
+    public static int getDigitalRearviewIpkScreen(SharedPreferences prefs) {
+        return IpkRoutePolicy.normalizeScreen(prefs.getInt(
+                KEY_DIGITAL_REARVIEW_IPK_SCREEN, IpkRoutePolicy.NAVIGATION));
+    }
+
+    public static void setDigitalRearviewIpkScreen(SharedPreferences prefs, int screen) {
+        prefs.edit().putInt(KEY_DIGITAL_REARVIEW_IPK_SCREEN,
+                IpkRoutePolicy.normalizeScreen(screen)).apply();
     }
 
     public static boolean isDigitalRearviewTapToHideEnabled(SharedPreferences prefs) {

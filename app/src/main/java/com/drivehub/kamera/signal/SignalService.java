@@ -4,6 +4,7 @@ import com.drivehub.kamera.R;
 
 import com.drivehub.kamera.MainActivity;
 import com.drivehub.kamera.camera.CameraIndex;
+import com.drivehub.kamera.camera.IpkCameraOverlay;
 import com.drivehub.kamera.camera.OverlayService;
 import com.drivehub.kamera.camera.TileViewActivity;
 import com.drivehub.kamera.dashcam.DashcamSettingsController;
@@ -76,6 +77,13 @@ public class SignalService extends Service {
 
     private static volatile SignalService sInstance;
 
+    private IpkCameraOverlay ipkRearview;
+
+    private void hideCameraOverlays() {
+        if (ipkRearview != null) ipkRearview.hide();
+        OverlayService.hideOverlay(this);
+    }
+
     private Object car;
     private Object lampManager;
     private Object lampCallbackProxy;
@@ -105,6 +113,30 @@ public class SignalService extends Service {
     private long rearviewTempHiddenUntilMs = 0L; // mainHandler only
     private long signalTempHiddenUntilMs = 0L;   // mainHandler only
     private final Handler mainHandler = new Handler();
+    private final OemOverlayRecovery oemOverlayRecovery = new OemOverlayRecovery();
+    private final Runnable oemOverlayRestoreRunnable = new Runnable() {
+        @Override public void run() {
+            if (!oemOverlayRecovery.isPending()) return;
+            Boolean foreground = readOemAvmForegroundState();
+            boolean destroyed = OEM_LIFECYCLE_DESTROYED.equals(
+                    SystemPropertiesHelper.getString(OEM_LIFECYCLE_PROP));
+            if (oemOverlayRecovery.canRestore(foreground, isOemAvmLatchedActive(), destroyed,
+                    SystemClock.elapsedRealtime())) {
+                oemOverlayRecovery.cancel();
+                lastLamp = Integer.MIN_VALUE;
+                lastGear = Integer.MIN_VALUE;
+                currentMode = -1;
+                // CarLampManager may only send changes. Read a fresh sample ourselves
+                // so a stationary car does not need another indicator or gear event.
+                int lamp = SystemPropertiesHelper.getInt("arcsoft.avm.mCurCarTurnLamp", 0);
+                int gear = SystemPropertiesHelper.getInt("arcsoft.avm.mCurCarGear", 0);
+                onVehicleStateSample(lamp, gear, SystemClock.elapsedRealtime());
+                DevRuntimeLog.add("SignalService", "OEM closed => display decision restored with fresh vehicle state");
+                return;
+            }
+            mainHandler.postDelayed(this, OemOverlayRecovery.SETTLE_MS);
+        }
+    };
     private final Runnable hideRunnable = new Runnable() {
         @Override
         public void run() {
@@ -175,14 +207,19 @@ public class SignalService extends Service {
         }
         inst.mainHandler.post(() -> {
             if (active) {
+                inst.mainHandler.removeCallbacks(inst.oemOverlayRestoreRunnable);
+                inst.oemOverlayRecovery.cancel();
                 inst.waitForSignalSampleAfterOemReleaseAtMs = 0L;
                 inst.mainHandler.removeCallbacks(inst.hideRunnable);
                 inst.clearOverlayShownTimestamp();
-                OverlayService.hideOverlay(inst);
+                inst.hideCameraOverlays();
             } else if (wasActive) {
                 inst.waitForSignalSampleAfterOemReleaseAtMs = SystemClock.elapsedRealtime();
+                inst.oemOverlayRecovery.start();
+                inst.mainHandler.removeCallbacks(inst.oemOverlayRestoreRunnable);
+                inst.mainHandler.post(inst.oemOverlayRestoreRunnable);
                 inst.clearOverlayShownTimestamp();
-                OverlayService.hideOverlay(inst);
+                inst.hideCameraOverlays();
                 DevRuntimeLog.add("SignalService", "OEM released => waiting for fresh lamp sample");
             }
             inst.lastLamp = Integer.MIN_VALUE;
@@ -294,6 +331,7 @@ public class SignalService extends Service {
     public void onCreate() {
         super.onCreate();
         sInstance = this;
+        ipkRearview = new IpkCameraOverlay(this);
         systemPerformanceOverlay = new SystemPerformanceOverlay(this);
         NotificationChannelHelper.ensureChannel(this, CHANNEL_ID, "MG4 Signal");
         registerDebugBroadcastSniffer();
@@ -439,12 +477,16 @@ public class SignalService extends Service {
         oemCoexistPrefListener = (sp, key) -> {
             if (UiPrefs.KEY_OEM_AVM_COEXIST.equals(key)) {
                 mainHandler.post(this::applyOemCoexistState);
+            } else if (UiPrefs.KEY_DIGITAL_REARVIEW_DISPLAY_TARGET.equals(key)
+                    || UiPrefs.KEY_DIGITAL_REARVIEW_IPK_SCREEN.equals(key)) {
+                requestRecheck();
             } else if (UiPrefs.KEY_DIGITAL_REARVIEW_ENABLED.equals(key)) {
                 mainHandler.post(() -> {
                     // Any explicit pref change cancels the temp-hide so the new state takes effect immediately.
                     mainHandler.removeCallbacks(rearviewRestoreRunnable);
                     rearviewTempHiddenUntilMs = 0L;
                     applyOemCoexistState();
+                    requestRecheck();
                 });
             }
         };
@@ -591,7 +633,22 @@ public class SignalService extends Service {
         }
     }
 
+    private void updateIpkRearview() {
+        if (ipkRearview == null) return;
+        SharedPreferences prefs = UiPrefs.getPrefs(this);
+        boolean enabled = DigitalRearviewPolicy.showOnIpk(
+                UiPrefs.isDigitalRearviewEnabled(prefs),
+                UiPrefs.getDigitalRearviewDisplayTarget(prefs),
+                currentGear == REVERSE_GEAR_VALUE || TileViewActivity.isVisible()
+                        || MainActivity.isSettingsDialogOpen() || isOemAvmLatchedActive());
+        if (enabled && !isOemAvmInForeground()) ipkRearview.show();
+        else ipkRearview.hide();
+    }
+
     private void updateOverlayDecision() {
+        if (oemOverlayRecovery.isPending()) return;
+        // Independent of main-screen signal priority and the main-screen tap-to-hide timer.
+        updateIpkRearview();
         final TurnSignal signal = TurnSignal.fromValue(currentLamp);
         refreshLaneChangeSpeedMonitoring(signal);
         final boolean laneChangeSpeedEligible = isSignalAllowedAtCurrentSpeed();
@@ -619,8 +676,9 @@ public class SignalService extends Service {
                 && !isWaitingForSignalSampleAfterOemRelease()
                 && laneChangeSpeedEligible) {
             nextMode = 2;
-        } else if (isDigitalRearviewEnabled() && !isRearviewTempHidden()
-                && !MainActivity.isSettingsDialogOpen()) {
+        } else if (DigitalRearviewPolicy.showOnInfotainment(isDigitalRearviewEnabled(),
+                UiPrefs.getDigitalRearviewDisplayTarget(UiPrefs.getPrefs(this)),
+                isRearviewTempHidden(), MainActivity.isSettingsDialogOpen())) {
             nextMode = 4;
         } else {
             nextMode = 0;
@@ -855,18 +913,22 @@ public class SignalService extends Service {
     }
 
     private boolean isOemAvmInForeground() {
+        return Boolean.TRUE.equals(readOemAvmForegroundState());
+    }
+
+    private Boolean readOemAvmForegroundState() {
         try {
             ActivityManager am = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
-            if (am == null) return false;
+            if (am == null) return null;
             // Because this is a system app, getRunningTasks(1) is usually permitted.
             java.util.List<ActivityManager.RunningTaskInfo> tasks = am.getRunningTasks(1);
-            if (tasks == null || tasks.isEmpty()) return false;
+            if (tasks == null || tasks.isEmpty()) return null;
             ActivityManager.RunningTaskInfo t = tasks.get(0);
-            if (t.topActivity == null) return false;
+            if (t.topActivity == null) return null;
             return OEM_AVM_PACKAGE.equals(t.topActivity.getPackageName());
         } catch (Throwable t) {
             Log.w(TAG, "isOemAvmInForeground failed: " + t);
-            return false;
+            return null;
         }
     }
 
@@ -952,7 +1014,10 @@ public class SignalService extends Service {
         mainHandler.removeCallbacks(rearviewRestoreRunnable);
         mainHandler.removeCallbacks(signalRestoreRunnable);
         mainHandler.removeCallbacks(laneChangeSpeedRunnable);
-        OverlayService.hideOverlay(this);
+        mainHandler.removeCallbacks(oemOverlayRestoreRunnable);
+        oemOverlayRecovery.cancel();
+        hideCameraOverlays();
+        if (ipkRearview != null) { ipkRearview.close(); ipkRearview = null; }
         sInstance = null;
     }
 

@@ -1,4 +1,5 @@
 #include "camera_stream_manager.h"
+#include "latest_preview_frame.h"
 
 #include <android/hardware_buffer.h>
 #include <android/log.h>
@@ -1030,6 +1031,9 @@ namespace camera_stream_manager
         public:
             virtual ~FrameConsumer() = default;
             virtual void processFrame(const cv::Mat &rgbaFrame) = 0;
+            virtual bool isPreview() const { return false; }
+            virtual int64_t lastPreviewPostUs() const { return 0; }
+            virtual std::array<int64_t, 4> previewStats() const { return {0, 0, 0, 0}; }
 
             /**
              * Whether this consumer would rather have the camera buffer as it came off the
@@ -1053,6 +1057,100 @@ namespace camera_stream_manager
             virtual bool isFinalized() const = 0;
             virtual bool waitUntilStopped(int timeoutMs) = 0;
             virtual void finalize() = 0;
+        };
+
+        class ParallelPreviewConsumer final : public FrameConsumer,
+                                              public std::enable_shared_from_this<ParallelPreviewConsumer>
+        {
+            struct Frame { cv::Mat rgba; int64_t capturedUs = 0; };
+        public:
+            explicit ParallelPreviewConsumer(ANativeWindow *window, bool mirror)
+                : window_(window), mirror_(mirror), frames_(0) {}
+            ~ParallelPreviewConsumer() override { ANativeWindow_release(window_); }
+
+            void start() {
+                auto self = shared_from_this();
+                std::thread([self] { self->run(); }).detach();
+            }
+            bool isPreview() const override { return true; }
+            int64_t lastPreviewPostUs() const override { return lastPostUs_.load(); }
+            std::array<int64_t, 4> previewStats() const override {
+                return {lastPostUs_.load(), postedFrames_.load(), lastLatencyUs_.load() / 1000,
+                        lastPostCostUs_.load() / 1000};
+            }
+            void processFrame(const cv::Mat &rgba) override {
+                const int64_t captured = nowUs();
+                frames_.submit(captured, [&] { return Frame{rgba.clone(), captured}; });
+            }
+            void requestStop() override {
+                stopping_.store(true);
+                frames_.stop();
+            }
+            bool isStopRequested() const override { return stopping_.load(); }
+            bool isFinalized() const override { return finished_.load(); }
+            bool waitUntilStopped(int timeoutMs) override {
+                std::unique_lock<std::mutex> lock(doneMutex_);
+                return done_.wait_for(lock, std::chrono::milliseconds(timeoutMs),
+                                      [this] { return finished_.load(); });
+            }
+            void finalize() override { requestStop(); }
+        private:
+            void run() {
+                try {
+                    Frame frame;
+                    int width = 0, height = 0;
+                    while (frames_.take(frame)) {
+                        if (nowUs() - frame.capturedUs > 250000) continue;
+                        if (frame.rgba.cols != width || frame.rgba.rows != height) {
+                            width = frame.rgba.cols;
+                            height = frame.rgba.rows;
+                            if (ANativeWindow_setBuffersGeometry(window_, width, height,
+                                    AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM) != 0) break;
+                        }
+                        if (mirror_) cv::flip(frame.rgba, frame.rgba, 1);
+                        ANativeWindow_Buffer out{};
+                        const int64_t postStart = nowUs();
+                        // This can block on a suspended display. Only this output's worker
+                        // waits; it owns its window and survives detachment until the call ends.
+                        if (ANativeWindow_lock(window_, &out, nullptr) != 0) break;
+                        if (stopping_.load() || nowUs() - frame.capturedUs > 500000) {
+                            std::memset(out.bits, 0, static_cast<size_t>(out.stride) * out.height * 4U);
+                        } else {
+                            const int rows = std::min(out.height, height);
+                            const size_t bytes = static_cast<size_t>(std::min(out.width, width)) * 4U;
+                            for (int y = 0; y < rows; ++y)
+                                std::memcpy(static_cast<uint8_t *>(out.bits) + y * out.stride * 4U,
+                                            frame.rgba.ptr(y), bytes);
+                        }
+                        if (ANativeWindow_unlockAndPost(window_) != 0) break;
+                        const int64_t posted = nowUs();
+                        if (!stopping_.load() && posted - frame.capturedUs <= 500000) {
+                            lastLatencyUs_.store(posted - frame.capturedUs);
+                            lastPostCostUs_.store(posted - postStart);
+                            postedFrames_.fetch_add(1);
+                            lastPostUs_.store(posted);
+                        }
+                    }
+                } catch (const std::exception &e) {
+                    loge("parallel preview ended: %s", e.what());
+                } catch (...) {
+                    loge("parallel preview ended on an unknown exception");
+                }
+                requestStop();
+                {
+                    std::lock_guard<std::mutex> lock(doneMutex_);
+                    finished_.store(true);
+                }
+                done_.notify_all();
+            }
+            ANativeWindow *window_;
+            const bool mirror_;
+            LatestPreviewFrame<Frame> frames_;
+            std::atomic<bool> stopping_{false}, finished_{false};
+            std::atomic<int64_t> lastPostUs_{0};
+            std::atomic<int64_t> postedFrames_{0}, lastLatencyUs_{0}, lastPostCostUs_{0};
+            std::mutex doneMutex_;
+            std::condition_variable done_;
         };
 
         class SingleCameraRecordingConsumer final : public FrameConsumer
@@ -2684,6 +2782,29 @@ namespace camera_stream_manager
                 return stopConsumer(slot);
             }
 
+            int64_t previewPostUs(int id) {
+                std::lock_guard<std::mutex> lock(mutex_);
+                auto it = consumers_.find(id);
+                return it == consumers_.end() ? 0 : it->second->lastPreviewPostUs();
+            }
+
+            std::array<int64_t, 4> previewSnapshot(int id) {
+                std::lock_guard<std::mutex> lock(mutex_);
+                auto it = consumers_.find(id);
+                return it == consumers_.end() ? std::array<int64_t, 4>{0, 0, 0, 0}
+                                             : it->second->previewStats();
+            }
+
+            void detachExtraPreviews() {
+                std::vector<int> ids;
+                {
+                    std::lock_guard<std::mutex> lock(mutex_);
+                    for (const auto &entry : consumers_)
+                        if (entry.second->isPreview()) ids.push_back(entry.first);
+                }
+                for (int id : ids) detachConsumer(id);
+            }
+
             /**
              * Lets a consumer go without waiting for it to finish.
              *
@@ -3510,6 +3631,7 @@ namespace camera_stream_manager
         bool gCombinedRecordingActive = false;
 
         static constexpr int COMBINED_CONSUMER_ID_BASE = 1000;
+        static constexpr int PREVIEW_CONSUMER_ID_BASE = 2000;
         static constexpr int COMBINED_CAMERA_MASK_ALL = 0x0F;
         static constexpr std::array<int, 4> COMBINED_VIDEO_INDICES = {
             CAMERA_VIDEO_INDEX_FRONT, CAMERA_VIDEO_INDEX_RIGHT,
@@ -3590,6 +3712,48 @@ namespace camera_stream_manager
         eraseSessionIfIdle(videoIndex, session);
     }
 
+    bool attachPreviewSink(JNIEnv *env, int videoIndex, int sinkId, jobject surface) {
+        if (sinkId < 0 || sinkId > 31 || surface == nullptr) return false;
+        ANativeWindow *window = ANativeWindow_fromSurface(env, surface);
+        if (window == nullptr) return false;
+        auto consumer = std::make_shared<ParallelPreviewConsumer>(window, videoIndex == CAMERA_INDEX_REAR);
+        auto session = getOrCreateSession(videoIndex);
+        try {
+            consumer->start();
+            if (session->attachConsumer(PREVIEW_CONSUMER_ID_BASE + sinkId, consumer)) return true;
+        } catch (const std::exception &e) {
+            loge("attach parallel preview failed: %s", e.what());
+        }
+        consumer->requestStop();
+        eraseSessionIfIdle(videoIndex, session);
+        return false;
+    }
+
+    void detachPreviewSink(int videoIndex, int sinkId) {
+        if (sinkId < 0 || sinkId > 31) return;
+        auto session = getSession(videoIndex);
+        if (session == nullptr) return;
+        session->detachConsumer(PREVIEW_CONSUMER_ID_BASE + sinkId);
+        eraseSessionIfIdle(videoIndex, session);
+    }
+
+    int64_t previewSinkFrameAgeMs(int videoIndex, int sinkId) {
+        if (sinkId < 0 || sinkId > 31) return -1;
+        auto session = getSession(videoIndex);
+        if (session == nullptr) return -1;
+        const int64_t posted = session->previewPostUs(PREVIEW_CONSUMER_ID_BASE + sinkId);
+        return posted == 0 ? -1 : (nowUs() - posted) / 1000;
+    }
+
+    std::array<int64_t, 4> previewSinkStats(int videoIndex, int sinkId) {
+        if (sinkId < 0 || sinkId > 31) return {-1, 0, 0, 0};
+        auto session = getSession(videoIndex);
+        if (session == nullptr) return {-1, 0, 0, 0};
+        auto stats = session->previewSnapshot(PREVIEW_CONSUMER_ID_BASE + sinkId);
+        stats[0] = stats[0] == 0 ? -1 : (nowUs() - stats[0]) / 1000;
+        return stats;
+    }
+
     void detachAllPreviews()
     {
         std::vector<std::pair<int, std::shared_ptr<CameraSession>>> sessions;
@@ -3603,6 +3767,7 @@ namespace camera_stream_manager
         }
         for (const auto &entry : sessions)
         {
+            entry.second->detachExtraPreviews();
             entry.second->detachPreview();
             eraseSessionIfIdle(entry.first, entry.second);
         }

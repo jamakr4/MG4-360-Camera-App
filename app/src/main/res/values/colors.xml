@@ -31,4 +31,6 @@
     <color name="close_button_surface">#4D2B2B2B</color>
     <color name="overlay_tile_surface">#FF050505</color>
     <color name="overlay_tile_stroke">#1FFFFFFF</color>
+    <!-- SAIC cluster screen_background_dark; also used by MG4Control's ClusterGaugeView. -->
+    <color name="ipk_content_background">#FF0C0C0C</color>
 </resources>
