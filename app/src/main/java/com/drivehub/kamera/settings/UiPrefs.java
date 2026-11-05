@@ -56,7 +56,6 @@ public final class UiPrefs {
     public static final String KEY_OVERLAY_HIDE_DELAY_MS = "overlayHideDelayMs";
     public static final String KEY_OVERLAY_MIN_SHOW_MS = "overlayMinShowMs";
     public static final String KEY_DEV_OVERLAY_TOP_INSET_PX = "devOverlayTopInsetPx";
-    public static final String KEY_DEV_FOREGROUND_MODE_POLL_MS = "devForegroundModePollMs";
     public static final String KEY_DEV_DEFAULT_POLL_MS = "devDefaultPollMs";
     public static final String KEY_DEV_SIGNAL_OFF_POLL_MS = "devSignalOffPollMs";
     public static final String KEY_DEV_OEM_AVM_MAX_SPEED_KMH = "devOemAvmMaxSpeedKmh";
@@ -85,7 +84,6 @@ public final class UiPrefs {
     private static final int DEFAULT_OVERLAY_MIN_SHOW_MS = 3000;
     public static final int DEFAULT_LANE_CHANGE_MIN_SPEED_KMH = 15;
     public static final int DEFAULT_DEV_OVERLAY_TOP_INSET_PX = 80;
-    public static final int DEFAULT_DEV_FOREGROUND_MODE_POLL_MS = 1000;
     public static final int DEFAULT_DEV_DEFAULT_POLLING_MS = 100;
     public static final int DEFAULT_DEV_SIGNAL_OFF_POLLING_MS = 20;
     public static final int DEFAULT_DEV_OEM_AVM_MAX_SPEED_KMH = 20;
@@ -284,11 +282,6 @@ public final class UiPrefs {
     public static int getDevOverlayTopInsetPx(SharedPreferences prefs) {
         return clampDevOverlayTopInsetPx(
                 prefs.getInt(KEY_DEV_OVERLAY_TOP_INSET_PX, DEFAULT_DEV_OVERLAY_TOP_INSET_PX));
-    }
-
-    public static int getDevForegroundModePollMs(SharedPreferences prefs) {
-        return clampDevPollingMs(
-                prefs.getInt(KEY_DEV_FOREGROUND_MODE_POLL_MS, DEFAULT_DEV_FOREGROUND_MODE_POLL_MS));
     }
 
     public static int getDevOemAvmMaxSpeedKmh(SharedPreferences prefs) {

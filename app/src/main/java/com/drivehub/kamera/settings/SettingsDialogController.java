@@ -244,7 +244,6 @@ public final class SettingsDialogController {
         v.swDevPerformanceOverlay = dialog.findViewById(R.id.switchDevPerformanceOverlay);
         v.etDevDefaultPollMs = dialog.findViewById(R.id.etDevDefaultPollMs);
         v.etDevSignalOffPollMs = dialog.findViewById(R.id.etDevSignalOffPollMs);
-        v.etDevForegroundModePollMs = dialog.findViewById(R.id.etDevForegroundModePollMs);
         v.etDevOemAvmMaxSpeedKmh = dialog.findViewById(R.id.etDevOemAvmMaxSpeedKmh);
         v.seekDevOverlayTopInsetPx = dialog.findViewById(R.id.seekDevOverlayTopInsetPx);
         v.etDevOverlayTopInsetPx = dialog.findViewById(R.id.etDevOverlayTopInsetPx);
@@ -431,7 +430,6 @@ public final class SettingsDialogController {
                 views.swDevPerformanceOverlay,
                 views.seekDevOverlayTopInsetPx,
                 views.etDevOverlayTopInsetPx,
-                views.etDevForegroundModePollMs,
                 views.etDevDefaultPollMs,
                 views.etDevSignalOffPollMs,
                 views.etDevOemAvmMaxSpeedKmh,
@@ -773,7 +771,6 @@ public final class SettingsDialogController {
         Switch swDevPerformanceOverlay;
         EditText etDevDefaultPollMs;
         EditText etDevSignalOffPollMs;
-        EditText etDevForegroundModePollMs;
         EditText etDevOemAvmMaxSpeedKmh;
         SeekBar seekDevOverlayTopInsetPx;
         EditText etDevOverlayTopInsetPx;

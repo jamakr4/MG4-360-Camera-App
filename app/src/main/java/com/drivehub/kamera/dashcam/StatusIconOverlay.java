@@ -5,6 +5,8 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.PixelFormat;
+import android.graphics.Point;
+import android.graphics.Rect;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
@@ -15,7 +17,8 @@ import android.view.WindowManager;
 import androidx.annotation.Nullable;
 
 import com.drivehub.kamera.dev.DevRuntimeLog;
-import com.drivehub.kamera.camera.ProjectionForeground;
+import com.drivehub.kamera.camera.FloatingWindowGeometry;
+import com.drivehub.kamera.camera.FloatingWindowPlacement;
 import com.drivehub.kamera.settings.UiPrefs;
 
 /** Optional, non-interactive status dot positioned on the full MG4 display. */
@@ -36,13 +39,7 @@ public final class StatusIconOverlay {
     private WindowManager.LayoutParams params;
     private DotView view;
     private String shownStatus;
-    private final Runnable positionPoll = new Runnable() {
-        @Override public void run() {
-            if (view == null || windowManager == null || params == null) return;
-            repositionNow();
-            main.postDelayed(this, UiPrefs.getDevForegroundModePollMs(UiPrefs.getPrefs(context)));
-        }
-    };
+    private FloatingWindowGeometry geometry;
 
     public StatusIconOverlay(Context context) {
         this.context = context.getApplicationContext();
@@ -68,20 +65,23 @@ public final class StatusIconOverlay {
 
     private void repositionNow() {
         if (view == null || windowManager == null || params == null) return;
-        int x = horizontalOffset(params.width);
-        int y = getPositionY(context);
-        if (params.x == x && params.y == y) return;
-        params.x = x;
-        params.y = y;
-        try {
-            windowManager.updateViewLayout(view, params);
-        } catch (RuntimeException e) {
-            Log.w(TAG, "Could not reposition status dot", e);
+        Point size = FloatingWindowGeometry.screenSize(context);
+        Rect bounds = geometry != null && geometry.isMeasured()
+                ? geometry.screenBounds() : new Rect(0, 0, size.x, size.y);
+        FloatingWindowPlacement place = FloatingWindowPlacement.calculate(
+                getPositionX(context), getPositionY(context), params.width, params.height,
+                geometry == null ? 0 : geometry.originX(), geometry == null ? 0 : geometry.originY(),
+                bounds.left, bounds.top, bounds.right, bounds.bottom);
+        if (params.x != place.windowX || params.y != place.windowY) {
+            params.x = place.windowX;
+            params.y = place.windowY;
+            if (geometry != null) geometry.updateLayout();
         }
+        if (geometry != null && geometry.isMeasured()) view.setAlpha(1f);
     }
 
     private void removeNow() {
-        main.removeCallbacks(positionPoll);
+        if (geometry != null) { geometry.close(); geometry = null; }
         if (windowManager != null && view != null) {
             try {
                 windowManager.removeView(view);
@@ -124,6 +124,7 @@ public final class StatusIconOverlay {
         if (wm == null) return;
         DotView dot = new DotView(context);
         dot.setColour(colour);
+        dot.setAlpha(0f);
         int barHeight = statusBarHeightPx(context);
         WindowManager.LayoutParams lp = new WindowManager.LayoutParams(
                 iconWidthPx(context),
@@ -133,8 +134,8 @@ public final class StatusIconOverlay {
                         | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
                         | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
                 PixelFormat.TRANSLUCENT);
-        lp.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
-        lp.x = horizontalOffset(lp.width);
+        lp.gravity = Gravity.TOP | Gravity.START;
+        lp.x = getPositionX(context);
         lp.y = getPositionY(context);
         for (int type : WINDOW_TYPES) {
             lp.type = type;
@@ -144,7 +145,7 @@ public final class StatusIconOverlay {
                 view = dot;
                 params = lp;
                 shownStatus = status;
-                main.postDelayed(positionPoll, UiPrefs.getDevForegroundModePollMs(UiPrefs.getPrefs(context)));
+                geometry = new FloatingWindowGeometry(wm, dot, lp, this::repositionNow);
                 DevRuntimeLog.add(TAG, "status dot=" + status + " windowType=" + type
                         + " size=" + lp.width + "x" + lp.height);
                 return;
@@ -154,35 +155,27 @@ public final class StatusIconOverlay {
         }
     }
 
-    private int horizontalOffset(int iconWidth) {
-        int launcherWidth = ProjectionForeground.isActive(context)
-                ? 0 : ProjectionForeground.LAUNCHER_BAR_WIDTH_PX;
-        return StatusIconPosition.windowX(getPositionX(context), iconWidth, launcherWidth);
-    }
-
     static int iconWidthPx(Context context) {
         return Math.max(1, Math.round(statusBarHeightPx(context)
                 * (2 * SIDE_PAD + 2 * DOT_RADIUS)));
     }
 
     static int maxPositionX(Context context) {
-        return Math.max(0, StatusIconPosition.SCREEN_WIDTH - iconWidthPx(context));
+        return Math.max(0, FloatingWindowGeometry.screenSize(context).x - iconWidthPx(context));
     }
 
     static int maxPositionY(Context context) {
-        return Math.max(0, StatusIconPosition.SCREEN_HEIGHT - statusBarHeightPx(context));
+        return Math.max(0, FloatingWindowGeometry.screenSize(context).y - statusBarHeightPx(context));
     }
 
     static int getPositionX(Context context) {
-        return StatusIconPosition.clamp(UiPrefs.getPrefs(context).getInt(
-                UiPrefs.KEY_DASHCAM_STATUS_ICON_X, 1166),
-                StatusIconPosition.SCREEN_WIDTH, iconWidthPx(context));
+        return Math.max(0, Math.min(maxPositionX(context), UiPrefs.getPrefs(context).getInt(
+                UiPrefs.KEY_DASHCAM_STATUS_ICON_X, 1166)));
     }
 
     static int getPositionY(Context context) {
-        return StatusIconPosition.clamp(UiPrefs.getPrefs(context).getInt(
-                UiPrefs.KEY_DASHCAM_STATUS_ICON_Y, 0),
-                StatusIconPosition.SCREEN_HEIGHT, statusBarHeightPx(context));
+        return Math.max(0, Math.min(maxPositionY(context), UiPrefs.getPrefs(context).getInt(
+                UiPrefs.KEY_DASHCAM_STATUS_ICON_Y, 0)));
     }
 
     private static int statusBarHeightPx(Context context) {
