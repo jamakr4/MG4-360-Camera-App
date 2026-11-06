@@ -48,7 +48,7 @@ Community mod for the MG4 EV (AAOS 9, pre-2026 facelift) that replaces the stock
 ## Feature Highlights
 
 - **Turn signal overlay**: opens automatically when the indicator is activated, without the original speed-based auto-close behavior.
-- **Digital rearview mirror**: keeps the factory rear camera visible as a persistent floating mirror for situations where the rear window is blocked by cargo, while still yielding to turn-signal cameras and then restoring the rear view afterwards.
+- **Digital rearview mirror (FICM + IPK)**: keeps the factory rear camera visible on the infotainment display, the driver instrument cluster, or both. The IPK mirror can appear on the Navigation or Media page and keeps showing the rear view while turn-signal cameras take priority on the infotainment display.
 - **Tesla-style tile view**: replaces the launcher-like OEM overlay, also known as the fullscreen takeover, with a cleaner presentation.
 - **Compact View**: makes the turn-signal camera overlay narrower with independently adjustable left and right crop edges.
 - **Native 4-camera dashcam**: records the factory cameras in a single 1440x1040 grid clip, with up to 720x480 per camera and a footer including time, speed, and a custom signature.
@@ -231,24 +231,26 @@ You can position the dot anywhere on the screen. Expand the position controls be
 > Continuous loop recording writes constantly to internal storage. This can accelerate flash wear over time. Use at your own risk. Test clips and event-only recording are not affected since they only record on demand.
 
 <details>
-<summary><strong>Digital Rearview</strong></summary>
+<summary><strong>Digital Rearview (FICM + IPK)</strong></summary>
 
-Digital Rearview is the persistent rear camera overlay.
+Digital Rearview keeps the factory rear camera visible as a persistent mirror, for example when cargo blocks the rear window. It can appear on the infotainment display (FICM), the driver instrument cluster (IPK), or both.
 
 To use it:
 
 1. Open `Settings` -> `Digital Rearview`.
-2. Enable `Digital rearview`.
-3. The rear camera will stay visible as a floating window when no higher-priority signal overlay is active.
-4. You can drag and resize the overlay, and the app restores the last layout automatically.
-5. `Tap to temporarily hide` is enabled by default (5 seconds) – one tap dismisses the overlay, and it reappears after the set duration.
-6. The "X" in the preview closes it permanently until Digital Rearview is turned back on.
+2. Turn on `Enable Digital Rearview Mirror`.
+3. Under `Show mirror on`, select `Infotainment`, `IPK`, or `Both`. The default is `Infotainment`.
+4. If using the IPK, choose `Navigation` (default) or `Media` under `IPK screen`. Open that page manually in the instrument cluster; the mirror appears only on the selected page.
+5. On the infotainment display, you can drag and resize the mirror. The app restores the saved layout automatically. The IPK mirror uses a fixed position and shares the configured corner rounding.
 
 Behavior:
 
-- Reverse gear still has priority and follows the OEM/main-screen flow.
-- Turn-signal cameras temporarily override Digital Rearview and the rearview returns afterwards.
-- The digital rearview can also be toggled by the separate companion trigger app.
+- Turn-signal cameras appear only on the infotainment display, temporarily replacing its mirror. The rear view returns afterwards, while the IPK keeps showing the rear camera throughout.
+- `Tap to temporarily hide` is enabled by default (5 seconds). It hides only the infotainment mirror for the configured duration; the IPK mirror stays visible.
+- The "X" in the infotainment preview or switching Digital Rearview off via an external trigger stops the mirror on both displays, including during a temporary hide.
+- The companion trigger app and MG4Control shortcuts toggle the same mirror setting and use the selected display targets.
+- Opening the app or its settings hides the infotainment mirror while the IPK mirror stays active on its selected page.
+- Reverse gear, OEM 360 and the four-camera tile view retain priority and pause the IPK mirror. It returns afterwards if still enabled and its selected IPK page is visible.
 
 </details>
 

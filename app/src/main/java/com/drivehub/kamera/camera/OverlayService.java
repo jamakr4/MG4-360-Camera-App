@@ -7,14 +7,13 @@ import com.drivehub.kamera.helper.app.NotificationChannelHelper;
 import com.drivehub.kamera.signal.SignalService;
 import com.drivehub.kamera.settings.UiPrefs;
 
-import android.app.ActivityManager;
 import android.app.Notification;
 import android.app.NotificationManager;
 import android.app.Service;
-import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Rect;
+import android.graphics.Point;
 import android.graphics.Matrix;
 import android.graphics.SurfaceTexture;
 import android.graphics.PixelFormat;
@@ -59,12 +58,6 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
     /** Min/max bounds for two-finger pinch resizing. */
     private static final int OVERLAY_MIN_WIDTH_PX = 240;
     private static final int OVERLAY_MAX_WIDTH_PX = 3840;
-    private static final int MG4_DISPLAY_WIDTH_PX = 1920;
-    private static final int MG4_DISPLAY_HEIGHT_PX = 720;
-    private static final int MG4_LAUNCHER_BAR_WIDTH_PX = ProjectionForeground.LAUNCHER_BAR_WIDTH_PX;
-    private static final int MG4_SAIC_WORK_AREA_WIDTH_PX = MG4_DISPLAY_WIDTH_PX - MG4_LAUNCHER_BAR_WIDTH_PX;
-    private static final int OVERLAY_MODE_SAIC = 0;
-    private static final int OVERLAY_MODE_FULLSCREEN = 1;
     private static final long SIGNAL_FADE_IN_MS = 110L;
     private static final long SIGNAL_FADE_OUT_MS = 90L;
     private static final float SIGNAL_FADE_IN_START_ALPHA = 0.18f;
@@ -74,7 +67,8 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
     private static final String KEY_LAST_Y = "last_y";
     private static final String KEY_OVERLAY_W = "overlay_w";
     private static final String KEY_OVERLAY_H = "overlay_h";
-    private static final String KEY_LAST_OVERLAY_MODE = "last_overlay_mode";
+    private static final String KEY_SCREEN_X = "screen_x";
+    private static final String KEY_SCREEN_Y = "screen_y";
 
     private static volatile boolean sOverlayVisible = false;
     private static volatile String sOverlayReason = "";
@@ -92,7 +86,12 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
     /** Current window size, updated via pinch gestures. */
     private int overlayWidthPx = DEFAULT_OVERLAY_WIDTH_PX;
     private int overlayHeightPx = DEFAULT_OVERLAY_HEIGHT_PX;
-    private int overlayMode = OVERLAY_MODE_SAIC;
+    private int preferredWidthPx = DEFAULT_OVERLAY_WIDTH_PX;
+    private int preferredHeightPx = DEFAULT_OVERLAY_HEIGHT_PX;
+    private int preferredScreenX = 32, preferredScreenY = 120;
+    private boolean restoreLegacyPosition;
+    private boolean awaitingInitialGeometry;
+    private FloatingWindowGeometry geometry;
 
     private ScaleGestureDetector scaleGestureDetector;
     private float resizeTargetWidthPx = DEFAULT_OVERLAY_WIDTH_PX;
@@ -108,16 +107,6 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
             saveOverlayLayoutPrefs();
         }
     };
-    private final Runnable foregroundModePollRunnable = new Runnable() {
-        @Override
-        public void run() {
-            refreshOverlayMode(false);
-            if (overlayView != null) {
-                mainHandler.postDelayed(this, getForegroundModePollMs());
-            }
-        }
-    };
-
     private float initialX;
     private float initialY;
     private float initialTouchX;
@@ -139,8 +128,6 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
                     updateOverlayPresentation(true);
                 } else if (UiPrefs.KEY_DEV_OVERLAY_TOP_INSET_PX.equals(key)) {
                     updateOverlayPresentation(true);
-                } else if (UiPrefs.KEY_DEV_FOREGROUND_MODE_POLL_MS.equals(key)) {
-                    restartForegroundModePolling();
                 } else if (UiPrefs.KEY_OVERLAY_RESIZE_LOCKED.equals(key)
                         && UiPrefs.isOverlayResizeLocked(sharedPreferences)) {
                     cancelPendingResize();
@@ -153,7 +140,7 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
                         stopSelf();
                     } else {
                         overlayView.animate().cancel();
-                        overlayView.setAlpha(1f);
+                        if (!awaitingInitialGeometry) overlayView.setAlpha(1f);
                     }
                 }
             };
@@ -231,9 +218,9 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
         } else {
             fadeOutPending = false;
             overlayView.animate().cancel();
-            overlayView.setAlpha(1f);
+            if (!awaitingInitialGeometry) overlayView.setAlpha(1f);
             sOverlayVisible = true;
-            refreshOverlayMode(false);
+            if (geometry != null) geometry.refresh();
             applyOverlayCornerRadius();
             updateOverlayPresentation(false);
             // If the overlay is already open and only the camera index changed, switch the feed.
@@ -241,7 +228,6 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
                 startPreview();
             }
         }
-        restartForegroundModePolling();
         return START_STICKY;
     }
 
@@ -257,13 +243,13 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
             int w = sp.getInt(KEY_OVERLAY_W, DEFAULT_OVERLAY_WIDTH_PX);
             int h = sp.getInt(KEY_OVERLAY_H, DEFAULT_OVERLAY_HEIGHT_PX);
             if (w >= OVERLAY_MIN_WIDTH_PX && h >= 1) {
-                overlayWidthPx = w;
-                overlayHeightPx = h;
+                preferredWidthPx = w;
+                preferredHeightPx = h;
             }
         } catch (Throwable e) {
             Log.w("OverlayService", "Failed to read overlay size prefs", e);
         }
-        normalizeOverlaySizeForCurrentMode();
+        normalizeOverlaySize();
 
         overlayParams = new WindowManager.LayoutParams(
                 getVisibleOverlayWidth(),
@@ -276,25 +262,15 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
         );
         overlayParams.gravity = Gravity.TOP | Gravity.START;
 
-        // Read the last saved position from prefs, or fall back to the default.
-        int defaultX = 32;
-        int defaultY = 120;
-        try {
-            android.content.SharedPreferences sp =
-                    getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-            defaultX = sp.getInt(KEY_LAST_X, defaultX);
-            defaultY = sp.getInt(KEY_LAST_Y, defaultY);
-            int savedMode = sp.getInt(KEY_LAST_OVERLAY_MODE, OVERLAY_MODE_SAIC);
-            overlayMode = resolveOverlayMode();
-            defaultX = translateXBetweenModes(defaultX, savedMode, overlayMode);
-            defaultY = translateCoordinate(defaultY, 0, 0);
-        } catch (Throwable e) {
-            Log.w("OverlayService", "Failed to read overlay position prefs", e);
-            overlayMode = resolveOverlayMode();
-        }
-        overlayParams.x = defaultX;
-        overlayParams.y = defaultY;
-        clampOverlayPositionToScreen();
+        // New positions use physical screen coordinates. Old window coordinates are
+        // migrated once, after the actual origin has been measured on the attached view.
+        android.content.SharedPreferences sp = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        restoreLegacyPosition = !sp.contains(KEY_SCREEN_X) && sp.contains(KEY_LAST_X);
+        preferredScreenX = sp.getInt(KEY_SCREEN_X, sp.getInt(KEY_LAST_X, 32));
+        preferredScreenY = sp.getInt(KEY_SCREEN_Y, sp.getInt(KEY_LAST_Y, 120));
+        overlayParams.x = preferredScreenX;
+        overlayParams.y = preferredScreenY;
+        if (!restoreLegacyPosition) clampOverlayPositionToScreen();
 
         overlayView = createOverlayCard();
 
@@ -340,13 +316,13 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
                     }
                 });
 
-        if (shouldFadeInOnShow()) {
-            overlayView.setAlpha(SIGNAL_FADE_IN_START_ALPHA);
-        }
+        awaitingInitialGeometry = true;
+        overlayView.setAlpha(0f);
         windowManager.addView(overlayView, overlayParams);
+        geometry = new FloatingWindowGeometry(windowManager, overlayView, overlayParams,
+                this::onWindowGeometryChanged);
         sOverlayVisible = true;
         sOverlayReason = overlayReason == null ? "" : overlayReason;
-        startFadeInIfNeeded();
         applyPreviewTransform();
 
         overlayView.setOnTouchListener((v, event) -> {
@@ -358,6 +334,7 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
 
             if (action == MotionEvent.ACTION_CANCEL) {
                 finishResizeGesture();
+                if (geometry != null) geometry.setPaused(false);
                 return true;
             }
 
@@ -367,8 +344,9 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
 
             switch (action) {
                 case MotionEvent.ACTION_DOWN:
-                    initialX = overlayParams.x;
-                    initialY = overlayParams.y;
+                    if (geometry != null) geometry.setPaused(true);
+                    initialX = overlayParams.x + windowOriginX();
+                    initialY = overlayParams.y + windowOriginY();
                     initialTouchX = event.getRawX();
                     initialTouchY = event.getRawY();
                     return true;
@@ -383,13 +361,15 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
                     float dy = event.getRawY() - initialTouchY;
                     int newX = (int) (initialX + dx);
                     int newY = (int) (initialY + dy);
-                    overlayParams.x = newX;
-                    overlayParams.y = newY;
+                    preferredScreenX = newX;
+                    preferredScreenY = newY;
                     clampOverlayPositionToScreen();
-                    windowManager.updateViewLayout(overlayView, overlayParams);
+                    rememberVisiblePosition();
+                    updateWindowLayout();
                     return true;
                 case MotionEvent.ACTION_UP:
                     finishResizeGesture();
+                    if (geometry != null) geometry.setPaused(false);
                     float tapDx = event.getRawX() - initialTouchX;
                     float tapDy = event.getRawY() - initialTouchY;
                     boolean isTap = (tapDx * tapDx + tapDy * tapDy) < (float) (dpToPx(12) * dpToPx(12));
@@ -441,15 +421,18 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
             resizeTargetWidthPx = wh[0];
         }
         if (overlayWidthPx == wh[0] && overlayHeightPx == wh[1]) {
+            preferredWidthPx = wh[0];
+            preferredHeightPx = wh[1];
             return;
         }
 
-        overlayWidthPx = wh[0];
-        overlayHeightPx = wh[1];
+        preferredWidthPx = overlayWidthPx = wh[0];
+        preferredHeightPx = overlayHeightPx = wh[1];
         overlayParams.width = getVisibleOverlayWidth();
         overlayParams.height = getVisibleOverlayHeight();
         clampOverlayPositionToScreen();
-        windowManager.updateViewLayout(overlayView, overlayParams);
+        rememberVisiblePosition();
+        updateWindowLayout();
         applyPreviewTransform();
     }
 
@@ -591,15 +574,15 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
                 rotated ? 1f : visibleFraction, rotated ? visibleFraction : 1f);
     }
 
-    private void normalizeOverlaySizeForCurrentMode() {
+    private void normalizeOverlaySize() {
         boolean shouldRotate = shouldRotatePreviewToDrivingDirection();
-        boolean isLandscape = overlayWidthPx >= overlayHeightPx;
+        boolean isLandscape = preferredWidthPx >= preferredHeightPx;
         if (shouldRotate == isLandscape) {
-            int swappedWidth = overlayHeightPx;
-            overlayHeightPx = overlayWidthPx;
-            overlayWidthPx = swappedWidth;
+            int swappedWidth = preferredHeightPx;
+            preferredHeightPx = preferredWidthPx;
+            preferredWidthPx = swappedWidth;
         }
-        int[] clamped = clampOverlaySize(overlayWidthPx);
+        int[] clamped = clampOverlaySize(preferredWidthPx);
         overlayWidthPx = clamped[0];
         overlayHeightPx = clamped[1];
     }
@@ -625,13 +608,13 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
     }
 
     private void updateOverlayPresentation(boolean persist) {
-        normalizeOverlaySizeForCurrentMode();
+        normalizeOverlaySize();
         if (overlayParams != null) {
             overlayParams.width = getVisibleOverlayWidth();
             overlayParams.height = getVisibleOverlayHeight();
             clampOverlayPositionToScreen();
             if (windowManager != null && overlayView != null) {
-                windowManager.updateViewLayout(overlayView, overlayParams);
+                updateWindowLayout();
             }
         }
         applyPreviewTransform();
@@ -715,89 +698,71 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
         }
     }
 
-    private void clampOverlayPositionToScreen() {
-        clampOverlayPositionToBounds(getAvailableOverlayBoundsPx());
+    private int windowOriginX() { return geometry == null ? 0 : geometry.originX(); }
+    private int windowOriginY() { return geometry == null ? 0 : geometry.originY(); }
+
+    private void rememberVisiblePosition() {
+        preferredScreenX = overlayParams.x + windowOriginX();
+        preferredScreenY = overlayParams.y + windowOriginY();
     }
 
-    private void clampOverlayPositionToBounds(Rect bounds) {
-        if (windowManager == null || overlayParams == null) return;
-        if (bounds == null) return;
-        int maxX = Math.max(bounds.left, bounds.right - overlayParams.width);
-        int maxY = Math.max(bounds.top, bounds.bottom - overlayParams.height);
-        if (overlayParams.x < bounds.left) overlayParams.x = bounds.left;
-        if (overlayParams.y < bounds.top) overlayParams.y = bounds.top;
-        if (overlayParams.x > maxX) overlayParams.x = maxX;
-        if (overlayParams.y > maxY) overlayParams.y = maxY;
+    private void clampOverlayPositionToScreen() {
+        if (overlayParams == null) return;
+        Rect bounds = getAvailableOverlayBoundsPx();
+        FloatingWindowPlacement place = FloatingWindowPlacement.calculate(
+                preferredScreenX, preferredScreenY, overlayParams.width, overlayParams.height,
+                windowOriginX(), windowOriginY(), bounds.left, bounds.top, bounds.right, bounds.bottom);
+        overlayParams.x = place.windowX;
+        overlayParams.y = place.windowY;
     }
 
     private Rect getAvailableOverlayBoundsPx() {
-        return getBoundsForMode(overlayMode);
-    }
-
-    private Rect getBoundsForMode(int mode) {
-        int topInsetPx = uiPrefs == null ? UiPrefs.DEFAULT_DEV_OVERLAY_TOP_INSET_PX
+        Rect bounds;
+        if (geometry != null && geometry.isMeasured()) {
+            bounds = geometry.visibleBounds();
+        } else {
+            Point size = FloatingWindowGeometry.screenSize(this);
+            bounds = new Rect(0, 0, size.x, size.y);
+        }
+        // Keep the user's optional reserved top area; the actual system frame is measured.
+        int minimumTop = uiPrefs == null ? UiPrefs.DEFAULT_DEV_OVERLAY_TOP_INSET_PX
                 : UiPrefs.getDevOverlayTopInsetPx(uiPrefs);
-        if (mode == OVERLAY_MODE_FULLSCREEN) {
-            return new Rect(0, topInsetPx, MG4_DISPLAY_WIDTH_PX, MG4_DISPLAY_HEIGHT_PX);
-        }
-        return new Rect(0, topInsetPx, MG4_SAIC_WORK_AREA_WIDTH_PX, MG4_DISPLAY_HEIGHT_PX);
+        bounds.top = Math.min(bounds.bottom - 1, Math.max(bounds.top, minimumTop));
+        return bounds;
     }
 
-    private int resolveOverlayMode() {
-        return ProjectionForeground.isActive(this) ? OVERLAY_MODE_FULLSCREEN : OVERLAY_MODE_SAIC;
+    private void updateWindowLayout() {
+        if (geometry != null) geometry.updateLayout();
+        else if (windowManager != null && overlayView != null)
+            windowManager.updateViewLayout(overlayView, overlayParams);
     }
 
-    private void refreshOverlayMode(boolean persist) {
-        int newMode = resolveOverlayMode();
-        if (newMode == overlayMode) {
-            return;
+    private void onWindowGeometryChanged() {
+        if (overlayView == null || overlayParams == null || geometry == null) return;
+        boolean migrate = restoreLegacyPosition;
+        if (migrate) {
+            rememberVisiblePosition();
+            restoreLegacyPosition = false;
         }
-        int oldMode = overlayMode;
-        Rect oldBounds = getBoundsForMode(overlayMode);
-        Rect newBounds = getBoundsForMode(newMode);
-        overlayMode = newMode;
-        if (overlayParams == null || oldBounds == null || newBounds == null) {
-            return;
-        }
-        overlayParams.x = translateXBetweenModes(overlayParams.x, oldMode, newMode);
-        overlayParams.y = translateCoordinate(overlayParams.y, oldBounds.top, newBounds.top);
-        int[] clampedSize = clampOverlaySize(overlayWidthPx);
-        overlayWidthPx = clampedSize[0];
-        overlayHeightPx = clampedSize[1];
+        int oldX = overlayParams.x, oldY = overlayParams.y;
+        int oldWidth = overlayParams.width, oldHeight = overlayParams.height;
+        normalizeOverlaySize();
         overlayParams.width = getVisibleOverlayWidth();
         overlayParams.height = getVisibleOverlayHeight();
-        clampOverlayPositionToBounds(newBounds);
-        if (windowManager != null && overlayView != null) {
-            windowManager.updateViewLayout(overlayView, overlayParams);
+        clampOverlayPositionToScreen();
+        if (oldX != overlayParams.x || oldY != overlayParams.y
+                || oldWidth != overlayParams.width || oldHeight != overlayParams.height) {
+            updateWindowLayout();
             applyPreviewTransform();
         }
-        if (persist) {
-            saveOverlayLayoutPrefs();
+        if (migrate) saveOverlayLayoutPrefs();
+        if (awaitingInitialGeometry && !fadeOutPending) {
+            awaitingInitialGeometry = false;
+            overlayView.setAlpha(shouldFadeInOnShow() ? SIGNAL_FADE_IN_START_ALPHA : 1f);
+            startFadeInIfNeeded();
         }
-    }
-
-    private int translateCoordinate(int value, int oldOrigin, int newOrigin) {
-        return newOrigin + (value - oldOrigin);
-    }
-
-    private int translateXBetweenModes(int value, int oldMode, int newMode) {
-        return value + getVisualLeftInsetForMode(oldMode) - getVisualLeftInsetForMode(newMode);
-    }
-
-    private int getVisualLeftInsetForMode(int mode) {
-        return mode == OVERLAY_MODE_FULLSCREEN ? 0 : MG4_LAUNCHER_BAR_WIDTH_PX;
-    }
-
-    private void restartForegroundModePolling() {
-        mainHandler.removeCallbacks(foregroundModePollRunnable);
-        if (overlayView != null) {
-            mainHandler.postDelayed(foregroundModePollRunnable, getForegroundModePollMs());
-        }
-    }
-
-    private int getForegroundModePollMs() {
-        return uiPrefs == null ? UiPrefs.DEFAULT_DEV_FOREGROUND_MODE_POLL_MS
-                : UiPrefs.getDevForegroundModePollMs(uiPrefs);
+        com.drivehub.kamera.dev.DevRuntimeLog.add("FloatingGeometry", "camera origin="
+                + windowOriginX() + "," + windowOriginY() + " frame=" + geometry.visibleBounds());
     }
 
     private void saveOverlayLayoutPrefs() {
@@ -806,11 +771,10 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
             android.content.SharedPreferences sp =
                     getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
             sp.edit()
-                    .putInt(KEY_LAST_X, overlayParams.x)
-                    .putInt(KEY_LAST_Y, overlayParams.y)
-                    .putInt(KEY_OVERLAY_W, overlayWidthPx)
-                    .putInt(KEY_OVERLAY_H, overlayHeightPx)
-                    .putInt(KEY_LAST_OVERLAY_MODE, overlayMode)
+                    .putInt(KEY_SCREEN_X, preferredScreenX)
+                    .putInt(KEY_SCREEN_Y, preferredScreenY)
+                    .putInt(KEY_OVERLAY_W, preferredWidthPx)
+                    .putInt(KEY_OVERLAY_H, preferredHeightPx)
                     .apply();
         } catch (Throwable e) {
             Log.w("OverlayService", "Failed to save overlay prefs", e);
@@ -823,7 +787,6 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
         if (uiPrefs != null) {
             uiPrefs.unregisterOnSharedPreferenceChangeListener(prefListener);
         }
-        mainHandler.removeCallbacks(foregroundModePollRunnable);
         cancelResizeFrame();
         if (resizePending) {
             applyPendingResize();
@@ -839,6 +802,7 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
             textureSurface.release();
             textureSurface = null;
         }
+        if (geometry != null) { geometry.close(); geometry = null; }
         if (windowManager != null && overlayView != null) {
             windowManager.removeView(overlayView);
         }

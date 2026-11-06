@@ -30,7 +30,6 @@ public final class DevSettingsController {
             Switch swPerformanceOverlay,
             SeekBar seekOverlayTopInsetPx,
             EditText etOverlayTopInsetPx,
-            EditText etForegroundModePollMs,
             EditText etDefaultPollMs,
             EditText etSignalOffPollMs,
             EditText etOemAvmMaxSpeedKmh,
@@ -51,12 +50,6 @@ public final class DevSettingsController {
                 1,
                 UiPrefs::getDevOverlayTopInsetPx,
                 UiPrefs::clampDevOverlayTopInsetPx
-        );
-        bindPollingField(
-                prefs,
-                etForegroundModePollMs,
-                UiPrefs.KEY_DEV_FOREGROUND_MODE_POLL_MS,
-                UiPrefs.getDevForegroundModePollMs(prefs)
         );
         bindPollingField(
                 prefs,
@@ -96,7 +89,6 @@ public final class DevSettingsController {
                 prefs,
                 seekOverlayTopInsetPx,
                 etOverlayTopInsetPx,
-                etForegroundModePollMs,
                 etDefaultPollMs,
                 etSignalOffPollMs,
                 etOemAvmMaxSpeedKmh,
@@ -208,7 +200,6 @@ public final class DevSettingsController {
             SharedPreferences prefs,
             SeekBar seekOverlayTopInsetPx,
             EditText etOverlayTopInsetPx,
-            EditText etForegroundModePollMs,
             EditText etDefaultPollMs,
             EditText etSignalOffPollMs,
             EditText etOemAvmMaxSpeedKmh,
@@ -220,7 +211,6 @@ public final class DevSettingsController {
         btnResetDefaults.setOnClickListener(v -> {
             prefs.edit()
                     .putInt(UiPrefs.KEY_DEV_OVERLAY_TOP_INSET_PX, UiPrefs.DEFAULT_DEV_OVERLAY_TOP_INSET_PX)
-                    .putInt(UiPrefs.KEY_DEV_FOREGROUND_MODE_POLL_MS, UiPrefs.DEFAULT_DEV_FOREGROUND_MODE_POLL_MS)
                     .putInt(UiPrefs.KEY_DEV_DEFAULT_POLL_MS, UiPrefs.DEFAULT_DEV_DEFAULT_POLLING_MS)
                     .putInt(UiPrefs.KEY_DEV_SIGNAL_OFF_POLL_MS, UiPrefs.DEFAULT_DEV_SIGNAL_OFF_POLLING_MS)
                     .putInt(UiPrefs.KEY_DEV_OEM_AVM_MAX_SPEED_KMH, UiPrefs.DEFAULT_DEV_OEM_AVM_MAX_SPEED_KMH)
@@ -233,7 +223,6 @@ public final class DevSettingsController {
             if (seekOverlayTopInsetPx != null) {
                 seekOverlayTopInsetPx.setProgress(UiPrefs.DEFAULT_DEV_OVERLAY_TOP_INSET_PX);
             }
-            setPollingFieldValue(etForegroundModePollMs, UiPrefs.DEFAULT_DEV_FOREGROUND_MODE_POLL_MS);
             setPollingFieldValue(etDefaultPollMs, UiPrefs.DEFAULT_DEV_DEFAULT_POLLING_MS);
             setPollingFieldValue(etSignalOffPollMs, UiPrefs.DEFAULT_DEV_SIGNAL_OFF_POLLING_MS);
             setIntFieldValue(etOemAvmMaxSpeedKmh, UiPrefs.DEFAULT_DEV_OEM_AVM_MAX_SPEED_KMH);

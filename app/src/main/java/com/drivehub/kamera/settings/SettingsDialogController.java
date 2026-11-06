@@ -12,6 +12,8 @@ import com.drivehub.kamera.dev.DevSettingsController;
 import com.drivehub.kamera.ota.OtaController;
 import com.drivehub.kamera.signal.SignalCameraSettingsController;
 import com.drivehub.kamera.signal.SignalService;
+import com.drivehub.kamera.signal.DigitalRearviewPolicy;
+import com.drivehub.kamera.camera.IpkRoutePolicy;
 import com.drivehub.kamera.settings.SegmentedControl;
 
 import android.app.Dialog;
@@ -129,6 +131,7 @@ public final class SettingsDialogController {
         SharedPreferences prefs = UiPrefs.getPrefs(activity);
         views = bindViews(prefs);
         wireSubControllers(prefs);
+        wireRearviewDisplaySettings(prefs);
         wireAppearance(prefs);
         wireDevLogControls();
         wireDashcamAdvancedNavigation();
@@ -241,7 +244,6 @@ public final class SettingsDialogController {
         v.swDevPerformanceOverlay = dialog.findViewById(R.id.switchDevPerformanceOverlay);
         v.etDevDefaultPollMs = dialog.findViewById(R.id.etDevDefaultPollMs);
         v.etDevSignalOffPollMs = dialog.findViewById(R.id.etDevSignalOffPollMs);
-        v.etDevForegroundModePollMs = dialog.findViewById(R.id.etDevForegroundModePollMs);
         v.etDevOemAvmMaxSpeedKmh = dialog.findViewById(R.id.etDevOemAvmMaxSpeedKmh);
         v.seekDevOverlayTopInsetPx = dialog.findViewById(R.id.seekDevOverlayTopInsetPx);
         v.etDevOverlayTopInsetPx = dialog.findViewById(R.id.etDevOverlayTopInsetPx);
@@ -330,6 +332,33 @@ public final class SettingsDialogController {
         return v;
     }
 
+    private void wireRearviewDisplaySettings(SharedPreferences prefs) {
+        SegmentedControl target = dialog.findViewById(R.id.segRearviewDisplayTarget);
+        SegmentedControl screen = dialog.findViewById(R.id.segRearviewIpkScreen);
+        View ipkOptions = dialog.findViewById(R.id.rearviewIpkOptions);
+        View tapOptions = dialog.findViewById(R.id.rearviewTapToHideOptions);
+        int initialTarget = UiPrefs.getDigitalRearviewDisplayTarget(prefs);
+        target.check(target.getChildAt(initialTarget).getId());
+        screen.check(UiPrefs.getDigitalRearviewIpkScreen(prefs) == IpkRoutePolicy.MEDIA
+                ? R.id.segRearviewIpkMedia : R.id.segRearviewIpkNavigation);
+        ipkOptions.setVisibility(DigitalRearviewPolicy.usesIpk(initialTarget) ? View.VISIBLE : View.GONE);
+        tapOptions.setVisibility(DigitalRearviewPolicy.usesInfotainment(initialTarget) ? View.VISIBLE : View.GONE);
+        target.addOnButtonCheckedListener((group, id, checked) -> {
+            if (!checked) return;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                if (group.getChildAt(i).getId() != id) continue;
+                UiPrefs.setDigitalRearviewDisplayTarget(prefs, i);
+                ipkOptions.setVisibility(DigitalRearviewPolicy.usesIpk(i) ? View.VISIBLE : View.GONE);
+                tapOptions.setVisibility(DigitalRearviewPolicy.usesInfotainment(i) ? View.VISIBLE : View.GONE);
+                break;
+            }
+        });
+        screen.addOnButtonCheckedListener((group, id, checked) -> {
+            if (checked) UiPrefs.setDigitalRearviewIpkScreen(prefs,
+                    id == R.id.segRearviewIpkMedia ? IpkRoutePolicy.MEDIA : IpkRoutePolicy.NAVIGATION);
+        });
+    }
+
     private void wireSubControllers(SharedPreferences prefs) {
         signalCam.bind(
                 prefs,
@@ -401,7 +430,6 @@ public final class SettingsDialogController {
                 views.swDevPerformanceOverlay,
                 views.seekDevOverlayTopInsetPx,
                 views.etDevOverlayTopInsetPx,
-                views.etDevForegroundModePollMs,
                 views.etDevDefaultPollMs,
                 views.etDevSignalOffPollMs,
                 views.etDevOemAvmMaxSpeedKmh,
@@ -743,7 +771,6 @@ public final class SettingsDialogController {
         Switch swDevPerformanceOverlay;
         EditText etDevDefaultPollMs;
         EditText etDevSignalOffPollMs;
-        EditText etDevForegroundModePollMs;
         EditText etDevOemAvmMaxSpeedKmh;
         SeekBar seekDevOverlayTopInsetPx;
         EditText etDevOverlayTopInsetPx;

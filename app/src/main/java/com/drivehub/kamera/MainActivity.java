@@ -206,7 +206,9 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         applyWarningVisibility();
 
         try {
-            SignalService.start(this);
+            // Keep the active IPK mirror and existing vehicle listeners running when
+            // returning to the app; starting the service again would re-register them.
+            if (!SignalService.isRunning()) SignalService.start(this);
         } catch (Throwable ignored) {
         }
 
@@ -262,6 +264,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         } catch (Throwable ignored) {
         }
         OverlayService.hideOverlay(this);
+        SignalService.requestRecheck();
         applyWarningVisibility();
         applyStoredRecordingStatus();
         refreshTestRecordButtonState();

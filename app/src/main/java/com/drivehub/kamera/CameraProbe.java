@@ -19,6 +19,15 @@ public final class CameraProbe {
     /** Detaches the preview consumer from the given /dev/video index. */
     public static native void detachPreview(int videoIndex);
 
+    /** Additional display output; attaching/detaching it leaves the main preview intact. */
+    public static native boolean attachPreviewSink(int videoIndex, int sinkId,
+            android.view.Surface surface);
+    public static native void detachPreviewSink(int videoIndex, int sinkId);
+    /** -1 until this output has posted a frame, otherwise its age in milliseconds. */
+    public static native long previewSinkFrameAgeMs(int videoIndex, int sinkId);
+    /** Age (ms), posted-frame count, capture-to-post (ms), window-post cost (ms). */
+    public static native long[] previewSinkStats(int videoIndex, int sinkId);
+
     /**
      * What each camera device reported the last time it was opened: pixel format, size, stride
      * and field order.

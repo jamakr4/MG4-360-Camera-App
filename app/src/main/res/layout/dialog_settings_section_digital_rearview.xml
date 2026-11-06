@@ -62,41 +62,144 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="@string/settings_rearview_tap_to_hide" />
+                android:text="@string/settings_rearview_display_target" />
 
-            <Switch
-                android:id="@+id/switchRearviewTapToHide"
-                style="@style/DrivehubSettingsSwitch" />
+            <com.drivehub.kamera.settings.SegmentedControl
+                android:id="@+id/segRearviewDisplayTarget"
+                style="@style/DrivehubSettingsSegmentGroup">
+
+                <TextView
+                    android:id="@+id/segRearviewDisplayInfotainment"
+                    style="@style/DrivehubSettingsSegmentItem"
+                    android:layout_width="120dp"
+                    android:background="@drawable/bg_settings_segment_start"
+                    android:text="@string/settings_rearview_display_infotainment" />
+
+                <TextView
+                    android:id="@+id/segRearviewDisplayIpk"
+                    style="@style/DrivehubSettingsSegmentItem"
+                    android:layout_width="76dp"
+                    android:background="@drawable/bg_settings_segment_middle"
+                    android:text="@string/settings_rearview_display_ipk" />
+
+                <TextView
+                    android:id="@+id/segRearviewDisplayBoth"
+                    style="@style/DrivehubSettingsSegmentItem"
+                    android:layout_width="76dp"
+                    android:background="@drawable/bg_settings_segment_end"
+                    android:text="@string/settings_rearview_display_both" />
+
+            </com.drivehub.kamera.settings.SegmentedControl>
 
         </LinearLayout>
 
         <LinearLayout
+            android:id="@+id/rearviewIpkOptions"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:gravity="center_vertical"
-            android:minHeight="44dp"
-            android:orientation="horizontal">
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:minHeight="56dp"
+                android:orientation="horizontal">
+
+                <TextView
+                    style="@style/DrivehubSettingsCardRowLabel"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/settings_rearview_ipk_screen" />
+
+                <com.drivehub.kamera.settings.SegmentedControl
+                    android:id="@+id/segRearviewIpkScreen"
+                    style="@style/DrivehubSettingsSegmentGroup">
+
+                    <TextView
+                        android:id="@+id/segRearviewIpkNavigation"
+                        style="@style/DrivehubSettingsSegmentItem"
+                        android:layout_width="120dp"
+                        android:background="@drawable/bg_settings_segment_start"
+                        android:text="@string/settings_rearview_ipk_navigation" />
+
+                    <TextView
+                        android:id="@+id/segRearviewIpkMedia"
+                        style="@style/DrivehubSettingsSegmentItem"
+                        android:layout_width="120dp"
+                        android:background="@drawable/bg_settings_segment_end"
+                        android:text="@string/settings_rearview_ipk_media" />
+
+                </com.drivehub.kamera.settings.SegmentedControl>
+
+            </LinearLayout>
 
             <TextView
-                style="@style/DrivehubSettingsCardRowLabel"
-                android:layout_width="0dp"
+                style="@style/DrivehubSettingsCaption"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/settings_rearview_tap_to_hide_duration" />
-
-            <EditText
-                android:id="@+id/etRearviewTapToHideDurationSec"
-                style="@style/DrivehubSettingsSliderValue"
-                android:inputType="number"
-                android:maxLength="3" />
+                android:paddingBottom="4dp"
+                android:text="@string/settings_rearview_ipk_screen_hint" />
 
         </LinearLayout>
 
-        <TextView
-            style="@style/DrivehubSettingsCaption"
+        <LinearLayout
+            android:id="@+id/rearviewTapToHideOptions"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/settings_rearview_tap_to_hide_hint" />
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:minHeight="56dp"
+                android:orientation="horizontal">
+
+                <TextView
+                    style="@style/DrivehubSettingsCardRowLabel"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/settings_rearview_tap_to_hide" />
+
+                <Switch
+                    android:id="@+id/switchRearviewTapToHide"
+                    style="@style/DrivehubSettingsSwitch" />
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:minHeight="44dp"
+                android:orientation="horizontal">
+
+                <TextView
+                    style="@style/DrivehubSettingsCardRowLabel"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/settings_rearview_tap_to_hide_duration" />
+
+                <EditText
+                    android:id="@+id/etRearviewTapToHideDurationSec"
+                    style="@style/DrivehubSettingsSliderValue"
+                    android:inputType="number"
+                    android:maxLength="3" />
+
+            </LinearLayout>
+
+            <TextView
+                style="@style/DrivehubSettingsCaption"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/settings_rearview_tap_to_hide_hint" />
+
+        </LinearLayout>
 
     </LinearLayout>
 

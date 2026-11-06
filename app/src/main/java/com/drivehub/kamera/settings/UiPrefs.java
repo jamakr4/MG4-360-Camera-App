@@ -1,6 +1,8 @@
 package com.drivehub.kamera.settings;
 
 import com.drivehub.kamera.dashcam.DashcamSettingsController;
+import com.drivehub.kamera.camera.IpkRoutePolicy;
+import com.drivehub.kamera.signal.DigitalRearviewPolicy;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.view.View;
@@ -39,6 +41,8 @@ public final class UiPrefs {
     public static final String KEY_LANE_CHANGE_MIN_SPEED_KMH = "laneChangeMinSpeedKmh";
     public static final String KEY_OVERLAY_ROTATE_TO_DRIVING_DIRECTION = "overlayRotateToDrivingDirection";
     public static final String KEY_DIGITAL_REARVIEW_ENABLED = "digitalRearviewEnabled";
+    public static final String KEY_DIGITAL_REARVIEW_DISPLAY_TARGET = "digitalRearviewDisplayTarget";
+    public static final String KEY_DIGITAL_REARVIEW_IPK_SCREEN = "digitalRearviewIpkScreen";
     public static final String KEY_DIGITAL_REARVIEW_TAP_TO_HIDE_ENABLED = "digitalRearviewTapToHideEnabled";
     public static final String KEY_DIGITAL_REARVIEW_TAP_TO_HIDE_DURATION_SEC = "digitalRearviewTapToHideDurationSec";
     public static final int DEFAULT_DIGITAL_REARVIEW_TAP_TO_HIDE_DURATION_SEC = 5;
@@ -52,7 +56,6 @@ public final class UiPrefs {
     public static final String KEY_OVERLAY_HIDE_DELAY_MS = "overlayHideDelayMs";
     public static final String KEY_OVERLAY_MIN_SHOW_MS = "overlayMinShowMs";
     public static final String KEY_DEV_OVERLAY_TOP_INSET_PX = "devOverlayTopInsetPx";
-    public static final String KEY_DEV_FOREGROUND_MODE_POLL_MS = "devForegroundModePollMs";
     public static final String KEY_DEV_DEFAULT_POLL_MS = "devDefaultPollMs";
     public static final String KEY_DEV_SIGNAL_OFF_POLL_MS = "devSignalOffPollMs";
     public static final String KEY_DEV_OEM_AVM_MAX_SPEED_KMH = "devOemAvmMaxSpeedKmh";
@@ -81,7 +84,6 @@ public final class UiPrefs {
     private static final int DEFAULT_OVERLAY_MIN_SHOW_MS = 3000;
     public static final int DEFAULT_LANE_CHANGE_MIN_SPEED_KMH = 15;
     public static final int DEFAULT_DEV_OVERLAY_TOP_INSET_PX = 80;
-    public static final int DEFAULT_DEV_FOREGROUND_MODE_POLL_MS = 1000;
     public static final int DEFAULT_DEV_DEFAULT_POLLING_MS = 100;
     public static final int DEFAULT_DEV_SIGNAL_OFF_POLLING_MS = 20;
     public static final int DEFAULT_DEV_OEM_AVM_MAX_SPEED_KMH = 20;
@@ -144,6 +146,26 @@ public final class UiPrefs {
 
     public static void setDigitalRearviewEnabled(SharedPreferences prefs, boolean enabled) {
         prefs.edit().putBoolean(KEY_DIGITAL_REARVIEW_ENABLED, enabled).apply();
+    }
+
+    public static int getDigitalRearviewDisplayTarget(SharedPreferences prefs) {
+        return DigitalRearviewPolicy.normalizeDisplayTarget(prefs.getInt(
+                KEY_DIGITAL_REARVIEW_DISPLAY_TARGET, DigitalRearviewPolicy.DISPLAY_INFOTAINMENT));
+    }
+
+    public static void setDigitalRearviewDisplayTarget(SharedPreferences prefs, int target) {
+        prefs.edit().putInt(KEY_DIGITAL_REARVIEW_DISPLAY_TARGET,
+                DigitalRearviewPolicy.normalizeDisplayTarget(target)).apply();
+    }
+
+    public static int getDigitalRearviewIpkScreen(SharedPreferences prefs) {
+        return IpkRoutePolicy.normalizeScreen(prefs.getInt(
+                KEY_DIGITAL_REARVIEW_IPK_SCREEN, IpkRoutePolicy.NAVIGATION));
+    }
+
+    public static void setDigitalRearviewIpkScreen(SharedPreferences prefs, int screen) {
+        prefs.edit().putInt(KEY_DIGITAL_REARVIEW_IPK_SCREEN,
+                IpkRoutePolicy.normalizeScreen(screen)).apply();
     }
 
     public static boolean isDigitalRearviewTapToHideEnabled(SharedPreferences prefs) {
@@ -260,11 +282,6 @@ public final class UiPrefs {
     public static int getDevOverlayTopInsetPx(SharedPreferences prefs) {
         return clampDevOverlayTopInsetPx(
                 prefs.getInt(KEY_DEV_OVERLAY_TOP_INSET_PX, DEFAULT_DEV_OVERLAY_TOP_INSET_PX));
-    }
-
-    public static int getDevForegroundModePollMs(SharedPreferences prefs) {
-        return clampDevPollingMs(
-                prefs.getInt(KEY_DEV_FOREGROUND_MODE_POLL_MS, DEFAULT_DEV_FOREGROUND_MODE_POLL_MS));
     }
 
     public static int getDevOemAvmMaxSpeedKmh(SharedPreferences prefs) {
