@@ -43,3 +43,12 @@ app/src/main/res/raw/
 
 # Keep the Gradle wrapper executable jar tracked.
 !gradle/wrapper/gradle-wrapper.jar
+# Local test resources: supplied 3D model/textures and extracted MG/SAIC assets.
+# Keep these available to local Android builds, but never commit them.
+/app/src/main/assets/mg4/
+/app/src/main/assets/oem/
+
+# Optional emulator ABI smoke-test inputs from the same local OEM APK.
+/app/src/androidTest/assets/oem/
+# Private user camera screenshots used only for local projection previews/tests.
+/app/src/androidTest/assets/reference/
