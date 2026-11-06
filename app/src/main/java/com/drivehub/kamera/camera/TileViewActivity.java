@@ -5,6 +5,7 @@ import com.drivehub.kamera.R;
 
 import com.drivehub.kamera.settings.UiPrefs;
 import com.drivehub.kamera.signal.SignalService;
+import com.drivehub.kamera.ui.AppSystemBars;
 
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
@@ -48,6 +49,7 @@ public class TileViewActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_tile_view);
+        AppSystemBars.apply(getWindow());
         prefs = UiPrefs.getPrefs(this);
 
         applyCornerRadius();
@@ -103,6 +105,18 @@ public class TileViewActivity extends AppCompatActivity {
                 card.setRadius(UiPrefs.getCornerRadiusPx(card, prefs));
             }
         }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        AppSystemBars.apply(getWindow());
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) AppSystemBars.apply(getWindow());
     }
 
     @Override

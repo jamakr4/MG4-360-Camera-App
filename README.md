@@ -152,6 +152,10 @@ Community mod for the MG4 EV (AAOS 9, pre-2026 facelift) that replaces the stock
 
 ## Quick Guides
 
+**App display**
+
+The app uses the full screen width, with the SAIC side navigation hidden in the app and its dialogs. Under `Settings` → `Display`, **Show status bar** controls the top SAIC status bar; it is shown by default. The choice is saved and applies immediately, including while Settings is open. Swipe inward from a screen edge to temporarily reveal the hidden system controls.
+
 <details>
 <summary><strong>Indicator Cam</strong></summary>
 

@@ -2,6 +2,7 @@ package com.drivehub.kamera.dev;
 
 import com.drivehub.kamera.R;
 import com.drivehub.kamera.dashcam.DashcamStorageManager;
+import com.drivehub.kamera.ui.AppSystemBars;
 
 /** Read/export tools available from Engineering Mode. */
 public final class OemCapturesDialog {
@@ -13,7 +14,7 @@ public final class OemCapturesDialog {
             String report = com.drivehub.kamera.dev.OemCaptures.describe();
             mainHandler.post(() -> {
                 if (activity.isFinishing() || activity.isDestroyed()) return;
-                new androidx.appcompat.app.AlertDialog.Builder(activity)
+                AppSystemBars.showDialog(new androidx.appcompat.app.AlertDialog.Builder(activity)
                     .setTitle(R.string.dashcam_oem_captures)
                     .setMessage(report)
                     .setNegativeButton(android.R.string.cancel, null)
@@ -24,11 +25,11 @@ public final class OemCapturesDialog {
                                     : com.drivehub.kamera.dev.OemCaptures.copyTo(resolution.baseDir);
                             mainHandler.post(() -> {
                                 if (activity.isFinishing() || activity.isDestroyed()) return;
-                                new androidx.appcompat.app.AlertDialog.Builder(activity)
-                                        .setMessage(result).setPositiveButton(android.R.string.ok, null).show();
+                                AppSystemBars.showDialog(new androidx.appcompat.app.AlertDialog.Builder(activity)
+                                        .setMessage(result).setPositiveButton(android.R.string.ok, null).create());
                             });
                         }, "OemCaptureExport").start();
-                    }).show();
+                    }).create());
             });
         }, "OemCaptureList").start();
     }

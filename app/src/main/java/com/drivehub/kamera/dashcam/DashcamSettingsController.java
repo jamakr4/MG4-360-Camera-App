@@ -6,6 +6,7 @@ import com.drivehub.kamera.MainActivity;
 import com.drivehub.kamera.settings.SegmentedControl;
 import com.drivehub.kamera.settings.SimpleTextWatcher;
 import com.drivehub.kamera.settings.UiPrefs;
+import com.drivehub.kamera.ui.AppSystemBars;
 
 import android.Manifest;
 import android.app.Dialog;
@@ -665,7 +666,7 @@ public final class DashcamSettingsController {
     }
 
     private void showCentered(Dialog dialog, int widthDp) {
-        dialog.show();
+        AppSystemBars.showDialog(dialog);
         Window window = dialog.getWindow();
         if (window == null) return;
         float density = activity.getResources().getDisplayMetrics().density;
