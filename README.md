@@ -57,7 +57,7 @@ Community mod for the MG4 EV (AAOS 9, pre-2026 facelift) that replaces the stock
 - **Event capture**: saves a pre- and post-trigger recording window into a separate `events/` folder.
 - **Flexible overlay feedback**: pause, resume, event, and error banners with adjustable size and volume, plus an optional persistent recording status dot with freely adjustable horizontal and vertical position anywhere on the screen.
 - **OEM 360 AVM coexistence**: can briefly yield camera access so the stock reverse/360 view still opens when needed.
-- **External trigger support**: send `com.drivehub.kamera.action.TRIGGER_DASHCAM_EVENT` from ADB or another app to save an event clip.
+- **External trigger support**: send `com.drivehub.kamera.action.TRIGGER_DASHCAM_EVENT` from ADB or another app to save an event clip. Compatible [MG4Control](https://github.com/SliDeeN/MG4Control) versions also support direct `App function` shortcuts for **Save dashcam event** and **Toggle digital rearview**.
 - **Auto language selection**: English and German are selected automatically from the vehicle language.
 
 > [!NOTE]
