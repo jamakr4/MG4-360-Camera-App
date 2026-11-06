@@ -33,7 +33,9 @@ Community mod for the MG4 EV (AAOS 9, pre-2026 facelift) that replaces the stock
   &nbsp;·&nbsp;
   <a href="https://github.com/jamakr4/MG4-Digital-Rearview-Trigger"><strong>Digital Mirror Companion App</strong></a>
   &nbsp;·&nbsp;
-  <a href="https://youtu.be/Rzb_Owc_RT0"><strong>Demo Video</strong></a>
+  <a href="https://www.youtube.com/watch?v=HyrV3ExR3aA&amp;t=7s"><strong>Demo Video 1</strong></a>
+  &nbsp;·&nbsp;
+  <a href="https://www.youtube.com/watch?v=gccuZU6uf3M"><strong>Demo Video 2</strong></a>
 </p>
 
 > [!IMPORTANT]
@@ -78,7 +80,9 @@ Community mod for the MG4 EV (AAOS 9, pre-2026 facelift) that replaces the stock
 </p>
 
 <p align="center">
-  <a href="https://youtu.be/Rzb_Owc_RT0">▶ Full demo on YouTube</a>
+  <a href="https://www.youtube.com/watch?v=HyrV3ExR3aA&amp;t=7s">▶ Demo Day on YouTube</a>
+  &nbsp;·&nbsp;
+  <a href="https://www.youtube.com/watch?v=gccuZU6uf3M">▶ Demo Night on YouTube</a>
 </p>
 
 ## Installation Instructions
