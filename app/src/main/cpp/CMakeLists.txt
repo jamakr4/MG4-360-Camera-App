@@ -9,18 +9,16 @@ add_library(cameraprobe SHARED
         cameraprobe.cpp
         cameraprobe_record.cpp
         camera_stream_manager.cpp
-        side_camera_frames.cpp
+        side_camera_preview.cpp
 )
 
 find_library(log-lib log)
 find_library(android-lib android)
 find_library(media-lib mediandk)
-find_library(gles-lib GLESv2)
 
 target_link_libraries(cameraprobe
         ${log-lib}
         ${android-lib}
         ${media-lib}
-        ${gles-lib}
         ${OpenCV_LIBS}
 )

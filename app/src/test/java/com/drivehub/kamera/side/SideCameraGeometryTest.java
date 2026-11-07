@@ -4,11 +4,17 @@ import org.junit.Test;
 import static org.junit.Assert.*;
 
 public class SideCameraGeometryTest {
-    @Test public void sideRotationKeepsFrontAboveRearWithoutMirroring() {
-        assertArrayEquals(new float[]{1,0},SideCameraGeometry.rawUv(true,0,0),.00001f);
-        assertArrayEquals(new float[]{0,1},SideCameraGeometry.rawUv(true,1,1),.00001f);
-        assertArrayEquals(new float[]{0,1},SideCameraGeometry.rawUv(false,0,0),.00001f);
-        assertArrayEquals(new float[]{1,0},SideCameraGeometry.rawUv(false,1,1),.00001f);
+    @Test public void nativeCropsKeepPortraitFrontAndRearInOrder() {
+        for (boolean left : new boolean[]{true, false}) {
+            float[] values = SideCameraGeometry.previewCrops(left);
+            SideCameraGeometry.Crop[] expected = {SideCameraGeometry.side(left),
+                    SideCameraGeometry.wheel(left, true), SideCameraGeometry.wheel(left, false)};
+            for (int i = 0; i < 3; i++) {
+                assertArrayEquals(new float[]{expected[i].left, expected[i].top,
+                        expected[i].right, expected[i].bottom},
+                        java.util.Arrays.copyOfRange(values, i*4, i*4+4), .00001f);
+            }
+        }
     }
     @Test public void allWheelRegionsContainTheMeasuredTireExtentsAndAdjacentGround() {
         for(boolean left:new boolean[]{true,false}) {
@@ -32,14 +38,10 @@ public class SideCameraGeometryTest {
             assertAspect(side,254f/456);
         }
     }
-    @Test public void everyUvStaysInsideTheOriginalCameraImage() {
-        for(boolean left:new boolean[]{true,false}) {
-            for(SideCameraGeometry.Crop crop:new SideCameraGeometry.Crop[]{SideCameraGeometry.side(left),
-                    SideCameraGeometry.wheel(left,true),SideCameraGeometry.wheel(left,false)}) {
-                float[] vertices=SideCameraGeometry.vertices(left,crop);
-                for(int i=0;i<4;i++)for(int coordinate=2;coordinate<4;coordinate++) {
-                    float value=vertices[i*4+coordinate];assertTrue(value>=0&&value<=1);
-                }
+    @Test public void everyCropStaysInsideTheOriginalCameraImage() {
+        for (boolean left : new boolean[]{true, false}) {
+            for (float value : SideCameraGeometry.previewCrops(left)) {
+                assertTrue(value >= 0 && value <= 1);
             }
         }
     }

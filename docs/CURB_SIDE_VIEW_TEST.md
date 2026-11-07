@@ -2,70 +2,90 @@
 
 The left module reuses the side-camera crops from the local
 `codex/main-activity-surround-test` branch. It uses only `/dev/video16` (left)
-and `/dev/video14` (right), without OEM surround libraries, calibration or model
-assets. The existing main camera preview remains alongside it.
+and `/dev/video14` (right). The main camera preview remains alongside it.
 
 The original close and settings buttons retain their layout, padding, icons and
-colors. The new mode buttons follow the saved Settings accent immediately. The
-selected button is filled; the other has a transparent fill and accent outline.
-There is no gray header or control-bar background.
-Mode names appear only on the bottom buttons; there is no title at the top.
+colors. The mode buttons follow the Settings accent immediately: the selected
+button is filled; the other has a transparent fill and accent outline. There is
+no gray header/control-bar background and no title at the top.
 
-## Geometry and ownership
+## Rendering after the first vehicle test
 
-The module scales uniformly from 540 × 640 physical pixels. The image region is
+The first vehicle test reported heavy stuttering on the left, recurring SAIC side
+navigation in Settings and while reversing/moving, and black left images when the
+navigation bar appeared. The right camera remained smooth.
+
+The original left path had an 80 ms snapshot/render timer (at most 12.5 FPS), its
+own stacked-field UYVY-to-NV12 conversion, texture uploads and a GLSurfaceView.
+That path has been removed. Side consumers now receive the same RGBA preview field
+as the main camera, from the existing capture-loop conversion. Each side uses the
+existing independent native-window preview worker and latest-frame mailbox.
+There is no extra YUV conversion, GL context, texture upload or fixed display FPS
+limit. Rotation/cropping runs on the preview worker, outside the capture thread.
+The last selected mode uses the same persisted preference as the first test.
+
+The module scales uniformly from 540 × 640 physical pixels. The camera area is
 516 × 456, with an 8-pixel gap between the 254-pixel-wide columns. Wheel mode has
-two 224-pixel-high rows; side mode has two 456-pixel-high portrait views. The front
-of the vehicle is at the top, with no direction labels over camera images.
+two 224-pixel-high rows per side; side mode has one 456-pixel-high portrait image.
+Each side owns a fixed 254 × 456 SurfaceView buffer. Mode switches and size changes
+reuse it. Crop coordinates are passed directly from `SideCameraGeometry` to native
+code, including when RGBA input contains only the 720 × 240 main-preview field.
 
-`SideCameraPanel` owns the mode preference and UI. `SideCameraView` owns the GL
-lifecycle. Mode switching changes UV crops without changing camera consumers.
-The preference key also reads the test branch's previously saved selection.
+Consumer IDs 2100/2101 remain independent of the main preview and recording.
+Each side reports freshness separately. Missing/stalled outputs retry every two
+seconds without detaching the healthy side. Pause/close and OEM handoff release
+only these preview consumers; recorder and IPK ownership stays with existing code.
 
-The stream manager gives each side an independent preview consumer (2100/2101).
-Packed-frame snapshots are limited to 12.5 FPS; display snapshots use a try-lock
-so they do not wait on capture/recording threads. Each side expires independently
-after 500 ms. Failed feeds are retried every two seconds, while healthy feeds
-remain attached. Closing/pausing the view and OEM handoff detach only these
-consumers, leaving other stream consumers under their existing owners.
+## Navigation and resize handling
+
+`AppSystemBars` now maintains each app/dialog window's immersive state after focus,
+visibility and inset changes. Android 9 uses the legacy visibility callback and
+stable layout flags. Newer Android versions use window-inset visibility. Reapply
+requests are throttled and cannot be postponed indefinitely by repeated callbacks.
+Dialogs inherit hidden navigation before taking input focus, then regain normal
+keyboard/input focus. The top status bar still follows its existing setting.
+
+MainActivity consumes status-bar/cutout insets, but not navigation-bar insets.
+Transient SAIC navigation therefore overlays the camera region rather than
+shrinking it. Surface size callbacks do not reattach or pre-warm side previews.
 
 ## Local validation (2026-11-07)
 
-- Debug and minified Release builds passed.
-- All 67 JVM tests passed, including the four imported crop/rotation tests.
-- Android Lint passed without errors.
-- The host C++ test passed for stacked-field UYVY to NV12 conversion, padded
-  strides and invalid input sizes.
-- Two instrumentation tests passed on the Android 13 Automotive arm64 emulator:
-  GLES rotation/front-rear ordering and independent left/right/both feed loss;
-  mode persistence across activity recreation, live accent updates, original
-  icon dimensions/padding, uniform module scaling, and five pause/resume cycles.
-- A separate cold process restart restored Wheels mode. The emulator's original
-  Sides selection was restored afterward.
-- Visual inspection confirmed the large original X and settings icon, accent
-  controls on black, and separate missing-camera messages.
-- Original `btnClose` and `btnSettings` XML elements were compared with the
-  branch's starting revision and are identical.
+- Debug and minified Release builds passed; Android Lint reported no errors.
+- All 67 JVM tests passed, including crop geometry and JNI crop ordering.
+- Both native C++ executables passed on the Android 13 Automotive arm64 emulator:
+  preview mailbox behavior, and the actual OpenCV side compositor with 720 × 240
+  and 720 × 480 inputs, padded stride, front/rear and inner/outer orientation,
+  wheel gaps, unchanged source frames and buffer reuse across mode switches.
+- All three Android instrumentation tests passed: persisted modes, live accent,
+  original icon dimensions/padding, five pause/resume cycles, stable side surfaces
+  under left/right navigation-inset injection and mode changes, dialog input focus,
+  and automatic hiding after navigation is revealed without another focus change.
+- The local emulator runs the new Debug APK. No vehicle installation was performed.
 
-Build and JVM/lint checks:
+Build checks:
 
 ```sh
 ./gradlew :app:assembleDebug :app:assembleRelease :app:testDebugUnitTest \
   :app:lintDebug :app:assembleDebugAndroidTest --offline
-c++ -std=c++17 -Wall -Wextra -Werror app/src/test/cpp/side_camera_nv12_test.cpp \
-  -o /tmp/mg4-side-camera-nv12-test
-/tmp/mg4-side-camera-nv12-test
 ```
 
-## Vehicle acceptance still required
+The standalone C++ test project is `app/src/test/cpp/CMakeLists.txt`. Configure it
+with the Android NDK toolchain, `ANDROID_ABI=arm64-v8a`, `ANDROID_PLATFORM=android-28`,
+`ANDROID_STL=c++_static`, and `OpenCV_DIR` pointing to the Android SDK's native JNI
+folder. Build and run `side_camera_preview_test` and `latest_preview_frame_test`
+on the emulator/device with ADB.
 
-1. Check all four wheel crops and both portrait views against live vehicle images.
-2. Switch modes during loop recording and an event/test clip; verify uninterrupted
-   recording and no camera device reopen caused by the switch.
-3. Check OEM 360/reverse handoff and restoration, plus existing indicator/IPK
-   camera priorities.
-4. Reopen the app repeatedly and restart the vehicle; confirm the selected mode
-   returns, healthy feeds remain independent, and camera resources are released.
+## Vehicle verification
 
-The emulator has no MG4 camera hardware, so it cannot validate recording
-throughput or actual vehicle camera ownership and alignment.
+1. Compare Wheels/Sides motion against the right preview, both with and without
+   loop recording. Check the unchanged front/rear crop placement.
+2. Open/close Settings and its child dialogs repeatedly; verify no SAIC side-bar
+   flash and no black left camera images.
+3. Reverse while stationary, then moving, and change back to forward gear. Confirm
+   navigation stays hidden and OEM camera handoff/restoration still works.
+4. Repeat app open/close and vehicle restart, including indicator/IPK camera use.
+
+The emulator cannot reproduce the SAIC Android 9 vehicle policy or camera hardware.
+Smooth live capture/recording and the moving-reverse scenario require another
+vehicle test; the local checks do not establish those results.

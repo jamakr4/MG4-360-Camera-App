@@ -35,22 +35,17 @@ public final class SideCameraGeometry {
         return new Crop(x0,y0,x0+band,y0+span);
     }
 
-    /** Top-left-origin upright image to top-left-origin raw camera UV. No extra mirroring. */
-    public static float[] rawUv(boolean leftCamera, float x, float y) {
-        // Left: -90 degrees; right: +90 degrees, as in OverlayService's driving-direction view.
-        return leftCamera ? new float[]{1-y,x} : new float[]{y,1-x};
-    }
-
-    /** Interleaved x,y,u,v vertices, bottom-left / bottom-right / top-left / top-right. */
-    public static float[] vertices(boolean leftCamera, Crop crop) {
-        float[] out = new float[16];
-        float[] xs = {crop.left,crop.right,crop.left,crop.right};
-        float[] ys = {crop.bottom,crop.bottom,crop.top,crop.top};
-        for (int i=0;i<4;i++) {
-            float[] uv=rawUv(leftCamera,xs[i],ys[i]);
-            out[i*4]=(i%2==0)?-1:1; out[i*4+1]=(i<2)?-1:1;
-            out[i*4+2]=uv[0]; out[i*4+3]=uv[1];
+    /** JNI crop order: portrait side, front wheel, rear wheel; each left/top/right/bottom. */
+    public static float[] previewCrops(boolean leftCamera) {
+        Crop[] crops = {side(leftCamera), wheel(leftCamera, true), wheel(leftCamera, false)};
+        float[] values = new float[12];
+        for (int i = 0; i < crops.length; i++) {
+            Crop crop = crops[i];
+            values[i*4] = crop.left;
+            values[i*4+1] = crop.top;
+            values[i*4+2] = crop.right;
+            values[i*4+3] = crop.bottom;
         }
-        return out;
+        return values;
     }
 }

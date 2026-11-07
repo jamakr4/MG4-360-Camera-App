@@ -1,6 +1,7 @@
 #pragma once
 
 #include <jni.h>
+#include "side_camera_preview.h"
 
 #include <string>
 #include <cstdint>
@@ -8,9 +9,13 @@
 
 namespace camera_stream_manager {
 
-void enableSideCameraFrames();
-bool attachSideCameraFrames(bool retryStale);
-void detachSideCameraFrames();
+void enableSideCameraPreviews();
+void setSideCameraWheelsMode(bool wheels);
+bool attachSideCameraPreview(JNIEnv* env, int side, jobject surface,
+                             const side_camera_preview::Crops& crops);
+void detachSideCameraPreview(int side);
+void detachSideCameraPreviews();
+int64_t sideCameraPreviewAgeMs(int side);
 
 bool attachPreview(JNIEnv* env, int videoIndex, jobject surface, bool enhanced = false);
 void detachPreview(int videoIndex);

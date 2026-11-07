@@ -1,6 +1,6 @@
 #include "camera_stream_manager.h"
 #include "latest_preview_frame.h"
-#include "side_camera_frames.h"
+#include "side_camera_preview.h"
 
 #include <android/hardware_buffer.h>
 #include <android/log.h>
@@ -1060,38 +1060,16 @@ namespace camera_stream_manager
             virtual void finalize() = 0;
         };
 
-        class SideCameraConsumer final : public FrameConsumer {
-        public:
-            explicit SideCameraConsumer(int side) : side_(side) {}
-            bool isPreview() const override { return true; }
-            bool wantsPackedFrame() const override { return true; }
-            void processFrame(const cv::Mat&) override {}
-            void processPackedFrame(const cv::Mat& frame) override {
-                std::lock_guard<std::mutex> lock(mutex_);
-                if (!stopped_.load()) side_camera_frames::submit(side_, frame);
-            }
-            void requestStop() override {
-                std::lock_guard<std::mutex> lock(mutex_);
-                stopped_.store(true);
-                side_camera_frames::clear(side_);
-            }
-            bool isStopRequested() const override { return stopped_.load(); }
-            bool isFinalized() const override { return stopped_.load(); }
-            bool waitUntilStopped(int) override { return stopped_.load(); }
-            void finalize() override { requestStop(); }
-        private:
-            const int side_;
-            std::mutex mutex_;
-            std::atomic<bool> stopped_{false};
-        };
+        std::atomic<bool> gSideCameraWheels{false};
 
         class ParallelPreviewConsumer final : public FrameConsumer,
                                               public std::enable_shared_from_this<ParallelPreviewConsumer>
         {
             struct Frame { cv::Mat rgba; int64_t capturedUs = 0; };
         public:
-            explicit ParallelPreviewConsumer(ANativeWindow *window, bool mirror)
-                : window_(window), mirror_(mirror), frames_(0) {}
+            explicit ParallelPreviewConsumer(ANativeWindow *window, bool mirror, int side = -1,
+                    const side_camera_preview::Crops& crops = {})
+                : window_(window), mirror_(mirror), side_(side), crops_(crops), frames_(0) {}
             ~ParallelPreviewConsumer() override { ANativeWindow_release(window_); }
 
             void start() {
@@ -1125,15 +1103,22 @@ namespace camera_stream_manager
                 try {
                     Frame frame;
                     int width = 0, height = 0;
+                    cv::Mat upright, composed;
                     while (frames_.take(frame)) {
                         if (nowUs() - frame.capturedUs > 250000) continue;
-                        if (frame.rgba.cols != width || frame.rgba.rows != height) {
-                            width = frame.rgba.cols;
-                            height = frame.rgba.rows;
+                        cv::Mat display = frame.rgba;
+                        if (side_ >= 0) {
+                            side_camera_preview::compose(frame.rgba, side_ == 0,
+                                    gSideCameraWheels.load(), crops_, upright, composed);
+                            display = composed;
+                        }
+                        if (display.cols != width || display.rows != height) {
+                            width = display.cols;
+                            height = display.rows;
                             if (ANativeWindow_setBuffersGeometry(window_, width, height,
                                     AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM) != 0) break;
                         }
-                        if (mirror_) cv::flip(frame.rgba, frame.rgba, 1);
+                        if (mirror_) cv::flip(display, display, 1);
                         ANativeWindow_Buffer out{};
                         const int64_t postStart = nowUs();
                         // This can block on a suspended display. Only this output's worker
@@ -1146,7 +1131,7 @@ namespace camera_stream_manager
                             const size_t bytes = static_cast<size_t>(std::min(out.width, width)) * 4U;
                             for (int y = 0; y < rows; ++y)
                                 std::memcpy(static_cast<uint8_t *>(out.bits) + y * out.stride * 4U,
-                                            frame.rgba.ptr(y), bytes);
+                                            display.ptr(y), bytes);
                         }
                         if (ANativeWindow_unlockAndPost(window_) != 0) break;
                         const int64_t posted = nowUs();
@@ -1171,6 +1156,8 @@ namespace camera_stream_manager
             }
             ANativeWindow *window_;
             const bool mirror_;
+            const int side_;
+            const side_camera_preview::Crops crops_;
             LatestPreviewFrame<Frame> frames_;
             std::atomic<bool> stopping_{false}, finished_{false};
             std::atomic<int64_t> lastPostUs_{0};
@@ -3728,46 +3715,72 @@ namespace camera_stream_manager
         constexpr int SIDE_CONSUMER_ID_BASE = 2100;
     }
 
-    void enableSideCameraFrames() {
+    void enableSideCameraPreviews() {
         std::lock_guard<std::mutex> lock(gSideCameraOwnerMutex);
         gSideCameraEnabled = true;
     }
 
-    bool attachSideCameraFrames(bool retryStale) {
-        std::lock_guard<std::mutex> lock(gSideCameraOwnerMutex);
-        if (!gSideCameraEnabled) return false;
-        std::array<cv::Mat, 2> frames;
-        std::array<int64_t, 2> ages;
-        side_camera_frames::snapshot(frames, ages);
-        bool any = false;
-        for (int side = 0; side < 2; ++side) {
-            auto session = getOrCreateSession(SIDE_CAMERA_INDICES[side]);
-            const int id = SIDE_CONSUMER_ID_BASE + side;
-            // Retry only the failed side, leaving healthy feeds and recorders attached.
-            if (retryStale && (ages[side] < 0 || ages[side] > side_camera_frames::MAX_AGE_MS))
-                session->detachConsumer(id);
-            if (session->hasConsumer(id)) {
-                any = true;
-            } else if (session->attachConsumer(id, std::make_shared<SideCameraConsumer>(side))) {
-                any = true;
-            } else {
-                eraseSessionIfIdle(SIDE_CAMERA_INDICES[side], session);
-            }
-        }
-        return any;
+    void setSideCameraWheelsMode(bool wheels) {
+        gSideCameraWheels.store(wheels);
     }
 
-    void detachSideCameraFrames() {
+    int64_t sideCameraPreviewAgeMs(int side) {
+        if (side < 0 || side > 1) return -1;
+        auto session = getSession(SIDE_CAMERA_INDICES[side]);
+        if (!session) return -1;
+        const auto posted = session->previewPostUs(SIDE_CONSUMER_ID_BASE + side);
+        return posted ? (nowUs() - posted) / 1000 : -1;
+    }
+
+    bool attachSideCameraPreview(JNIEnv* env, int side, jobject surface,
+                                 const side_camera_preview::Crops& crops) {
+        if (side < 0 || side > 1 || !surface || !side_camera_preview::valid(crops)) return false;
         std::lock_guard<std::mutex> lock(gSideCameraOwnerMutex);
-        gSideCameraEnabled = false; // Close the race with GL attachment during pause/OEM handoff.
-        for (int side = 0; side < 2; ++side) {
+        if (!gSideCameraEnabled) return false;
+        auto session = getOrCreateSession(SIDE_CAMERA_INDICES[side]);
+        const int id = SIDE_CONSUMER_ID_BASE + side;
+        const auto age = sideCameraPreviewAgeMs(side);
+        if (session->hasConsumer(id)) {
+            if (age >= 0 && age < 2000) return true;
+            session->detachConsumer(id);
+        }
+        ANativeWindow* window = ANativeWindow_fromSurface(env, surface);
+        if (!window) {
+            eraseSessionIfIdle(SIDE_CAMERA_INDICES[side], session);
+            return false;
+        }
+        auto consumer = std::make_shared<ParallelPreviewConsumer>(window, false, side, crops);
+        try {
+            consumer->start();
+            if (session->attachConsumer(id, consumer)) return true;
+        } catch (const std::exception& error) {
+            loge("side preview failed: %s", error.what());
+        }
+        consumer->requestStop();
+        eraseSessionIfIdle(SIDE_CAMERA_INDICES[side], session);
+        return false;
+    }
+
+    namespace {
+        void detachSideCameraPreviewLocked(int side) {
             auto session = getSession(SIDE_CAMERA_INDICES[side]);
             if (session) {
                 session->detachConsumer(SIDE_CONSUMER_ID_BASE + side);
                 eraseSessionIfIdle(SIDE_CAMERA_INDICES[side], session);
             }
-            side_camera_frames::clear(side);
         }
+    }
+
+    void detachSideCameraPreview(int side) {
+        if (side < 0 || side > 1) return;
+        std::lock_guard<std::mutex> lock(gSideCameraOwnerMutex);
+        detachSideCameraPreviewLocked(side);
+    }
+
+    void detachSideCameraPreviews() {
+        std::lock_guard<std::mutex> lock(gSideCameraOwnerMutex);
+        gSideCameraEnabled = false;
+        for (int side = 0; side < 2; ++side) detachSideCameraPreviewLocked(side);
     }
 
     bool attachPreview(JNIEnv *env, int videoIndex, jobject surface, bool enhanced)
@@ -3836,7 +3849,7 @@ namespace camera_stream_manager
 
     void detachAllPreviews()
     {
-        detachSideCameraFrames();
+        detachSideCameraPreviews();
         std::vector<std::pair<int, std::shared_ptr<CameraSession>>> sessions;
         {
             std::lock_guard<std::mutex> lock(gManagerMutex);
