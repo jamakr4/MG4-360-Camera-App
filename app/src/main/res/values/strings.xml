@@ -339,4 +339,11 @@
     <string name="dashcam_status_position_hint">Move the status dot anywhere on the screen. Its position is saved and kept within the screen edges.</string>
     <string name="dashcam_status_position_expand">Show position sliders</string>
     <string name="dashcam_status_position_collapse">Hide position sliders</string>
+    <string name="side_camera_wheels">Wheels</string>
+    <string name="side_camera_sides">Sides</string>
+    <string name="side_camera_left_missing">Left camera unavailable</string>
+    <string name="side_camera_right_missing">Right camera unavailable</string>
+    <string name="side_camera_oem_paused">Paused for OEM 360°</string>
+    <string name="side_camera_selected">Selected</string>
+    <string name="side_camera_not_selected">Not selected</string>
 </resources>

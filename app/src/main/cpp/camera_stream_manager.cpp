@@ -1,5 +1,6 @@
 #include "camera_stream_manager.h"
 #include "latest_preview_frame.h"
+#include "side_camera_frames.h"
 
 #include <android/hardware_buffer.h>
 #include <android/log.h>
@@ -1057,6 +1058,31 @@ namespace camera_stream_manager
             virtual bool isFinalized() const = 0;
             virtual bool waitUntilStopped(int timeoutMs) = 0;
             virtual void finalize() = 0;
+        };
+
+        class SideCameraConsumer final : public FrameConsumer {
+        public:
+            explicit SideCameraConsumer(int side) : side_(side) {}
+            bool isPreview() const override { return true; }
+            bool wantsPackedFrame() const override { return true; }
+            void processFrame(const cv::Mat&) override {}
+            void processPackedFrame(const cv::Mat& frame) override {
+                std::lock_guard<std::mutex> lock(mutex_);
+                if (!stopped_.load()) side_camera_frames::submit(side_, frame);
+            }
+            void requestStop() override {
+                std::lock_guard<std::mutex> lock(mutex_);
+                stopped_.store(true);
+                side_camera_frames::clear(side_);
+            }
+            bool isStopRequested() const override { return stopped_.load(); }
+            bool isFinalized() const override { return stopped_.load(); }
+            bool waitUntilStopped(int) override { return stopped_.load(); }
+            void finalize() override { requestStop(); }
+        private:
+            const int side_;
+            std::mutex mutex_;
+            std::atomic<bool> stopped_{false};
         };
 
         class ParallelPreviewConsumer final : public FrameConsumer,
@@ -2754,6 +2780,11 @@ namespace camera_stream_manager
                 return started;
             }
 
+            bool hasConsumer(int consumerId) {
+                std::lock_guard<std::mutex> lock(mutex_);
+                return consumers_.find(consumerId) != consumers_.end();
+            }
+
             bool attachConsumer(int consumerId, const std::shared_ptr<FrameConsumer> &consumer)
             {
                 if (consumer == nullptr)
@@ -3690,6 +3721,55 @@ namespace camera_stream_manager
 
     } // namespace
 
+    namespace {
+        std::mutex gSideCameraOwnerMutex;
+        bool gSideCameraEnabled = false;
+        constexpr int SIDE_CAMERA_INDICES[] = {16, 14};
+        constexpr int SIDE_CONSUMER_ID_BASE = 2100;
+    }
+
+    void enableSideCameraFrames() {
+        std::lock_guard<std::mutex> lock(gSideCameraOwnerMutex);
+        gSideCameraEnabled = true;
+    }
+
+    bool attachSideCameraFrames(bool retryStale) {
+        std::lock_guard<std::mutex> lock(gSideCameraOwnerMutex);
+        if (!gSideCameraEnabled) return false;
+        std::array<cv::Mat, 2> frames;
+        std::array<int64_t, 2> ages;
+        side_camera_frames::snapshot(frames, ages);
+        bool any = false;
+        for (int side = 0; side < 2; ++side) {
+            auto session = getOrCreateSession(SIDE_CAMERA_INDICES[side]);
+            const int id = SIDE_CONSUMER_ID_BASE + side;
+            // Retry only the failed side, leaving healthy feeds and recorders attached.
+            if (retryStale && (ages[side] < 0 || ages[side] > side_camera_frames::MAX_AGE_MS))
+                session->detachConsumer(id);
+            if (session->hasConsumer(id)) {
+                any = true;
+            } else if (session->attachConsumer(id, std::make_shared<SideCameraConsumer>(side))) {
+                any = true;
+            } else {
+                eraseSessionIfIdle(SIDE_CAMERA_INDICES[side], session);
+            }
+        }
+        return any;
+    }
+
+    void detachSideCameraFrames() {
+        std::lock_guard<std::mutex> lock(gSideCameraOwnerMutex);
+        gSideCameraEnabled = false; // Close the race with GL attachment during pause/OEM handoff.
+        for (int side = 0; side < 2; ++side) {
+            auto session = getSession(SIDE_CAMERA_INDICES[side]);
+            if (session) {
+                session->detachConsumer(SIDE_CONSUMER_ID_BASE + side);
+                eraseSessionIfIdle(SIDE_CAMERA_INDICES[side], session);
+            }
+            side_camera_frames::clear(side);
+        }
+    }
+
     bool attachPreview(JNIEnv *env, int videoIndex, jobject surface, bool enhanced)
     {
         auto session = getOrCreateSession(videoIndex);
@@ -3756,6 +3836,7 @@ namespace camera_stream_manager
 
     void detachAllPreviews()
     {
+        detachSideCameraFrames();
         std::vector<std::pair<int, std::shared_ptr<CameraSession>>> sessions;
         {
             std::lock_guard<std::mutex> lock(gManagerMutex);

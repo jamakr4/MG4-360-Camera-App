@@ -12,6 +12,7 @@ public final class UiPrefs {
     public static final String REC_PREFS_NAME = "rec_prefs";
     public static final String KEY_TILE_CORNER_RADIUS = "tileCornerRadius";
     public static final String KEY_ACCENT_COLOR = "accentColor";
+    public static final String KEY_MAIN_SIDE_CAMERA_WHEELS = "main_surround_left_wheels";
     public static final String KEY_SHOW_STATUS_BAR = "showStatusBar";
     public static final String KEY_ALLOW_BETA_UPDATES = "allowBetaUpdates";
     public static final String KEY_SMOOTH_ENTRY = "smoothEntry";

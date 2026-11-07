@@ -9,6 +9,7 @@ import com.drivehub.kamera.settings.SettingsAppearanceController;
 import com.drivehub.kamera.settings.SettingsDialogController;
 import com.drivehub.kamera.settings.UiPrefs;
 import com.drivehub.kamera.signal.SignalService;
+import com.drivehub.kamera.side.SideCameraPanel;
 import com.drivehub.kamera.ui.AppSystemBars;
 
 import android.annotation.SuppressLint;
@@ -41,6 +42,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private static final int REQ_DASHCAM_USB_FOLDER = 1842;
 
     private SurfaceHolder surfaceHolder;
+    private SideCameraPanel sideCameraPanel;
     private TextView tvStatus;
     private View recordingStatusPill;
     private View recordingStatusDot;
@@ -161,6 +163,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         });
         AppSystemBars.apply(getWindow());
 
+        sideCameraPanel = findViewById(R.id.sideCameraPanel);
         SurfaceView surfaceView = findViewById(R.id.surfaceView);
         surfaceHolder = surfaceView.getHolder();
         surfaceHolder.addCallback(this);
@@ -247,6 +250,13 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     protected void onResume() {
         super.onResume();
         AppSystemBars.apply(getWindow());
+        sideCameraPanel.resumeDisplay();
+    }
+
+    @Override
+    protected void onPause() {
+        sideCameraPanel.pauseDisplay();
+        super.onPause();
     }
 
     @Override

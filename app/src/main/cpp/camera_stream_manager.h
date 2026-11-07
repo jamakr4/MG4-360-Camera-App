@@ -8,6 +8,10 @@
 
 namespace camera_stream_manager {
 
+void enableSideCameraFrames();
+bool attachSideCameraFrames(bool retryStale);
+void detachSideCameraFrames();
+
 bool attachPreview(JNIEnv* env, int videoIndex, jobject surface, bool enhanced = false);
 void detachPreview(int videoIndex);
 void detachAllPreviews();
