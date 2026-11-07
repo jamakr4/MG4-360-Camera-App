@@ -3,10 +3,12 @@ package com.drivehub.kamera.side;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.graphics.Color;
+import android.graphics.Rect;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.RippleDrawable;
 import android.widget.Button;
 import android.widget.ImageButton;
+import android.view.ViewGroup;
 
 import androidx.lifecycle.Lifecycle;
 import androidx.test.core.app.ActivityScenario;
@@ -46,10 +48,18 @@ public class SideCameraPanelInstrumentedTest {
                 ImageButton close = activity.findViewById(R.id.btnClose);
                 ImageButton settings = activity.findViewById(R.id.btnSettings);
                 float density = activity.getResources().getDisplayMetrics().density;
-                assertEquals(Math.round(148 * density), close.getWidth());
-                assertEquals(Math.round(34 * density), close.getPaddingLeft());
-                assertEquals(Math.round(108 * density), settings.getWidth());
-                assertEquals(Math.round(24 * density), settings.getPaddingLeft());
+                int minimumTouchSize = Math.round(48 * density);
+                assertTrue(close.getWidth() >= minimumTouchSize);
+                assertTrue(close.getHeight() >= minimumTouchSize);
+                assertTrue(settings.getWidth() >= minimumTouchSize);
+                assertTrue(settings.getHeight() >= minimumTouchSize);
+                Rect closeBounds = new Rect(), cameraBounds = new Rect();
+                close.getGlobalVisibleRect(closeBounds);
+                ViewGroup cameras = activity.findViewById(R.id.sideCameraView);
+                cameras.getChildAt(0).getGlobalVisibleRect(cameraBounds);
+                assertTrue("Close must stay above the camera image", closeBounds.bottom <= cameraBounds.top);
+                assertEquals(activity.findViewById(R.id.modeWheels).getTop(), settings.getTop());
+                assertEquals(activity.findViewById(R.id.modeSides).getBottom(), settings.getBottom());
                 prefs.edit().putString(UiPrefs.KEY_ACCENT_COLOR, "#F08020").apply();
             });
             // Preference listeners execute on the main thread after the edit.

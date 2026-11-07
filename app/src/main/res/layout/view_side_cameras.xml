@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<merge xmlns:android="http://schemas.android.com/apk/res/android">
+<merge xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <com.drivehub.kamera.side.SideCameraView
         android:id="@+id/sideCameraView"
@@ -30,4 +31,26 @@
         android:id="@+id/modeSides"
         style="@style/SideCameraModeButton"
         android:text="@string/side_camera_sides" />
+
+    <ImageButton
+        android:id="@+id/btnClose"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:background="@android:color/transparent"
+        android:contentDescription="@string/main_button_close_app"
+        android:padding="8dp"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_close"
+        app:tint="@android:color/white" />
+
+    <ImageButton
+        android:id="@+id/btnSettings"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:background="@android:color/transparent"
+        android:contentDescription="@string/main_button_settings"
+        android:padding="12dp"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_settings_material"
+        app:tint="@android:color/white" />
 </merge>

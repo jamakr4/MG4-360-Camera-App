@@ -121,21 +121,6 @@
 
     </RelativeLayout>
 
-    <ImageButton
-        android:id="@+id/btnSettings"
-        android:layout_width="108dp"
-        android:layout_height="108dp"
-        android:layout_marginStart="16dp"
-        android:layout_marginBottom="16dp"
-        android:background="@android:color/transparent"
-        android:contentDescription="@string/main_button_settings"
-        android:padding="24dp"
-        android:scaleType="fitCenter"
-        android:src="@drawable/ic_settings_material"
-        app:tint="@color/settings_accent"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent" />
-
     <Button
         android:id="@+id/btnTriggerEventSave"
         android:layout_width="300dp"
@@ -167,20 +152,5 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="@id/surfaceView" />
-
-    <ImageButton
-        android:id="@+id/btnClose"
-        android:layout_width="148dp"
-        android:layout_height="148dp"
-        android:layout_marginStart="2dp"
-        android:layout_marginTop="2dp"
-        android:background="@android:color/transparent"
-        android:contentDescription="@string/main_button_close_app"
-        android:padding="34dp"
-        android:scaleType="fitCenter"
-        android:src="@drawable/ic_close"
-        app:tint="#FFFFFF"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintStart_toStartOf="parent" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

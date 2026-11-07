@@ -4,8 +4,10 @@ The left module reuses the side-camera crops from the local
 `codex/main-activity-surround-test` branch. It uses only `/dev/video16` (left)
 and `/dev/video14` (right). The main camera preview remains alongside it.
 
-The original close and settings buttons retain their layout, padding, icons and
-colors. The mode buttons follow the Settings accent immediately: the selected
+The close and settings buttons use smaller white icons within the left module.
+The close hit area stays entirely above the camera images; Settings shares the
+mode buttons' top/bottom edges and has a wide touch area. The mode buttons follow
+the Settings accent immediately: the selected
 button is filled; the other has a transparent fill and accent outline. There is
 no gray header/control-bar background and no title at the top.
 
@@ -58,7 +60,7 @@ shrinking it. Surface size callbacks do not reattach or pre-warm side previews.
   and 720 × 480 inputs, padded stride, front/rear and inner/outer orientation,
   wheel gaps, unchanged source frames and buffer reuse across mode switches.
 - All three Android instrumentation tests passed: persisted modes, live accent,
-  original icon dimensions/padding, five pause/resume cycles, stable side surfaces
+  icon touch targets/header separation/control-row alignment, five pause/resume cycles, stable side surfaces
   under left/right navigation-inset injection and mode changes, dialog input focus,
   and automatic hiding after navigation is revealed without another focus change.
 - The local emulator runs the new Debug APK. No vehicle installation was performed.

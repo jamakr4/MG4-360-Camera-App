@@ -109,6 +109,9 @@ public final class SideCameraPanel extends ViewGroup {
                     MeasureSpec.makeMeasureSpec(Math.round(rect[3] * scale), MeasureSpec.EXACTLY));
             if (child instanceof TextView) {
                 ((TextView) child).setTextSize(TypedValue.COMPLEX_UNIT_PX, 26 * scale);
+            } else if (child.getId() == R.id.btnClose || child.getId() == R.id.btnSettings) {
+                int padding = Math.round((child.getId() == R.id.btnClose ? 8 : 12) * scale);
+                child.setPadding(padding, padding, padding, padding);
             }
         }
     }
@@ -127,7 +130,10 @@ public final class SideCameraPanel extends ViewGroup {
     }
 
     private int[] bounds(int id) {
-        // Leave the original settings button its full hit target at the bottom left.
+        // Keep the close hit target inside the header, above the first camera tile at y=76.
+        if (id == R.id.btnClose) return new int[]{12, 0, 64, 64};
+        // The settings icon shares the mode buttons' top/bottom edges and has a wide hit area.
+        if (id == R.id.btnSettings) return new int[]{12, 560, 112, 64};
         if (id == R.id.modeWheels) return new int[]{140, 560, 188, 64};
         if (id == R.id.modeSides) return new int[]{336, 560, 188, 64};
         if (id == R.id.leftCameraFailure) return new int[]{12, 76, 254, 456};
