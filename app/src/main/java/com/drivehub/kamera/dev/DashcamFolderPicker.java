@@ -1,6 +1,7 @@
 package com.drivehub.kamera.dev;
 
 import com.drivehub.kamera.R;
+import com.drivehub.kamera.ui.AppSystemBars;
 
 import android.content.Context;
 
@@ -68,7 +69,7 @@ final class DashcamFolderPicker {
         } else {
             builder.setItems(labels.toArray(new String[0]), (dialog, which) -> showDialog(targets.get(which)));
         }
-        builder.show();
+        AppSystemBars.showDialog(builder.create());
     }
 
     private static File resolvePickerStartDir(String rawPath) {

@@ -72,7 +72,11 @@ Community mod for the MG4 EV (AAOS 9, pre-2026 facelift) that replaces the stock
 <p align="center">
   <img src="images/blinker_cam_v2.gif" alt="Turn signal overlay" width="48%">
   <img src="images/dashcam_demo_v3.gif" alt="Dashcam mode" width="48%">
+</p>
 
+<p align="center">
+  <img src="images/DigitalRearView-IPK.jpg" alt="Digital rearview mirror on the driver instrument cluster (IPK)" width="48%">
+  <img src="images/CompactView.jpg" alt="Compact turn signal camera overlay" width="48%">
 </p>
 
 <p align="center">
@@ -155,6 +159,10 @@ Community mod for the MG4 EV (AAOS 9, pre-2026 facelift) that replaces the stock
 > Remember that you are working on a high-value vehicle, not a disposable device. Follow only instructions written for your exact hardware and software version, and proceed only if you fully understand the process. An incorrect downgrade may leave the FICM unusable or cause other unforeseen problems. This process is not approved or supported by MG. You have been warned.
 
 ## Quick Guides
+
+**App display**
+
+The app uses the full screen width, with the SAIC side navigation hidden in the app and its dialogs. Under `Settings` → `Display`, **Show status bar** controls the top SAIC status bar; it is shown by default. The choice is saved and applies immediately, including while Settings is open. Swipe inward from a screen edge to temporarily reveal the hidden system controls.
 
 <details>
 <summary><strong>Indicator Cam</strong></summary>

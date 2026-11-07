@@ -9,6 +9,7 @@ import com.drivehub.kamera.settings.SettingsAppearanceController;
 import com.drivehub.kamera.settings.SettingsDialogController;
 import com.drivehub.kamera.settings.UiPrefs;
 import com.drivehub.kamera.signal.SignalService;
+import com.drivehub.kamera.ui.AppSystemBars;
 
 import android.annotation.SuppressLint;
 import android.content.BroadcastReceiver;
@@ -158,6 +159,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
             return insets;
         });
+        AppSystemBars.apply(getWindow());
 
         SurfaceView surfaceView = findViewById(R.id.surfaceView);
         surfaceHolder = surfaceView.getHolder();
@@ -239,6 +241,18 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             }
             return false;
         });
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        AppSystemBars.apply(getWindow());
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) AppSystemBars.apply(getWindow());
     }
 
     @Override

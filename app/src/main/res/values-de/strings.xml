@@ -11,6 +11,8 @@
     <string name="settings_tab_dev">Dev</string>
     <string name="settings_tab_dev_status">Dev Status</string>
     <string name="settings_section_display">Anzeige</string>
+    <string name="settings_show_status_bar">Statusleiste anzeigen</string>
+    <string name="settings_show_status_bar_hint">Wenn ausgeblendet, vom oberen Bildschirmrand nach unten wischen, um die SAIC-Statusleiste kurz einzublenden.</string>
     <string name="settings_section_signal_camera">Blinker-Kamera</string>
     <string name="settings_section_digital_rearview">Digitaler Rückspiegel</string>
     <string name="settings_section_dashcam_status">Status</string>

@@ -4,6 +4,7 @@ import com.drivehub.kamera.R;
 
 import com.drivehub.kamera.ui.ColorHueStripView;
 import com.drivehub.kamera.ui.ColorSaturationValueView;
+import com.drivehub.kamera.ui.AppSystemBars;
 
 import android.app.Dialog;
 import android.content.SharedPreferences;
@@ -238,7 +239,7 @@ public final class SettingsAppearanceController {
             dialog.dismiss();
         });
 
-        dialog.show();
+        AppSystemBars.showDialog(dialog);
         if (dialog.getWindow() != null) {
             float density = activity.getResources().getDisplayMetrics().density;
             dialog.getWindow().setLayout((int) (430 * density), android.view.ViewGroup.LayoutParams.WRAP_CONTENT);

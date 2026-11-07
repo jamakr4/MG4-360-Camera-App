@@ -11,6 +11,8 @@
     <string name="settings_tab_dev">Dev</string>
     <string name="settings_tab_dev_status">Dev Status</string>
     <string name="settings_section_display">Display</string>
+    <string name="settings_show_status_bar">Show status bar</string>
+    <string name="settings_show_status_bar_hint">When hidden, swipe down from the top edge to show the SAIC status bar temporarily.</string>
     <string name="settings_section_signal_camera">Signal camera</string>
     <string name="settings_section_digital_rearview">Digital Rearview</string>
     <string name="settings_section_dashcam_status">Status</string>

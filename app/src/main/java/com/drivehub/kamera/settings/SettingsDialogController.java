@@ -15,6 +15,7 @@ import com.drivehub.kamera.signal.SignalService;
 import com.drivehub.kamera.signal.DigitalRearviewPolicy;
 import com.drivehub.kamera.camera.IpkRoutePolicy;
 import com.drivehub.kamera.settings.SegmentedControl;
+import com.drivehub.kamera.ui.AppSystemBars;
 
 import android.app.Dialog;
 import android.content.SharedPreferences;
@@ -146,7 +147,7 @@ public final class SettingsDialogController {
         RecordingService.PersistedStatus s = RecordingService.readPersistedStatus(prefs);
         onRecordingStatusChanged(s.status, s.activeCameras, s.totalCameras, s.lastError);
 
-        dialog.show();
+        AppSystemBars.showDialog(dialog);
         applyDialogWindowSize(dialog);
     }
 
@@ -191,6 +192,7 @@ public final class SettingsDialogController {
         v.etSignalCompactRight = dialog.findViewById(R.id.etSignalCompactRight);
         v.swDashcamEnabled = dialog.findViewById(R.id.switchDashcamEnabled);
         v.swSafetyWarning = dialog.findViewById(R.id.switchSafetyWarning);
+        v.swShowStatusBar = dialog.findViewById(R.id.switchShowStatusBar);
         v.swSmoothEntry = dialog.findViewById(R.id.switchSmoothEntry);
         v.swLockTileResizing = dialog.findViewById(R.id.switchLockTileResizing);
         v.swLockTileMoving = dialog.findViewById(R.id.switchLockTileMoving);
@@ -304,6 +306,12 @@ public final class SettingsDialogController {
         v.tvDevStatusEventLog = dialog.findViewById(R.id.tvDevStatusEventLog);
         v.contentScroll = dialog.findViewById(R.id.settingsContentScroll);
 
+        v.swShowStatusBar.setChecked(UiPrefs.isStatusBarVisible(prefs));
+        v.swShowStatusBar.setOnCheckedChangeListener((btn, checked) -> {
+            UiPrefs.setStatusBarVisible(prefs, checked);
+            AppSystemBars.apply(activity.getWindow());
+            AppSystemBars.apply(dialog.getWindow());
+        });
         v.swSafetyWarning.setChecked(UiPrefs.isSafetyWarningEnabled(prefs));
         v.swSafetyWarning.setOnCheckedChangeListener((btn, checked) -> {
             UiPrefs.setSafetyWarningEnabled(prefs, checked);
@@ -467,6 +475,7 @@ public final class SettingsDialogController {
                         views.swBannerPauseResume,
                         views.swBannerErrorRecovered,
                         views.swSafetyWarning,
+                        views.swShowStatusBar,
                         views.swSmoothEntry,
                         views.swLockTileResizing,
                         views.swLockTileMoving,
@@ -720,6 +729,7 @@ public final class SettingsDialogController {
         EditText etSignalCompactRight;
         Switch swDashcamEnabled;
         Switch swSafetyWarning;
+        Switch swShowStatusBar;
         Switch swSmoothEntry;
         Switch swLockTileResizing;
         Switch swLockTileMoving;

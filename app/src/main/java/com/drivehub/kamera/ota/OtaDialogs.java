@@ -3,6 +3,7 @@ package com.drivehub.kamera.ota;
 import com.drivehub.kamera.R;
 
 import com.drivehub.kamera.settings.UiPrefs;
+import com.drivehub.kamera.ui.AppSystemBars;
 
 import android.app.Dialog;
 import android.content.Context;
@@ -155,7 +156,7 @@ final class OtaDialogs {
     }
 
     private static void showCentered(Dialog dialog, int widthDp, int heightDp) {
-        dialog.show();
+        AppSystemBars.showDialog(dialog);
         Window window = dialog.getWindow();
         if (window == null) return;
         float density = dialog.getContext().getResources().getDisplayMetrics().density;
