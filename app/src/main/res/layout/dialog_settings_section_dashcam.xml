@@ -448,6 +448,42 @@
 
     </LinearLayout>
 
+    <TextView
+        style="@style/DrivehubSettingsCardLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:layout_marginBottom="8dp"
+        android:text="@string/surveillance_title" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_settings_inline_card"
+        android:orientation="vertical"
+        android:padding="18dp">
+        <TextView
+            android:id="@+id/tvSurveillanceStatus"
+            style="@style/DrivehubSettingsBodyMuted"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/surveillance_hint" />
+        <TextView
+            android:id="@+id/tvSurveillanceDirectory"
+            style="@style/DrivehubSettingsBodyMuted"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/surveillance_directory_default" />
+        <Button
+            android:id="@+id/btnSurveillanceDirectory"
+            style="@style/DrivehubDialogButtonSecondary"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/surveillance_choose_directory" />
+    </LinearLayout>
+
     <!-- ============ STORAGE ============ -->
     <TextView
         style="@style/DrivehubSettingsCardLabel"

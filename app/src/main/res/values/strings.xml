@@ -339,4 +339,25 @@
     <string name="dashcam_status_position_hint">Move the status dot anywhere on the screen. Its position is saved and kept within the screen edges.</string>
     <string name="dashcam_status_position_expand">Show position sliders</string>
     <string name="dashcam_status_position_collapse">Hide position sliders</string>
+    <string name="remote_start_continuous">Start surveillance recording</string>
+    <string name="remote_stop_continuous">Stop surveillance recording</string>
+    <string name="remote_query_state">Query surveillance recording state</string>
+    <string name="remote_test_usb_write">Test USB recording storage</string>
+    <string name="surveillance_title">Surveillance recording</string>
+    <string name="surveillance_hint">MG4Control can start recording for up to 2 hours. Footage uses a separate folder. Normal dashcam recording resumes with its previous setting afterwards.</string>
+    <string name="surveillance_active_hint">Surveillance is active. Normal dashcam recording is temporarily disabled and will be restored when surveillance ends.</string>
+    <string name="surveillance_directory_default">Automatic folder: surveillance, beside the normal dashcam folder.</string>
+    <string name="surveillance_choose_directory">Choose surveillance folder</string>
+    <string name="surveillance_directory_invalid">Choose a separate folder outside normal dashcam storage.</string>
+    <string name="notification_surveillance_starting">Starting surveillance recording</string>
+    <string name="notification_surveillance_status">Surveillance: %1$s · %2$s</string>
+    <string name="surveillance_storage_very_low">Very low storage: less than 1 GiB free</string>
+    <string name="surveillance_storage_low">Low storage: less than 3 GiB free</string>
+    <string name="surveillance_storage_limited">Limited storage for two hours: less than 9 GiB free</string>
+    <string name="surveillance_storage_ok">Storage OK: at least 9 GiB free (estimate)</string>
+    <string name="surveillance_storage_unknown">Checking available storage</string>
+    <string name="surveillance_state_started">recording</string>
+    <string name="surveillance_state_paused">paused for factory cameras</string>
+    <string name="surveillance_state_error">error</string>
+    <string name="surveillance_state_starting">starting</string>
 </resources>

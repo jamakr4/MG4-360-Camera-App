@@ -339,4 +339,25 @@
     <string name="dashcam_status_position_hint">Verschiebe den Statuspunkt auf dem gesamten Bildschirm. Die Position wird gespeichert und auf die Bildschirmränder begrenzt.</string>
     <string name="dashcam_status_position_expand">Positionsregler einblenden</string>
     <string name="dashcam_status_position_collapse">Positionsregler ausblenden</string>
+    <string name="remote_start_continuous">Überwachungsaufnahme starten</string>
+    <string name="remote_stop_continuous">Überwachungsaufnahme beenden</string>
+    <string name="remote_query_state">Status der Überwachungsaufnahme abfragen</string>
+    <string name="remote_test_usb_write">USB-Aufnahmespeicher prüfen</string>
+    <string name="surveillance_title">Überwachungsaufnahme</string>
+    <string name="surveillance_hint">MG4Control kann die Aufnahme für bis zu 2 Stunden starten. Videos werden in einem separaten Ordner gespeichert. Danach gilt wieder die vorherige Dashcam-Einstellung.</string>
+    <string name="surveillance_active_hint">Die Überwachung ist aktiv. Die normale Dashcam-Aufnahme ist vorübergehend deaktiviert und wird danach wiederhergestellt.</string>
+    <string name="surveillance_directory_default">Automatischer Ordner: surveillance, neben dem normalen Dashcam-Ordner.</string>
+    <string name="surveillance_choose_directory">Überwachungsordner auswählen</string>
+    <string name="surveillance_directory_invalid">Bitte einen separaten Ordner außerhalb des normalen Dashcam-Speichers wählen.</string>
+    <string name="notification_surveillance_starting">Überwachungsaufnahme startet</string>
+    <string name="notification_surveillance_status">Überwachung: %1$s · %2$s</string>
+    <string name="surveillance_storage_very_low">Sehr wenig Speicher: weniger als 1 GiB frei</string>
+    <string name="surveillance_storage_low">Wenig Speicher: weniger als 3 GiB frei</string>
+    <string name="surveillance_storage_limited">Begrenzter Speicher für zwei Stunden: weniger als 9 GiB frei</string>
+    <string name="surveillance_storage_ok">Speicher OK: mindestens 9 GiB frei (Schätzwert)</string>
+    <string name="surveillance_storage_unknown">Freier Speicher wird geprüft</string>
+    <string name="surveillance_state_started">Aufnahme läuft</string>
+    <string name="surveillance_state_paused">Pause für Werkskameras</string>
+    <string name="surveillance_state_error">Fehler</string>
+    <string name="surveillance_state_starting">startet</string>
 </resources>

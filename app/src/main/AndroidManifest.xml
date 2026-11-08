@@ -87,6 +87,43 @@
         </receiver>
 
         <receiver
+            android:name=".remote.StartContinuousReceiver"
+            android:exported="true"
+            android:label="@string/remote_start_continuous">
+            <intent-filter>
+                <action android:name="com.drivehub.kamera.action.START_CONTINUOUS" />
+                <action android:name="com.mg4.control.action.SHORTCUT" />
+            </intent-filter>
+        </receiver>
+        <receiver
+            android:name=".remote.StopContinuousReceiver"
+            android:exported="true"
+            android:label="@string/remote_stop_continuous">
+            <intent-filter>
+                <action android:name="com.drivehub.kamera.action.STOP_CONTINUOUS" />
+                <action android:name="com.mg4.control.action.SHORTCUT" />
+            </intent-filter>
+        </receiver>
+        <receiver
+            android:name=".remote.QueryStateReceiver"
+            android:exported="true"
+            android:label="@string/remote_query_state">
+            <intent-filter>
+                <action android:name="com.drivehub.kamera.action.QUERY_STATE" />
+                <action android:name="com.mg4.control.action.SHORTCUT" />
+            </intent-filter>
+        </receiver>
+        <receiver
+            android:name=".remote.TestUsbWriteReceiver"
+            android:exported="true"
+            android:label="@string/remote_test_usb_write">
+            <intent-filter>
+                <action android:name="com.drivehub.kamera.action.TEST_USB_WRITE" />
+                <action android:name="com.mg4.control.action.SHORTCUT" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
             android:name=".dashcam.DashcamEventTriggerReceiver"
             android:enabled="true"
             android:exported="true"

@@ -433,6 +433,7 @@ public final class SettingsDialogController {
                         views.tvBannerErrorRecoveredVolumeValue,
                         views.btnBannerErrorRecoveredTest)
         );
+        dashcam.bindSurveillance(dialog);
         dev.bind(
                 prefs,
                 views.swDevPerformanceOverlay,
