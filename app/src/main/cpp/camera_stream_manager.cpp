@@ -1062,7 +1062,8 @@ namespace camera_stream_manager
         };
 
         std::atomic<bool> gSideCameraWheels{false};
-        std::atomic<unsigned> gSideCameraWheelAlignment{0};
+        // Pack the two effective float angles into one atomic snapshot. Disabled axes use 0°.
+        std::atomic<uint64_t> gSideCameraWheelAlignment{0};
 
         class ParallelPreviewConsumer final : public FrameConsumer,
                                               public std::enable_shared_from_this<ParallelPreviewConsumer>
@@ -1111,9 +1112,17 @@ namespace camera_stream_manager
                         if (nowUs() - frame.capturedUs > 250000) continue;
                         cv::Mat display = frame.rgba;
                         if (side_ >= 0) {
+                            const uint64_t settings = gSideCameraWheelAlignment.load();
+                            const uint32_t frontBits = static_cast<uint32_t>(settings);
+                            const uint32_t rearBits = static_cast<uint32_t>(settings >> 32);
+                            float frontDegrees, rearDegrees;
+                            std::memcpy(&frontDegrees, &frontBits, sizeof(frontDegrees));
+                            std::memcpy(&rearDegrees, &rearBits, sizeof(rearDegrees));
+                            const unsigned alignment = (frontDegrees != 0 ? side_camera_preview::ALIGN_FRONT : 0)
+                                    | (rearDegrees != 0 ? side_camera_preview::ALIGN_REAR : 0);
                             side_camera_preview::compose(frame.rgba, side_ == 0,
                                     gSideCameraWheels.load(), crops_, upright, composed,
-                                    wheelTransforms, gSideCameraWheelAlignment.load());
+                                    wheelTransforms, alignment, frontDegrees, rearDegrees);
                             display = composed;
                         }
                         if (display.cols != width || display.rows != height) {
@@ -3731,9 +3740,15 @@ namespace camera_stream_manager
         gSideCameraWheels.store(wheels);
     }
 
-    void setSideCameraWheelAlignment(bool frontEnabled, bool rearEnabled) {
-        gSideCameraWheelAlignment.store((frontEnabled ? side_camera_preview::ALIGN_FRONT : 0)
-                | (rearEnabled ? side_camera_preview::ALIGN_REAR : 0));
+    void setSideCameraWheelAlignment(bool frontEnabled, bool rearEnabled,
+                                     float frontDegrees, float rearDegrees) {
+        frontDegrees = frontEnabled ? side_camera_preview::clampAngle(frontDegrees, 16.5f) : 0;
+        rearDegrees = rearEnabled ? side_camera_preview::clampAngle(rearDegrees, -45.f) : 0;
+        uint32_t frontBits, rearBits;
+        std::memcpy(&frontBits, &frontDegrees, sizeof(frontBits));
+        std::memcpy(&rearBits, &rearDegrees, sizeof(rearBits));
+        gSideCameraWheelAlignment.store(static_cast<uint64_t>(frontBits)
+                | (static_cast<uint64_t>(rearBits) << 32));
     }
 
     int64_t sideCameraPreviewAgeMs(int side) {

@@ -11,6 +11,10 @@ using Crops = std::array<float, 12>;
 constexpr int WIDTH = 254, HEIGHT = 456, WHEEL_HEIGHT = 224, GAP = 8;
 constexpr unsigned ALIGN_FRONT = 1, ALIGN_REAR = 2;
 
+inline float clampAngle(float degrees, float fallback) {
+    return std::isfinite(degrees) ? std::max(-180.f, std::min(180.f, degrees)) : fallback;
+}
+
 // Android Canvas uses clockwise-positive screen angles. Compose scale/crop and rotation
 // directly, avoiding OpenCV getRotationMatrix2D's opposite angle convention.
 inline cv::Matx23d wheelTransform(cv::Size source, const Crops& crops, int crop, double degrees) {
@@ -31,13 +35,16 @@ inline cv::Matx23d wheelTransform(cv::Size source, const Crops& crops, int crop,
 struct WheelTransforms {
     cv::Matx23d front, rear;
 
-    void update(cv::Size source, bool left, const Crops& crops) {
-        if (ready_ && source == source_ && left == left_ && crops == crops_) return;
-        front = wheelTransform(source, crops, 1, left ? 16.5 : -16.5);
-        rear = wheelTransform(source, crops, 2, left ? -45 : 45);
+    void update(cv::Size source, bool left, const Crops& crops, float frontDegrees, float rearDegrees) {
+        if (ready_ && source == source_ && left == left_ && crops == crops_
+                && frontDegrees == frontDegrees_ && rearDegrees == rearDegrees_) return;
+        front = wheelTransform(source, crops, 1, left ? frontDegrees : -frontDegrees);
+        rear = wheelTransform(source, crops, 2, left ? rearDegrees : -rearDegrees);
         source_ = source;
         left_ = left;
         crops_ = crops;
+        frontDegrees_ = frontDegrees;
+        rearDegrees_ = rearDegrees;
         ready_ = true;
     }
 
@@ -45,6 +52,7 @@ private:
     bool ready_ = false, left_ = false;
     cv::Size source_;
     Crops crops_{};
+    float frontDegrees_ = 0, rearDegrees_ = 0;
 };
 
 inline bool valid(const Crops& crops) {
@@ -69,21 +77,23 @@ inline cv::Rect region(const cv::Mat& image, const Crops& crops, int crop) {
 // Work runs on the existing independent preview worker, never on the capture thread.
 inline void compose(const cv::Mat& rgba, bool left, bool wheels, const Crops& crops,
                     cv::Mat& upright, cv::Mat& output, WheelTransforms& transforms,
-                    unsigned alignment = 0) {
+                    unsigned alignment = 0, float frontDegrees = 16.5f, float rearDegrees = -45.f) {
     cv::rotate(rgba, upright, left ? cv::ROTATE_90_COUNTERCLOCKWISE : cv::ROTATE_90_CLOCKWISE);
     output.create(HEIGHT, WIDTH, CV_8UC4);
     if (wheels) {
         output.setTo(cv::Scalar(0, 0, 0, 255));
         cv::Mat front = output(cv::Rect(0, 0, WIDTH, WHEEL_HEIGHT));
         cv::Mat rear = output(cv::Rect(0, WHEEL_HEIGHT + GAP, WIDTH, WHEEL_HEIGHT));
-        if (alignment & (ALIGN_FRONT | ALIGN_REAR)) transforms.update(upright.size(), left, crops);
-        if (alignment & ALIGN_FRONT) {
+        const bool rotateFront = (alignment & ALIGN_FRONT) && frontDegrees != 0;
+        const bool rotateRear = (alignment & ALIGN_REAR) && rearDegrees != 0;
+        if (rotateFront || rotateRear) transforms.update(upright.size(), left, crops, frontDegrees, rearDegrees);
+        if (rotateFront) {
             cv::warpAffine(upright, front, transforms.front, front.size(), cv::INTER_LINEAR,
                     cv::BORDER_CONSTANT, cv::Scalar(0, 0, 0, 255));
         } else {
             cv::resize(upright(region(upright, crops, 1)), front, front.size(), 0, 0, cv::INTER_LINEAR);
         }
-        if (alignment & ALIGN_REAR) {
+        if (rotateRear) {
             cv::warpAffine(upright, rear, transforms.rear, rear.size(), cv::INTER_LINEAR,
                     cv::BORDER_CONSTANT, cv::Scalar(0, 0, 0, 255));
         } else {

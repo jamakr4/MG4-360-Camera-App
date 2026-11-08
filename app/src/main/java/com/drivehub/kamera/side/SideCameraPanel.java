@@ -30,7 +30,9 @@ public final class SideCameraPanel extends ViewGroup {
         if (UiPrefs.KEY_MAIN_SIDE_CAMERA_WHEELS.equals(key) || UiPrefs.KEY_ACCENT_COLOR.equals(key)) {
             updateMode();
         } else if (UiPrefs.KEY_PARKING_FRONT_WHEEL_ALIGNMENT.equals(key)
-                || UiPrefs.KEY_PARKING_REAR_WHEEL_ALIGNMENT.equals(key)) {
+                || UiPrefs.KEY_PARKING_REAR_WHEEL_ALIGNMENT.equals(key)
+                || UiPrefs.KEY_DEV_PARKING_FRONT_WHEEL_ANGLE.equals(key)
+                || UiPrefs.KEY_DEV_PARKING_REAR_WHEEL_ANGLE.equals(key)) {
             updateWheelAlignment();
         } else if (UiPrefs.KEY_OEM_AVM_ACTIVE.equals(key) || UiPrefs.KEY_OEM_AVM_COEXIST.equals(key)
                 || UiPrefs.KEY_OEM_CAMERA_ACCESS_BLOCKED.equals(key)) {
@@ -92,7 +94,8 @@ public final class SideCameraPanel extends ViewGroup {
 
     private void updateWheelAlignment() {
         SideCameraNative.setWheelAlignment(UiPrefs.isParkingFrontWheelAlignmentEnabled(prefs),
-                UiPrefs.isParkingRearWheelAlignmentEnabled(prefs));
+                UiPrefs.isParkingRearWheelAlignmentEnabled(prefs),
+                UiPrefs.getDevParkingFrontWheelAngle(prefs), UiPrefs.getDevParkingRearWheelAngle(prefs));
     }
 
     private void styleButton(Button button, boolean selected) {

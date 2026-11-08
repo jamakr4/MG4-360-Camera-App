@@ -15,6 +15,10 @@ public final class UiPrefs {
     public static final String KEY_MAIN_SIDE_CAMERA_WHEELS = "main_surround_left_wheels";
     public static final String KEY_PARKING_FRONT_WHEEL_ALIGNMENT = "parkingFrontWheelAlignment";
     public static final String KEY_PARKING_REAR_WHEEL_ALIGNMENT = "parkingRearWheelAlignment";
+    public static final String KEY_DEV_PARKING_FRONT_WHEEL_ANGLE = "devParkingFrontWheelAngle";
+    public static final String KEY_DEV_PARKING_REAR_WHEEL_ANGLE = "devParkingRearWheelAngle";
+    public static final float DEFAULT_PARKING_FRONT_WHEEL_ANGLE = 16.5f;
+    public static final float DEFAULT_PARKING_REAR_WHEEL_ANGLE = -45f;
     public static final String KEY_SHOW_STATUS_BAR = "showStatusBar";
     public static final String KEY_ALLOW_BETA_UPDATES = "allowBetaUpdates";
     public static final String KEY_SMOOTH_ENTRY = "smoothEntry";
@@ -225,6 +229,20 @@ public final class UiPrefs {
 
     public static void setParkingRearWheelAlignmentEnabled(SharedPreferences prefs, boolean enabled) {
         prefs.edit().putBoolean(KEY_PARKING_REAR_WHEEL_ALIGNMENT, enabled).apply();
+    }
+
+    public static float getDevParkingFrontWheelAngle(SharedPreferences prefs) {
+        return clampParkingWheelAngle(prefs.getFloat(KEY_DEV_PARKING_FRONT_WHEEL_ANGLE,
+                DEFAULT_PARKING_FRONT_WHEEL_ANGLE), DEFAULT_PARKING_FRONT_WHEEL_ANGLE);
+    }
+
+    public static float getDevParkingRearWheelAngle(SharedPreferences prefs) {
+        return clampParkingWheelAngle(prefs.getFloat(KEY_DEV_PARKING_REAR_WHEEL_ANGLE,
+                DEFAULT_PARKING_REAR_WHEEL_ANGLE), DEFAULT_PARKING_REAR_WHEEL_ANGLE);
+    }
+
+    public static float clampParkingWheelAngle(float value, float fallback) {
+        return Float.isFinite(value) ? Math.max(-180f, Math.min(180f, value)) : fallback;
     }
 
     public static boolean isStatusBarVisible(SharedPreferences prefs) {

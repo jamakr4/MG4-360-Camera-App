@@ -111,6 +111,23 @@ int main() {
                 assert(cv::norm(output, originalSide, cv::NORM_INF) == 0);
                 assert(cv::norm(source, original, cv::NORM_INF) == 0);
             }
+            // Live edits must invalidate cached matrices even with identical frame/crop sizes.
+            for (const auto angles : {cv::Vec2f(-22.5f, 30.f), cv::Vec2f(0.f, 0.f),
+                                      cv::Vec2f(180.f, -180.f), cv::Vec2f(16.5f, -45.f)}) {
+                compose(source, left, true, spec, upright, output, transforms, 3, angles[0], angles[1]);
+                assert(output.data == allocation);
+                if (angles[0] == 0 && angles[1] == 0) {
+                    assert(cv::norm(output, originalWheels, cv::NORM_INF) == 0);
+                } else if (std::abs(angles[0]) < 180) {
+                    checkAlignedWheel(output(cv::Rect(0, 0, WIDTH, WHEEL_HEIGHT)), spec, 1, left,
+                            height, left ? angles[0] : -angles[0]);
+                    checkAlignedWheel(output(cv::Rect(0, WHEEL_HEIGHT+GAP, WIDTH, WHEEL_HEIGHT)), spec, 2, left,
+                            height, left ? angles[1] : -angles[1]);
+                }
+                compose(source, left, false, spec, upright, output, transforms, 3, angles[0], angles[1]);
+                assert(cv::norm(output, originalSide, cv::NORM_INF) == 0);
+                assert(cv::norm(source, original, cv::NORM_INF) == 0);
+            }
             compose(source, left, false, spec, upright, output, transforms);
             assert(output.data == allocation);
             assert(output.at<cv::Vec4b>(228, 100)[2] == 42); // No stale wheel-mode gap.
@@ -122,6 +139,6 @@ int main() {
     assert(!valid(invalid));
     invalid = crops(true); invalid[2] = invalid[0]; assert(!valid(invalid));
     invalid = crops(false); invalid[7] = 2; assert(!valid(invalid));
-    std::cout << "Side preview: all axle combinations, angle direction, neighbouring source pixels, black borders, "
+    std::cout << "Side preview: custom/reset/zero angles, all axle combinations, angle direction, neighbouring source pixels, black borders, "
                  "legacy output, field/full frames, padded stride, buffer reuse and input isolation passed" << std::endl;
 }

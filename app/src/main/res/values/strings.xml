@@ -129,6 +129,14 @@
     <string name="settings_dev_dashcam_max_event_dirs">Saved events kept</string>
     <string name="settings_dev_dashcam_capacity_warning">⚠ Raising these values can fill storage quickly. Each 30 s clip is ~33 MB; each saved event keeps ~5 clips. The app does not check free space — too-high values can lead to storage overflow or other unpredictable issues.</string>
     <string name="settings_dev_performance_overlay">Performance display</string>
+    <string name="settings_dev_parking_wheel_angles">Parking: wheel alignment</string>
+    <string name="settings_dev_parking_front_angle">Front axle rotation angle</string>
+    <string name="settings_dev_parking_rear_angle">Rear axle rotation angle</string>
+    <string name="settings_dev_parking_front_reset">Reset front axle angle</string>
+    <string name="settings_dev_parking_rear_reset">Reset rear axle angle</string>
+    <string name="settings_dev_parking_wheel_angles_hint">Angle for the left wheel view (−180° to +180°); the right view rotates in the opposite direction. Applies when the corresponding axle is enabled under Parking.</string>
+    <string name="settings_reset">Reset</string>
+    <string name="settings_angle_unit">°</string>
     <string name="settings_dev_performance_overlay_enabled">Show system performance</string>
     <string name="settings_dev_performance_overlay_hint">Permanently shows system and app CPU/RAM, load and temperature in the top-left corner until switched off here.</string>
     <string name="performance_temperature_unavailable">Temp –</string>

@@ -129,6 +129,14 @@
     <string name="settings_dev_dashcam_max_event_dirs">Gespeicherte Ereignisse</string>
     <string name="settings_dev_dashcam_capacity_warning">⚠ Höhere Werte können den Speicher schnell volllaufen lassen. Ein 30-s-Clip ist ca. 33 MB, ein Ereignis behält ca. 5 Clips. Die App prüft den freien Speicher nicht — zu hohe Werte können zu Speicherüberlauf oder anderen unvorhersehbaren Problemen führen.</string>
     <string name="settings_dev_performance_overlay">Performance-Anzeige</string>
+    <string name="settings_dev_parking_wheel_angles">Parking: Radausrichtung</string>
+    <string name="settings_dev_parking_front_angle">Drehwinkel Vorderachse</string>
+    <string name="settings_dev_parking_rear_angle">Drehwinkel Hinterachse</string>
+    <string name="settings_dev_parking_front_reset">Vorderachse zurücksetzen</string>
+    <string name="settings_dev_parking_rear_reset">Hinterachse zurücksetzen</string>
+    <string name="settings_dev_parking_wheel_angles_hint">Winkel der linken Radansicht (−180° bis +180°); rechts wird gegensinnig gedreht. Wirkt, wenn die jeweilige Achse unter Parking eingeschaltet ist.</string>
+    <string name="settings_reset">Reset</string>
+    <string name="settings_angle_unit">°</string>
     <string name="settings_dev_performance_overlay_enabled">Systemleistung anzeigen</string>
     <string name="settings_dev_performance_overlay_hint">Zeigt System- und App-CPU/RAM, Load und Temperatur dauerhaft oben links an, bis die Anzeige hier ausgeschaltet wird.</string>
     <string name="performance_temperature_unavailable">Temp –</string>

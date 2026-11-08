@@ -10,6 +10,8 @@ import com.drivehub.kamera.signal.SignalService;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.text.Editable;
+import android.view.inputmethod.EditorInfo;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.SeekBar;
@@ -19,10 +21,63 @@ import android.widget.Toast;
 
 import java.util.function.IntUnaryOperator;
 import java.util.function.ToIntFunction;
+import java.math.BigDecimal;
+import java.text.DecimalFormatSymbols;
 
 public final class DevSettingsController {
 
     public DevSettingsController() {
+    }
+
+    public void bindParkingWheelAngles(SharedPreferences prefs, EditText front, Button resetFront,
+                                      EditText rear, Button resetRear) {
+        bindWheelAngle(prefs, front, resetFront, UiPrefs.KEY_DEV_PARKING_FRONT_WHEEL_ANGLE,
+                UiPrefs.DEFAULT_PARKING_FRONT_WHEEL_ANGLE);
+        bindWheelAngle(prefs, rear, resetRear, UiPrefs.KEY_DEV_PARKING_REAR_WHEEL_ANGLE,
+                UiPrefs.DEFAULT_PARKING_REAR_WHEEL_ANGLE);
+    }
+
+    private void bindWheelAngle(SharedPreferences prefs, EditText field, Button reset,
+                               String key, float defaultAngle) {
+        setAngleField(field, UiPrefs.clampParkingWheelAngle(prefs.getFloat(key, defaultAngle), defaultAngle));
+        field.addTextChangedListener(new SimpleTextWatcher() {
+            @Override public void afterTextChanged(Editable text) {
+                try {
+                    float value = Float.parseFloat(text.toString().trim().replace(',', '.'));
+                    if (Float.isFinite(value)) prefs.edit().putFloat(key,
+                            UiPrefs.clampParkingWheelAngle(value, defaultAngle)).apply();
+                } catch (NumberFormatException ignored) {
+                    // Keep the last valid angle while a sign/decimal value is being typed.
+                }
+            }
+        });
+        Runnable normalize = () -> setAngleField(field,
+                UiPrefs.clampParkingWheelAngle(prefs.getFloat(key, defaultAngle), defaultAngle));
+        field.setOnFocusChangeListener((view, focused) -> {
+            if (!focused) normalize.run();
+        });
+        field.setOnEditorActionListener((view, action, event) -> {
+            if (action != EditorInfo.IME_ACTION_DONE) return false;
+            normalize.run();
+            field.clearFocus();
+            InputMethodManager keyboard = (InputMethodManager) field.getContext()
+                    .getSystemService(Context.INPUT_METHOD_SERVICE);
+            if (keyboard != null) keyboard.hideSoftInputFromWindow(field.getWindowToken(), 0);
+            return true;
+        });
+        reset.setOnClickListener(view -> {
+            prefs.edit().putFloat(key, defaultAngle).apply();
+            setAngleField(field, defaultAngle);
+        });
+    }
+
+    private void setAngleField(EditText field, float value) {
+        String text = new BigDecimal(Float.toString(value)).stripTrailingZeros().toPlainString()
+                .replace('.', DecimalFormatSymbols.getInstance().getDecimalSeparator());
+        if (!text.contentEquals(field.getText())) {
+            field.setText(text);
+            field.setSelection(field.getText().length());
+        }
     }
 
     public void bind(

@@ -475,6 +475,11 @@ public final class SettingsDialogController {
                 views.btnDevDashcamBrowseFolder,
                 views.btnDevResetDefaults
         );
+        dev.bindParkingWheelAngles(prefs,
+                dialog.findViewById(R.id.etDevParkingFrontWheelAngle),
+                dialog.findViewById(R.id.btnDevParkingFrontWheelAngleReset),
+                dialog.findViewById(R.id.etDevParkingRearWheelAngle),
+                dialog.findViewById(R.id.btnDevParkingRearWheelAngleReset));
         views.btnDevOemCaptures.setOnClickListener(v -> com.drivehub.kamera.dev.OemCapturesDialog.show(activity));
     }
 
