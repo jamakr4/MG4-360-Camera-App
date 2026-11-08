@@ -19,6 +19,7 @@ import androidx.test.platform.app.InstrumentationRegistry;
 
 import com.drivehub.kamera.MainActivity;
 import com.drivehub.kamera.R;
+import com.drivehub.kamera.settings.UiPrefs;
 import com.drivehub.kamera.ui.AppSystemBars;
 
 import org.junit.Test;
@@ -36,48 +37,65 @@ public class SideCameraWindowInstrumentedTest {
             InstrumentationRegistry.getInstrumentation().waitForIdleSync();
             Rect[] original = new Rect[2];
             AtomicInteger destroyed = new AtomicInteger();
-            scenario.onActivity(activity -> {
-                SideCameraView cameras = activity.findViewById(R.id.sideCameraView);
-                for (int side = 0; side < 2; side++) {
-                    SurfaceHolder holder = ((SurfaceView) cameras.getChildAt(side)).getHolder();
-                    assertTrue(holder.getSurface().isValid());
-                    original[side] = new Rect(holder.getSurfaceFrame());
-                    assertEquals(new Rect(0, 0, 254, 456), original[side]);
-                    holder.addCallback(new SurfaceHolder.Callback() {
-                        @Override public void surfaceCreated(SurfaceHolder h) {}
-                        @Override public void surfaceChanged(SurfaceHolder h, int f, int w, int height) {}
-                        @Override public void surfaceDestroyed(SurfaceHolder h) { destroyed.incrementAndGet(); }
-                    });
+            android.content.SharedPreferences prefs = UiPrefs.getPrefs(
+                    InstrumentationRegistry.getInstrumentation().getTargetContext());
+            java.util.Map<String, ?> saved = prefs.getAll();
+            try {
+                scenario.onActivity(activity -> {
+                    SideCameraView cameras = activity.findViewById(R.id.sideCameraView);
+                    for (int side = 0; side < 2; side++) {
+                        SurfaceHolder holder = ((SurfaceView) cameras.getChildAt(side)).getHolder();
+                        assertTrue(holder.getSurface().isValid());
+                        original[side] = new Rect(holder.getSurfaceFrame());
+                        assertEquals(new Rect(0, 0, 254, 456), original[side]);
+                        holder.addCallback(new SurfaceHolder.Callback() {
+                            @Override public void surfaceCreated(SurfaceHolder h) {}
+                            @Override public void surfaceChanged(SurfaceHolder h, int f, int w, int height) {}
+                            @Override public void surfaceDestroyed(SurfaceHolder h) { destroyed.incrementAndGet(); }
+                        });
+                    }
+                    View root = activity.findViewById(R.id.main);
+                    WindowInsetsCompat base = ViewCompat.getRootWindowInsets(root);
+                    assertNotNull(base);
+                    int left = root.getPaddingLeft(), right = root.getPaddingRight();
+                    for (Insets nav : new Insets[]{Insets.of(96, 0, 0, 0), Insets.of(0, 0, 96, 0)}) {
+                        WindowInsetsCompat transientBar = new WindowInsetsCompat.Builder(base)
+                                .setInsets(WindowInsetsCompat.Type.navigationBars(), nav)
+                                .setVisible(WindowInsetsCompat.Type.navigationBars(), true).build();
+                        ViewCompat.dispatchApplyWindowInsets(root, transientBar);
+                        assertEquals(left, root.getPaddingLeft());
+                        assertEquals(right, root.getPaddingRight());
+                        assertEquals(AppSystemBars.contentInsets(base, true),
+                                AppSystemBars.contentInsets(transientBar, true));
+                        assertEquals(AppSystemBars.contentInsets(base, false),
+                                AppSystemBars.contentInsets(transientBar, false));
+                    }
+                    activity.findViewById(R.id.modeWheels).performClick();
+                    for (int mask = 0; mask < 4; mask++) {
+                        UiPrefs.setParkingFrontWheelAlignmentEnabled(prefs, (mask & 1) != 0);
+                        UiPrefs.setParkingRearWheelAlignmentEnabled(prefs, (mask & 2) != 0);
+                    }
+                    activity.findViewById(R.id.modeSides).performClick();
+                });
+                InstrumentationRegistry.getInstrumentation().waitForIdleSync();
+                scenario.onActivity(activity -> {
+                    SideCameraView cameras = activity.findViewById(R.id.sideCameraView);
+                    for (int side = 0; side < 2; side++) {
+                        SurfaceHolder holder = ((SurfaceView) cameras.getChildAt(side)).getHolder();
+                        assertEquals(original[side], holder.getSurfaceFrame());
+                        assertTrue(holder.getSurface().isValid());
+                    }
+                    assertEquals(0, destroyed.get());
+                });
+            } finally {
+                android.content.SharedPreferences.Editor editor = prefs.edit();
+                for (String key : new String[]{UiPrefs.KEY_PARKING_FRONT_WHEEL_ALIGNMENT,
+                        UiPrefs.KEY_PARKING_REAR_WHEEL_ALIGNMENT}) {
+                    if (saved.containsKey(key)) editor.putBoolean(key, (Boolean) saved.get(key));
+                    else editor.remove(key);
                 }
-                View root = activity.findViewById(R.id.main);
-                WindowInsetsCompat base = ViewCompat.getRootWindowInsets(root);
-                assertNotNull(base);
-                int left = root.getPaddingLeft(), right = root.getPaddingRight();
-                for (Insets nav : new Insets[]{Insets.of(96, 0, 0, 0), Insets.of(0, 0, 96, 0)}) {
-                    WindowInsetsCompat transientBar = new WindowInsetsCompat.Builder(base)
-                            .setInsets(WindowInsetsCompat.Type.navigationBars(), nav)
-                            .setVisible(WindowInsetsCompat.Type.navigationBars(), true).build();
-                    ViewCompat.dispatchApplyWindowInsets(root, transientBar);
-                    assertEquals(left, root.getPaddingLeft());
-                    assertEquals(right, root.getPaddingRight());
-                    assertEquals(AppSystemBars.contentInsets(base, true),
-                            AppSystemBars.contentInsets(transientBar, true));
-                    assertEquals(AppSystemBars.contentInsets(base, false),
-                            AppSystemBars.contentInsets(transientBar, false));
-                }
-                activity.findViewById(R.id.modeWheels).performClick();
-                activity.findViewById(R.id.modeSides).performClick();
-            });
-            InstrumentationRegistry.getInstrumentation().waitForIdleSync();
-            scenario.onActivity(activity -> {
-                SideCameraView cameras = activity.findViewById(R.id.sideCameraView);
-                for (int side = 0; side < 2; side++) {
-                    SurfaceHolder holder = ((SurfaceView) cameras.getChildAt(side)).getHolder();
-                    assertEquals(original[side], holder.getSurfaceFrame());
-                    assertTrue(holder.getSurface().isValid());
-                }
-                assertEquals(0, destroyed.get());
-            });
+                assertTrue(editor.commit());
+            }
         }
     }
 

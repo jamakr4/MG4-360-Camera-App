@@ -1062,6 +1062,7 @@ namespace camera_stream_manager
         };
 
         std::atomic<bool> gSideCameraWheels{false};
+        std::atomic<unsigned> gSideCameraWheelAlignment{0};
 
         class ParallelPreviewConsumer final : public FrameConsumer,
                                               public std::enable_shared_from_this<ParallelPreviewConsumer>
@@ -1105,12 +1106,14 @@ namespace camera_stream_manager
                     Frame frame;
                     int width = 0, height = 0;
                     cv::Mat upright, composed;
+                    side_camera_preview::WheelTransforms wheelTransforms;
                     while (frames_.take(frame)) {
                         if (nowUs() - frame.capturedUs > 250000) continue;
                         cv::Mat display = frame.rgba;
                         if (side_ >= 0) {
                             side_camera_preview::compose(frame.rgba, side_ == 0,
-                                    gSideCameraWheels.load(), crops_, upright, composed);
+                                    gSideCameraWheels.load(), crops_, upright, composed,
+                                    wheelTransforms, gSideCameraWheelAlignment.load());
                             display = composed;
                         }
                         if (display.cols != width || display.rows != height) {
@@ -3726,6 +3729,11 @@ namespace camera_stream_manager
 
     void setSideCameraWheelsMode(bool wheels) {
         gSideCameraWheels.store(wheels);
+    }
+
+    void setSideCameraWheelAlignment(bool frontEnabled, bool rearEnabled) {
+        gSideCameraWheelAlignment.store((frontEnabled ? side_camera_preview::ALIGN_FRONT : 0)
+                | (rearEnabled ? side_camera_preview::ALIGN_REAR : 0));
     }
 
     int64_t sideCameraPreviewAgeMs(int side) {

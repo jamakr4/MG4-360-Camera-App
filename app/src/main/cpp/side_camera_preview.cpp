@@ -10,6 +10,12 @@ Java_com_drivehub_kamera_side_SideCameraNative_setWheelsMode(JNIEnv*, jclass, jb
     camera_stream_manager::setSideCameraWheelsMode(wheels);
 }
 
+extern "C" JNIEXPORT void JNICALL
+Java_com_drivehub_kamera_side_SideCameraNative_setWheelAlignment(JNIEnv*, jclass,
+        jboolean frontEnabled, jboolean rearEnabled) {
+    camera_stream_manager::setSideCameraWheelAlignment(frontEnabled, rearEnabled);
+}
+
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_drivehub_kamera_side_SideCameraNative_attachPreview(JNIEnv* env, jclass, jint side,
         jobject surface, jfloatArray cropArray) {

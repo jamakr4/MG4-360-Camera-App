@@ -13,6 +13,8 @@ public final class UiPrefs {
     public static final String KEY_TILE_CORNER_RADIUS = "tileCornerRadius";
     public static final String KEY_ACCENT_COLOR = "accentColor";
     public static final String KEY_MAIN_SIDE_CAMERA_WHEELS = "main_surround_left_wheels";
+    public static final String KEY_PARKING_FRONT_WHEEL_ALIGNMENT = "parkingFrontWheelAlignment";
+    public static final String KEY_PARKING_REAR_WHEEL_ALIGNMENT = "parkingRearWheelAlignment";
     public static final String KEY_SHOW_STATUS_BAR = "showStatusBar";
     public static final String KEY_ALLOW_BETA_UPDATES = "allowBetaUpdates";
     public static final String KEY_SMOOTH_ENTRY = "smoothEntry";
@@ -207,6 +209,22 @@ public final class UiPrefs {
 
     public static boolean isSafetyWarningEnabled(SharedPreferences prefs) {
         return prefs.getBoolean(KEY_SAFETY_WARNING, true);
+    }
+
+    public static boolean isParkingFrontWheelAlignmentEnabled(SharedPreferences prefs) {
+        return prefs.getBoolean(KEY_PARKING_FRONT_WHEEL_ALIGNMENT, false);
+    }
+
+    public static void setParkingFrontWheelAlignmentEnabled(SharedPreferences prefs, boolean enabled) {
+        prefs.edit().putBoolean(KEY_PARKING_FRONT_WHEEL_ALIGNMENT, enabled).apply();
+    }
+
+    public static boolean isParkingRearWheelAlignmentEnabled(SharedPreferences prefs) {
+        return prefs.getBoolean(KEY_PARKING_REAR_WHEEL_ALIGNMENT, false);
+    }
+
+    public static void setParkingRearWheelAlignmentEnabled(SharedPreferences prefs, boolean enabled) {
+        prefs.edit().putBoolean(KEY_PARKING_REAR_WHEEL_ALIGNMENT, enabled).apply();
     }
 
     public static boolean isStatusBarVisible(SharedPreferences prefs) {

@@ -4,6 +4,13 @@
     <string name="shortcut_save_dashcam_event">Save dashcam event</string>
     <string name="settings_tab_update">Update</string>
     <string name="settings_tab_settings">Settings</string>
+    <string name="settings_tab_parking">Parking</string>
+    <string name="settings_parking_main_view">Main view</string>
+    <string name="settings_parking_wheel_alignment">Align wheel views</string>
+    <string name="settings_parking_front_axle">Front axle</string>
+    <string name="settings_parking_rear_axle">Rear axle</string>
+    <string name="settings_options_expanded">Expanded</string>
+    <string name="settings_options_collapsed">Collapsed</string>
     <string name="settings_tab_signal_camera">Signal Cam</string>
     <string name="settings_tab_digital_rearview">Digital Rearview</string>
     <string name="settings_tab_dashcam">Dashcam</string>

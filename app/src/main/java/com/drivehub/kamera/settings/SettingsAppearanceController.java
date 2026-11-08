@@ -68,6 +68,7 @@ public final class SettingsAppearanceController {
             EditText etAccentColor,
             TextView tabUpdate,
             TextView tabSettings,
+            TextView tabParking,
             TextView tabSignalCamera,
             TextView tabDigitalRearview,
             TextView tabDashcam,
@@ -87,6 +88,7 @@ public final class SettingsAppearanceController {
         this.tabs = new TextView[]{
                 tabUpdate,
                 tabSettings,
+                tabParking,
                 tabSignalCamera,
                 tabDigitalRearview,
                 tabDashcam,

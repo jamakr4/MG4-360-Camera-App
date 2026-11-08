@@ -36,6 +36,8 @@ import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.core.view.ViewCompat;
+
 import java.io.File;
 
 /**
@@ -46,8 +48,8 @@ import java.io.File;
 public final class SettingsDialogController {
 
     private static final int DEFAULT_TAB_INDEX = 1; // Settings
-    private static final int DEV_TAB_INDEX = 6;
-    private static final int DEV_STATUS_TAB_INDEX = 7;
+    private static final int DEV_TAB_INDEX = 7;
+    private static final int DEV_STATUS_TAB_INDEX = 8;
     private static final int DEV_UNLOCK_TAPS = 5;
     private static final int EXPECTED_TOTAL_CAMERAS = 4;
     private static final int CAMERA_PROBE_MAX_INDEX = 18;
@@ -131,6 +133,7 @@ public final class SettingsDialogController {
 
         SharedPreferences prefs = UiPrefs.getPrefs(activity);
         views = bindViews(prefs);
+        wireParkingSettings(prefs);
         wireSubControllers(prefs);
         wireRearviewDisplaySettings(prefs);
         wireAppearance(prefs);
@@ -192,6 +195,8 @@ public final class SettingsDialogController {
         v.etSignalCompactRight = dialog.findViewById(R.id.etSignalCompactRight);
         v.swDashcamEnabled = dialog.findViewById(R.id.switchDashcamEnabled);
         v.swSafetyWarning = dialog.findViewById(R.id.switchSafetyWarning);
+        v.swParkingFrontWheelAlignment = dialog.findViewById(R.id.switchParkingFrontWheelAlignment);
+        v.swParkingRearWheelAlignment = dialog.findViewById(R.id.switchParkingRearWheelAlignment);
         v.swShowStatusBar = dialog.findViewById(R.id.switchShowStatusBar);
         v.swSmoothEntry = dialog.findViewById(R.id.switchSmoothEntry);
         v.swLockTileResizing = dialog.findViewById(R.id.switchLockTileResizing);
@@ -264,6 +269,7 @@ public final class SettingsDialogController {
         v.dialogClose = dialog.findViewById(R.id.btnClose);
         v.tabUpdate = dialog.findViewById(R.id.tabUpdate);
         v.tabSettings = dialog.findViewById(R.id.tabSettings);
+        v.tabParking = dialog.findViewById(R.id.tabParking);
         v.tabSignalCamera = dialog.findViewById(R.id.tabSignalCamera);
         v.tabDigitalRearview = dialog.findViewById(R.id.tabDigitalRearview);
         v.tabDashcam = dialog.findViewById(R.id.tabDashcam);
@@ -271,11 +277,12 @@ public final class SettingsDialogController {
         v.tabDev = dialog.findViewById(R.id.tabDev);
         v.tabDevStatus = dialog.findViewById(R.id.tabDevStatus);
         v.settingsTabs = new TextView[]{
-                v.tabUpdate, v.tabSettings, v.tabSignalCamera, v.tabDigitalRearview, v.tabDashcam,
+                v.tabUpdate, v.tabSettings, v.tabParking, v.tabSignalCamera, v.tabDigitalRearview, v.tabDashcam,
                 v.tabCredits, v.tabDev, v.tabDevStatus
         };
         v.sectionUpdate = dialog.findViewById(R.id.sectionUpdate);
         v.sectionSettings = dialog.findViewById(R.id.sectionSettings);
+        v.sectionParking = dialog.findViewById(R.id.sectionParking);
         v.sectionSignalCamera = dialog.findViewById(R.id.sectionSignalCamera);
         v.sectionDigitalRearview = dialog.findViewById(R.id.sectionDigitalRearview);
         v.sectionDashcam = dialog.findViewById(R.id.sectionDashcam);
@@ -283,7 +290,7 @@ public final class SettingsDialogController {
         v.sectionDev = dialog.findViewById(R.id.sectionDev);
         v.sectionDevStatus = dialog.findViewById(R.id.sectionDevStatus);
         v.settingsSections = new View[]{
-                v.sectionUpdate, v.sectionSettings, v.sectionSignalCamera, v.sectionDigitalRearview, v.sectionDashcam,
+                v.sectionUpdate, v.sectionSettings, v.sectionParking, v.sectionSignalCamera, v.sectionDigitalRearview, v.sectionDashcam,
                 v.sectionCredits, v.sectionDev, v.sectionDevStatus
         };
         v.accentRow = dialog.findViewById(R.id.rowAccentColor);
@@ -338,6 +345,26 @@ public final class SettingsDialogController {
                     UiPrefs.setOemAvmCoexistEnabled(prefs, checked));
         }
         return v;
+    }
+
+    private void wireParkingSettings(SharedPreferences prefs) {
+        views.swParkingFrontWheelAlignment.setChecked(UiPrefs.isParkingFrontWheelAlignmentEnabled(prefs));
+        views.swParkingRearWheelAlignment.setChecked(UiPrefs.isParkingRearWheelAlignmentEnabled(prefs));
+        views.swParkingFrontWheelAlignment.setOnCheckedChangeListener((button, enabled) ->
+                UiPrefs.setParkingFrontWheelAlignmentEnabled(prefs, enabled));
+        views.swParkingRearWheelAlignment.setOnCheckedChangeListener((button, enabled) ->
+                UiPrefs.setParkingRearWheelAlignmentEnabled(prefs, enabled));
+        View row = dialog.findViewById(R.id.rowParkingWheelAlignment);
+        View options = dialog.findViewById(R.id.parkingWheelAlignmentOptions);
+        View chevron = dialog.findViewById(R.id.ivParkingWheelAlignmentChevron);
+        ViewCompat.setStateDescription(row, activity.getString(R.string.settings_options_collapsed));
+        row.setOnClickListener(v -> {
+            boolean expanded = options.getVisibility() != View.VISIBLE;
+            options.setVisibility(expanded ? View.VISIBLE : View.GONE);
+            chevron.setRotation(expanded ? 180 : 0);
+            ViewCompat.setStateDescription(row, activity.getString(expanded
+                    ? R.string.settings_options_expanded : R.string.settings_options_collapsed));
+        });
     }
 
     private void wireRearviewDisplaySettings(SharedPreferences prefs) {
@@ -475,6 +502,8 @@ public final class SettingsDialogController {
                         views.swBannerPauseResume,
                         views.swBannerErrorRecovered,
                         views.swSafetyWarning,
+                        views.swParkingFrontWheelAlignment,
+                        views.swParkingRearWheelAlignment,
                         views.swShowStatusBar,
                         views.swSmoothEntry,
                         views.swLockTileResizing,
@@ -503,6 +532,7 @@ public final class SettingsDialogController {
                 views.etAccentColor,
                 views.tabUpdate,
                 views.tabSettings,
+                views.tabParking,
                 views.tabSignalCamera,
                 views.tabDigitalRearview,
                 views.tabDashcam,
@@ -729,6 +759,8 @@ public final class SettingsDialogController {
         EditText etSignalCompactRight;
         Switch swDashcamEnabled;
         Switch swSafetyWarning;
+        Switch swParkingFrontWheelAlignment;
+        Switch swParkingRearWheelAlignment;
         Switch swShowStatusBar;
         Switch swSmoothEntry;
         Switch swLockTileResizing;
@@ -799,6 +831,7 @@ public final class SettingsDialogController {
         ImageButton dialogClose;
         TextView tabUpdate;
         TextView tabSettings;
+        TextView tabParking;
         TextView tabSignalCamera;
         TextView tabDigitalRearview;
         TextView tabDashcam;
@@ -808,6 +841,7 @@ public final class SettingsDialogController {
         TextView[] settingsTabs;
         View sectionUpdate;
         View sectionSettings;
+        View sectionParking;
         View sectionSignalCamera;
         View sectionDigitalRearview;
         View sectionDashcam;
