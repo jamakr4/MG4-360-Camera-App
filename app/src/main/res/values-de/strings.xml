@@ -9,6 +9,8 @@
     <string name="settings_parking_wheel_alignment">Radansichten ausrichten</string>
     <string name="settings_parking_front_axle">Vorderachse</string>
     <string name="settings_parking_rear_axle">Hinterachse</string>
+    <string name="settings_parking_highlight_missing_areas">Fehlende Bildbereiche hervorheben</string>
+    <string name="settings_parking_highlight_missing_areas_hint">Kennzeichnet Bereiche außerhalb des Kamerabilds mit Schraffur.</string>
     <string name="settings_options_expanded">Ausgeklappt</string>
     <string name="settings_options_collapsed">Eingeklappt</string>
     <string name="settings_tab_signal_camera">Blinker-Kamera</string>

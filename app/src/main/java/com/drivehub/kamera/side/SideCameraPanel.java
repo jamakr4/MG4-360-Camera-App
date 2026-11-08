@@ -31,6 +31,7 @@ public final class SideCameraPanel extends ViewGroup {
             updateMode();
         } else if (UiPrefs.KEY_PARKING_FRONT_WHEEL_ALIGNMENT.equals(key)
                 || UiPrefs.KEY_PARKING_REAR_WHEEL_ALIGNMENT.equals(key)
+                || UiPrefs.KEY_PARKING_HIGHLIGHT_MISSING_AREAS.equals(key)
                 || UiPrefs.KEY_DEV_PARKING_FRONT_WHEEL_ANGLE.equals(key)
                 || UiPrefs.KEY_DEV_PARKING_REAR_WHEEL_ANGLE.equals(key)) {
             updateWheelAlignment();
@@ -96,6 +97,7 @@ public final class SideCameraPanel extends ViewGroup {
         SideCameraNative.setWheelAlignment(UiPrefs.isParkingFrontWheelAlignmentEnabled(prefs),
                 UiPrefs.isParkingRearWheelAlignmentEnabled(prefs),
                 UiPrefs.getDevParkingFrontWheelAngle(prefs), UiPrefs.getDevParkingRearWheelAngle(prefs));
+        SideCameraNative.setHighlightMissingAreas(UiPrefs.isParkingHighlightMissingAreasEnabled(prefs));
     }
 
     private void styleButton(Button button, boolean selected) {

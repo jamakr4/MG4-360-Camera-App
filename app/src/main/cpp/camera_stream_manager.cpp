@@ -1064,6 +1064,7 @@ namespace camera_stream_manager
         std::atomic<bool> gSideCameraWheels{false};
         // Pack the two effective float angles into one atomic snapshot. Disabled axes use 0°.
         std::atomic<uint64_t> gSideCameraWheelAlignment{0};
+        std::atomic<bool> gSideCameraHighlightMissingAreas{false};
 
         class ParallelPreviewConsumer final : public FrameConsumer,
                                               public std::enable_shared_from_this<ParallelPreviewConsumer>
@@ -1122,7 +1123,8 @@ namespace camera_stream_manager
                                     | (rearDegrees != 0 ? side_camera_preview::ALIGN_REAR : 0);
                             side_camera_preview::compose(frame.rgba, side_ == 0,
                                     gSideCameraWheels.load(), crops_, upright, composed,
-                                    wheelTransforms, alignment, frontDegrees, rearDegrees);
+                                    wheelTransforms, alignment, frontDegrees, rearDegrees,
+                                    gSideCameraHighlightMissingAreas.load());
                             display = composed;
                         }
                         if (display.cols != width || display.rows != height) {
@@ -3757,6 +3759,10 @@ namespace camera_stream_manager
         if (!session) return -1;
         const auto posted = session->previewPostUs(SIDE_CONSUMER_ID_BASE + side);
         return posted ? (nowUs() - posted) / 1000 : -1;
+    }
+
+    void setSideCameraHighlightMissingAreas(bool enabled) {
+        gSideCameraHighlightMissingAreas.store(enabled);
     }
 
     bool attachSideCameraPreview(JNIEnv* env, int side, jobject surface,

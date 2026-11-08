@@ -197,6 +197,7 @@ public final class SettingsDialogController {
         v.swSafetyWarning = dialog.findViewById(R.id.switchSafetyWarning);
         v.swParkingFrontWheelAlignment = dialog.findViewById(R.id.switchParkingFrontWheelAlignment);
         v.swParkingRearWheelAlignment = dialog.findViewById(R.id.switchParkingRearWheelAlignment);
+        v.swParkingHighlightMissingAreas = dialog.findViewById(R.id.switchParkingHighlightMissingAreas);
         v.swShowStatusBar = dialog.findViewById(R.id.switchShowStatusBar);
         v.swSmoothEntry = dialog.findViewById(R.id.switchSmoothEntry);
         v.swLockTileResizing = dialog.findViewById(R.id.switchLockTileResizing);
@@ -354,6 +355,9 @@ public final class SettingsDialogController {
                 UiPrefs.setParkingFrontWheelAlignmentEnabled(prefs, enabled));
         views.swParkingRearWheelAlignment.setOnCheckedChangeListener((button, enabled) ->
                 UiPrefs.setParkingRearWheelAlignmentEnabled(prefs, enabled));
+        views.swParkingHighlightMissingAreas.setChecked(UiPrefs.isParkingHighlightMissingAreasEnabled(prefs));
+        views.swParkingHighlightMissingAreas.setOnCheckedChangeListener((button, enabled) ->
+                UiPrefs.setParkingHighlightMissingAreasEnabled(prefs, enabled));
         View row = dialog.findViewById(R.id.rowParkingWheelAlignment);
         View options = dialog.findViewById(R.id.parkingWheelAlignmentOptions);
         View chevron = dialog.findViewById(R.id.ivParkingWheelAlignmentChevron);
@@ -509,6 +513,7 @@ public final class SettingsDialogController {
                         views.swSafetyWarning,
                         views.swParkingFrontWheelAlignment,
                         views.swParkingRearWheelAlignment,
+                        views.swParkingHighlightMissingAreas,
                         views.swShowStatusBar,
                         views.swSmoothEntry,
                         views.swLockTileResizing,
@@ -766,6 +771,7 @@ public final class SettingsDialogController {
         Switch swSafetyWarning;
         Switch swParkingFrontWheelAlignment;
         Switch swParkingRearWheelAlignment;
+        Switch swParkingHighlightMissingAreas;
         Switch swShowStatusBar;
         Switch swSmoothEntry;
         Switch swLockTileResizing;

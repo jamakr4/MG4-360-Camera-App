@@ -17,11 +17,11 @@ static Crops crops(bool left) {
 // Independent inverse screen-space rotation oracle over the source's known colour ramp.
 // Also checks that rotation samples neighbouring source pixels beyond the original crop.
 static void checkAlignedWheel(const cv::Mat& wheel, const Crops& spec, int crop,
-                              bool left, int rawHeight, double degrees) {
+                              bool left, int rawHeight, double degrees, bool highlighted = false) {
     const double angle = degrees * CV_PI / 180;
     const double c = std::cos(angle), s = std::sin(angle);
     const int i = crop * 4;
-    int black = 0, neighbouring = 0, checked = 0;
+    int black = 0, neighbouring = 0, checked = 0, hatchBackground = 0, hatchLines = 0;
     for (int y = 3; y < WHEEL_HEIGHT; y += 11) for (int x = 3; x < WIDTH; x += 11) {
         const double dx = x + .5 - WIDTH * .5, dy = y + .5 - WHEEL_HEIGHT * .5;
         const double u = (spec[i] + spec[i+2]) * .5
@@ -32,7 +32,15 @@ static void checkAlignedWheel(const cv::Mat& wheel, const Crops& spec, int crop,
         const auto pixel = wheel.at<cv::Vec4b>(y, x);
         assert(pixel[3] == 255);
         if (uprightX < -1 || uprightX > rawHeight || uprightY < -1 || uprightY > 720) {
-            assert(pixel == cv::Vec4b(0, 0, 0, 255));
+            if (highlighted) {
+                assert(pixel[0] >= 0x30 && pixel[0] <= 0x79);
+                assert(pixel[1] >= 0x23 && pixel[1] <= 0x50);
+                assert(pixel[2] >= 0x2E && pixel[2] <= 0x6B);
+                if (pixel == cv::Vec4b(0x30, 0x23, 0x2E, 255)) ++hatchBackground;
+                else ++hatchLines;
+            } else {
+                assert(pixel == cv::Vec4b(0, 0, 0, 255));
+            }
             ++black;
         } else if (uprightX >= 1 && uprightX < rawHeight-2 && uprightY >= 1 && uprightY < 718) {
             const double rawX = left ? 719-uprightY : uprightY;
@@ -45,6 +53,7 @@ static void checkAlignedWheel(const cv::Mat& wheel, const Crops& spec, int crop,
         }
     }
     assert(black > 0 && checked > 100 && neighbouring > 0);
+    if (highlighted) assert(hatchBackground > 0 && hatchLines > 0);
 }
 
 int main() {
@@ -106,7 +115,25 @@ int main() {
                     assert(cv::norm(cv::Mat(transforms.front), cv::Mat(frontTransform), cv::NORM_INF) == 0);
                     assert(cv::norm(cv::Mat(transforms.rear), cv::Mat(rearTransform), cv::NORM_INF) == 0);
                 }
-                compose(source, left, false, spec, upright, output, transforms, alignment);
+                compose(source, left, true, spec, upright, output, transforms, alignment, 16.5f, -45.f, true);
+                assert(output.data == allocation);
+                for (int axle = 0; axle < 2; ++axle) {
+                    const cv::Rect tile(0, axle*(WHEEL_HEIGHT+GAP), WIDTH, WHEEL_HEIGHT);
+                    if (alignment & (1U << axle)) {
+                        checkAlignedWheel(output(tile), spec, axle+1, left, height,
+                                axle == 0 ? (left ? 16.5 : -16.5) : (left ? -45 : 45), true);
+                    } else {
+                        assert(cv::norm(output(tile), originalWheels(tile), cv::NORM_INF) == 0);
+                    }
+                }
+                for (int y = 224; y < 232; y++) for (int x = 0; x < WIDTH; x++)
+                    assert(output.at<cv::Vec4b>(y, x) == cv::Vec4b(0, 0, 0, 255));
+                const auto* frontTint = transforms.frontMissingTint.data;
+                const auto* rearTint = transforms.rearMissingTint.data;
+                compose(source, left, true, spec, upright, output, transforms, alignment, 16.5f, -45.f, true);
+                assert(transforms.frontMissingTint.data == frontTint);
+                assert(transforms.rearMissingTint.data == rearTint);
+                compose(source, left, false, spec, upright, output, transforms, alignment, 16.5f, -45.f, true);
                 assert(output.data == allocation);
                 assert(cv::norm(output, originalSide, cv::NORM_INF) == 0);
                 assert(cv::norm(source, original, cv::NORM_INF) == 0);
@@ -114,20 +141,27 @@ int main() {
             // Live edits must invalidate cached matrices even with identical frame/crop sizes.
             for (const auto angles : {cv::Vec2f(-22.5f, 30.f), cv::Vec2f(0.f, 0.f),
                                       cv::Vec2f(180.f, -180.f), cv::Vec2f(16.5f, -45.f)}) {
-                compose(source, left, true, spec, upright, output, transforms, 3, angles[0], angles[1]);
+                compose(source, left, true, spec, upright, output, transforms, 3, angles[0], angles[1], true);
                 assert(output.data == allocation);
                 if (angles[0] == 0 && angles[1] == 0) {
                     assert(cv::norm(output, originalWheels, cv::NORM_INF) == 0);
                 } else if (std::abs(angles[0]) < 180) {
                     checkAlignedWheel(output(cv::Rect(0, 0, WIDTH, WHEEL_HEIGHT)), spec, 1, left,
-                            height, left ? angles[0] : -angles[0]);
+                            height, left ? angles[0] : -angles[0], true);
                     checkAlignedWheel(output(cv::Rect(0, WHEEL_HEIGHT+GAP, WIDTH, WHEEL_HEIGHT)), spec, 2, left,
-                            height, left ? angles[1] : -angles[1]);
+                            height, left ? angles[1] : -angles[1], true);
                 }
                 compose(source, left, false, spec, upright, output, transforms, 3, angles[0], angles[1]);
                 assert(cv::norm(output, originalSide, cv::NORM_INF) == 0);
                 assert(cv::norm(source, original, cv::NORM_INF) == 0);
             }
+            // Real black camera content must never be mistaken for an uncovered corner.
+            cv::Mat dark(source.size(), CV_8UC4, cv::Scalar(0, 0, 0, 255));
+            compose(dark, left, true, spec, upright, output, transforms, 3, 16.5f, -45.f, true);
+            for (int axle = 0; axle < 2; ++axle)
+                for (int y = WHEEL_HEIGHT/2-20; y < WHEEL_HEIGHT/2+20; ++y)
+                    for (int x = WIDTH/2-20; x < WIDTH/2+20; ++x)
+                        assert(output.at<cv::Vec4b>(y+axle*(WHEEL_HEIGHT+GAP), x) == cv::Vec4b(0, 0, 0, 255));
             compose(source, left, false, spec, upright, output, transforms);
             assert(output.data == allocation);
             assert(output.at<cv::Vec4b>(228, 100)[2] == 42); // No stale wheel-mode gap.
@@ -139,6 +173,6 @@ int main() {
     assert(!valid(invalid));
     invalid = crops(true); invalid[2] = invalid[0]; assert(!valid(invalid));
     invalid = crops(false); invalid[7] = 2; assert(!valid(invalid));
-    std::cout << "Side preview: custom/reset/zero angles, all axle combinations, angle direction, neighbouring source pixels, black borders, "
+    std::cout << "Side preview: cached missing-area hatching, untouched black camera content, custom/reset/zero angles, all axle combinations, angle direction, neighbouring source pixels, black borders, "
                  "legacy output, field/full frames, padded stride, buffer reuse and input isolation passed" << std::endl;
 }

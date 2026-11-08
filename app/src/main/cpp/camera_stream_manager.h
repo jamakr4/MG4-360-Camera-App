@@ -16,6 +16,7 @@ void enableSideCameraPreviews();
 void setSideCameraWheelsMode(bool wheels);
 void setSideCameraWheelAlignment(bool frontEnabled, bool rearEnabled,
                                  float frontDegrees, float rearDegrees);
+void setSideCameraHighlightMissingAreas(bool enabled);
 bool attachSideCameraPreview(JNIEnv* env, int side, jobject surface,
                              const side_camera_preview::Crops& crops);
 void detachSideCameraPreview(int side);

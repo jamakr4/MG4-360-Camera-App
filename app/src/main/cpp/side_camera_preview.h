@@ -31,9 +31,10 @@ inline cv::Matx23d wheelTransform(cv::Size source, const Crops& crops, int crop,
             s*sx, c*sy, s*(tx-cx) + c*(ty-cy) + cy};
 }
 
-// One cache per output worker; neither mode nor preference changes allocate image buffers.
+// One cache per output worker; reuse matrices, coverage and tint buffers between frames.
 struct WheelTransforms {
     cv::Matx23d front, rear;
+    cv::Mat frontMissingTint, rearMissingTint;
 
     void update(cv::Size source, bool left, const Crops& crops, float frontDegrees, float rearDegrees) {
         if (ready_ && source == source_ && left == left_ && crops == crops_
@@ -46,13 +47,56 @@ struct WheelTransforms {
         frontDegrees_ = frontDegrees;
         rearDegrees_ = rearDegrees;
         ready_ = true;
+        highlightReady_ = false;
+    }
+
+    void prepareHighlight() {
+        if (highlightReady_) return;
+        sourceCoverage_.create(source_, CV_8UC1);
+        sourceCoverage_.setTo(255);
+        makeMissingTint(front, frontMissingTint);
+        makeMissingTint(rear, rearMissingTint);
+        highlightReady_ = true;
     }
 
 private:
-    bool ready_ = false, left_ = false;
+    // Same background, diagonal colour and 12px spacing as the local Canvas debug view.
+    static const cv::Mat& hatch() {
+        static const cv::Mat pattern = [] {
+            cv::Mat image(WHEEL_HEIGHT, WIDTH, CV_8UC4, cv::Scalar(0x30, 0x23, 0x2E, 255));
+            for (int x = -WHEEL_HEIGHT; x < WIDTH; x += 12)
+                cv::line(image, {x, 0}, {x+WHEEL_HEIGHT, WHEEL_HEIGHT},
+                        cv::Scalar(0x79, 0x50, 0x6B, 255), 1, cv::LINE_AA);
+            return image;
+        }();
+        return pattern;
+    }
+
+    void makeMissingTint(const cv::Matx23d& transform, cv::Mat& tint) {
+        // Warp an opaque source mask once per geometry change. Camera RGB is never used
+        // to detect missing pixels, so actual black/shadowed camera areas stay untouched.
+        cv::warpAffine(sourceCoverage_, coverage_, transform, {WIDTH, WHEEL_HEIGHT},
+                cv::INTER_LINEAR, cv::BORDER_CONSTANT, 0);
+        tint.create(WHEEL_HEIGHT, WIDTH, CV_8UC4);
+        for (int y = 0; y < WHEEL_HEIGHT; ++y) {
+            const auto* coverage = coverage_.ptr<uint8_t>(y);
+            const auto* pattern = hatch().ptr<cv::Vec4b>(y);
+            auto* row = tint.ptr<cv::Vec4b>(y);
+            for (int x = 0; x < WIDTH; ++x) {
+                const unsigned missing = 255 - coverage[x];
+                // The RGBA warp already contains camera RGB multiplied by coverage. Add
+                // only the missing background contribution, including antialiased edges.
+                row[x] = cv::Vec4b((pattern[x][0]*missing+127)/255,
+                        (pattern[x][1]*missing+127)/255, (pattern[x][2]*missing+127)/255, 0);
+            }
+        }
+    }
+
+    bool ready_ = false, left_ = false, highlightReady_ = false;
     cv::Size source_;
     Crops crops_{};
     float frontDegrees_ = 0, rearDegrees_ = 0;
+    cv::Mat sourceCoverage_, coverage_;
 };
 
 inline bool valid(const Crops& crops) {
@@ -77,7 +121,8 @@ inline cv::Rect region(const cv::Mat& image, const Crops& crops, int crop) {
 // Work runs on the existing independent preview worker, never on the capture thread.
 inline void compose(const cv::Mat& rgba, bool left, bool wheels, const Crops& crops,
                     cv::Mat& upright, cv::Mat& output, WheelTransforms& transforms,
-                    unsigned alignment = 0, float frontDegrees = 16.5f, float rearDegrees = -45.f) {
+                    unsigned alignment = 0, float frontDegrees = 16.5f, float rearDegrees = -45.f,
+                    bool highlightMissingAreas = false) {
     cv::rotate(rgba, upright, left ? cv::ROTATE_90_COUNTERCLOCKWISE : cv::ROTATE_90_CLOCKWISE);
     output.create(HEIGHT, WIDTH, CV_8UC4);
     if (wheels) {
@@ -87,15 +132,18 @@ inline void compose(const cv::Mat& rgba, bool left, bool wheels, const Crops& cr
         const bool rotateFront = (alignment & ALIGN_FRONT) && frontDegrees != 0;
         const bool rotateRear = (alignment & ALIGN_REAR) && rearDegrees != 0;
         if (rotateFront || rotateRear) transforms.update(upright.size(), left, crops, frontDegrees, rearDegrees);
+        if (highlightMissingAreas && (rotateFront || rotateRear)) transforms.prepareHighlight();
         if (rotateFront) {
             cv::warpAffine(upright, front, transforms.front, front.size(), cv::INTER_LINEAR,
                     cv::BORDER_CONSTANT, cv::Scalar(0, 0, 0, 255));
+            if (highlightMissingAreas) cv::add(front, transforms.frontMissingTint, front);
         } else {
             cv::resize(upright(region(upright, crops, 1)), front, front.size(), 0, 0, cv::INTER_LINEAR);
         }
         if (rotateRear) {
             cv::warpAffine(upright, rear, transforms.rear, rear.size(), cv::INTER_LINEAR,
                     cv::BORDER_CONSTANT, cv::Scalar(0, 0, 0, 255));
+            if (highlightMissingAreas) cv::add(rear, transforms.rearMissingTint, rear);
         } else {
             cv::resize(upright(region(upright, crops, 2)), rear, rear.size(), 0, 0, cv::INTER_LINEAR);
         }

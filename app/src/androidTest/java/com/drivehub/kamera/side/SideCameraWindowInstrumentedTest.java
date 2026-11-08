@@ -74,6 +74,7 @@ public class SideCameraWindowInstrumentedTest {
                     for (int mask = 0; mask < 4; mask++) {
                         UiPrefs.setParkingFrontWheelAlignmentEnabled(prefs, (mask & 1) != 0);
                         UiPrefs.setParkingRearWheelAlignmentEnabled(prefs, (mask & 2) != 0);
+                        UiPrefs.setParkingHighlightMissingAreasEnabled(prefs, (mask & 1) != 0);
                     }
                     activity.findViewById(R.id.modeSides).performClick();
                 });
@@ -90,7 +91,7 @@ public class SideCameraWindowInstrumentedTest {
             } finally {
                 android.content.SharedPreferences.Editor editor = prefs.edit();
                 for (String key : new String[]{UiPrefs.KEY_PARKING_FRONT_WHEEL_ALIGNMENT,
-                        UiPrefs.KEY_PARKING_REAR_WHEEL_ALIGNMENT}) {
+                        UiPrefs.KEY_PARKING_REAR_WHEEL_ALIGNMENT, UiPrefs.KEY_PARKING_HIGHLIGHT_MISSING_AREAS}) {
                     if (saved.containsKey(key)) editor.putBoolean(key, (Boolean) saved.get(key));
                     else editor.remove(key);
                 }

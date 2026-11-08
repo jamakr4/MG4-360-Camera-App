@@ -16,6 +16,11 @@ Java_com_drivehub_kamera_side_SideCameraNative_setWheelAlignment(JNIEnv*, jclass
     camera_stream_manager::setSideCameraWheelAlignment(frontEnabled, rearEnabled, frontDegrees, rearDegrees);
 }
 
+extern "C" JNIEXPORT void JNICALL
+Java_com_drivehub_kamera_side_SideCameraNative_setHighlightMissingAreas(JNIEnv*, jclass, jboolean enabled) {
+    camera_stream_manager::setSideCameraHighlightMissingAreas(enabled);
+}
+
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_drivehub_kamera_side_SideCameraNative_attachPreview(JNIEnv* env, jclass, jint side,
         jobject surface, jfloatArray cropArray) {

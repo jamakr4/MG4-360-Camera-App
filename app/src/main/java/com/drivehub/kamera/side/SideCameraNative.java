@@ -12,6 +12,7 @@ final class SideCameraNative {
     static native void setWheelsMode(boolean wheels);
     static native void setWheelAlignment(boolean frontEnabled, boolean rearEnabled,
                                          float frontDegrees, float rearDegrees);
+    static native void setHighlightMissingAreas(boolean enabled);
     static native boolean attachPreview(int side, android.view.Surface surface, float[] crops);
     static native void detachPreview(int side);
     static native void detachPreviews();

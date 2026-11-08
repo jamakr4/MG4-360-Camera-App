@@ -15,6 +15,7 @@ public final class UiPrefs {
     public static final String KEY_MAIN_SIDE_CAMERA_WHEELS = "main_surround_left_wheels";
     public static final String KEY_PARKING_FRONT_WHEEL_ALIGNMENT = "parkingFrontWheelAlignment";
     public static final String KEY_PARKING_REAR_WHEEL_ALIGNMENT = "parkingRearWheelAlignment";
+    public static final String KEY_PARKING_HIGHLIGHT_MISSING_AREAS = "parkingHighlightMissingAreas";
     public static final String KEY_DEV_PARKING_FRONT_WHEEL_ANGLE = "devParkingFrontWheelAngle";
     public static final String KEY_DEV_PARKING_REAR_WHEEL_ANGLE = "devParkingRearWheelAngle";
     public static final float DEFAULT_PARKING_FRONT_WHEEL_ANGLE = 16.5f;
@@ -229,6 +230,14 @@ public final class UiPrefs {
 
     public static void setParkingRearWheelAlignmentEnabled(SharedPreferences prefs, boolean enabled) {
         prefs.edit().putBoolean(KEY_PARKING_REAR_WHEEL_ALIGNMENT, enabled).apply();
+    }
+
+    public static boolean isParkingHighlightMissingAreasEnabled(SharedPreferences prefs) {
+        return prefs.getBoolean(KEY_PARKING_HIGHLIGHT_MISSING_AREAS, false);
+    }
+
+    public static void setParkingHighlightMissingAreasEnabled(SharedPreferences prefs, boolean enabled) {
+        prefs.edit().putBoolean(KEY_PARKING_HIGHLIGHT_MISSING_AREAS, enabled).apply();
     }
 
     public static float getDevParkingFrontWheelAngle(SharedPreferences prefs) {

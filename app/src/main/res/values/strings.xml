@@ -9,6 +9,8 @@
     <string name="settings_parking_wheel_alignment">Align wheel views</string>
     <string name="settings_parking_front_axle">Front axle</string>
     <string name="settings_parking_rear_axle">Rear axle</string>
+    <string name="settings_parking_highlight_missing_areas">Highlight missing areas</string>
+    <string name="settings_parking_highlight_missing_areas_hint">Use hatching for areas outside the camera image.</string>
     <string name="settings_options_expanded">Expanded</string>
     <string name="settings_options_collapsed">Collapsed</string>
     <string name="settings_tab_signal_camera">Signal Cam</string>

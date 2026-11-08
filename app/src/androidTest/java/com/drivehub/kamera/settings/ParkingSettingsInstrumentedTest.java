@@ -92,11 +92,13 @@ public class ParkingSettingsInstrumentedTest {
         Map<String, ?> saved = prefs.getAll();
         assertTrue(prefs.edit().remove(UiPrefs.KEY_PARKING_FRONT_WHEEL_ALIGNMENT)
                 .remove(UiPrefs.KEY_PARKING_REAR_WHEEL_ALIGNMENT)
+                .remove(UiPrefs.KEY_PARKING_HIGHLIGHT_MISSING_AREAS)
                 .putBoolean(UiPrefs.KEY_SAFETY_WARNING, false)
                 .putString(UiPrefs.KEY_ACCENT_COLOR, "#F08020").commit());
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
             assertFalse(UiPrefs.isParkingFrontWheelAlignmentEnabled(prefs));
             assertFalse(UiPrefs.isParkingRearWheelAlignmentEnabled(prefs));
+            assertFalse(UiPrefs.isParkingHighlightMissingAreasEnabled(prefs));
             openParking(scenario);
             dialogView(R.id.parkingWheelAlignmentOptions).check(matches(withEffectiveVisibility(Visibility.GONE)));
             dialogView(R.id.switchSafetyWarning).check(matches(not(isChecked())));
@@ -107,6 +109,10 @@ public class ParkingSettingsInstrumentedTest {
 
             dialogView(R.id.rowParkingWheelAlignment).perform(click());
             dialogView(R.id.parkingWheelAlignmentOptions).check(matches(isDisplayed()));
+            dialogView(R.id.switchParkingHighlightMissingAreas).check(matches(not(isChecked()))).perform(click());
+            assertTrue(UiPrefs.isParkingHighlightMissingAreasEnabled(prefs));
+            assertFalse(UiPrefs.isParkingFrontWheelAlignmentEnabled(prefs));
+            assertFalse(UiPrefs.isParkingRearWheelAlignmentEnabled(prefs));
             dialogView(R.id.ivParkingWheelAlignmentChevron).check((view, error) -> {
                 if (error != null) throw error;
                 assertEquals(180f, view.getRotation(), 0);
@@ -139,12 +145,17 @@ public class ParkingSettingsInstrumentedTest {
             dialogView(R.id.rowParkingWheelAlignment).perform(click());
             dialogView(R.id.switchParkingFrontWheelAlignment).check(matches(not(isChecked())));
             dialogView(R.id.switchParkingRearWheelAlignment).check(matches(isChecked()));
+            dialogView(R.id.switchParkingHighlightMissingAreas).check(matches(isChecked())).perform(click());
+            assertFalse(UiPrefs.isParkingHighlightMissingAreasEnabled(prefs));
+            assertFalse(UiPrefs.isParkingFrontWheelAlignmentEnabled(prefs));
+            assertTrue(UiPrefs.isParkingRearWheelAlignmentEnabled(prefs));
             dialogView(R.id.switchSafetyWarning).check(matches(isChecked()));
             dialogView(R.id.btnClose).perform(click());
         } finally {
             SharedPreferences.Editor editor = prefs.edit();
             for (String key : new String[]{UiPrefs.KEY_PARKING_FRONT_WHEEL_ALIGNMENT,
-                    UiPrefs.KEY_PARKING_REAR_WHEEL_ALIGNMENT, UiPrefs.KEY_SAFETY_WARNING, UiPrefs.KEY_ACCENT_COLOR}) {
+                    UiPrefs.KEY_PARKING_REAR_WHEEL_ALIGNMENT, UiPrefs.KEY_PARKING_HIGHLIGHT_MISSING_AREAS,
+                    UiPrefs.KEY_SAFETY_WARNING, UiPrefs.KEY_ACCENT_COLOR}) {
                 Object value = saved.get(key);
                 if (value instanceof Boolean) editor.putBoolean(key, (Boolean) value);
                 else if (value instanceof String) editor.putString(key, (String) value);
