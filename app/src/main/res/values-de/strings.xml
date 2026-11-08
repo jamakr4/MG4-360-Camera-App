@@ -31,6 +31,8 @@
     <string name="settings_section_dashcam_advanced">Erweitert</string>
     <string name="settings_dashcam_enabled">Dashcam aktivieren</string>
     <string name="settings_dashcam_fps">Aufnahme-FPS</string>
+    <string name="settings_dev_dashcam_recording">Dashcam-Aufnahme</string>
+    <string name="settings_dev_dashcam_fps_hint">Zielbildrate der Aufnahme (1–60 FPS, Standard 25). Änderungen gelten ab dem nächsten Clip.</string>
     <string name="settings_dashcam_signature">Signatur</string>
     <string name="settings_dashcam_signature_placeholder">z.B. MG4 EV</string>
     <string name="settings_dashcam_show_speed">Geschwindigkeit im Video anzeigen</string>

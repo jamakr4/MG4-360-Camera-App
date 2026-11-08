@@ -31,6 +31,8 @@
     <string name="settings_section_dashcam_advanced">Advanced</string>
     <string name="settings_dashcam_enabled">Enable dashcam</string>
     <string name="settings_dashcam_fps">Recording FPS</string>
+    <string name="settings_dev_dashcam_recording">Dashcam recording</string>
+    <string name="settings_dev_dashcam_fps_hint">Target recording frame rate (1–60 FPS, default 25). Changes apply from the next clip.</string>
     <string name="settings_dashcam_signature">Signature</string>
     <string name="settings_dashcam_signature_placeholder">e.g. MG4 EV</string>
     <string name="settings_dashcam_show_speed">Show speed in video</string>

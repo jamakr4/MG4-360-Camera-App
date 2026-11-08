@@ -229,7 +229,7 @@ To use it:
 
 1. Open `Settings` -> `Dashcam`.
 2. Enable `Dashcam`.
-3. Optional: adjust FPS, footer signature, and whether speed should be shown in the recording.
+3. Optional: adjust the footer signature and whether speed should be shown in the recording.
 4. Optional: in `Settings`, enable the global OEM 360° AVM setting if you still want to use the stock reverse/360 camera app alongside the custom features (recommended).
 5. Use `Trigger event save` in the app, the hazard-light trigger, or an external broadcast to save an event clip.
 
@@ -335,6 +335,7 @@ A hidden Dev tab exposes lower-level tuning knobs. To unlock it, open Settings a
 
 Available tools and settings:
 
+- **Dashcam recording** contains the **Recording FPS** setting (1–60 FPS, default 25). Existing values are preserved, and changes apply from the next clip. The actual recording frame rate also depends on incoming camera frames.
 - **Parking: wheel alignment** provides a separate angle field for each axle, from −180° to +180°. The value applies to the left wheel view; the right view uses the opposite angle. Decimal points and commas are accepted. Each adjacent **Reset** button restores only that axle's default (+16.5° front, −45° rear). The corresponding axle toggle under `Parking` controls whether alignment is applied.
 - **Performance overlay** shows system and app CPU and RAM usage, system load, and temperature in the top-left corner until disabled.
 - **Factory camera recordings** lists and exports existing captures from the SAIC 360 camera app to the `avm/` folder in the selected dashcam storage location. The factory app's hidden recorder can produce raw camera images and H.264 video; this tool only reads and exports existing files and does not start the recorder.
