@@ -212,7 +212,8 @@ public class RecordingService extends Service {
             } else if (oemPauseRequested) {
                 if (oemGoneAt == 0) oemGoneAt = now;
                 long grace = oemSeenAt == 0 || oemGoneAt - oemSeenAt < 1500 ? 8000 : 2000;
-                if (OemPausePolicy.shouldResume(foreground, now, oemAskedAt, oemGoneAt, grace)) {
+                if (!SignalService.isReverseActive()
+                        && OemPausePolicy.shouldResume(foreground, now, oemAskedAt, oemGoneAt, grace)) {
                     SignalService.setOemAvmActive(this, false);
                     resumeAfterOemRequest(this);
                 }
@@ -288,14 +289,17 @@ public class RecordingService extends Service {
     public static void pauseForOemRequest(Context context) {
         SharedPreferences prefs = UiPrefs.getPrefs(context);
         if ((!prefs.getBoolean(DashcamSettingsController.KEY_ENABLED, false)
-                && !(instance != null && instance.futureOnlyEventSession)) || !isRunning()) {
+                && !(instance != null && (instance.futureOnlyEventSession || instance.worker != null))) || !isRunning()) {
             return;
         }
         RecordingService live = instance;
         if (live != null) {
-            if (!live.oemPauseRequested) live.oemAskedAt = SystemClock.elapsedRealtime();
-            live.oemPauseRequested = true;
-            live.segmentStopRequested = true;
+            synchronized (live.stateLock) {
+                if (live.oemPauseRequested) return;
+                live.oemAskedAt = SystemClock.elapsedRealtime();
+                live.oemPauseRequested = true;
+                live.segmentStopRequested = true;
+            }
             Thread current = live.worker;
             if (current != null) current.interrupt();
         }
@@ -306,6 +310,7 @@ public class RecordingService extends Service {
 
     public static void resumeAfterOemRequest(Context context) {
         SharedPreferences prefs = UiPrefs.getPrefs(context);
+        if (UiPrefs.isOemCameraAccessBlocked(prefs)) return;
         if ((!prefs.getBoolean(DashcamSettingsController.KEY_ENABLED, false)
                 && !(instance != null && instance.futureOnlyEventSession)) || !isRunning()) {
             return;
@@ -428,6 +433,7 @@ public class RecordingService extends Service {
         }
 
         if (ACTION_RESUME_AFTER_OEM_REQUEST.equals(action)) {
+            if (UiPrefs.isOemCameraAccessBlocked(prefs())) return START_STICKY;
             DevRuntimeLog.add("RecordingService", "ACTION_RESUME_AFTER_OEM_REQUEST");
             boolean wasPaused = STATUS_PAUSED_OEM.equals(prefs().getString(KEY_STATUS, STATUS_OFF));
             oemPauseRequested = false;
@@ -498,6 +504,10 @@ public class RecordingService extends Service {
         StorageIoGate.reopen();
         stopRequested = false;
         DevRuntimeLog.add("RecordingService", action == null ? "ACTION_START(null)" : action);
+        if (UiPrefs.isOemCameraAccessBlocked(prefs())) {
+            oemPauseRequested = true;
+            segmentStopRequested = true;
+        }
         startForeground(NOTIF_ID, buildNotification(getString(R.string.notification_recording_starting)));
         publishStatus(STATUS_STARTING, 0, TOTAL_CAMERAS, "");
         if (ACTION_RECORD_TEST.equals(action)) {

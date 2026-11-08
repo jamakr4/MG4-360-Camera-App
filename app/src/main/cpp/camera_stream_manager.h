@@ -9,6 +9,9 @@
 
 namespace camera_stream_manager {
 
+void setOemCameraAccessBlocked(bool blocked);
+bool isOemCameraAccessBlocked();
+
 void enableSideCameraPreviews();
 void setSideCameraWheelsMode(bool wheels);
 bool attachSideCameraPreview(JNIEnv* env, int side, jobject surface,

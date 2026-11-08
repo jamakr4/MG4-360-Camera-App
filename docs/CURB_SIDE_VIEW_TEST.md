@@ -35,8 +35,8 @@ code, including when RGBA input contains only the 720 × 240 main-preview field.
 
 Consumer IDs 2100/2101 remain independent of the main preview and recording.
 Each side reports freshness separately. Missing/stalled outputs retry every two
-seconds without detaching the healthy side. Pause/close and OEM handoff release
-only these preview consumers; recorder and IPK ownership stays with existing code.
+seconds without detaching the healthy side. Pause/close releases these side preview consumers independently.
+OEM handoff now blocks all app camera outputs as described below.
 
 ## Navigation and resize handling
 
@@ -78,6 +78,39 @@ with the Android NDK toolchain, `ANDROID_ABI=arm64-v8a`, `ANDROID_PLATFORM=andro
 folder. Build and run `side_camera_preview_test` and `latest_preview_frame_test`
 on the emulator/device with ADB.
 
+## OEM ownership follow-up (2026-11-08)
+
+OEM coexistence now controls a common native camera gate, including while
+MainActivity or Settings is open. Reverse gear or an OEM start request closes it.
+All app preview sessions are detached in parallel, preview-only combined output
+and warm camera holds are released, and an active recorder is interrupted through
+its existing urgent OEM-pause path. This also works with the dashcam disabled.
+
+Main, side, overlay/IPK and combined preview attachments, and recorder starts,
+are rejected while the native gate is closed. CameraSession also checks the gate
+before attaching another consumer to an existing capture session. Activity/surface
+recreation and automatic side retries cannot reclaim the devices. Main and side
+views display an OEM pause message rather than presenting a frozen image as live.
+
+An OEM stop during R does not reopen cameras. Return requires leaving R and a
+confirmed OEM absence lasting at least the existing 250 ms settling interval.
+The existing OEM lifecycle monitor now reads gear independently of lamp callbacks.
+Without a running recorder it also recovers an abandoned/stale OEM request after
+an 8-second startup grace and confirmed absence; unknown foreground stays blocked
+until another reliable exit signal. A fresh request resets that grace interval.
+
+Disabling OEM coexistence clears the gate immediately and restores normal app
+preview behavior. Recording resume actions remain blocked during OEM ownership,
+and repeated pause requests do not produce duplicate pause notifications.
+
+Local validation: Debug/Release builds and Lint passed, all 69 JVM tests and all
+six affected Android instrumentation tests passed. Coverage includes recovery
+unit tests for stop signals/re-entry during R, and
+Android integration checks for an open app with the recorder disabled, all public
+preview/recorder entry points, a recreated Activity, bouncing start/stop requests,
+coexistence toggles, and recovery without a STOP or new vehicle event. Physical
+V4L2 device release timing and moving-reverse behavior still need a vehicle test.
+
 ## Vehicle verification
 
 1. Compare Wheels/Sides motion against the right preview, both with and without
@@ -85,7 +118,8 @@ on the emulator/device with ADB.
 2. Open/close Settings and its child dialogs repeatedly; verify no SAIC side-bar
    flash and no black left camera images.
 3. Reverse while stationary, then moving, and change back to forward gear. Confirm
-   navigation stays hidden and OEM camera handoff/restoration still works.
+   OEM 360 opens without repeated camera takeovers, and app views return after
+   leaving R and closing OEM 360. Repeat with the dashcam disabled and enabled.
 4. Repeat app open/close and vehicle restart, including indicator/IPK camera use.
 
 The emulator cannot reproduce the SAIC Android 9 vehicle policy or camera hardware.

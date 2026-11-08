@@ -52,6 +52,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private int activePreviewCameraIndex = -1;
     private boolean previewRunning = false;
     private boolean previewPausedForTestClip = false;
+    private boolean previewResumed = false;
     private float downX = 0f;
     private float downY = 0f;
 
@@ -61,6 +62,10 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private final OtaController otaController = new OtaController(this);
     private final SettingsDialogController settingsDialog = new SettingsDialogController(
             this, appearanceController, otaController, this::applyWarningVisibility);
+    private final SharedPreferences.OnSharedPreferenceChangeListener cameraAccessListener = (prefs, key) -> {
+        if (UiPrefs.KEY_OEM_CAMERA_ACCESS_BLOCKED.equals(key) || UiPrefs.KEY_OEM_AVM_ACTIVE.equals(key)
+                || UiPrefs.KEY_OEM_AVM_COEXIST.equals(key)) startPreviewIfReady();
+    };
 
     public static void setSettingsDialogOpen(boolean open) {
         sSettingsDialogOpen = open;
@@ -155,6 +160,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         super.onCreate(savedInstanceState);
         EdgeToEdge.enable(this);
         UiPrefs.migrateLegacyPrefsIfNeeded(this);
+        SignalService.refreshCameraAccess(this);
         setContentView(R.layout.activity_main);
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (v, insets) -> {
             Insets systemBars = AppSystemBars.contentInsets(insets,
@@ -177,16 +183,16 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         recordingStatusDot = findViewById(R.id.recordingStatusDot);
         tvRecordingStatus = findViewById(R.id.tvRecordingStatus);
 
-        ImageButton btnSettings = findViewById(R.id.btnSettings);
+        ImageButton btnSettings = sideCameraPanel.findViewById(R.id.btnSettings);
         btnSettings.setOnClickListener(v -> settingsDialog.show());
 
-        ImageButton btnClose = findViewById(R.id.btnClose);
+        ImageButton btnClose = sideCameraPanel.findViewById(R.id.btnClose);
         btnClose.setOnClickListener(v -> finishAndRemoveTask());
 
         btnRecordTestClip = findViewById(R.id.btnRecordTestClip);
         btnRecordTestClip.setOnClickListener(v -> {
             SharedPreferences prefs = UiPrefs.getPrefs(this);
-            if (!DashcamSettingsController.isTestRecordEnabled(prefs)) {
+            if (!DashcamSettingsController.isTestRecordEnabled(prefs) || UiPrefs.isOemCameraAccessBlocked(prefs)) {
                 return;
             }
             int testDurationSec = DashcamSettingsController.getTestRecordDurationSec(prefs);
@@ -250,12 +256,17 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     @Override
     protected void onResume() {
         super.onResume();
+        previewResumed = true;
+        SignalService.refreshCameraAccess(this);
         AppSystemBars.apply(getWindow());
         sideCameraPanel.resumeDisplay();
+        startPreviewIfReady();
     }
 
     @Override
     protected void onPause() {
+        previewResumed = false;
+        stopPreview();
         sideCameraPanel.pauseDisplay();
         super.onPause();
     }
@@ -270,6 +281,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     protected void onStart() {
         super.onStart();
         sMainVisible = true;
+        UiPrefs.getPrefs(this).registerOnSharedPreferenceChangeListener(cameraAccessListener);
         if (settingsDialog.isOpen()) {
             sSettingsDialogOpen = true;
         }
@@ -300,6 +312,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         super.onStop();
         sMainVisible = false;
         sSettingsDialogOpen = false;
+        UiPrefs.getPrefs(this).unregisterOnSharedPreferenceChangeListener(cameraAccessListener);
         // Re-apply signal/rearview overlay state once MainActivity stops blocking it.
         SignalService.requestRecheck();
         otaController.stop();
@@ -404,11 +417,20 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     }
 
     private void startPreviewIfReady() {
+        boolean blocked = UiPrefs.isOemCameraAccessBlocked(UiPrefs.getPrefs(this));
+        View pausedMessage = findViewById(R.id.mainPreviewOemPaused);
+        if (pausedMessage != null) pausedMessage.setVisibility(blocked ? View.VISIBLE : View.GONE);
+        if (!previewResumed || previewPausedForTestClip || blocked) {
+            stopPreview();
+            if (blocked && tvStatus != null) tvStatus.setText(R.string.side_camera_oem_paused);
+            return;
+        }
         if (surfaceHolder == null || surfaceHolder.getSurface() == null ||
                 !surfaceHolder.getSurface().isValid()) {
             if (tvStatus != null) tvStatus.setText(R.string.main_surface_not_ready);
             return;
         }
+        if (previewRunning && activePreviewCameraIndex == currentVideoIndex) return;
         if (activePreviewCameraIndex != -1 && activePreviewCameraIndex != currentVideoIndex) {
             CameraProbe.detachPreview(activePreviewCameraIndex);
             activePreviewCameraIndex = -1;

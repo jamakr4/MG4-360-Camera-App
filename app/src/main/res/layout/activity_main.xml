@@ -35,6 +35,23 @@
         app:layout_constraintEnd_toEndOf="parent" />
 
     <TextView
+        android:id="@+id/mainPreviewOemPaused"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:background="@android:color/black"
+        android:gravity="center"
+        android:padding="24dp"
+        android:text="@string/side_camera_oem_paused"
+        android:textColor="@android:color/white"
+        android:textSize="20sp"
+        android:accessibilityLiveRegion="polite"
+        android:visibility="gone"
+        app:layout_constraintStart_toStartOf="@id/surfaceView"
+        app:layout_constraintEnd_toEndOf="@id/surfaceView"
+        app:layout_constraintTop_toTopOf="@id/surfaceView"
+        app:layout_constraintBottom_toBottomOf="@id/surfaceView" />
+
+    <TextView
         android:id="@+id/tvStatus"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"

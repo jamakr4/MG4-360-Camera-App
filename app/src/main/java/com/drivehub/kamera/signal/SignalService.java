@@ -3,6 +3,7 @@ package com.drivehub.kamera.signal;
 import com.drivehub.kamera.R;
 
 import com.drivehub.kamera.MainActivity;
+import com.drivehub.kamera.CameraProbe;
 import com.drivehub.kamera.camera.CameraIndex;
 import com.drivehub.kamera.camera.IpkCameraOverlay;
 import com.drivehub.kamera.camera.OverlayService;
@@ -28,6 +29,7 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.IBinder;
+import android.os.Looper;
 import android.os.SystemClock;
 import android.util.Log;
 
@@ -96,11 +98,14 @@ public class SignalService extends Service {
     private Handler oemLifecycleHandler;
     private volatile boolean oemLifecycleMonitoring;
     private volatile String lastOemLifecycle = "";
+    private volatile int lastOemGear = Integer.MIN_VALUE;
+    private long lastOemGearSampleMs;
+    private long oemAbsentSince;
     private SharedPreferences.OnSharedPreferenceChangeListener oemCoexistPrefListener;
     private SystemPerformanceOverlay systemPerformanceOverlay;
     private int lastLamp = Integer.MIN_VALUE;
     private int currentLamp = 0;
-    private int currentGear = 0;
+    private volatile int currentGear = 0;
     private int currentMode = -1; // -1:init, 0:none, 1:left, 2:right, 3:reverse, 4:rearview
     // A lamp value read while the OEM AVM owns the screen can be stale by the time its
     // Activity is closed. Do not let that value resurrect our signal overlay; wait for a
@@ -121,15 +126,22 @@ public class SignalService extends Service {
             boolean destroyed = OEM_LIFECYCLE_DESTROYED.equals(
                     SystemPropertiesHelper.getString(OEM_LIFECYCLE_PROP));
             if (oemOverlayRecovery.canRestore(foreground, isOemAvmLatchedActive(), destroyed,
+                    currentGear == REVERSE_GEAR_VALUE,
                     SystemClock.elapsedRealtime())) {
+                int gear = SystemPropertiesHelper.getInt("arcsoft.avm.mCurCarGear", currentGear);
+                if (gear == REVERSE_GEAR_VALUE) {
+                    onVehicleStateSample(currentLamp, gear, SystemClock.elapsedRealtime());
+                    mainHandler.postDelayed(this, OemOverlayRecovery.SETTLE_MS);
+                    return;
+                }
                 oemOverlayRecovery.cancel();
+                setCameraAccessBlocked(SignalService.this, false);
                 lastLamp = Integer.MIN_VALUE;
                 lastGear = Integer.MIN_VALUE;
                 currentMode = -1;
                 // CarLampManager may only send changes. Read a fresh sample ourselves
                 // so a stationary car does not need another indicator or gear event.
                 int lamp = SystemPropertiesHelper.getInt("arcsoft.avm.mCurCarTurnLamp", 0);
-                int gear = SystemPropertiesHelper.getInt("arcsoft.avm.mCurCarGear", 0);
                 onVehicleStateSample(lamp, gear, SystemClock.elapsedRealtime());
                 DevRuntimeLog.add("SignalService", "OEM closed => display decision restored with fresh vehicle state");
                 return;
@@ -197,23 +209,27 @@ public class SignalService extends Service {
         SharedPreferences prefs = UiPrefs.getPrefs(context);
         boolean wasActive = UiPrefs.isOemAvmActive(prefs);
         UiPrefs.setOemAvmActive(prefs, active);
+        // Publish the request before releasing devices, so concurrent decisions cannot unblock it.
+        if (active && UiPrefs.isOemAvmCoexistEnabled(prefs)) setCameraAccessBlocked(context, true);
         DevRuntimeLog.add("SignalService", "OEM latch=" + active);
         SignalService inst = sInstance;
         if (inst == null) {
             if (active) {
                 OverlayService.hideOverlay(context);
             }
+            if (!active) setCameraAccessBlocked(context, false);
             return;
         }
         inst.mainHandler.post(() -> {
             if (active) {
+                inst.oemAbsentSince = 0;
                 inst.mainHandler.removeCallbacks(inst.oemOverlayRestoreRunnable);
                 inst.oemOverlayRecovery.cancel();
                 inst.waitForSignalSampleAfterOemReleaseAtMs = 0L;
                 inst.mainHandler.removeCallbacks(inst.hideRunnable);
                 inst.clearOverlayShownTimestamp();
                 inst.hideCameraOverlays();
-            } else if (wasActive) {
+            } else if (wasActive && UiPrefs.isOemAvmCoexistEnabled(prefs)) {
                 inst.waitForSignalSampleAfterOemReleaseAtMs = SystemClock.elapsedRealtime();
                 inst.oemOverlayRecovery.start();
                 inst.mainHandler.removeCallbacks(inst.oemOverlayRestoreRunnable);
@@ -232,6 +248,54 @@ public class SignalService extends Service {
     public static boolean isReverseActive() {
         SignalService inst = sInstance;
         return inst != null && inst.currentGear == REVERSE_GEAR_VALUE;
+    }
+
+    /** Synchronize ownership before an Activity creates/resumes its preview surfaces. */
+    public static void refreshCameraAccess(Context context) {
+        SignalService inst = sInstance;
+        if (inst != null) {
+            if (Looper.myLooper() == inst.mainHandler.getLooper()) inst.updateOemCameraAccess();
+            else inst.mainHandler.post(inst::updateOemCameraAccess);
+        } else {
+            SharedPreferences prefs = UiPrefs.getPrefs(context);
+            if (!UiPrefs.isOemAvmCoexistEnabled(prefs)) setCameraAccessBlocked(context, false);
+            else if (UiPrefs.isOemAvmActive(prefs)
+                    || SystemPropertiesHelper.getInt("arcsoft.avm.mCurCarGear", 0) == REVERSE_GEAR_VALUE)
+                setCameraAccessBlocked(context, true);
+        }
+    }
+
+    private static synchronized void setCameraAccessBlocked(Context context, boolean blocked) {
+        SharedPreferences prefs = UiPrefs.getPrefs(context);
+        if (!blocked && UiPrefs.isOemAvmCoexistEnabled(prefs)
+                && (UiPrefs.isOemAvmActive(prefs) || isReverseActive())) return;
+        boolean previous = prefs.getBoolean(UiPrefs.KEY_OEM_CAMERA_ACCESS_BLOCKED, false);
+        if (blocked && !previous) RecordingService.pauseForOemRequest(context);
+        CameraProbe.setOemCameraAccessBlocked(blocked);
+        if (previous == blocked) return;
+        prefs.edit().putBoolean(UiPrefs.KEY_OEM_CAMERA_ACCESS_BLOCKED, blocked).apply();
+        DevRuntimeLog.add(TAG, "OEM camera ownership blocked=" + blocked);
+        if (!blocked) RecordingService.resumeAfterOemRequest(context);
+    }
+
+    private boolean updateOemCameraAccess() {
+        boolean coexist = isOemCoexistActive();
+        boolean requested = currentGear == REVERSE_GEAR_VALUE || isOemAvmLatchedActive();
+        if (!coexist) {
+            mainHandler.removeCallbacks(oemOverlayRestoreRunnable);
+            oemOverlayRecovery.cancel();
+        } else if (!requested && !oemOverlayRecovery.isPending()
+                && UiPrefs.getPrefs(this).getBoolean(UiPrefs.KEY_OEM_CAMERA_ACCESS_BLOCKED, false)) {
+            // Includes leaving R when OEM never emitted a stop broadcast.
+            oemOverlayRecovery.start();
+            mainHandler.post(oemOverlayRestoreRunnable);
+        }
+        boolean blocked = coexist && (requested || oemOverlayRecovery.isPending());
+        boolean entering = blocked && !UiPrefs.getPrefs(this)
+                .getBoolean(UiPrefs.KEY_OEM_CAMERA_ACCESS_BLOCKED, false);
+        setCameraAccessBlocked(this, blocked);
+        if (entering) hideCameraOverlays();
+        return blocked;
     }
 
     public static void requestRecheck() {
@@ -446,11 +510,19 @@ public class SignalService extends Service {
     private void onVehicleStateSample(int lamp, int gear, long sampledAtMs) {
         currentLamp = lamp;
         currentGear = gear;
+        updateOemCameraAccess();
         if (waitForSignalSampleAfterOemReleaseAtMs > 0L
                 && sampledAtMs >= waitForSignalSampleAfterOemReleaseAtMs) {
             waitForSignalSampleAfterOemReleaseAtMs = 0L;
             DevRuntimeLog.add("SignalService", "Fresh lamp sample after OEM release: " + lamp);
         }
+        reconcileOemAvmState();
+        updateOverlayDecision();
+    }
+
+    private void onGearStateSample(int gear) {
+        currentGear = gear;
+        updateOemCameraAccess();
         reconcileOemAvmState();
         updateOverlayDecision();
     }
@@ -495,6 +567,7 @@ public class SignalService extends Service {
     }
 
     private void applyOemCoexistState() {
+        updateOemCameraAccess();
         if (isOemCoexistActive()) {
             startOemLifecycleMonitor();
         } else {
@@ -525,12 +598,23 @@ public class SignalService extends Service {
             initialState = OEM_LIFECYCLE_DESTROYED;
         }
         lastOemLifecycle = initialState;
+        lastOemGear = Integer.MIN_VALUE;
+        lastOemGearSampleMs = 0;
         DevRuntimeLog.add("SignalService",
                 "OEM lifecycle monitor started, initial='" + initialState + "'");
         oemLifecycleHandler.post(new Runnable() {
             @Override
             public void run() {
                 if (!oemLifecycleMonitoring) return;
+                // CarLampManager may not emit a callback when only the gear changes.
+                int gear = SystemPropertiesHelper.getInt("arcsoft.avm.mCurCarGear", currentGear);
+                long sampledAt = SystemClock.elapsedRealtime();
+                if (gear != lastOemGear || (sampledAt - lastOemGearSampleMs >= 500
+                        && UiPrefs.isOemCameraAccessBlocked(UiPrefs.getPrefs(SignalService.this)))) {
+                    lastOemGear = gear;
+                    lastOemGearSampleMs = sampledAt;
+                    mainHandler.post(() -> { if (oemLifecycleMonitoring) onGearStateSample(gear); });
+                }
                 String state = SystemPropertiesHelper.getString(OEM_LIFECYCLE_PROP);
                 if (!state.equals(lastOemLifecycle)) {
                     String prev = lastOemLifecycle;
@@ -553,9 +637,11 @@ public class SignalService extends Service {
         oemLifecycleThread = null;
         oemLifecycleHandler = null;
         lastObservedOemForeground = false;
+        oemAbsentSince = 0;
     }
 
     private void onOemLifecycleChanged(String prev, String next) {
+        if (!isOemCoexistActive()) return;
         DevRuntimeLog.add("SignalService", "OEM lifecycle: '" + prev + "' => '" + next + "'");
         if (OEM_LIFECYCLE_START.equals(next)) {
             setOemAvmActive(this, true);
@@ -642,6 +728,8 @@ public class SignalService extends Service {
     }
 
     private void updateOverlayDecision() {
+        // OEM ownership takes priority over main routing, including reverse and Settings.
+        if (updateOemCameraAccess()) return;
         if (oemOverlayRecovery.isPending()) return;
         // Update the independent IPK output before applying any main-screen routing or cache.
         final DigitalRearviewPolicy.Outputs rearview = rearviewOutputs();
@@ -942,10 +1030,11 @@ public class SignalService extends Service {
             lastObservedOemForeground = false;
             return;
         }
-        boolean foreground = isOemAvmInForeground();
+        Boolean foreground = readOemAvmForegroundState();
         boolean latched = isOemAvmLatchedActive();
 
-        if (foreground) {
+        if (Boolean.TRUE.equals(foreground)) {
+            oemAbsentSince = 0;
             lastObservedOemForeground = true;
             if (!latched && VehicleSpeedReader.readSpeedKmh() <= UiPrefs.getDevOemAvmMaxSpeedKmh(UiPrefs.getPrefs(this))) {
                 DevRuntimeLog.add("SignalService", "OEM foreground fallback => pause");
@@ -955,12 +1044,22 @@ public class SignalService extends Service {
             return;
         }
 
-        if (lastObservedOemForeground && latched) {
-            DevRuntimeLog.add("SignalService", "OEM foreground fallback => resume");
+        if (!Boolean.FALSE.equals(foreground) || !latched) {
+            oemAbsentSince = 0;
+            return;
+        }
+        long now = SystemClock.elapsedRealtime();
+        if (oemAbsentSince == 0) oemAbsentSince = now;
+        // A startup request can precede the OEM Activity. Also recover a stale persisted latch
+        // without requiring a running recorder or a new indicator/gear event.
+        long grace = lastObservedOemForeground ? OemOverlayRecovery.SETTLE_MS : 8000;
+        if (currentGear != REVERSE_GEAR_VALUE && now - oemAbsentSince >= grace) {
+            DevRuntimeLog.add("SignalService", "OEM confirmed absent => resume");
             setOemAvmActive(this, false);
             RecordingService.resumeAfterOemRequest(this);
+            oemAbsentSince = 0;
+            lastObservedOemForeground = false;
         }
-        lastObservedOemForeground = false;
     }
 
 

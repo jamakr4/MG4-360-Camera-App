@@ -52,6 +52,7 @@ namespace camera_stream_manager
         static constexpr const char *TAG = "CameraStreamManager";
         static constexpr int PREVIEW_SELECT_TIMEOUT_US = 100000;
         static constexpr int STOP_WAIT_MS = 2500;
+        std::atomic<bool> gOemCameraAccessBlocked{false};
 
         /**
          * How long a camera may be held open with nothing reading from it, while the recorder
@@ -2931,6 +2932,7 @@ namespace camera_stream_manager
                 bool release = false;
                 {
                     std::lock_guard<std::mutex> lock(mutex_);
+                    warm = warm && !gOemCameraAccessBlocked.load();
                     keepWarm_ = warm;
                     keepWarmDeadlineUs_ = warm ? nowUs() + KEEP_WARM_HOLD_MS * 1000LL : 0;
                     release = !warm && !hasConsumersLocked();
@@ -3134,6 +3136,8 @@ namespace camera_stream_manager
 
             bool ensureStartedLocked()
             {
+                // This also covers an existing session: another consumer must not reclaim it.
+                if (gOemCameraAccessBlocked.load()) return false;
                 if (running_.load())
                 {
                     return true;
@@ -3734,6 +3738,7 @@ namespace camera_stream_manager
 
     bool attachSideCameraPreview(JNIEnv* env, int side, jobject surface,
                                  const side_camera_preview::Crops& crops) {
+        if (gOemCameraAccessBlocked.load()) return false;
         if (side < 0 || side > 1 || !surface || !side_camera_preview::valid(crops)) return false;
         std::lock_guard<std::mutex> lock(gSideCameraOwnerMutex);
         if (!gSideCameraEnabled) return false;
@@ -3785,6 +3790,7 @@ namespace camera_stream_manager
 
     bool attachPreview(JNIEnv *env, int videoIndex, jobject surface, bool enhanced)
     {
+        if (gOemCameraAccessBlocked.load()) return false;
         auto session = getOrCreateSession(videoIndex);
         const bool ok = session->attachPreview(env, surface, enhanced);
         if (!ok)
@@ -3806,6 +3812,7 @@ namespace camera_stream_manager
     }
 
     bool attachPreviewSink(JNIEnv *env, int videoIndex, int sinkId, jobject surface) {
+        if (gOemCameraAccessBlocked.load()) return false;
         if (sinkId < 0 || sinkId > 31 || surface == nullptr) return false;
         ANativeWindow *window = ANativeWindow_fromSurface(env, surface);
         if (window == nullptr) return false;
@@ -3849,7 +3856,10 @@ namespace camera_stream_manager
 
     void detachAllPreviews()
     {
-        detachSideCameraPreviews();
+        // Close side reattachment while releasing every camera in parallel. Three sequential
+        // capture joins can exceed the OEM startup budget when MainActivity owns three feeds.
+        std::lock_guard<std::mutex> sideOwner(gSideCameraOwnerMutex);
+        gSideCameraEnabled = false;
         std::vector<std::pair<int, std::shared_ptr<CameraSession>>> sessions;
         {
             std::lock_guard<std::mutex> lock(gManagerMutex);
@@ -3859,17 +3869,37 @@ namespace camera_stream_manager
                 sessions.emplace_back(entry.first, entry.second);
             }
         }
-        for (const auto &entry : sessions)
-        {
-            entry.second->detachExtraPreviews();
-            entry.second->detachPreview();
-            eraseSessionIfIdle(entry.first, entry.second);
+        std::vector<std::thread> releases;
+        for (const auto &entry : sessions) {
+            releases.emplace_back([entry] {
+                entry.second->detachExtraPreviews();
+                entry.second->detachPreview();
+                eraseSessionIfIdle(entry.first, entry.second);
+            });
+        }
+        for (auto &release : releases) release.join();
+    }
+
+    bool isOemCameraAccessBlocked() {
+        return gOemCameraAccessBlocked.load();
+    }
+
+    void setOemCameraAccessBlocked(bool blocked) {
+        const bool previous = gOemCameraAccessBlocked.exchange(blocked);
+        if (blocked && !previous) {
+            const int64_t began = nowUs();
+            detachAllPreviews();
+            // A preview-only combined composer can hold all four cameras without a recorder.
+            detachCombinedPreview();
+            releaseCombinedCameras();
+            logi("OEM camera gate closed; preview release ms=%lld", (nowUs() - began) / 1000);
         }
     }
 
     bool startRecording(JNIEnv * /*env*/, int slot, int videoIndex, const std::string &outputPath,
                         int width, int height, int fps, int bitrate)
     {
+        if (gOemCameraAccessBlocked.load()) return false;
         auto session = getOrCreateSession(videoIndex);
         if (!session->startRecording(slot, outputPath, width, height, fps, bitrate))
         {
@@ -3968,7 +3998,9 @@ namespace camera_stream_manager
                                 int cellWidth, int cellHeight, int fps, int bitrate,
                                 const std::string &signature, bool showSpeed, int cameraMask)
     {
+        if (gOemCameraAccessBlocked.load()) return false;
         std::lock_guard<std::mutex> combinedLock(gCombinedMutex);
+        if (gOemCameraAccessBlocked.load()) return false;
         std::shared_ptr<CombinedRecordingSink> sink;
         if (gCombinedRecordingActive)
         {
@@ -4067,6 +4099,7 @@ namespace camera_stream_manager
                                int fps, const std::string &signature, bool showSpeed,
                                int cameraMask)
     {
+        if (gOemCameraAccessBlocked.load()) return false;
         if (surface == nullptr)
         {
             return false;
@@ -4079,6 +4112,10 @@ namespace camera_stream_manager
         }
 
         std::lock_guard<std::mutex> combinedLock(gCombinedMutex);
+        if (gOemCameraAccessBlocked.load()) {
+            ANativeWindow_release(window);
+            return false;
+        }
         if (gCombinedSink != nullptr)
         {
             gCombinedSink->setPreviewWindow(window);

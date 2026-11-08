@@ -65,6 +65,7 @@ public final class UiPrefs {
     public static final String KEY_SAFETY_WARNING = "safetyWarning";
     public static final String KEY_OEM_AVM_COEXIST = "oemCoexist";
     public static final String KEY_OEM_AVM_ACTIVE = "oemAvmActive";
+    public static final String KEY_OEM_CAMERA_ACCESS_BLOCKED = "oemCameraAccessBlocked";
     private static final String LEGACY_AVM_PREFS_NAME = "AVM_Settings";
     private static final String LEGACY_KEY_SAFETY_WARNING = "ShowSafetyWarning";
     public static final int MAX_TILE_CORNER_RADIUS = 35;
@@ -254,6 +255,11 @@ public final class UiPrefs {
 
     public static boolean isOemAvmActive(SharedPreferences prefs) {
         return prefs.getBoolean(KEY_OEM_AVM_ACTIVE, false);
+    }
+
+    public static boolean isOemCameraAccessBlocked(SharedPreferences prefs) {
+        return isOemAvmCoexistEnabled(prefs) && (isOemAvmActive(prefs)
+                || prefs.getBoolean(KEY_OEM_CAMERA_ACCESS_BLOCKED, false));
     }
 
     public static void setOemAvmActive(SharedPreferences prefs, boolean active) {

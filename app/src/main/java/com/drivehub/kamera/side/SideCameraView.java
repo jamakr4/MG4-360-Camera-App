@@ -72,7 +72,9 @@ public final class SideCameraView extends ViewGroup {
     }
 
     void yieldToOem(boolean value) {
-        if (yielded == value) return;
+        // A coexistence toggle can arrive before the native gate is released. The subsequent
+        // ownership update must retry immediately even if the UI already considers it unblocked.
+        if (yielded == value && (value || !active)) return;
         yielded = value;
         if (value) {
             SideCameraNative.detachPreviews();

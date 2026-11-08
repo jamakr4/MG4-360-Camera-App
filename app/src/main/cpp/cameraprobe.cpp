@@ -184,3 +184,13 @@ Java_com_drivehub_kamera_CameraProbe_previewSinkStats(JNIEnv* env, jclass, jint 
     if (result != nullptr) env->SetLongArrayRegion(result, 0, 4, data);
     return result;
 }
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_drivehub_kamera_CameraProbe_setOemCameraAccessBlocked(JNIEnv*, jclass, jboolean blocked) {
+    camera_stream_manager::setOemCameraAccessBlocked(blocked);
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_drivehub_kamera_CameraProbe_isOemCameraAccessBlocked(JNIEnv*, jclass) {
+    return camera_stream_manager::isOemCameraAccessBlocked();
+}

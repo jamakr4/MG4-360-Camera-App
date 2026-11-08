@@ -45,4 +45,25 @@ public class OemOverlayRecoveryTest {
         assertFalse(recovery.canRestore(false, false, true, 3000));
         assertTrue(recovery.canRestore(false, false, true, 3250));
     }
+
+    @Test public void oemStopDuringReverseCannotGiveCamerasBack() {
+        OemOverlayRecovery recovery = new OemOverlayRecovery();
+        recovery.start();
+        assertFalse(recovery.canRestore(false, false, true, true, 0));
+        assertFalse(recovery.canRestore(false, false, true, true, 60000));
+        assertFalse(recovery.canRestore(false, false, true, false, 61000));
+        assertFalse(recovery.canRestore(false, false, true, false, 61249));
+        assertTrue(recovery.canRestore(false, false, true, false, 61250));
+    }
+
+    @Test public void reverseReentryCancelsThePartialReleaseInterval() {
+        OemOverlayRecovery recovery = new OemOverlayRecovery();
+        recovery.start();
+        assertFalse(recovery.canRestore(false, false, true, false, 1000));
+        assertFalse(recovery.canRestore(false, false, true, true, 1200));
+        assertFalse(recovery.canRestore(false, false, true, false, 1300));
+        assertFalse(recovery.canRestore(true, false, false, false, 1500));
+        assertFalse(recovery.canRestore(false, false, true, false, 1600));
+        assertTrue(recovery.canRestore(false, false, true, false, 1850));
+    }
 }
