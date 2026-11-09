@@ -12,6 +12,14 @@ public final class UiPrefs {
     public static final String REC_PREFS_NAME = "rec_prefs";
     public static final String KEY_TILE_CORNER_RADIUS = "tileCornerRadius";
     public static final String KEY_ACCENT_COLOR = "accentColor";
+    public static final String KEY_MAIN_SIDE_CAMERA_WHEELS = "main_surround_left_wheels";
+    public static final String KEY_PARKING_FRONT_WHEEL_ALIGNMENT = "parkingFrontWheelAlignment";
+    public static final String KEY_PARKING_REAR_WHEEL_ALIGNMENT = "parkingRearWheelAlignment";
+    public static final String KEY_PARKING_HIGHLIGHT_MISSING_AREAS = "parkingHighlightMissingAreas";
+    public static final String KEY_DEV_PARKING_FRONT_WHEEL_ANGLE = "devParkingFrontWheelAngle";
+    public static final String KEY_DEV_PARKING_REAR_WHEEL_ANGLE = "devParkingRearWheelAngle";
+    public static final float DEFAULT_PARKING_FRONT_WHEEL_ANGLE = 16.5f;
+    public static final float DEFAULT_PARKING_REAR_WHEEL_ANGLE = -45f;
     public static final String KEY_SHOW_STATUS_BAR = "showStatusBar";
     public static final String KEY_ALLOW_BETA_UPDATES = "allowBetaUpdates";
     public static final String KEY_SMOOTH_ENTRY = "smoothEntry";
@@ -64,6 +72,7 @@ public final class UiPrefs {
     public static final String KEY_SAFETY_WARNING = "safetyWarning";
     public static final String KEY_OEM_AVM_COEXIST = "oemCoexist";
     public static final String KEY_OEM_AVM_ACTIVE = "oemAvmActive";
+    public static final String KEY_OEM_CAMERA_ACCESS_BLOCKED = "oemCameraAccessBlocked";
     private static final String LEGACY_AVM_PREFS_NAME = "AVM_Settings";
     private static final String LEGACY_KEY_SAFETY_WARNING = "ShowSafetyWarning";
     public static final int MAX_TILE_CORNER_RADIUS = 35;
@@ -207,6 +216,44 @@ public final class UiPrefs {
         return prefs.getBoolean(KEY_SAFETY_WARNING, true);
     }
 
+    public static boolean isParkingFrontWheelAlignmentEnabled(SharedPreferences prefs) {
+        return prefs.getBoolean(KEY_PARKING_FRONT_WHEEL_ALIGNMENT, false);
+    }
+
+    public static void setParkingFrontWheelAlignmentEnabled(SharedPreferences prefs, boolean enabled) {
+        prefs.edit().putBoolean(KEY_PARKING_FRONT_WHEEL_ALIGNMENT, enabled).apply();
+    }
+
+    public static boolean isParkingRearWheelAlignmentEnabled(SharedPreferences prefs) {
+        return prefs.getBoolean(KEY_PARKING_REAR_WHEEL_ALIGNMENT, true);
+    }
+
+    public static void setParkingRearWheelAlignmentEnabled(SharedPreferences prefs, boolean enabled) {
+        prefs.edit().putBoolean(KEY_PARKING_REAR_WHEEL_ALIGNMENT, enabled).apply();
+    }
+
+    public static boolean isParkingHighlightMissingAreasEnabled(SharedPreferences prefs) {
+        return prefs.getBoolean(KEY_PARKING_HIGHLIGHT_MISSING_AREAS, true);
+    }
+
+    public static void setParkingHighlightMissingAreasEnabled(SharedPreferences prefs, boolean enabled) {
+        prefs.edit().putBoolean(KEY_PARKING_HIGHLIGHT_MISSING_AREAS, enabled).apply();
+    }
+
+    public static float getDevParkingFrontWheelAngle(SharedPreferences prefs) {
+        return clampParkingWheelAngle(prefs.getFloat(KEY_DEV_PARKING_FRONT_WHEEL_ANGLE,
+                DEFAULT_PARKING_FRONT_WHEEL_ANGLE), DEFAULT_PARKING_FRONT_WHEEL_ANGLE);
+    }
+
+    public static float getDevParkingRearWheelAngle(SharedPreferences prefs) {
+        return clampParkingWheelAngle(prefs.getFloat(KEY_DEV_PARKING_REAR_WHEEL_ANGLE,
+                DEFAULT_PARKING_REAR_WHEEL_ANGLE), DEFAULT_PARKING_REAR_WHEEL_ANGLE);
+    }
+
+    public static float clampParkingWheelAngle(float value, float fallback) {
+        return Float.isFinite(value) ? Math.max(-180f, Math.min(180f, value)) : fallback;
+    }
+
     public static boolean isStatusBarVisible(SharedPreferences prefs) {
         return prefs.getBoolean(KEY_SHOW_STATUS_BAR, true);
     }
@@ -253,6 +300,11 @@ public final class UiPrefs {
 
     public static boolean isOemAvmActive(SharedPreferences prefs) {
         return prefs.getBoolean(KEY_OEM_AVM_ACTIVE, false);
+    }
+
+    public static boolean isOemCameraAccessBlocked(SharedPreferences prefs) {
+        return isOemAvmCoexistEnabled(prefs) && (isOemAvmActive(prefs)
+                || prefs.getBoolean(KEY_OEM_CAMERA_ACCESS_BLOCKED, false));
     }
 
     public static void setOemAvmActive(SharedPreferences prefs, boolean active) {

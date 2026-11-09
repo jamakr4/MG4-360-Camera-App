@@ -5,6 +5,21 @@ import static org.junit.Assert.*;
 import static com.drivehub.kamera.signal.DigitalRearviewPolicy.*;
 
 public class DigitalRearviewPolicyTest {
+    @Test public void onlyNormalDisableOrDeselectRequestsAnIpkFadeOut() {
+        assertTrue(selectOutputs(false, DISPLAY_IPK, false, false, false).fadeIpkExit);
+        assertTrue(selectOutputs(true, DISPLAY_INFOTAINMENT, false, false, false).fadeIpkExit);
+        for (int target : new int[]{DISPLAY_IPK, DISPLAY_BOTH}) {
+            assertFalse(selectOutputs(true, target, false, false, false).fadeIpkExit);
+            assertFalse(selectOutputs(true, target, true, true, false).fadeIpkExit);
+        }
+    }
+
+    @Test public void vehicleBlockersAlwaysOverrideARequestedFadeOut() {
+        for (int target = DISPLAY_INFOTAINMENT; target <= DISPLAY_BOTH; ++target)
+            for (boolean enabled : new boolean[]{false, true})
+                assertFalse(selectOutputs(enabled, target, false, true, true).fadeIpkExit);
+    }
+
     @Test public void openingAppUiHidesOnlyTheInfotainmentMirror() {
         for (int target : new int[]{DISPLAY_BOTH, DISPLAY_IPK}) {
             Outputs outputs = selectOutputs(true, target, false, true, false);

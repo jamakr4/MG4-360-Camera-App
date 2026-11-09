@@ -53,6 +53,7 @@ Community mod for the MG4 EV (AAOS 9, pre-2026 facelift) that replaces the stock
 - **Digital rearview mirror (FICM + IPK)**: keeps the factory rear camera visible on the infotainment display, the driver instrument cluster, or both. The IPK mirror can appear on the Navigation or Media page and keeps showing the rear view while turn-signal cameras take priority on the infotainment display.
 - **Tesla-style tile view**: replaces the launcher-like OEM overlay, also known as the fullscreen takeover, with a cleaner presentation.
 - **Compact View**: makes the turn-signal camera overlay narrower with independently adjustable left and right crop edges.
+- **Parking views**: switch the main screen's left panel between four **Wheels** close-ups and two tall **Sides** views. Align the front and rear wheel views independently, with optional hatching to highlight areas outside the camera image.
 - **Native 4-camera dashcam**: records the factory cameras in a single 1440x1040 grid clip, with up to 720x480 per camera and a footer including time, speed, and a custom signature.
 - **Event capture**: saves a pre- and post-trigger recording window into a separate `events/` folder.
 - **Flexible overlay feedback**: pause, resume, event, and error banners with adjustable size and volume, plus an optional persistent recording status dot with freely adjustable horizontal and vertical position anywhere on the screen.
@@ -76,7 +77,7 @@ Community mod for the MG4 EV (AAOS 9, pre-2026 facelift) that replaces the stock
 
 <p align="center">
   <img src="images/DigitalRearView-IPK.jpg" alt="Digital rearview mirror on the driver instrument cluster (IPK)" width="48%">
-  <img src="images/CompactView.jpg" alt="Compact turn signal camera overlay" width="48%">
+  <img src="images/wheel_cam.jpg" alt="Compact turn signal camera overlay" width="48%">
 </p>
 
 <p align="center">
@@ -165,6 +166,33 @@ Community mod for the MG4 EV (AAOS 9, pre-2026 facelift) that replaces the stock
 The app uses the full screen width, with the SAIC side navigation hidden in the app and its dialogs. Under `Settings` → `Display`, **Show status bar** controls the top SAIC status bar; it is shown by default. The choice is saved and applies immediately, including while Settings is open. Swipe inward from a screen edge to temporarily reveal the hidden system controls.
 
 <details>
+<summary><strong>Parking (main view)</strong></summary>
+
+The main screen has a left camera panel beside the large camera preview. Select **Wheels** for four wheel close-ups (front wheels above, rear wheels below), or **Sides** for two tall side views. The selected mode is saved.
+
+To adjust the wheel views:
+
+1. Open `Settings` -> `Parking`.
+2. Expand **Align wheel views** using the chevron.
+3. Enable **Front axle** and **Rear axle** independently. Rear axle alignment is on by default; front axle alignment is off. Previously saved choices are preserved.
+4. **Highlight missing areas** is enabled by default and marks areas outside the camera image with diagonal hatching. Disable it to leave these areas black. Dark areas within the image keep their original appearance. Previously saved choices are preserved.
+
+Default alignment angles:
+
+| Axle | Left view | Right view |
+|---|---:|---:|
+| Front | +16.5° | −16.5° |
+| Rear | −45° | +45° |
+
+Alignment rotates the image inside each fixed wheel tile, keeping its centre and scale without automatic zoom. These controls apply to the **Wheels** previews in the left panel. Changes take effect immediately and are saved across app restarts. Custom angles and a separate reset for each axle are available in **Dev Mode** under **Parking: wheel alignment**.
+
+The **Show safety warning** switch for the main view is also under `Parking`.
+
+With **Allow OEM 360° camera app** enabled under `Settings`, the app releases its cameras for reverse gear or an OEM camera request, including while the main screen is open and the dashcam is off. App previews resume after the OEM handoff ends.
+
+</details>
+
+<details>
 <summary><strong>Indicator Cam</strong></summary>
 
 The indicator camera opens automatically when you activate the left or right turn signal.
@@ -201,7 +229,7 @@ To use it:
 
 1. Open `Settings` -> `Dashcam`.
 2. Enable `Dashcam`.
-3. Optional: adjust FPS, footer signature, and whether speed should be shown in the recording.
+3. Optional: adjust the footer signature and whether speed should be shown in the recording.
 4. Optional: in `Settings`, enable the global OEM 360° AVM setting if you still want to use the stock reverse/360 camera app alongside the custom features (recommended).
 5. Use `Trigger event save` in the app, the hazard-light trigger, or an external broadcast to save an event clip.
 
@@ -262,6 +290,7 @@ Behavior:
 - The "X" in the infotainment preview or switching Digital Rearview off via an external trigger stops the mirror on both displays, including during a temporary hide.
 - The companion trigger app and MG4Control shortcuts toggle the same mirror setting and use the selected display targets.
 - Opening the app or its settings hides the infotainment mirror while the IPK mirror stays active on its selected page.
+- **Smooth Entry** under `Settings` -> `Display` also controls the IPK mirror and is enabled by default. The entire IPK panel fades in over 110 ms after its first fresh camera frame is displayed, and fades out over 90 ms when the mirror is switched off or its IPK output is deselected. Camera access is released at the start of fade-out. Leaving the selected IPK page, unavailable page status, reverse gear, OEM takeover, camera failure, screen-off and display/service shutdown remove the panel immediately.
 - Reverse gear, OEM 360 and the four-camera tile view retain priority and pause the IPK mirror. It returns afterwards if still enabled and its selected IPK page is visible.
 
 </details>
@@ -307,6 +336,8 @@ A hidden Dev tab exposes lower-level tuning knobs. To unlock it, open Settings a
 
 Available tools and settings:
 
+- **Dashcam recording** contains the **Recording FPS** setting (1–60 FPS, default 25). Existing values are preserved, and changes apply from the next clip. The actual recording frame rate also depends on incoming camera frames.
+- **Parking: wheel alignment** provides a separate angle field for each axle, from −180° to +180°. The value applies to the left wheel view; the right view uses the opposite angle. Decimal points and commas are accepted. Each adjacent **Reset** button restores only that axle's default (+16.5° front, −45° rear). The corresponding axle toggle under `Parking` controls whether alignment is applied.
 - **Performance overlay** shows system and app CPU and RAM usage, system load, and temperature in the top-left corner until disabled.
 - **Factory camera recordings** lists and exports existing captures from the SAIC 360 camera app to the `avm/` folder in the selected dashcam storage location. The factory app's hidden recorder can produce raw camera images and H.264 video; this tool only reads and exports existing files and does not start the recorder.
 - **Polling rates** for idle, turn-signal-active, and Android Auto / CarPlay foreground scenarios.

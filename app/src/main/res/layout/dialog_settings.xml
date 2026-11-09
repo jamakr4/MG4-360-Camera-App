@@ -48,6 +48,11 @@
                     android:text="@string/settings_tab_settings" />
 
                 <TextView
+                    android:id="@+id/tabParking"
+                    style="@style/DrivehubSettingsTabInactive"
+                    android:text="@string/settings_tab_parking" />
+
+                <TextView
                     android:id="@+id/tabSignalCamera"
                     style="@style/DrivehubSettingsTabInactive"
                     android:text="@string/settings_tab_signal_camera" />
@@ -158,6 +163,8 @@
             <include layout="@layout/dialog_settings_section_update" />
 
             <include layout="@layout/dialog_settings_section_settings" />
+
+            <include layout="@layout/dialog_settings_section_parking" />
 
             <include layout="@layout/dialog_settings_section_signal_camera" />
 

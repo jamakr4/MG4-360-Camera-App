@@ -8,6 +8,10 @@ public final class CameraProbe {
     private CameraProbe() {
     }
 
+    /** Blocks every new native camera attachment and releases all preview outputs. */
+    public static native void setOemCameraAccessBlocked(boolean blocked);
+    public static native boolean isOemCameraAccessBlocked();
+
     /** Probes /dev/video0..maxIndex-1 and returns a human-readable summary. */
     public static native String probeAll(int maxIndex);
 

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item name="debug_axle_left_rotation" type="id" />
+    <item name="debug_axle_right_rotation" type="id" />
+    <item name="debug_axle_left_value" type="id" />
+    <item name="debug_axle_right_value" type="id" />
+    <item name="debug_front_axle" type="id" />
+    <item name="debug_rear_axle" type="id" />
+    <item name="debug_rotation_linked" type="id" />
+    <item name="debug_rotation_pinned" type="id" />
+    <item name="debug_rotation_original" type="id" />
+</resources>

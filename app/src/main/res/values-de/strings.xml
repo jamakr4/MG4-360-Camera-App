@@ -4,6 +4,15 @@
     <string name="shortcut_save_dashcam_event">Dashcam-Ereignis speichern</string>
     <string name="settings_tab_update">Update</string>
     <string name="settings_tab_settings">Einstellungen</string>
+    <string name="settings_tab_parking">Parking</string>
+    <string name="settings_parking_main_view">Hauptansicht</string>
+    <string name="settings_parking_wheel_alignment">Radansichten ausrichten</string>
+    <string name="settings_parking_front_axle">Vorderachse</string>
+    <string name="settings_parking_rear_axle">Hinterachse</string>
+    <string name="settings_parking_highlight_missing_areas">Fehlende Bildbereiche hervorheben</string>
+    <string name="settings_parking_highlight_missing_areas_hint">Kennzeichnet Bereiche außerhalb des Kamerabilds mit Schraffur.</string>
+    <string name="settings_options_expanded">Ausgeklappt</string>
+    <string name="settings_options_collapsed">Eingeklappt</string>
     <string name="settings_tab_signal_camera">Blinker-Kamera</string>
     <string name="settings_tab_digital_rearview">Digitaler Rueckspiegel</string>
     <string name="settings_tab_dashcam">Dashcam</string>
@@ -22,6 +31,8 @@
     <string name="settings_section_dashcam_advanced">Erweitert</string>
     <string name="settings_dashcam_enabled">Dashcam aktivieren</string>
     <string name="settings_dashcam_fps">Aufnahme-FPS</string>
+    <string name="settings_dev_dashcam_recording">Dashcam-Aufnahme</string>
+    <string name="settings_dev_dashcam_fps_hint">Zielbildrate der Aufnahme (1–60 FPS, Standard 25). Änderungen gelten ab dem nächsten Clip.</string>
     <string name="settings_dashcam_signature">Signatur</string>
     <string name="settings_dashcam_signature_placeholder">z.B. MG4 EV</string>
     <string name="settings_dashcam_show_speed">Geschwindigkeit im Video anzeigen</string>
@@ -67,7 +78,7 @@
     <string name="settings_oem_avm_coexist">OEM-360°-App weiter nutzen</string>
     <string name="settings_oem_avm_coexist_hint">Globale Einstellung für die werkseitige 360°-Kamera-App. Wenn aktiv, gibt die App bei Bedarf den Kamerazugriff frei, damit die OEM-Rueckfahr-/360°-Ansicht weiter starten kann. Wenn deaktiviert, haben die Custom-Features immer Vorrang und die OEM-360°-App wird parallel bewusst nicht unterstuetzt.</string>
     <string name="settings_smooth_entry">Smooth Entry</string>
-    <string name="settings_smooth_entry_hint">Blendet die Blinkerkamera sanft ein und aus, statt sie abrupt anzuzeigen oder zu schließen.</string>
+    <string name="settings_smooth_entry_hint">Blendet die Blinkerkamera und IPK-Kameravorschauen sanft ein und aus.</string>
     <string name="settings_lock_tile_resizing">Tile-Größe sperren</string>
     <string name="settings_lock_tile_moving">Tile-Position sperren</string>
     <string name="settings_dashcam_banners_section">Benachrichtigungs-Banner</string>
@@ -122,6 +133,14 @@
     <string name="settings_dev_dashcam_max_event_dirs">Gespeicherte Ereignisse</string>
     <string name="settings_dev_dashcam_capacity_warning">⚠ Höhere Werte können den Speicher schnell volllaufen lassen. Ein 30-s-Clip ist ca. 33 MB, ein Ereignis behält ca. 5 Clips. Die App prüft den freien Speicher nicht — zu hohe Werte können zu Speicherüberlauf oder anderen unvorhersehbaren Problemen führen.</string>
     <string name="settings_dev_performance_overlay">Performance-Anzeige</string>
+    <string name="settings_dev_parking_wheel_angles">Parking: Radausrichtung</string>
+    <string name="settings_dev_parking_front_angle">Drehwinkel Vorderachse</string>
+    <string name="settings_dev_parking_rear_angle">Drehwinkel Hinterachse</string>
+    <string name="settings_dev_parking_front_reset">Vorderachse zurücksetzen</string>
+    <string name="settings_dev_parking_rear_reset">Hinterachse zurücksetzen</string>
+    <string name="settings_dev_parking_wheel_angles_hint">Winkel der linken Radansicht (−180° bis +180°); rechts wird gegensinnig gedreht. Wirkt, wenn die jeweilige Achse unter Parking eingeschaltet ist.</string>
+    <string name="settings_reset">Reset</string>
+    <string name="settings_angle_unit">°</string>
     <string name="settings_dev_performance_overlay_enabled">Systemleistung anzeigen</string>
     <string name="settings_dev_performance_overlay_hint">Zeigt System- und App-CPU/RAM, Load und Temperatur dauerhaft oben links an, bis die Anzeige hier ausgeschaltet wird.</string>
     <string name="performance_temperature_unavailable">Temp –</string>
@@ -339,4 +358,11 @@
     <string name="dashcam_status_position_hint">Verschiebe den Statuspunkt auf dem gesamten Bildschirm. Die Position wird gespeichert und auf die Bildschirmränder begrenzt.</string>
     <string name="dashcam_status_position_expand">Positionsregler einblenden</string>
     <string name="dashcam_status_position_collapse">Positionsregler ausblenden</string>
+    <string name="side_camera_wheels">Räder</string>
+    <string name="side_camera_sides">Seiten</string>
+    <string name="side_camera_left_missing">Linke Kamera nicht verfügbar</string>
+    <string name="side_camera_right_missing">Rechte Kamera nicht verfügbar</string>
+    <string name="side_camera_oem_paused">Für OEM 360° pausiert</string>
+    <string name="side_camera_selected">Ausgewählt</string>
+    <string name="side_camera_not_selected">Nicht ausgewählt</string>
 </resources>

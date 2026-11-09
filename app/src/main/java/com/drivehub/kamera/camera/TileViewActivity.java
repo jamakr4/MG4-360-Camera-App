@@ -39,7 +39,8 @@ public class TileViewActivity extends AppCompatActivity {
     private android.content.SharedPreferences prefs;
     private final android.content.SharedPreferences.OnSharedPreferenceChangeListener prefListener = (sharedPreferences,
             key) -> {
-        if (UiPrefs.KEY_OEM_AVM_ACTIVE.equals(key)) runOnUiThread(this::refreshPreviews);
+        if (UiPrefs.KEY_OEM_AVM_ACTIVE.equals(key) || UiPrefs.KEY_OEM_CAMERA_ACCESS_BLOCKED.equals(key)
+                || UiPrefs.KEY_OEM_AVM_COEXIST.equals(key)) runOnUiThread(this::refreshPreviews);
         if (UiPrefs.KEY_TILE_CORNER_RADIUS.equals(key)) {
             applyCornerRadius();
         }
@@ -63,7 +64,7 @@ public class TileViewActivity extends AppCompatActivity {
             callbacks[i] = new SurfaceHolder.Callback() {
                 @Override
                 public void surfaceCreated(SurfaceHolder h) {
-                    if (!UiPrefs.isOemAvmActive(prefs)) CameraProbe.attachPreview(cameraIndex, h.getSurface());
+                    if (!UiPrefs.isOemCameraAccessBlocked(prefs)) CameraProbe.attachPreview(cameraIndex, h.getSurface());
                 }
 
                 @Override
@@ -81,7 +82,7 @@ public class TileViewActivity extends AppCompatActivity {
 
     private void refreshPreviews() {
         for (int i = 0; i < holders.length; i++) {
-            if (UiPrefs.isOemAvmActive(prefs)) CameraProbe.detachPreview(CAMERA_INDICES[i]);
+            if (UiPrefs.isOemCameraAccessBlocked(prefs)) CameraProbe.detachPreview(CAMERA_INDICES[i]);
             else if (sTileViewVisible && holders[i] != null && holders[i].getSurface().isValid())
                 CameraProbe.attachPreview(CAMERA_INDICES[i], holders[i].getSurface());
         }
