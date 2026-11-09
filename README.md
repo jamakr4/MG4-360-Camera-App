@@ -77,7 +77,7 @@ Community mod for the MG4 EV (AAOS 9, pre-2026 facelift) that replaces the stock
 
 <p align="center">
   <img src="images/DigitalRearView-IPK.jpg" alt="Digital rearview mirror on the driver instrument cluster (IPK)" width="48%">
-  <img src="images/CompactView.jpg" alt="Compact turn signal camera overlay" width="48%">
+  <img src="images/wheel_cam.jpg" alt="Compact turn signal camera overlay" width="48%">
 </p>
 
 <p align="center">
