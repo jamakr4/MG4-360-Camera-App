@@ -58,9 +58,6 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
     /** Min/max bounds for two-finger pinch resizing. */
     private static final int OVERLAY_MIN_WIDTH_PX = 240;
     private static final int OVERLAY_MAX_WIDTH_PX = 3840;
-    private static final long SIGNAL_FADE_IN_MS = 110L;
-    private static final long SIGNAL_FADE_OUT_MS = 90L;
-    private static final float SIGNAL_FADE_IN_START_ALPHA = 0.18f;
 
     private static final String PREFS_NAME = "overlay_prefs";
     private static final String KEY_LAST_X = "last_x";
@@ -505,7 +502,7 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
         if (overlayView == null || !shouldFadeInOnShow()) return;
         overlayView.animate()
                 .alpha(1f)
-                .setDuration(SIGNAL_FADE_IN_MS)
+                .setDuration(PreviewFadeController.FADE_IN_MS)
                 .setStartDelay(0L)
                 .start();
     }
@@ -522,7 +519,7 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
         overlayView.animate().cancel();
         overlayView.animate()
                 .alpha(0f)
-                .setDuration(SIGNAL_FADE_OUT_MS)
+                .setDuration(PreviewFadeController.FADE_OUT_MS)
                 .setStartDelay(0L)
                 .withEndAction(() -> {
                     if (!fadeOutPending) return;
@@ -758,7 +755,7 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
         if (migrate) saveOverlayLayoutPrefs();
         if (awaitingInitialGeometry && !fadeOutPending) {
             awaitingInitialGeometry = false;
-            overlayView.setAlpha(shouldFadeInOnShow() ? SIGNAL_FADE_IN_START_ALPHA : 1f);
+            overlayView.setAlpha(shouldFadeInOnShow() ? PreviewFadeController.FADE_IN_START_ALPHA : 1f);
             startFadeInIfNeeded();
         }
         com.drivehub.kamera.dev.DevRuntimeLog.add("FloatingGeometry", "camera origin="

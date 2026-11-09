@@ -225,7 +225,7 @@ public final class UiPrefs {
     }
 
     public static boolean isParkingRearWheelAlignmentEnabled(SharedPreferences prefs) {
-        return prefs.getBoolean(KEY_PARKING_REAR_WHEEL_ALIGNMENT, false);
+        return prefs.getBoolean(KEY_PARKING_REAR_WHEEL_ALIGNMENT, true);
     }
 
     public static void setParkingRearWheelAlignmentEnabled(SharedPreferences prefs, boolean enabled) {
@@ -233,7 +233,7 @@ public final class UiPrefs {
     }
 
     public static boolean isParkingHighlightMissingAreasEnabled(SharedPreferences prefs) {
-        return prefs.getBoolean(KEY_PARKING_HIGHLIGHT_MISSING_AREAS, false);
+        return prefs.getBoolean(KEY_PARKING_HIGHLIGHT_MISSING_AREAS, true);
     }
 
     public static void setParkingHighlightMissingAreasEnabled(SharedPreferences prefs, boolean enabled) {

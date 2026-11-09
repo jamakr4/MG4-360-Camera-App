@@ -724,6 +724,7 @@ public class SignalService extends Service {
     private void updateIpkRearview(DigitalRearviewPolicy.Outputs outputs) {
         if (ipkRearview == null) return;
         if (outputs.ipk) ipkRearview.show();
+        else if (outputs.fadeIpkExit) ipkRearview.hideWithFade();
         else ipkRearview.hide();
     }
 

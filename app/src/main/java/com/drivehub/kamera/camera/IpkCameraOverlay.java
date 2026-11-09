@@ -5,6 +5,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.graphics.Bitmap;
 import android.graphics.Outline;
 import android.graphics.PixelFormat;
 import android.graphics.Point;
@@ -24,6 +25,7 @@ import android.view.View;
 import android.view.ViewOutlineProvider;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import java.util.Locale;
 
 import androidx.core.content.ContextCompat;
@@ -32,6 +34,7 @@ import com.drivehub.kamera.R;
 import com.drivehub.kamera.dev.DevRuntimeLog;
 import com.drivehub.kamera.settings.UiPrefs;
 import com.drivehub.kamera.signal.DigitalRearviewPolicy;
+import com.drivehub.kamera.signal.SignalService;
 
 /** Main-thread window state, with independent preview and vehicle IO handlers. */
 public final class IpkCameraOverlay implements AutoCloseable {
@@ -48,6 +51,7 @@ public final class IpkCameraOverlay implements AutoCloseable {
     private final DisplayManager displays;
     private final IpkCarClient car;
     private FrameLayout root;
+    private PreviewFadeController fade;
     private TextureView texture;
     private WindowManager windows;
     private int displayId = -1;
@@ -111,20 +115,80 @@ public final class IpkCameraOverlay implements AutoCloseable {
     }
 
     public void hide() {
-        if (desiredCamera < 0) return;
+        if (desiredCamera < 0 && root == null) return;
         desiredCamera = -1;
         main.removeCallbacks(tick);
         destroyWindow();
     }
 
+    /** Release camera ownership immediately; only the already displayed panel fades out. */
+    public void hideWithFade() {
+        if (closed || desiredCamera < 0) return;
+        long now = SystemClock.elapsedRealtime();
+        if (root == null || fade == null || isBlocked() || !isSelectedScreen(now)
+                || now - lastFreshFrame > FRAME_TIMEOUT_MS) {
+            hide();
+            return;
+        }
+        fade.setEnabled(UiPrefs.isSmoothEntryEnabled(prefs));
+        desiredCamera = -1;
+        main.removeCallbacks(tick);
+        generation++;
+        main.removeCallbacks(checkFrames);
+        // A disconnect may post a cleared producer buffer. Freeze the displayed texture once
+        // before releasing the sink; urgent hide() paths never wait for this small UI copy.
+        if (fade.isRevealed() && UiPrefs.isSmoothEntryEnabled(prefs) && !freezeDisplayedFrame()) {
+            destroyWindow();
+            return;
+        }
+        detachOutput();
+        if (isBlocked() || !isSelectedScreen(SystemClock.elapsedRealtime())) {
+            destroyWindow();
+            return;
+        }
+        FrameLayout view = root;
+        int token = generation;
+        fade.hide(() -> {
+            if (root == view && token == generation) destroyWindow();
+        });
+        // Keep observing route/blocker changes until the closing panel has been removed.
+        scheduleNow();
+    }
+
+    private boolean freezeDisplayedFrame() {
+        if (texture == null || !texture.isAvailable()) return false;
+        try {
+            Bitmap frame = texture.getBitmap();
+            if (frame == null) return false;
+            ImageView still = new ImageView(root.getContext());
+            still.setImageBitmap(frame);
+            still.setScaleType(ImageView.ScaleType.FIT_XY);
+            still.setOutlineProvider(texture.getOutlineProvider());
+            still.setClipToOutline(true);
+            root.addView(still, new FrameLayout.LayoutParams((FrameLayout.LayoutParams) texture.getLayoutParams()));
+            return true;
+        } catch (RuntimeException failure) {
+            event("outgoing frame unavailable: " + failure.getClass().getSimpleName());
+            return false;
+        }
+    }
+
     private final SharedPreferences.OnSharedPreferenceChangeListener preferenceListener = (p, key) -> {
-        if (UiPrefs.KEY_DIGITAL_REARVIEW_DISPLAY_TARGET.equals(key)
-                || UiPrefs.KEY_DIGITAL_REARVIEW_IPK_SCREEN.equals(key)) {
+        if (UiPrefs.KEY_DIGITAL_REARVIEW_IPK_SCREEN.equals(key)) {
             main.post(() -> {
                 if (closed) return;
                 destroyWindow();
                 retryAfter = 0;
                 scheduleNow();
+            });
+        } else if (UiPrefs.KEY_DIGITAL_REARVIEW_DISPLAY_TARGET.equals(key)
+                || UiPrefs.KEY_DIGITAL_REARVIEW_ENABLED.equals(key)
+                || UiPrefs.KEY_OEM_AVM_ACTIVE.equals(key)
+                || UiPrefs.KEY_OEM_CAMERA_ACCESS_BLOCKED.equals(key)) {
+            main.post(() -> { if (!closed) { retryAfter = 0; scheduleNow(); } });
+        } else if (UiPrefs.KEY_SMOOTH_ENTRY.equals(key)) {
+            main.post(() -> {
+                if (!closed && fade != null) fade.setEnabled(UiPrefs.isSmoothEntryEnabled(p));
             });
         } else if (UiPrefs.KEY_TILE_CORNER_RADIUS.equals(key)) {
             main.post(() -> {
@@ -153,38 +217,51 @@ public final class IpkCameraOverlay implements AutoCloseable {
 
     private void scheduleNow() {
         main.removeCallbacks(tick);
-        if (!closed && desiredCamera >= 0) main.post(tick);
+        if (!closed && (desiredCamera >= 0 || root != null)) main.post(tick);
+    }
+
+    private boolean isBlocked() {
+        return !screenOn || SignalService.isReverseActive() || TileViewActivity.isVisible()
+                || UiPrefs.isOemAvmActive(prefs) || UiPrefs.isOemCameraAccessBlocked(prefs);
+    }
+
+    private boolean isSelectedScreen(long now) {
+        return now - tabObservedAt <= 1000
+                && IpkRoutePolicy.isSelectedScreen(tab, UiPrefs.getDigitalRearviewIpkScreen(prefs));
+    }
+
+    private boolean allowWindow(long now) {
+        if (isBlocked() || !isSelectedScreen(now)) {
+            destroyWindow();
+            return false;
+        }
+        if (desiredCamera < 0) return false;
+        if (!UiPrefs.isDigitalRearviewEnabled(prefs)
+                || !DigitalRearviewPolicy.usesIpk(UiPrefs.getDigitalRearviewDisplayTarget(prefs))) {
+            hideWithFade();
+            return false;
+        }
+        return true;
     }
 
     private final Runnable tick = new Runnable() {
         @Override public void run() {
-            if (closed || desiredCamera < 0) return;
+            if (closed || (desiredCamera < 0 && root == null)) return;
             long now = SystemClock.elapsedRealtime();
             if (screenOn && !readPending && (lastTabRead == 0 || now - lastTabRead >= 250)) {
                 readPending = true;
                 lastTabRead = now;
                 carIo.post(car::readTab);
             }
-            if (!screenOn || !UiPrefs.isDigitalRearviewEnabled(prefs)
-                    || !DigitalRearviewPolicy.usesIpk(
-                            UiPrefs.getDigitalRearviewDisplayTarget(prefs))
-                    || UiPrefs.isOemAvmActive(prefs)) {
+            // Also watch an outgoing panel: an urgent blocker must cancel its animation.
+            if (root != null && now - lastFreshFrame > FRAME_TIMEOUT_MS) {
+                event("camera watchdog expired; overlay released");
+                retryAfter = now + 2000;
                 destroyWindow();
-            } else {
-                // Release a frozen image even if an IO call stalls.
-                if (root != null && now - lastFreshFrame > FRAME_TIMEOUT_MS) {
-                    event("camera watchdog expired; overlay released");
-                    retryAfter = now + 2000;
-                    destroyWindow();
-                }
-                if (now - tabObservedAt > 1000) tab = null;
-                if (IpkRoutePolicy.isSelectedScreen(tab, UiPrefs.getDigitalRearviewIpkScreen(prefs))) {
-                    if (root == null && now >= retryAfter) createWindow();
-                } else {
-                    destroyWindow();
-                }
             }
-            main.postDelayed(this, POLL_MS);
+            if (allowWindow(now) && root == null && now >= retryAfter) createWindow();
+            main.removeCallbacks(this);
+            if (!closed && (desiredCamera >= 0 || root != null)) main.postDelayed(this, POLL_MS);
         }
     };
 
@@ -251,7 +328,16 @@ public final class IpkCameraOverlay implements AutoCloseable {
                     });
                 }
                 @Override public void onSurfaceTextureSizeChanged(SurfaceTexture st, int w, int h) { }
-                @Override public void onSurfaceTextureUpdated(SurfaceTexture st) { }
+                @Override public void onSurfaceTextureUpdated(SurfaceTexture st) {
+                    if (texture != preview || token != generation || fade == null || output == null) return;
+                    long now = SystemClock.elapsedRealtime();
+                    if (!allowWindow(now)) return;
+                    if (now - lastFreshFrame > FRAME_TIMEOUT_MS) {
+                        destroyWindow();
+                        return;
+                    }
+                    if (fade.onTextureFrame()) onFirstFrameShown(output);
+                }
                 @Override public boolean onSurfaceTextureDestroyed(SurfaceTexture st) {
                     if (texture == preview) {
                         detachOutput();
@@ -274,6 +360,7 @@ public final class IpkCameraOverlay implements AutoCloseable {
             params.x = bounds[0]; params.y = bounds[1];
             params.setTitle("MG4 digital rearview IPK");
             root = view;
+            fade = new PreviewFadeController(view, UiPrefs.isSmoothEntryEnabled(prefs));
             texture = preview;
             displayId = display.getDisplayId();
             windowCreated = SystemClock.elapsedRealtime();
@@ -295,6 +382,11 @@ public final class IpkCameraOverlay implements AutoCloseable {
                 side, IpkRoutePolicy.previewHeight(side), Gravity.CENTER));
     }
 
+    private void onFirstFrameShown(Output sink) {
+        sink.firstFrameMs = SystemClock.elapsedRealtime() - mirrorStarted;
+        event("camera visible on IPK, tab=" + tab + " start=" + sink.firstFrameMs + " ms");
+    }
+
     private final Runnable checkFrames = new Runnable() {
         @Override public void run() {
             if (closed || root == null || output == null || !output.attached || healthPending) return;
@@ -309,14 +401,11 @@ public final class IpkCameraOverlay implements AutoCloseable {
                         return;
                     }
                     long now = SystemClock.elapsedRealtime();
+                    if (!allowWindow(now)) return;
                     long age = stats == null ? -1 : stats[0];
                     if (age >= 0 && age <= FRAME_TIMEOUT_MS) {
-                        if (root.getAlpha() == 0f) {
-                            sink.firstFrameMs = now - mirrorStarted;
-                            event("camera visible on IPK, tab=" + tab + " start=" + sink.firstFrameMs + " ms");
-                        }
-                        root.setAlpha(1f);
                         lastFreshFrame = now - age;
+                        if (fade.onFrameHealth(true)) onFirstFrameShown(sink);
                         if (sink.sampledAt == 0) {
                             sink.sampledAt = now;
                             sink.sampledFrames = stats[1];
@@ -328,13 +417,16 @@ public final class IpkCameraOverlay implements AutoCloseable {
                         detail = "live · " + (sink.fps < 0 ? "FPS misst…" : String.format(Locale.ROOT, "%.1f FPS", sink.fps))
                                 + " · Start " + sink.firstFrameMs + " ms · Alter " + age
                                 + " ms · Ausgabe " + stats[2] + "/" + stats[3] + " ms";
-                    } else if (now - windowCreated > FRAME_TIMEOUT_MS) {
-                        detail = "no fresh camera frame; overlay released";
-                        event(detail);
-                        retryAfter = now + 2000;
-                        destroyWindow();
+                    } else {
+                        fade.onFrameHealth(false);
+                        if (now - windowCreated > FRAME_TIMEOUT_MS) {
+                            detail = "no fresh camera frame; overlay released";
+                            event(detail);
+                            retryAfter = now + 2000;
+                            destroyWindow();
+                        }
                     }
-                    if (root != null) main.postDelayed(this, root.getAlpha() == 0f ? 40 : 250);
+                    if (root != null) main.postDelayed(this, fade.isRevealed() ? 250 : 40);
                 });
             });
         }
@@ -352,7 +444,9 @@ public final class IpkCameraOverlay implements AutoCloseable {
     private void destroyWindow() {
         generation++;
         main.removeCallbacks(checkFrames);
+        if (desiredCamera < 0) main.removeCallbacks(tick);
         detachOutput();
+        if (fade != null) { fade.close(); fade = null; }
         FrameLayout view = root;
         root = null; texture = null; displayId = -1;
         if (view != null && windows != null) {

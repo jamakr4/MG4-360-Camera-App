@@ -174,8 +174,8 @@ To adjust the wheel views:
 
 1. Open `Settings` -> `Parking`.
 2. Expand **Align wheel views** using the chevron.
-3. Enable **Front axle** and **Rear axle** independently. Both are off by default.
-4. Optional: enable **Highlight missing areas** to replace uncovered black areas with diagonal hatching. This option is off by default and marks only areas outside the camera image; dark areas within the image keep their original appearance.
+3. Enable **Front axle** and **Rear axle** independently. Rear axle alignment is on by default; front axle alignment is off. Previously saved choices are preserved.
+4. **Highlight missing areas** is enabled by default and marks areas outside the camera image with diagonal hatching. Disable it to leave these areas black. Dark areas within the image keep their original appearance. Previously saved choices are preserved.
 
 Default alignment angles:
 
@@ -290,6 +290,7 @@ Behavior:
 - The "X" in the infotainment preview or switching Digital Rearview off via an external trigger stops the mirror on both displays, including during a temporary hide.
 - The companion trigger app and MG4Control shortcuts toggle the same mirror setting and use the selected display targets.
 - Opening the app or its settings hides the infotainment mirror while the IPK mirror stays active on its selected page.
+- **Smooth Entry** under `Settings` -> `Display` also controls the IPK mirror and is enabled by default. The entire IPK panel fades in over 110 ms after its first fresh camera frame is displayed, and fades out over 90 ms when the mirror is switched off or its IPK output is deselected. Camera access is released at the start of fade-out. Leaving the selected IPK page, unavailable page status, reverse gear, OEM takeover, camera failure, screen-off and display/service shutdown remove the panel immediately.
 - Reverse gear, OEM 360 and the four-camera tile view retain priority and pause the IPK mirror. It returns afterwards if still enabled and its selected IPK page is visible.
 
 </details>

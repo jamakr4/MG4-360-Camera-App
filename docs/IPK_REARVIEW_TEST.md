@@ -26,6 +26,18 @@ bei nicht lesbarem Seitenstatus wird kein Kamerafenster angezeigt. Beim Zurückw
 zur gewählten Seite erscheint der aktive Spiegel wieder. Es werden keine
 Fahrzeug-Properties zur Seitenwahl geschrieben und kein Navigationsfokus verändert.
 
+**Smooth Entry** unter **Einstellungen → Anzeige** gilt zusätzlich für die gesamte
+IPK-Spiegelfläche samt Hintergrund. Die vorhandene Einstellung bleibt standardmäßig
+aktiv. Erst nach einem frischen Kamerabild und dessen TextureView-Aktualisierung
+blendet die Fläche von 18 % auf 100 % über 110 ms ein. Beim Ausschalten des Spiegels
+oder Abwählen der IPK-Ausgabe blendet das zuletzt angezeigte Bild über 90 ms aus;
+der Kamera-Sink wird vor Beginn dieser Animation abgemeldet. Ohne Smooth Entry
+erfolgen die Übergänge sofort, die Erstbild-Prüfung bleibt aktiv.
+
+Seitenwechsel, unbekannter Seitenstatus, Rückwärtsgang, OEM-Übergabe, Kachelansicht,
+Kameraausfall, Displayverlust, Bildschirm-Aus und Dienstende entfernen die Fläche
+sofort und brechen laufende Animationen ab.
+
 ## Prüfung im Fahrzeug
 
 1. Rückspiegel aktivieren. Alle drei Anzeigeziele prüfen, auch nach App-Neustart.
@@ -53,13 +65,25 @@ Fahrzeug-Properties zur Seitenwahl geschrieben und kein Navigationsfokus veränd
    Blinken und nach Standby/Wiederaufwachen testen.
 8. Mit laufender Dashcam wiederholen: Aufnahme und Hauptvorschau müssen weiterlaufen,
    auch wenn die IPK-Seite gewechselt oder die IPK-Ausgabe beendet wird.
+9. Smooth Entry ein-/ausschalten: Nach dem ersten Kamerabild muss die gesamte Fläche
+   inklusive Hintergrund weich einblenden beziehungsweise sofort erscheinen. Spiegel
+   ausschalten und zwischen IPK/Beides/Infotainment wechseln; nur reguläres Ausschalten
+   oder Abwählen der IPK-Ausgabe darf weich ausblenden. App/Settings öffnen und zwischen
+   IPK und Beides wechseln, ohne die aktive IPK-Ausgabe neu einzublenden.
+10. Während Ein-/Ausblenden mehrfach schnell aus-/einschalten, Smooth Entry abschalten,
+    die IPK-Seite verlassen sowie OEM/R aktivieren. Neue Vorschauen dürfen nicht durch
+    ältere Abschluss-Callbacks verschwinden. Fremde Seiten müssen sofort frei werden;
+    OEM darf nicht auf das Ende einer Animation warten. Standby/Wiederaufwachen prüfen.
 
 ## Lokale Validierung
 
-Erfolgreich ausgeführt: `testDebugUnitTest` (63 Tests ohne Fehler, einschließlich
-App-Oberfläche, externem Ausschalten und gemeinsamen Sperren), `assembleDebug`,
-`assembleRelease`, `lintDebug` (keine Fehler) und der native
-`latest_preview_frame_test.cpp`. Die Prüfung am Fahrzeug steht noch aus.
+Für Smooth Entry lokal geprüft: `testDebugUnitTest` (71 Tests ohne Fehler,
+einschließlich IPK-Routing, Anzeigezielen und sofortigen Abbruchentscheidungen),
+`assembleDebug`, `assembleRelease` und `lintDebug` (keine Fehler).
+Im Android-13-Automotive-Simulator bestanden sieben Übergangstests einschließlich
+einer echten TextureView mit Testbild, drei OEM-Koexistenztests und zwei vorhandene
+Fenster-/Navigationsleisten-Tests. Die optische Wirkung im echten IPK sowie die
+Fahrzeug-Übergaben bleiben anhand der obigen Liste im Fahrzeug zu prüfen.
 
 Ausgabeereignisse: `adb logcat -s IpkCamera CameraStreamManager`; zusätzlich stehen
 sie im vorhandenen Entwickler-Ereignisprotokoll unter `IpkCamera`.

@@ -97,8 +97,8 @@ public class ParkingSettingsInstrumentedTest {
                 .putString(UiPrefs.KEY_ACCENT_COLOR, "#F08020").commit());
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
             assertFalse(UiPrefs.isParkingFrontWheelAlignmentEnabled(prefs));
-            assertFalse(UiPrefs.isParkingRearWheelAlignmentEnabled(prefs));
-            assertFalse(UiPrefs.isParkingHighlightMissingAreasEnabled(prefs));
+            assertTrue(UiPrefs.isParkingRearWheelAlignmentEnabled(prefs));
+            assertTrue(UiPrefs.isParkingHighlightMissingAreasEnabled(prefs));
             openParking(scenario);
             dialogView(R.id.parkingWheelAlignmentOptions).check(matches(withEffectiveVisibility(Visibility.GONE)));
             dialogView(R.id.switchSafetyWarning).check(matches(not(isChecked())));
@@ -109,8 +109,10 @@ public class ParkingSettingsInstrumentedTest {
 
             dialogView(R.id.rowParkingWheelAlignment).perform(click());
             dialogView(R.id.parkingWheelAlignmentOptions).check(matches(isDisplayed()));
-            dialogView(R.id.switchParkingHighlightMissingAreas).check(matches(not(isChecked()))).perform(click());
-            assertTrue(UiPrefs.isParkingHighlightMissingAreasEnabled(prefs));
+            dialogView(R.id.switchParkingRearWheelAlignment).check(matches(isChecked())).perform(click());
+            assertFalse(UiPrefs.isParkingRearWheelAlignmentEnabled(prefs));
+            dialogView(R.id.switchParkingHighlightMissingAreas).check(matches(isChecked())).perform(click());
+            assertFalse(UiPrefs.isParkingHighlightMissingAreasEnabled(prefs));
             assertFalse(UiPrefs.isParkingFrontWheelAlignmentEnabled(prefs));
             assertFalse(UiPrefs.isParkingRearWheelAlignmentEnabled(prefs));
             dialogView(R.id.ivParkingWheelAlignmentChevron).check((view, error) -> {
@@ -145,8 +147,8 @@ public class ParkingSettingsInstrumentedTest {
             dialogView(R.id.rowParkingWheelAlignment).perform(click());
             dialogView(R.id.switchParkingFrontWheelAlignment).check(matches(not(isChecked())));
             dialogView(R.id.switchParkingRearWheelAlignment).check(matches(isChecked()));
-            dialogView(R.id.switchParkingHighlightMissingAreas).check(matches(isChecked())).perform(click());
-            assertFalse(UiPrefs.isParkingHighlightMissingAreasEnabled(prefs));
+            dialogView(R.id.switchParkingHighlightMissingAreas).check(matches(not(isChecked()))).perform(click());
+            assertTrue(UiPrefs.isParkingHighlightMissingAreasEnabled(prefs));
             assertFalse(UiPrefs.isParkingFrontWheelAlignmentEnabled(prefs));
             assertTrue(UiPrefs.isParkingRearWheelAlignmentEnabled(prefs));
             dialogView(R.id.switchSafetyWarning).check(matches(isChecked()));

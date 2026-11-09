@@ -10,10 +10,12 @@ public final class DigitalRearviewPolicy {
 
     public static final class Outputs {
         public final boolean infotainment, ipk;
+        public final boolean fadeIpkExit;
 
-        private Outputs(boolean infotainment, boolean ipk) {
+        private Outputs(boolean infotainment, boolean ipk, boolean fadeIpkExit) {
             this.infotainment = infotainment;
             this.ipk = ipk;
+            this.fadeIpkExit = fadeIpkExit;
         }
     }
 
@@ -23,7 +25,8 @@ public final class DigitalRearviewPolicy {
         // is an independent output and must not be interrupted by those screens.
         return new Outputs(
                 showOnInfotainment(enabled, target, temporarilyHidden, vehicleBlocked || appUiVisible),
-                showOnIpk(enabled, target, vehicleBlocked));
+                showOnIpk(enabled, target, vehicleBlocked),
+                !vehicleBlocked && (!enabled || !usesIpk(target)));
     }
 
     public static int normalizeDisplayTarget(int target) {
