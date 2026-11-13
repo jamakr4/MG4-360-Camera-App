@@ -1,5 +1,7 @@
 package com.drivehub.kamera.boot;
 
+import com.drivehub.kamera.camera.CameraHandoffController;
+
 import com.drivehub.kamera.dashcam.RecordingService;
 import com.drivehub.kamera.signal.SignalService;
 
@@ -17,6 +19,8 @@ public class BootReceiver extends BroadcastReceiver {
             return;
         if (!Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction()))
             return;
+
+        CameraHandoffController.onBoot(context);
 
         try {
             RecordingService.startIfDashcamEnabled(context);

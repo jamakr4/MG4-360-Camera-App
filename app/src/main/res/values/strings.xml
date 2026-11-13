@@ -365,4 +365,6 @@
     <string name="side_camera_oem_paused">Paused for OEM 360°</string>
     <string name="side_camera_selected">Selected</string>
     <string name="side_camera_not_selected">Not selected</string>
+    <string name="shortcut_release_cameras">Release cameras</string>
+    <string name="shortcut_resume_cameras">Resume cameras</string>
 </resources>

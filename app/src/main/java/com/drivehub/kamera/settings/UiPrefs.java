@@ -70,6 +70,7 @@ public final class UiPrefs {
     public static final String KEY_DEV_OEM_AVM_MAX_SPEED_KMH = "devOemAvmMaxSpeedKmh";
     public static final String KEY_DEV_PERFORMANCE_OVERLAY_ENABLED = "devPerformanceOverlayEnabled";
     public static final String KEY_SAFETY_WARNING = "safetyWarning";
+    public static final String KEY_EXTERNAL_CAMERA_PAUSED = "externalCameraPaused";
     public static final String KEY_OEM_AVM_COEXIST = "oemCoexist";
     public static final String KEY_OEM_AVM_ACTIVE = "oemAvmActive";
     public static final String KEY_OEM_CAMERA_ACCESS_BLOCKED = "oemCameraAccessBlocked";
@@ -303,7 +304,8 @@ public final class UiPrefs {
     }
 
     public static boolean isOemCameraAccessBlocked(SharedPreferences prefs) {
-        return isOemAvmCoexistEnabled(prefs) && (isOemAvmActive(prefs)
+        return prefs.getBoolean(KEY_EXTERNAL_CAMERA_PAUSED, false)
+                || isOemAvmCoexistEnabled(prefs) && (isOemAvmActive(prefs)
                 || prefs.getBoolean(KEY_OEM_CAMERA_ACCESS_BLOCKED, false));
     }
 

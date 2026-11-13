@@ -298,7 +298,7 @@ Behavior:
 <details>
 <summary><strong>MG4Control shortcuts</strong></summary>
 
-With a version of [MG4Control](https://github.com/SliDeeN/MG4Control) that supports `App function` shortcuts, you can assign these two functions from **360 Cam** directly to a custom shortcut:
+With a version of [MG4Control](https://github.com/SliDeeN/MG4Control) that supports `App function` shortcuts, you can assign these functions from **360 Cam** directly to a custom shortcut:
 
 - **Toggle digital rearview** — switches the digital rearview on or off each time the shortcut is triggered.
 - **Save dashcam event** — saves an event recording. If continuous recording is off, it starts a future-only event recording.
@@ -308,6 +308,94 @@ The function names are shown in English or German according to the system langua
 Integration reference: [MG4Control receiver discovery and invocation](https://github.com/SliDeeN/MG4Control/issues/172#issuecomment-6522784068).
 
 </details>
+
+<details>
+<summary><strong>External camera handoff (Rivela and companion apps)</strong></summary>
+
+Two exported receivers hand all cameras between this app and a companion app. They
+also appear as **Release cameras** / **Resume cameras** in MG4Control's App functions
+(**Kameras freigeben** / **Kameras reaktivieren** on German systems).
+
+```sh
+adb shell am broadcast -n com.drivehub.kamera/.camera.CameraReleaseTriggerReceiver \
+  -a com.drivehub.kamera.action.RELEASE_CAMERAS
+adb shell am broadcast -n com.drivehub.kamera/.camera.CameraResumeTriggerReceiver \
+  -a com.drivehub.kamera.action.RESUME_CAMERAS
+```
+
+Release pauses the dashcam and all main, side, turn-signal and digital-rearview
+outputs, including IPK. It works even when **Allow OEM 360° camera app** is off.
+The pause has no 60-second fallback: it lasts until Resume, survives an app process
+restart, and is cleared after an infotainment reboot. Settings are preserved.
+Resume restores only the functions currently enabled and applicable; it does not
+enable continuous recording or open an Activity.
+
+Use an **ordered broadcast** to receive a completion callback. A normal broadcast
+performs the same action without returning a result. This complete Java helper
+works for either action:
+
+```java
+private void handOffCameras(Context context, boolean release) {
+    String action = release
+            ? "com.drivehub.kamera.action.RELEASE_CAMERAS"
+            : "com.drivehub.kamera.action.RESUME_CAMERAS";
+    String receiver = release
+            ? "com.drivehub.kamera.camera.CameraReleaseTriggerReceiver"
+            : "com.drivehub.kamera.camera.CameraResumeTriggerReceiver";
+    Intent intent = new Intent(action).setComponent(
+            new ComponentName("com.drivehub.kamera", receiver));
+    context.sendOrderedBroadcast(intent, null, new BroadcastReceiver() {
+        @Override public void onReceive(Context ctx, Intent ignored) {
+            Bundle result = getResultExtras(false);
+            if (result == null) {
+                Log.w("CameraHandoff", "No compatible receiver replied");
+                return;
+            }
+            boolean success = getResultCode() == Activity.RESULT_OK
+                    && result.getBoolean("success", false);
+            Boolean claimed = result.containsKey("claimed")
+                    ? result.getBoolean("claimed") : null;
+            Log.i("CameraHandoff", "status=" + result.getString("status")
+                    + " success=" + success + " claimed=" + claimed
+                    + " blocked=" + result.getBoolean("blocked"));
+            // Open your own cameras only after a successful "released" response.
+            // Close your cameras BEFORE requesting Resume.
+        }
+    }, new Handler(Looper.getMainLooper()), Activity.RESULT_CANCELED, null, null);
+}
+```
+
+Imports: `android.app.Activity`, `android.content.BroadcastReceiver`,
+`android.content.ComponentName`, `android.content.Context`, `android.content.Intent`,
+`android.os.Bundle`, `android.os.Handler`, `android.os.Looper`, `android.util.Log`.
+
+The receiver finishes once within five seconds. Result extras:
+
+| Extra | Meaning |
+| --- | --- |
+| `success` | The requested transition completed. Result code is `Activity.RESULT_OK`; otherwise `Activity.RESULT_CANCELED`. |
+| `claimed` | This app actually has at least one camera device open. Omitted if ownership cannot be measured. |
+| `blocked` | The effective camera gate prevents this app from opening cameras. |
+| `status` | `released`, `claimed`, `idle`, `blocked`, `timeout`, or `error`. |
+
+`released` confirms zero open camera devices and no opening operation in flight.
+`claimed` confirms successful starts for all currently needed outputs; `idle` means
+there is no active camera demand. `blocked` means another restriction, such as OEM
+360 ownership or reverse gear, still prevents reactivation. `timeout` reports the
+measured state without undoing the requested pause. A slow operation may finish
+later; repeating the same trigger is safe. `error` means processing failed or a
+newer opposite request superseded this one.
+
+The response describes **this app's** ownership, not whether every other app has
+released the hardware. OEM STOP and the OEM timeout cannot cancel an external
+pause, and external Resume cannot cancel an OEM pause. There is one global
+external pause, without independent sessions for multiple companion apps.
+
+Vehicle verification with Rivela is documented in
+[the camera handoff checklist](CAMERA_HANDOFF.md).
+
+</details>
+
 
 ## Build Setup
 

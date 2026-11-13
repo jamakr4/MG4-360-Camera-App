@@ -35,7 +35,7 @@ public final class SideCameraPanel extends ViewGroup {
                 || UiPrefs.KEY_DEV_PARKING_FRONT_WHEEL_ANGLE.equals(key)
                 || UiPrefs.KEY_DEV_PARKING_REAR_WHEEL_ANGLE.equals(key)) {
             updateWheelAlignment();
-        } else if (UiPrefs.KEY_OEM_AVM_ACTIVE.equals(key) || UiPrefs.KEY_OEM_AVM_COEXIST.equals(key)
+        } else if (UiPrefs.KEY_OEM_AVM_ACTIVE.equals(key) || UiPrefs.KEY_OEM_AVM_COEXIST.equals(key) || UiPrefs.KEY_EXTERNAL_CAMERA_PAUSED.equals(key)
                 || UiPrefs.KEY_OEM_CAMERA_ACCESS_BLOCKED.equals(key)) {
             updateOemState();
         }
