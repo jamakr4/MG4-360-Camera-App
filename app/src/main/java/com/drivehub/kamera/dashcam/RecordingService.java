@@ -109,6 +109,7 @@ public class RecordingService extends Service {
     private volatile boolean stopRequested = false;
     private volatile boolean segmentStopRequested = false;
     private volatile boolean oemPauseRequested = false;
+    private volatile boolean oemAwaitingStop = false;
     private volatile int pendingErrorSubtitleResId = 0;
     private volatile int pendingErrorNotificationResId = 0;
     private volatile int pendingErrorGeneration = 0;
@@ -212,8 +213,14 @@ public class RecordingService extends Service {
             } else if (oemPauseRequested) {
                 if (oemGoneAt == 0) oemGoneAt = now;
                 long grace = oemSeenAt == 0 || oemGoneAt - oemSeenAt < 1500 ? 8000 : 2000;
-                if (!SignalService.isReverseActive()
-                        && OemPausePolicy.shouldResume(foreground, now, oemAskedAt, oemGoneAt, grace)) {
+                boolean resume;
+                synchronized (stateLock) {
+                    resume = !SignalService.isReverseActive()
+                            && OemPausePolicy.shouldResume(foreground, oemAwaitingStop,
+                                    now, oemAskedAt, oemGoneAt, grace);
+                    if (resume) oemAwaitingStop = false;
+                }
+                if (resume) {
                     SignalService.setOemAvmActive(this, false);
                     resumeAfterOemRequest(this);
                 }
@@ -287,6 +294,10 @@ public class RecordingService extends Service {
     }
 
     public static void pauseForOemRequest(Context context) {
+        pauseForOemRequest(context, false);
+    }
+
+    static void pauseForOemRequest(Context context, boolean fromStartBroadcast) {
         SharedPreferences prefs = UiPrefs.getPrefs(context);
         if ((!prefs.getBoolean(DashcamSettingsController.KEY_ENABLED, false)
                 && !(instance != null && (instance.futureOnlyEventSession || instance.worker != null))) || !isRunning()) {
@@ -295,6 +306,11 @@ public class RecordingService extends Service {
         RecordingService live = instance;
         if (live != null) {
             synchronized (live.stateLock) {
+                // A launch/foreground pause may precede ACTION_START; upgrade it before returning.
+                if (fromStartBroadcast && !live.oemAwaitingStop) {
+                    live.oemAwaitingStop = true;
+                    live.oemAskedAt = SystemClock.elapsedRealtime();
+                }
                 if (live.oemPauseRequested) return;
                 live.oemAskedAt = SystemClock.elapsedRealtime();
                 live.oemPauseRequested = true;
@@ -309,6 +325,17 @@ public class RecordingService extends Service {
     }
 
     public static void resumeAfterOemRequest(Context context) {
+        resumeAfterOemRequest(context, false);
+    }
+
+    static void resumeAfterOemRequest(Context context, boolean fromStopBroadcast) {
+        RecordingService live = instance;
+        if (fromStopBroadcast && live != null) {
+            // Release the broadcast latch even if reverse/overlay recovery still blocks cameras.
+            synchronized (live.stateLock) {
+                live.oemAwaitingStop = false;
+            }
+        }
         SharedPreferences prefs = UiPrefs.getPrefs(context);
         if (UiPrefs.isOemCameraAccessBlocked(prefs)) return;
         if ((!prefs.getBoolean(DashcamSettingsController.KEY_ENABLED, false)
@@ -434,15 +461,18 @@ public class RecordingService extends Service {
 
         if (ACTION_RESUME_AFTER_OEM_REQUEST.equals(action)) {
             if (UiPrefs.isOemCameraAccessBlocked(prefs())) return START_STICKY;
-            DevRuntimeLog.add("RecordingService", "ACTION_RESUME_AFTER_OEM_REQUEST");
-            boolean wasPaused = STATUS_PAUSED_OEM.equals(prefs().getString(KEY_STATUS, STATUS_OFF));
-            oemPauseRequested = false;
-            oemAskedAt = oemGoneAt = oemSeenAt = 0;
-            lastSegmentAt = SystemClock.elapsedRealtime();
-            segmentStopRequested = false;
             synchronized (stateLock) {
+                // Other lifecycle/foreground fallbacks must not override an outstanding ACTION_START.
+                if (oemAwaitingStop && UiPrefs.isOemAvmCoexistEnabled(prefs())) return START_STICKY;
+                oemPauseRequested = false;
+                oemAwaitingStop = false;
+                oemAskedAt = oemGoneAt = oemSeenAt = 0;
+                lastSegmentAt = SystemClock.elapsedRealtime();
+                segmentStopRequested = false;
                 stateLock.notifyAll();
             }
+            DevRuntimeLog.add("RecordingService", "ACTION_RESUME_AFTER_OEM_REQUEST");
+            boolean wasPaused = STATUS_PAUSED_OEM.equals(prefs().getString(KEY_STATUS, STATUS_OFF));
             boolean enabled = prefs().getBoolean(DashcamSettingsController.KEY_ENABLED, false) || futureOnlyEventSession;
             if (!enabled) {
                 if (worker == null) {
@@ -807,6 +837,7 @@ public class RecordingService extends Service {
         stopRequested = false;
         segmentStopRequested = false;
         oemPauseRequested = false;
+        oemAwaitingStop = false;
         startForeground(NOTIF_ID, buildNotification(getString(R.string.notification_recording_starting)));
         publishStatus(STATUS_STARTING, 0, TOTAL_CAMERAS, "");
         worker = recordingWorker(this::recordFutureOnlyEventLoop, "RecordingServiceFutureEventWorker");
@@ -1218,6 +1249,7 @@ public class RecordingService extends Service {
         stopRequested = true;
         segmentStopRequested = true;
         oemPauseRequested = false;
+        oemAwaitingStop = false;
         synchronized (stateLock) {
             stateLock.notifyAll();
         }
