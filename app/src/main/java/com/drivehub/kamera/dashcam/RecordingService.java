@@ -3,6 +3,7 @@ package com.drivehub.kamera.dashcam;
 import com.drivehub.kamera.R;
 
 import com.drivehub.kamera.CameraProbe;
+import com.drivehub.kamera.camera.CameraHandoffController;
 import com.drivehub.kamera.dev.DevRuntimeLog;
 import com.drivehub.kamera.helper.app.NotificationChannelHelper;
 import com.drivehub.kamera.helper.vehiclesensors.VehicleSpeedReader;
@@ -109,6 +110,7 @@ public class RecordingService extends Service {
     private volatile boolean stopRequested = false;
     private volatile boolean segmentStopRequested = false;
     private volatile boolean oemPauseRequested = false;
+    private volatile boolean oemAwaitingStop = false;
     private volatile int pendingErrorSubtitleResId = 0;
     private volatile int pendingErrorNotificationResId = 0;
     private volatile int pendingErrorGeneration = 0;
@@ -139,6 +141,7 @@ public class RecordingService extends Service {
     private long remaining(long deadline) { return Math.max(0, deadline - SystemClock.elapsedRealtime()); }
 
     private Thread recordingWorker(Runnable work, String name) {
+        CameraHandoffController.demand("recording", true);
         lastSegmentAt = SystemClock.elapsedRealtime();
         watchdogFailed = false;
         return new Thread(() -> {
@@ -154,6 +157,8 @@ public class RecordingService extends Service {
                 if (unfinished != null && !isReadableClip(unfinished)) discardClip(unfinished);
                 recordingFile = null;
                 worker = null;
+                CameraHandoffController.demand("recording", !stopRequested
+                        && prefs().getBoolean(DashcamSettingsController.KEY_ENABLED, false));
                 stopServiceIfNotEjecting();
             }
         }, name);
@@ -209,16 +214,22 @@ public class RecordingService extends Service {
                     SignalService.setOemAvmActive(this, true);
                     pauseForOemRequest(this);
                 }
-            } else if (oemPauseRequested) {
+            } else if (oemPauseRequested && !prefs().getBoolean(UiPrefs.KEY_EXTERNAL_CAMERA_PAUSED, false)) {
                 if (oemGoneAt == 0) oemGoneAt = now;
                 long grace = oemSeenAt == 0 || oemGoneAt - oemSeenAt < 1500 ? 8000 : 2000;
-                if (!SignalService.isReverseActive()
-                        && OemPausePolicy.shouldResume(foreground, now, oemAskedAt, oemGoneAt, grace)) {
+                boolean resume;
+                synchronized (stateLock) {
+                    resume = !SignalService.isReverseActive()
+                            && OemPausePolicy.shouldResume(foreground, oemAwaitingStop,
+                                    now, oemAskedAt, oemGoneAt, grace);
+                    if (resume) oemAwaitingStop = false;
+                }
+                if (resume) {
                     SignalService.setOemAvmActive(this, false);
                     resumeAfterOemRequest(this);
                 }
             }
-        } else if (oemPauseRequested) {
+        } else if (oemPauseRequested && !prefs().getBoolean(UiPrefs.KEY_EXTERNAL_CAMERA_PAUSED, false)) {
             SignalService.setOemAvmActive(this, false);
             resumeAfterOemRequest(this);
         }
@@ -249,6 +260,7 @@ public class RecordingService extends Service {
         boolean enabled = prefs.getBoolean(DashcamSettingsController.KEY_ENABLED, false);
         if (!enabled)
             return;
+        CameraHandoffController.demand("recording", true);
         Intent i = new Intent(context, RecordingService.class);
         i.setAction(ACTION_START);
         context.startForegroundService(i);
@@ -287,6 +299,10 @@ public class RecordingService extends Service {
     }
 
     public static void pauseForOemRequest(Context context) {
+        pauseForOemRequest(context, false);
+    }
+
+    static void pauseForOemRequest(Context context, boolean fromStartBroadcast) {
         SharedPreferences prefs = UiPrefs.getPrefs(context);
         if ((!prefs.getBoolean(DashcamSettingsController.KEY_ENABLED, false)
                 && !(instance != null && (instance.futureOnlyEventSession || instance.worker != null))) || !isRunning()) {
@@ -295,6 +311,11 @@ public class RecordingService extends Service {
         RecordingService live = instance;
         if (live != null) {
             synchronized (live.stateLock) {
+                // A launch/foreground pause may precede ACTION_START; upgrade it before returning.
+                if (fromStartBroadcast && !live.oemAwaitingStop) {
+                    live.oemAwaitingStop = true;
+                    live.oemAskedAt = SystemClock.elapsedRealtime();
+                }
                 if (live.oemPauseRequested) return;
                 live.oemAskedAt = SystemClock.elapsedRealtime();
                 live.oemPauseRequested = true;
@@ -309,6 +330,17 @@ public class RecordingService extends Service {
     }
 
     public static void resumeAfterOemRequest(Context context) {
+        resumeAfterOemRequest(context, false);
+    }
+
+    static void resumeAfterOemRequest(Context context, boolean fromStopBroadcast) {
+        RecordingService live = instance;
+        if (fromStopBroadcast && live != null) {
+            // Release the broadcast latch even if reverse/overlay recovery still blocks cameras.
+            synchronized (live.stateLock) {
+                live.oemAwaitingStop = false;
+            }
+        }
         SharedPreferences prefs = UiPrefs.getPrefs(context);
         if (UiPrefs.isOemCameraAccessBlocked(prefs)) return;
         if ((!prefs.getBoolean(DashcamSettingsController.KEY_ENABLED, false)
@@ -434,15 +466,18 @@ public class RecordingService extends Service {
 
         if (ACTION_RESUME_AFTER_OEM_REQUEST.equals(action)) {
             if (UiPrefs.isOemCameraAccessBlocked(prefs())) return START_STICKY;
-            DevRuntimeLog.add("RecordingService", "ACTION_RESUME_AFTER_OEM_REQUEST");
-            boolean wasPaused = STATUS_PAUSED_OEM.equals(prefs().getString(KEY_STATUS, STATUS_OFF));
-            oemPauseRequested = false;
-            oemAskedAt = oemGoneAt = oemSeenAt = 0;
-            lastSegmentAt = SystemClock.elapsedRealtime();
-            segmentStopRequested = false;
             synchronized (stateLock) {
+                // Other lifecycle/foreground fallbacks must not override an outstanding ACTION_START.
+                if (oemAwaitingStop && UiPrefs.isOemAvmCoexistEnabled(prefs())) return START_STICKY;
+                oemPauseRequested = false;
+                oemAwaitingStop = false;
+                oemAskedAt = oemGoneAt = oemSeenAt = 0;
+                lastSegmentAt = SystemClock.elapsedRealtime();
+                segmentStopRequested = false;
                 stateLock.notifyAll();
             }
+            DevRuntimeLog.add("RecordingService", "ACTION_RESUME_AFTER_OEM_REQUEST");
+            boolean wasPaused = STATUS_PAUSED_OEM.equals(prefs().getString(KEY_STATUS, STATUS_OFF));
             boolean enabled = prefs().getBoolean(DashcamSettingsController.KEY_ENABLED, false) || futureOnlyEventSession;
             if (!enabled) {
                 if (worker == null) {
@@ -665,6 +700,8 @@ public class RecordingService extends Service {
     }
 
     private boolean recordClip(File baseDir, long durationMs, String baseName, int keepSegments) {
+        CameraHandoffController.demand("recording", true);
+        long handoffGeneration = CameraHandoffController.generation();
         expectedSegmentMs = Math.max(1000, durationMs);
         SharedPreferences prefs = prefs();
         int recordingFps = DashcamSettingsController.getRecordingFps(prefs);
@@ -693,6 +730,17 @@ public class RecordingService extends Service {
         if (!started) {
             discardClip(outputFile);
             recordingFile = null;
+            // The external gate closes before preference notifications and the pause intent.
+            // Losing an in-flight start to that handoff is a pause, not a camera-open error.
+            if (oemPauseRequested || CameraProbe.isOemCameraAccessBlocked()) {
+                synchronized (stateLock) {
+                    if (!oemPauseRequested) oemAskedAt = SystemClock.elapsedRealtime();
+                    oemPauseRequested = true;
+                    segmentStopRequested = true;
+                }
+                publishStatus(STATUS_PAUSED_OEM, 0, TOTAL_CAMERAS, "");
+                return true;
+            }
             publishStatus(STATUS_ERROR, 0, TOTAL_CAMERAS, ERROR_GRID_START_FAILED);
             return false;
         }
@@ -710,6 +758,7 @@ public class RecordingService extends Service {
                 lastSamples = samples;
                 lastProgressAt = SystemClock.elapsedRealtime();
                 if (!announced && !oemPauseRequested) {
+                    CameraHandoffController.ready("recording", true, handoffGeneration);
                     publishStatus(STATUS_RECORDING, selectedCameraCount, TOTAL_CAMERAS, "");
                     announced = true;
                 }
@@ -729,6 +778,7 @@ public class RecordingService extends Service {
         }
 
         boolean urgent = oemPauseRequested;
+        if (urgent) CameraHandoffController.ready("recording", false, CameraHandoffController.generation());
         if (urgent) CameraProbe.detachAllPreviews();
         long stoppingAt = SystemClock.elapsedRealtime();
         boolean stopped = CameraProbe.stopCombinedMp4Record(
@@ -806,7 +856,9 @@ public class RecordingService extends Service {
         futureOnlyEventSession = true;
         stopRequested = false;
         segmentStopRequested = false;
-        oemPauseRequested = false;
+        oemPauseRequested = UiPrefs.isOemCameraAccessBlocked(prefs());
+        segmentStopRequested = oemPauseRequested;
+        oemAwaitingStop = false;
         startForeground(NOTIF_ID, buildNotification(getString(R.string.notification_recording_starting)));
         publishStatus(STATUS_STARTING, 0, TOTAL_CAMERAS, "");
         worker = recordingWorker(this::recordFutureOnlyEventLoop, "RecordingServiceFutureEventWorker");
@@ -1215,9 +1267,11 @@ public class RecordingService extends Service {
     }
 
     private void shutdownRecordingServiceWithoutStopSelf() {
+        CameraHandoffController.demand("recording", false);
         stopRequested = true;
         segmentStopRequested = true;
         oemPauseRequested = false;
+        oemAwaitingStop = false;
         synchronized (stateLock) {
             stateLock.notifyAll();
         }
@@ -1333,6 +1387,9 @@ public class RecordingService extends Service {
     }
 
     private void publishStatus(String status, int activeCameras, int totalCameras, String lastError) {
+        if (STATUS_ERROR.equals(status)) {
+            CameraHandoffController.failed("recording", CameraHandoffController.generation());
+        }
         if (status == null)
             status = STATUS_OFF;
         if (lastError == null)

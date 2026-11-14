@@ -24,6 +24,7 @@
         tools:ignore="ProtectedPermissions" />
 
     <application
+        android:name=".camera.CameraHandoffApplication"
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -104,6 +105,26 @@
             android:label="@string/shortcut_toggle_digital_rearview">
             <intent-filter>
                 <action android:name="com.drivehub.kamera.action.SET_DIGITAL_REARVIEW" />
+                <action android:name="com.mg4.control.action.SHORTCUT" />
+            </intent-filter>
+        </receiver>
+        <receiver
+            android:name=".camera.CameraReleaseTriggerReceiver"
+            android:enabled="true"
+            android:exported="true"
+            android:label="@string/shortcut_release_cameras">
+            <intent-filter>
+                <action android:name="com.drivehub.kamera.action.RELEASE_CAMERAS" />
+                <action android:name="com.mg4.control.action.SHORTCUT" />
+            </intent-filter>
+        </receiver>
+        <receiver
+            android:name=".camera.CameraResumeTriggerReceiver"
+            android:enabled="true"
+            android:exported="true"
+            android:label="@string/shortcut_resume_cameras">
+            <intent-filter>
+                <action android:name="com.drivehub.kamera.action.RESUME_CAMERAS" />
                 <action android:name="com.mg4.control.action.SHORTCUT" />
             </intent-filter>
         </receiver>

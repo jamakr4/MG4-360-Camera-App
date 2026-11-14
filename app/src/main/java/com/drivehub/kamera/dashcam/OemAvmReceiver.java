@@ -55,13 +55,13 @@ public class OemAvmReceiver extends BroadcastReceiver {
             }
             Log.i(TAG, "OEM AVM start/launch received: " + action);
             SignalService.setOemAvmActive(context, true);
-            RecordingService.pauseForOemRequest(context);
+            RecordingService.pauseForOemRequest(context, ACTION_AVM_START.equals(action));
             return;
         }
         if (ACTION_AVM_STOP.equals(action)) {
             Log.i(TAG, "OEM AVM stop received");
             SignalService.setOemAvmActive(context, false);
-            RecordingService.resumeAfterOemRequest(context);
+            RecordingService.resumeAfterOemRequest(context, true);
         }
     }
 }

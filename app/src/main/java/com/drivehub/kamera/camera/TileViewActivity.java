@@ -40,7 +40,7 @@ public class TileViewActivity extends AppCompatActivity {
     private final android.content.SharedPreferences.OnSharedPreferenceChangeListener prefListener = (sharedPreferences,
             key) -> {
         if (UiPrefs.KEY_OEM_AVM_ACTIVE.equals(key) || UiPrefs.KEY_OEM_CAMERA_ACCESS_BLOCKED.equals(key)
-                || UiPrefs.KEY_OEM_AVM_COEXIST.equals(key)) runOnUiThread(this::refreshPreviews);
+                || UiPrefs.KEY_OEM_AVM_COEXIST.equals(key) || UiPrefs.KEY_EXTERNAL_CAMERA_PAUSED.equals(key)) runOnUiThread(this::refreshPreviews);
         if (UiPrefs.KEY_TILE_CORNER_RADIUS.equals(key)) {
             applyCornerRadius();
         }
@@ -64,7 +64,7 @@ public class TileViewActivity extends AppCompatActivity {
             callbacks[i] = new SurfaceHolder.Callback() {
                 @Override
                 public void surfaceCreated(SurfaceHolder h) {
-                    if (!UiPrefs.isOemCameraAccessBlocked(prefs)) CameraProbe.attachPreview(cameraIndex, h.getSurface());
+                    refreshPreviews();
                 }
 
                 @Override
@@ -73,6 +73,7 @@ public class TileViewActivity extends AppCompatActivity {
 
                 @Override
                 public void surfaceDestroyed(SurfaceHolder h) {
+                    CameraHandoffController.demand("tile-" + cameraIndex, false);
                     CameraProbe.detachPreview(cameraIndex);
                 }
             };
@@ -82,9 +83,17 @@ public class TileViewActivity extends AppCompatActivity {
 
     private void refreshPreviews() {
         for (int i = 0; i < holders.length; i++) {
-            if (UiPrefs.isOemCameraAccessBlocked(prefs)) CameraProbe.detachPreview(CAMERA_INDICES[i]);
-            else if (sTileViewVisible && holders[i] != null && holders[i].getSurface().isValid())
-                CameraProbe.attachPreview(CAMERA_INDICES[i], holders[i].getSurface());
+            String key = "tile-" + CAMERA_INDICES[i];
+            boolean needed = sTileViewVisible && holders[i] != null && holders[i].getSurface().isValid();
+            CameraHandoffController.demand(key, needed);
+            long token = CameraHandoffController.generation();
+            if (UiPrefs.isOemCameraAccessBlocked(prefs)) {
+                CameraProbe.detachPreview(CAMERA_INDICES[i]);
+                CameraHandoffController.ready(key, false, token);
+            } else if (needed) {
+                CameraHandoffController.ready(key,
+                        CameraProbe.attachPreview(CAMERA_INDICES[i], holders[i].getSurface()), token);
+            }
         }
     }
 
@@ -135,6 +144,7 @@ public class TileViewActivity extends AppCompatActivity {
     @Override
     protected void onStop() {
         sTileViewVisible = false;
+        for (int camera : CAMERA_INDICES) CameraHandoffController.demand("tile-" + camera, false);
         prefs.unregisterOnSharedPreferenceChangeListener(prefListener);
         SignalService.requestRecheck();
         super.onStop();

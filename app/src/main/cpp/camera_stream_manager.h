@@ -2,6 +2,7 @@
 
 #include <jni.h>
 #include "side_camera_preview.h"
+#include "camera_access_gate.h"
 
 #include <string>
 #include <cstdint>
@@ -11,6 +12,8 @@ namespace camera_stream_manager {
 
 void setOemCameraAccessBlocked(bool blocked);
 bool isOemCameraAccessBlocked();
+CameraAccessGate& cameraAccessGate();
+void releaseCameraPreviewsForHandoff();
 
 void enableSideCameraPreviews();
 void setSideCameraWheelsMode(bool wheels);
