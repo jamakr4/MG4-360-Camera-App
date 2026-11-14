@@ -261,6 +261,12 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         previewResumed = true;
         SignalService.refreshCameraAccess(this);
         AppSystemBars.apply(getWindow());
+        if (RecordingService.isSurveillanceActive(this) && !RecordingService.isRunning()) {
+            try { RecordingService.startIfDashcamEnabled(this); }
+            catch (RuntimeException error) {
+                com.drivehub.kamera.remote.RemoteRecording.state(this, "error", "foreground_start_rejected", "", -1, "");
+            }
+        }
         sideCameraPanel.resumeDisplay();
         startPreviewIfReady();
     }
@@ -390,7 +396,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         boolean enabled = DashcamSettingsController.isTestRecordEnabled(prefs);
         int durationSec = DashcamSettingsController.getTestRecordDurationSec(prefs);
         btnRecordTestClip.setVisibility(enabled ? View.VISIBLE : View.GONE);
-        btnRecordTestClip.setEnabled(enabled);
+        btnRecordTestClip.setEnabled(enabled && !RecordingService.isSurveillanceActive(this));
         btnRecordTestClip.setText(getString(R.string.main_button_record_test_30s, durationSec));
     }
 
@@ -410,7 +416,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 || RecordingService.STATUS_STARTING.equals(status)
                 || RecordingService.STATUS_PAUSED_OEM.equals(status);
         btnRecordTestClip.setText(getString(R.string.main_button_record_test_30s, durationSec));
-        btnRecordTestClip.setEnabled(settingEnabled && !recordingInProgress);
+        btnRecordTestClip.setEnabled(settingEnabled && !recordingInProgress && !RecordingService.isSurveillanceActive(this));
     }
 
     private void restartPreviewAfterTestClipIfNeeded() {

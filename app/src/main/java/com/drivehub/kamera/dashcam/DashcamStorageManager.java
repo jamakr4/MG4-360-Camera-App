@@ -6,6 +6,7 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Build;
+import android.os.StatFs;
 import android.os.storage.StorageManager;
 import android.os.storage.StorageVolume;
 import android.provider.DocumentsContract;
@@ -417,7 +418,9 @@ public final class DashcamStorageManager {
         List<File> usable = new ArrayList<>();
         boolean anyWriteTestFailed = false;
         boolean outOfSpace = false;
+        File failedDirectory = null;
         for (UsbCandidate candidate : prioritized) {
+            if (failedDirectory == null) failedDirectory = candidate.rootDir;
             File accepted = null;
             for (File recordsDir : recordsDirCandidates(candidate, selectedLocation)) {
                 boolean existed = recordsDir.isDirectory();
@@ -429,12 +432,14 @@ public final class DashcamStorageManager {
                     continue;
                 }
                 if (!recordsDir.canWrite()) {
+                    failedDirectory = recordsDir;
                     Log.i(TAG, "no: not writable " + recordsDir.getAbsolutePath()
                             + " (existed=" + existed + " " + describeFile(recordsDir) + ")");
                     continue;
                 }
                 String probeError = writeProbeError(recordsDir);
                 if (probeError != null) {
+                    failedDirectory = recordsDir;
                     anyWriteTestFailed = true;
                     outOfSpace |= probeError.toLowerCase(Locale.US).contains("no space left")
                             || probeError.toLowerCase(Locale.US).contains("enospc");
@@ -462,7 +467,113 @@ public final class DashcamStorageManager {
             return new UsbProbe(UsbState.MULTIPLE_MEDIA, null);
         }
         return new UsbProbe(
-                outOfSpace ? UsbState.OUT_OF_SPACE : anyWriteTestFailed ? UsbState.WRITE_TEST_FAILED : UsbState.NOT_WRITABLE, null);
+                outOfSpace ? UsbState.OUT_OF_SPACE : anyWriteTestFailed ? UsbState.WRITE_TEST_FAILED : UsbState.NOT_WRITABLE,
+                failedDirectory);
+    }
+
+    public static final class UsbDiagnostic {
+        public final String status;
+        public final File directory;
+        public final boolean writable;
+        public final long freeBytes, totalBytes;
+
+        public UsbDiagnostic(String status, File directory, boolean writable) {
+            this.status = status;
+            this.directory = directory;
+            this.writable = writable;
+            long free = -1, total = -1;
+            try {
+                if (directory != null) {
+                    StatFs stat = new StatFs(directory.getAbsolutePath());
+                    free = stat.getAvailableBytes();
+                    total = stat.getTotalBytes();
+                }
+            } catch (Exception ignored) { /* Unknown is not an empty drive. */ }
+            freeBytes = free;
+            totalBytes = total;
+        }
+    }
+
+    /** Explicit USB diagnostics ignore the normal recording target and never reclaim files. */
+    public static UsbDiagnostic testUsbWrite(Context context) {
+        if (!StorageIoGate.begin()) return new UsbDiagnostic("busy", null, false);
+        try {
+            UsbProbe probe = probeUsb(context);
+            return new UsbDiagnostic(probe.state.name().toLowerCase(Locale.ROOT),
+                    probe.recordsDir, probe.state == UsbState.OK);
+        } finally { StorageIoGate.end(); }
+    }
+
+    /** Discovery deliberately does not require a successful write on an already-full drive. */
+    static Resolution discoverSurveillanceDestination(Context context) throws java.io.IOException {
+        int target = getStorageTarget(UiPrefs.getPrefs(context));
+        if (target != TARGET_INTERNAL_ONLY) {
+            List<UsbCandidate> candidates = surveillanceUsbCandidates(context);
+            if (candidates.size() > 1) throw new java.io.IOException("multiple_media");
+            if (!candidates.isEmpty()) {
+                UsbCandidate candidate = candidates.get(0);
+                for (File normal : recordsDirCandidates(candidate,
+                        getSelectedUsbLocation(UiPrefs.getPrefs(context)))) {
+                    File directory = new File(normal.getParentFile(), "surveillance");
+                    if (directory.isDirectory() ? directory.canWrite() : normal.getParentFile().canWrite())
+                        return new Resolution(directory, true, target, UsbState.NOT_CHECKED);
+                }
+                throw new java.io.IOException("storage_not_writable");
+            }
+            if (target == TARGET_USB_ONLY) throw new java.io.IOException("no_medium");
+        }
+        File normal = DashcamSettingsController.getRecordsBaseDir(context);
+        return new Resolution(new File(normal.getParentFile(), "surveillance"), false, target, UsbState.NOT_CHECKED);
+    }
+
+    private static List<UsbCandidate> surveillanceUsbCandidates(Context context) {
+        SelectedUsbLocation selected = getSelectedUsbLocation(UiPrefs.getPrefs(context));
+        List<UsbCandidate> candidates = findUsbCandidates(context);
+        if (selected != null) {
+            candidates = filterSelectedVolume(candidates, selected.volumeId);
+            if (candidates.isEmpty()) candidates = filterSelectedVolume(findLegacyStorageCandidates(context), selected.volumeId);
+            return candidates;
+        }
+        if (candidates.isEmpty()) candidates = findLegacyStorageCandidates(context);
+        return prioritizeUsbCandidates(candidates);
+    }
+
+    /** All normal roots, including mount aliases and the private fallback, are protected. */
+    public static List<File> normalRecordingDirectories(Context context) {
+        List<File> dirs = new ArrayList<>();
+        dirs.add(DashcamSettingsController.getRecordsBaseDir(context));
+        dirs.add(new File(android.os.Environment.getExternalStoragePublicDirectory(
+                android.os.Environment.DIRECTORY_DOWNLOADS), "dashcam"));
+        dirs.add(new File(context.getFilesDir(), "dashcam"));
+        SelectedUsbLocation selected = getSelectedUsbLocation(UiPrefs.getPrefs(context));
+        Map<String, UsbCandidate> all = new LinkedHashMap<>();
+        for (UsbCandidate candidate : findUsbCandidates(context)) all.put(candidate.rootDir.toString(), candidate);
+        for (UsbCandidate candidate : findLegacyStorageCandidates(context)) all.put(candidate.rootDir.toString(), candidate);
+        for (UsbCandidate candidate : all.values()) {
+            dirs.addAll(recordsDirCandidates(candidate, null));
+            if (selected != null && selected.volumeId.equals(candidate.volumeId))
+                dirs.addAll(recordsDirCandidates(candidate, selected));
+        }
+        String actual = UiPrefs.getPrefs(context).getString("dashcamActualPath", "");
+        if (!actual.isEmpty() && !actual.equals(UiPrefs.getPrefs(context).getString("surveillanceActualPath", "")))
+            dirs.add(new File(actual));
+        return dirs;
+    }
+
+    static boolean isUsbDirectory(Context context, File directory) throws java.io.IOException {
+        String path = SurveillancePolicy.identity(directory);
+        List<UsbCandidate> candidates = findUsbCandidates(context);
+        candidates.addAll(findLegacyStorageCandidates(context));
+        for (UsbCandidate candidate : candidates) {
+            String root = SurveillancePolicy.identity(candidate.rootDir);
+            if (path.equals(root) || path.startsWith(root + "/")) return true;
+        }
+        return false;
+    }
+
+    public static long availableBytes(File directory) {
+        try { return new StatFs(directory.getAbsolutePath()).getAvailableBytes(); }
+        catch (Exception e) { return -1; }
     }
 
     private static List<UsbCandidate> filterSelectedVolume(
@@ -621,7 +732,10 @@ public final class DashcamStorageManager {
             }
             boolean ok;
             try (FileInputStream in = new FileInputStream(probe)) {
-                ok = probe.length() == 7 && in.read() == 'd';
+                ok = probe.length() == 7;
+                for (byte value : "dashcam".getBytes(java.nio.charset.StandardCharsets.UTF_8))
+                    ok &= in.read() == value;
+                ok &= in.read() == -1;
             }
             return ok ? null : "file missing or empty after write";
         } catch (Throwable t) {

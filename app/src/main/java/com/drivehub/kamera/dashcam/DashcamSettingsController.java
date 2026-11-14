@@ -34,6 +34,7 @@ import android.widget.SeekBar;
 import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
+import com.drivehub.kamera.dev.DashcamFolderPicker;
 
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
@@ -44,6 +45,56 @@ public final class DashcamSettingsController {
 
     private static final String TAG = "DashcamSettings";
     public static final String KEY_ENABLED = "enabled";
+    private SharedPreferences surveillancePrefs;
+    private Switch surveillanceToggle;
+    private TextView surveillancePath;
+    private TextView surveillanceStatus;
+    private SharedPreferences.OnSharedPreferenceChangeListener surveillancePreferenceListener;
+
+    public void bindSurveillance(Dialog dialog) {
+        surveillancePrefs = UiPrefs.getPrefs(activity);
+        surveillanceToggle = dialog.findViewById(R.id.switchDashcamEnabled);
+        surveillancePath = dialog.findViewById(R.id.tvSurveillanceDirectory);
+        surveillanceStatus = dialog.findViewById(R.id.tvSurveillanceStatus);
+        View choose = dialog.findViewById(R.id.btnSurveillanceDirectory);
+        choose.setOnClickListener(view -> DashcamFolderPicker.show(activity,
+                surveillancePrefs.getString(SurveillanceStore.KEY_DIRECTORY, ""), new DashcamFolderPicker.Listener() {
+                    @Override public void onFolderSelected(String path) {
+                        new Thread(() -> {
+                            boolean valid;
+                            try { SurveillanceStorage.validateIsolation(activity, new File(path)); valid = true; }
+                            catch (Exception error) { valid = false; }
+                            final boolean accepted = valid;
+                            mainHandler.post(() -> {
+                                if (surveillancePrefs == null) return;
+                                if (accepted) surveillancePrefs.edit().putString(SurveillanceStore.KEY_DIRECTORY, path).apply();
+                                else Toast.makeText(activity, R.string.surveillance_directory_invalid, Toast.LENGTH_LONG).show();
+                            });
+                        }, "SurveillanceFolderCheck").start();
+                    }
+                    @Override public void onUseDefault() {
+                        if (surveillancePrefs != null) surveillancePrefs.edit().remove(SurveillanceStore.KEY_DIRECTORY).apply();
+                    }
+                }));
+        surveillancePreferenceListener = (prefs, key) -> {
+            if (KEY_ENABLED.equals(key) || SurveillanceStore.KEY_SESSION.equals(key)
+                    || SurveillanceStore.KEY_DIRECTORY.equals(key)) mainHandler.post(this::refreshSurveillanceSettings);
+        };
+        surveillancePrefs.registerOnSharedPreferenceChangeListener(surveillancePreferenceListener);
+        refreshSurveillanceSettings();
+    }
+
+    private void refreshSurveillanceSettings() {
+        if (surveillancePrefs == null) return;
+        boolean active = SurveillanceStore.isActive(surveillancePrefs);
+        syncingEnabled = true;
+        surveillanceToggle.setChecked(!active && surveillancePrefs.getBoolean(KEY_ENABLED, false));
+        surveillanceToggle.setEnabled(!active);
+        syncingEnabled = false;
+        surveillanceStatus.setText(active ? R.string.surveillance_active_hint : R.string.surveillance_hint);
+        String path = surveillancePrefs.getString(SurveillanceStore.KEY_DIRECTORY, "");
+        surveillancePath.setText(path.isEmpty() ? activity.getString(R.string.surveillance_directory_default) : path);
+    }
     public static final int DEFAULT_SEGMENT_SEC = 30;
     public static final int DEFAULT_RETENTION_CLIP_COUNT = 10;
     public static final int DEFAULT_MAX_RETAINED_EVENT_DIRS = 5;
@@ -252,6 +303,10 @@ public final class DashcamSettingsController {
             swEnabled.setOnCheckedChangeListener((buttonView, checked) -> {
                 if (syncingEnabled)
                     return;
+                if (SurveillanceStore.isActive(prefs)) {
+                    refreshSurveillanceSettings();
+                    return;
+                }
                 prefs.edit().putBoolean(KEY_ENABLED, checked).apply();
                 if (checked) {
                     if (!hasStoragePermission()) {
@@ -585,6 +640,11 @@ public final class DashcamSettingsController {
 
     // Called when the settings dialog closes — unregisters the USB eject receiver if still pending.
     public void onDismiss() {
+        if (surveillancePrefs != null && surveillancePreferenceListener != null)
+            surveillancePrefs.unregisterOnSharedPreferenceChangeListener(surveillancePreferenceListener);
+        surveillancePrefs = null;
+        surveillanceToggle = null;
+        surveillancePath = surveillanceStatus = null;
         unregisterUsbEjectReceiver();
         storagePrefs = null;
         boundStorageViews = null;
