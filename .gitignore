@@ -7,6 +7,13 @@ captures/
 local.properties
 *.local
 
+# Local documentation
+/docs/
+
+# Private vehicle camera captures, calibration and derived local experiments.
+# Outside every Android source/assets directory: never commit or package these.
+/local-private/
+
 # Android Studio / IntelliJ
 .idea/caches/
 .idea/libraries/
@@ -39,13 +46,29 @@ Thumbs.db
 *.swo
 
 # Licensed third-party raw assets (CC-BY-NC, not redistributable — see README)
-app/src/main/res/raw/
+app/src/main/res/raw/*
+!app/src/main/res/raw/keep.xml
 
 # Keep the Gradle wrapper executable jar tracked.
 !gradle/wrapper/gradle-wrapper.jar
 # Local test resources: supplied 3D model/textures and extracted MG/SAIC assets.
 # Keep these available to local Android builds, but never commit them.
-/app/src/main/assets/mg4/
+/app/src/main/assets/mg4/*
+!/app/src/main/assets/mg4/birdseye/
+!/app/src/main/assets/mg4/model3d/
+# Only prepared runtime materials and their metadata belong in this directory.
+/app/src/main/assets/mg4/model3d/*
+!/app/src/main/assets/mg4/model3d/ATTRIBUTION.md
+!/app/src/main/assets/mg4/model3d/car.mtl
+!/app/src/main/assets/mg4/model3d/car.png
+!/app/src/main/assets/mg4/model3d/model.json
+!/app/src/main/assets/mg4/model3d/paint-variants.json
+!/app/src/main/assets/mg4/model3d/paints/
+/app/src/main/assets/mg4/model3d/paints/*
+!/app/src/main/assets/mg4/model3d/paints/*.png
+# Keep the prepared 3D mesh local; metadata, atlas and attribution remain versioned.
+/app/src/main/assets/mg4/model3d/car.obj
+/app/src/main/assets/mg4/model3d/car.meshbin
 /app/src/main/assets/oem/
 
 # Optional emulator ABI smoke-test inputs from the same local OEM APK.

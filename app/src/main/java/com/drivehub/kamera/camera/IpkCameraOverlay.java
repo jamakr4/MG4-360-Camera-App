@@ -103,7 +103,7 @@ public final class IpkCameraOverlay implements AutoCloseable {
     }
 
     public void show() {
-        if (closed || desiredCamera >= 0) return;
+        if (closed) return;
         if (desiredCamera < 0) {
             desiredCamera = CameraIndex.REAR.getVideoIndex();
             destroyWindow();
@@ -217,7 +217,10 @@ public final class IpkCameraOverlay implements AutoCloseable {
 
     private void scheduleNow() {
         main.removeCallbacks(tick);
-        if (!closed && (desiredCamera >= 0 || root != null)) main.post(tick);
+        if (!closed && (desiredCamera >= 0 || root != null)) {
+            CameraHandoffController.demand("ipk-policy", true);
+            main.post(tick);
+        }
     }
 
     private boolean isBlocked() {
@@ -235,17 +238,25 @@ public final class IpkCameraOverlay implements AutoCloseable {
             destroyWindow();
             return false;
         }
-        if (desiredCamera < 0) return false;
+        if (desiredCamera < 0) {
+            CameraHandoffController.demand("ipk", false);
+            return false;
+        }
         if (!UiPrefs.isDigitalRearviewEnabled(prefs)
                 || !DigitalRearviewPolicy.usesIpk(UiPrefs.getDigitalRearviewDisplayTarget(prefs))) {
             hideWithFade();
             return false;
         }
+        CameraHandoffController.demand("ipk", clusterDisplay() != null);
         return true;
     }
 
     private final Runnable tick = new Runnable() {
         @Override public void run() {
+            try { updateWindow(); }
+            finally { CameraHandoffController.demand("ipk-policy", false); }
+        }
+        private void updateWindow() {
             if (closed || (desiredCamera < 0 && root == null)) return;
             long now = SystemClock.elapsedRealtime();
             if (screenOn && !readPending && (lastTabRead == 0 || now - lastTabRead >= 250)) {
@@ -288,6 +299,7 @@ public final class IpkCameraOverlay implements AutoCloseable {
         int[] bounds = IpkRoutePolicy.bounds(size.x, size.y);
         if (bounds[2] == 0) return;
         final int token = generation;
+        CameraHandoffController.demand("ipk", true);
         try {
             Context displayContext = context.createDisplayContext(display);
             windows = (WindowManager) displayContext.getSystemService(Context.WINDOW_SERVICE);
@@ -383,6 +395,7 @@ public final class IpkCameraOverlay implements AutoCloseable {
     }
 
     private void onFirstFrameShown(Output sink) {
+        CameraHandoffController.ready("ipk", true, CameraHandoffController.generation());
         sink.firstFrameMs = SystemClock.elapsedRealtime() - mirrorStarted;
         event("camera visible on IPK, tab=" + tab + " start=" + sink.firstFrameMs + " ms");
     }
@@ -442,6 +455,11 @@ public final class IpkCameraOverlay implements AutoCloseable {
     }
 
     private void destroyWindow() {
+        CameraHandoffController.ready("ipk", false, CameraHandoffController.generation());
+        if (desiredCamera < 0 || isBlocked() || !isSelectedScreen(SystemClock.elapsedRealtime())) {
+            CameraHandoffController.demand("ipk", false);
+            CameraHandoffController.demand("ipk-policy", false);
+        }
         generation++;
         main.removeCallbacks(checkFrames);
         if (desiredCamera < 0) main.removeCallbacks(tick);

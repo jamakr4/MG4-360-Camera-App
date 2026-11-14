@@ -11,6 +11,11 @@ public final class CameraProbe {
     /** Blocks every new native camera attachment and releases all preview outputs. */
     public static native void setOemCameraAccessBlocked(boolean blocked);
     public static native boolean isOemCameraAccessBlocked();
+    /** Closes the external gate immediately; releasing consumers is done on a worker thread. */
+    public static native void setExternalCameraAccessBlocked(boolean blocked);
+    public static native void releaseCameraPreviewsForHandoff();
+    /** Real open device count, in-flight open count, effective blocked flag. Never probes devices. */
+    public static native int[] cameraOwnershipSnapshot();
 
     /** Probes /dev/video0..maxIndex-1 and returns a human-readable summary. */
     public static native String probeAll(int maxIndex);

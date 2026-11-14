@@ -1,6 +1,7 @@
 package com.drivehub.kamera.side;
 
 import android.content.Context;
+import com.drivehub.kamera.camera.CameraHandoffController;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
@@ -46,6 +47,7 @@ public final class SideCameraView extends ViewGroup {
                     // A size/inset change must not detach or pre-warm a healthy preview.
                 }
                 @Override public void surfaceDestroyed(SurfaceHolder holder) {
+                    CameraHandoffController.demand("side-" + index, false);
                     SideCameraNative.detachPreview(index);
                     lastAttempt[index] = 0;
                     publishState(Math.max(0, lastMask) & ~(1 << index));
@@ -88,11 +90,17 @@ public final class SideCameraView extends ViewGroup {
 
     void pauseDisplay() {
         active = false;
+        CameraHandoffController.demand("side-0", false);
+        CameraHandoffController.demand("side-1", false);
         handler.removeCallbacks(tick);
         SideCameraNative.detachPreviews();
     }
 
     private void refresh() {
+        for (int side = 0; side < 2; side++) {
+            CameraHandoffController.demand("side-" + side, active && surfaces[side].getHolder().getSurface().isValid());
+        }
+        long handoffGeneration = CameraHandoffController.generation();
         int mask = 0;
         if (!yielded) {
             long now = SystemClock.elapsedRealtime();
@@ -108,6 +116,9 @@ public final class SideCameraView extends ViewGroup {
                             SideCameraGeometry.previewCrops(side == 0));
                 }
             }
+        }
+        for (int side = 0; side < 2; side++) {
+            CameraHandoffController.ready("side-" + side, (mask & (1 << side)) != 0, handoffGeneration);
         }
         publishState(mask);
     }

@@ -4,6 +4,7 @@ import com.drivehub.kamera.R;
 
 import com.drivehub.kamera.MainActivity;
 import com.drivehub.kamera.CameraProbe;
+import com.drivehub.kamera.camera.CameraHandoffController;
 import com.drivehub.kamera.camera.CameraIndex;
 import com.drivehub.kamera.camera.IpkCameraOverlay;
 import com.drivehub.kamera.camera.OverlayService;
@@ -245,6 +246,32 @@ public class SignalService extends Service {
         });
     }
 
+    /** Called on the main thread after the external native gate and preference are updated. */
+    public static void onExternalCameraAccessChanged(Context context) {
+        SignalService inst = sInstance;
+        if (inst == null) {
+            refreshCameraAccess(context);
+            SharedPreferences prefs = UiPrefs.getPrefs(context);
+            TurnSignal lamp = TurnSignal.fromValue(SystemPropertiesHelper.getInt("arcsoft.avm.mCurCarTurnLamp", 0));
+            boolean needsOutput = UiPrefs.isDigitalRearviewEnabled(prefs)
+                    || (UiPrefs.isOverlayOnSignalEnabled(prefs) && (lamp == TurnSignal.LEFT || lamp == TurnSignal.RIGHT));
+            if (!prefs.getBoolean(UiPrefs.KEY_EXTERNAL_CAMERA_PAUSED, false) && needsOutput) {
+                CameraHandoffController.demand("signal-policy", true);
+                try { start(context); }
+                catch (RuntimeException error) {
+                    CameraHandoffController.demand("signal-policy", false);
+                    throw error;
+                }
+            }
+            return;
+        }
+        if (UiPrefs.getPrefs(context).getBoolean(UiPrefs.KEY_EXTERNAL_CAMERA_PAUSED, false))
+            inst.hideCameraOverlays();
+        inst.lastLamp = inst.lastGear = Integer.MIN_VALUE;
+        inst.currentMode = -1;
+        inst.updateOverlayDecision();
+    }
+
     public static boolean isReverseActive() {
         SignalService inst = sInstance;
         return inst != null && inst.currentGear == REVERSE_GEAR_VALUE;
@@ -295,7 +322,7 @@ public class SignalService extends Service {
                 .getBoolean(UiPrefs.KEY_OEM_CAMERA_ACCESS_BLOCKED, false);
         setCameraAccessBlocked(this, blocked);
         if (entering) hideCameraOverlays();
-        return blocked;
+        return blocked || UiPrefs.getPrefs(this).getBoolean(UiPrefs.KEY_EXTERNAL_CAMERA_PAUSED, false);
     }
 
     public static void requestRecheck() {
@@ -421,6 +448,7 @@ public class SignalService extends Service {
         }
         registerOemCoexistListener();
         applyOemCoexistState();
+        updateOverlayDecision();
         return START_STICKY;
     }
 
@@ -729,6 +757,11 @@ public class SignalService extends Service {
     }
 
     private void updateOverlayDecision() {
+        try { updateOverlayDecisionForCameraAccess(); }
+        finally { CameraHandoffController.demand("signal-policy", false); }
+    }
+
+    private void updateOverlayDecisionForCameraAccess() {
         // OEM ownership takes priority over main routing, including reverse and Settings.
         if (updateOemCameraAccess()) return;
         if (oemOverlayRecovery.isPending()) return;

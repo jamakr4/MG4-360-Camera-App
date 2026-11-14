@@ -1,6 +1,7 @@
 package com.drivehub.kamera;
 
 import com.drivehub.kamera.camera.CameraIndex;
+import com.drivehub.kamera.camera.CameraHandoffController;
 import com.drivehub.kamera.camera.OverlayService;
 import com.drivehub.kamera.dashcam.DashcamSettingsController;
 import com.drivehub.kamera.dashcam.RecordingService;
@@ -51,6 +52,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private int currentVideoIndex = CameraIndex.FRONT.getVideoIndex();
     private int activePreviewCameraIndex = -1;
     private boolean previewRunning = false;
+    private long previewHandoffGeneration = -1;
     private boolean previewPausedForTestClip = false;
     private boolean previewResumed = false;
     private float downX = 0f;
@@ -64,7 +66,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             this, appearanceController, otaController, this::applyWarningVisibility);
     private final SharedPreferences.OnSharedPreferenceChangeListener cameraAccessListener = (prefs, key) -> {
         if (UiPrefs.KEY_OEM_CAMERA_ACCESS_BLOCKED.equals(key) || UiPrefs.KEY_OEM_AVM_ACTIVE.equals(key)
-                || UiPrefs.KEY_OEM_AVM_COEXIST.equals(key)) startPreviewIfReady();
+                || UiPrefs.KEY_OEM_AVM_COEXIST.equals(key) || UiPrefs.KEY_EXTERNAL_CAMERA_PAUSED.equals(key)) startPreviewIfReady();
     };
 
     public static void setSettingsDialogOpen(boolean open) {
@@ -266,6 +268,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     @Override
     protected void onPause() {
         previewResumed = false;
+        CameraHandoffController.demand("main", false);
         stopPreview();
         sideCameraPanel.pauseDisplay();
         super.onPause();
@@ -417,6 +420,9 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     }
 
     private void startPreviewIfReady() {
+        CameraHandoffController.demand("main", previewResumed && !previewPausedForTestClip
+                && surfaceHolder != null && surfaceHolder.getSurface().isValid());
+        long handoffGeneration = CameraHandoffController.generation();
         boolean blocked = UiPrefs.isOemCameraAccessBlocked(UiPrefs.getPrefs(this));
         View pausedMessage = findViewById(R.id.mainPreviewOemPaused);
         if (pausedMessage != null) pausedMessage.setVisibility(blocked ? View.VISIBLE : View.GONE);
@@ -430,13 +436,21 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             if (tvStatus != null) tvStatus.setText(R.string.main_surface_not_ready);
             return;
         }
-        if (previewRunning && activePreviewCameraIndex == currentVideoIndex) return;
-        if (activePreviewCameraIndex != -1 && activePreviewCameraIndex != currentVideoIndex) {
+        if (previewRunning && activePreviewCameraIndex == currentVideoIndex
+                && previewHandoffGeneration == handoffGeneration) {
+            CameraHandoffController.ready("main", true, handoffGeneration);
+            return;
+        }
+        if (activePreviewCameraIndex != -1 && (activePreviewCameraIndex != currentVideoIndex
+                || previewHandoffGeneration != handoffGeneration)) {
             CameraProbe.detachPreview(activePreviewCameraIndex);
             activePreviewCameraIndex = -1;
         }
+        CameraHandoffController.ready("main", false, handoffGeneration);
         boolean ok = CameraProbe.attachPreview(currentVideoIndex, surfaceHolder.getSurface());
+        CameraHandoffController.ready("main", ok, handoffGeneration);
         previewRunning = ok;
+        previewHandoffGeneration = handoffGeneration;
         activePreviewCameraIndex = ok ? currentVideoIndex : -1;
         if (tvStatus != null) {
             tvStatus.setText(ok
@@ -446,6 +460,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     }
 
     private void stopPreview() {
+        CameraHandoffController.ready("main", false, CameraHandoffController.generation());
         if (activePreviewCameraIndex == -1) return;
         CameraProbe.detachPreview(activePreviewCameraIndex);
         activePreviewCameraIndex = -1;
@@ -464,6 +479,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
     @Override
     public void surfaceDestroyed(SurfaceHolder holder) {
+        CameraHandoffController.demand("main", false);
         stopPreview();
     }
 

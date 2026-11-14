@@ -111,6 +111,12 @@ Java_com_drivehub_kamera_CameraProbe_probeAll(JNIEnv* env, jclass /*clazz*/, jin
 
     for (int i = 0; i < maxIndex; i++) {
         std::string path = "/dev/video" + std::to_string(i);
+        auto& gate = camera_stream_manager::cameraAccessGate();
+        CameraOpening opening(gate);
+        if (!opening) {
+            summary << "Camera access blocked\n";
+            break;
+        }
         int fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
         if (fd < 0) {
             std::string message = path + " open FAILED: " + errnoStr();
@@ -119,8 +125,10 @@ Java_com_drivehub_kamera_CameraProbe_probeAll(JNIEnv* env, jclass /*clazz*/, jin
             continue;
         }
 
-        std::string result = probeOne(fd);
+        gate.opened();
+        std::string result = gate.blocked() ? "blocked" : probeOne(fd);
         close(fd);
+        gate.closed();
 
         std::string message = path + " " + result;
         logi("%s", message.c_str());
@@ -193,4 +201,23 @@ Java_com_drivehub_kamera_CameraProbe_setOemCameraAccessBlocked(JNIEnv*, jclass, 
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_drivehub_kamera_CameraProbe_isOemCameraAccessBlocked(JNIEnv*, jclass) {
     return camera_stream_manager::isOemCameraAccessBlocked();
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_drivehub_kamera_CameraProbe_setExternalCameraAccessBlocked(JNIEnv*, jclass, jboolean blocked) {
+    camera_stream_manager::cameraAccessGate().setExternalBlocked(blocked);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_drivehub_kamera_CameraProbe_releaseCameraPreviewsForHandoff(JNIEnv*, jclass) {
+    camera_stream_manager::releaseCameraPreviewsForHandoff();
+}
+
+extern "C" JNIEXPORT jintArray JNICALL
+Java_com_drivehub_kamera_CameraProbe_cameraOwnershipSnapshot(JNIEnv* env, jclass) {
+    const auto state = camera_stream_manager::cameraAccessGate().snapshot();
+    const jint values[] = {state.devices, state.opening, state.blocked ? 1 : 0};
+    jintArray result = env->NewIntArray(3);
+    if (result != nullptr) env->SetIntArrayRegion(result, 0, 3, values);
+    return result;
 }
