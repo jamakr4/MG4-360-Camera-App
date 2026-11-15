@@ -276,8 +276,12 @@ public class DashcamEventOverlayService extends Service {
         return all[ordinal];
     }
 
-    // Plays the banner's notification tone at the group's configured volume
-    // (skips/stops if volume is 0).
+    @android.annotation.SuppressLint("DiscouragedApi") // Optional, untracked raw resource.
+    private int optionalBannerToneResource() {
+        return getResources().getIdentifier("notification_sound_7062_henrycena82595", "raw", getPackageName());
+    }
+
+    // Plays the optional banner tone at the group volume; stops/skips at volume 0.
     private void playBannerTone(DashcamSettingsController.BannerGroup group, SharedPreferences prefs) {
         int volumePct = DashcamSettingsController.getBannerVolume(prefs, group);
         if (volumePct <= 0) {
@@ -298,8 +302,12 @@ public class DashcamEventOverlayService extends Service {
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                 .build();
 
+        // Optional locally supplied audio is intentionally not tracked. A clean checkout
+        // must compile without it; installations containing the resource keep the same tone.
+        int sound = optionalBannerToneResource();
+        if (sound == 0) return;
         MediaPlayer player = new MediaPlayer();
-        try (AssetFileDescriptor afd = getResources().openRawResourceFd(R.raw.notification_sound_7062_henrycena82595)) {
+        try (AssetFileDescriptor afd = getResources().openRawResourceFd(sound)) {
             if (afd == null) {
                 player.release();
                 return;

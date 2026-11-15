@@ -71,6 +71,9 @@ app/src/main/res/raw/*
 /app/src/main/assets/mg4/model3d/car.meshbin
 /app/src/main/assets/oem/
 
+#docs
+/docs/*
+
 # Optional emulator ABI smoke-test inputs from the same local OEM APK.
 /app/src/androidTest/assets/oem/
 # Private user camera screenshots used only for local projection previews/tests.

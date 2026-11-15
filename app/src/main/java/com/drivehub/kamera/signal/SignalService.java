@@ -42,7 +42,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 
 /**
- * Listens only for turn-signal state:
+ * Observes gear and turn-signal state independently:
  * - left signal  -> left camera overlay
  * - right signal -> right camera overlay
  * - no signal    -> hide overlay
@@ -65,6 +65,8 @@ public class SignalService extends Service {
     private static final int REVERSE_GEAR_VALUE = 2;
     private static final String OEM_AVM_PACKAGE = "com.saicmotor.hmi.aroundview";
     // Broadcasts emitted by AVMActivity in the OEM AVM app (verified via decompiled smali).
+    private static final String ACTION_RESTORE_OEM_CAMERA = "com.drivehub.kamera.action.RESTORE_OEM_CAMERA";
+    private static final String EXTRA_RESTORE_RESULT = "restoreOemResult";
     private static final String ACTION_AVM_START = "com.saicmotor.hmi.aroundview.ACTION_START";
     private static final String ACTION_AVM_STOP = "com.saicmotor.hmi.aroundview.ACTION_STOP";
     // Inbound launch trigger to the OEM AVM app — sniffed here only for debugging visibility.
@@ -77,6 +79,9 @@ public class SignalService extends Service {
     private static final long OEM_LIFECYCLE_POLL_MS = 75L;
     public static final String ACTION_ROUTE_CAMERA = "com.drivehub.kamera.ACTION_ROUTE_CAMERA";
     public static final String EXTRA_CAMERA_INDEX = "camera_index";
+    public static final String ACTION_CLOSE_PARKING = "com.drivehub.kamera.action.CLOSE_AUTO_PARKING";
+    public static final String EXTRA_PARKING_SESSION = "parking_session";
+    private static final long PARKING_SPEED_POLL_MS = 250;
 
     private static volatile SignalService sInstance;
 
@@ -98,6 +103,10 @@ public class SignalService extends Service {
     private HandlerThread oemLifecycleThread;
     private Handler oemLifecycleHandler;
     private volatile boolean oemLifecycleMonitoring;
+    private volatile int oemMonitorGeneration;
+    private com.drivehub.kamera.birdseye.ExclusiveCameraLease exclusiveCameraLease;
+    private OemTakeoverManager takeoverManager;
+    private final OemPresencePolicy takeoverPresence = new OemPresencePolicy();
     private volatile String lastOemLifecycle = "";
     private volatile int lastOemGear = Integer.MIN_VALUE;
     private long lastOemGearSampleMs;
@@ -119,6 +128,9 @@ public class SignalService extends Service {
     private long rearviewTempHiddenUntilMs = 0L; // mainHandler only
     private long signalTempHiddenUntilMs = 0L;   // mainHandler only
     private final Handler mainHandler = new Handler();
+    private final ReverseLaunchPolicy reverseLaunch = new ReverseLaunchPolicy();
+    private final ParkingAutomationPolicy parkingAutomation = new ParkingAutomationPolicy();
+    private final Runnable parkingSpeedRunnable = this::pollParkingSpeed;
     private final OemOverlayRecovery oemOverlayRecovery = new OemOverlayRecovery();
     private final Runnable oemOverlayRestoreRunnable = new Runnable() {
         @Override public void run() {
@@ -211,7 +223,7 @@ public class SignalService extends Service {
         boolean wasActive = UiPrefs.isOemAvmActive(prefs);
         UiPrefs.setOemAvmActive(prefs, active);
         // Publish the request before releasing devices, so concurrent decisions cannot unblock it.
-        if (active && UiPrefs.isOemAvmCoexistEnabled(prefs)) setCameraAccessBlocked(context, true);
+        if (active && UiPrefs.shouldYieldToOem(prefs)) setCameraAccessBlocked(context, true);
         DevRuntimeLog.add("SignalService", "OEM latch=" + active);
         SignalService inst = sInstance;
         if (inst == null) {
@@ -230,7 +242,7 @@ public class SignalService extends Service {
                 inst.mainHandler.removeCallbacks(inst.hideRunnable);
                 inst.clearOverlayShownTimestamp();
                 inst.hideCameraOverlays();
-            } else if (wasActive && UiPrefs.isOemAvmCoexistEnabled(prefs)) {
+            } else if (wasActive && UiPrefs.shouldYieldToOem(prefs)) {
                 inst.waitForSignalSampleAfterOemReleaseAtMs = SystemClock.elapsedRealtime();
                 inst.oemOverlayRecovery.start();
                 inst.mainHandler.removeCallbacks(inst.oemOverlayRestoreRunnable);
@@ -285,16 +297,78 @@ public class SignalService extends Service {
             else inst.mainHandler.post(inst::updateOemCameraAccess);
         } else {
             SharedPreferences prefs = UiPrefs.getPrefs(context);
-            if (!UiPrefs.isOemAvmCoexistEnabled(prefs)) setCameraAccessBlocked(context, false);
+            if (!UiPrefs.shouldYieldToOem(prefs)) setCameraAccessBlocked(context, false);
             else if (UiPrefs.isOemAvmActive(prefs)
                     || SystemPropertiesHelper.getInt("arcsoft.avm.mCurCarGear", 0) == REVERSE_GEAR_VALUE)
                 setCameraAccessBlocked(context, true);
         }
     }
 
+    /** Called by the serialized takeover worker before changing receiver ownership. */
+    static void setTakeoverYield(Context context, boolean yield) {
+        SharedPreferences prefs = UiPrefs.getPrefs(context);
+        if (prefs.getBoolean(UiPrefs.KEY_OEM_TAKEOVER_YIELD, false) == yield) return;
+        if (!prefs.edit().putBoolean(UiPrefs.KEY_OEM_TAKEOVER_YIELD, yield).commit())
+            throw new IllegalStateException("Cannot persist camera yield state");
+        if (!yield && UiPrefs.isOemAvmCoexistEnabled(prefs)) {
+            // Recovery settling belongs to the main-thread coexist policy; do not override it
+            // from the takeover poller while the OEM Activity is still tearing down.
+            refreshCameraAccess(context);
+        } else {
+            setCameraAccessBlocked(context, yield);
+        }
+    }
+
+    public static void traceCameraEvent(String message) {
+        SignalService service = sInstance;
+        if (service != null && service.takeoverManager != null) service.takeoverManager.recordEvent(message);
+        else DevRuntimeLog.add("Camera lifecycle", message);
+    }
+
+    public static OemTakeoverController.Snapshot takeoverSnapshot() {
+        SignalService service = sInstance;
+        return service == null || service.takeoverManager == null ? null : service.takeoverManager.snapshot();
+    }
+
+    public static void restoreOemCamera(Context context) {
+        restoreOemCamera(context, null);
+    }
+
+    /** Every call requests an explicit restore, independently of the current switch value. */
+    public static void restoreOemCamera(Context context, java.util.function.Consumer<Boolean> onComplete) {
+        UiPrefs.setOemAvmCoexistEnabled(UiPrefs.getPrefs(context), true);
+        android.os.ResultReceiver result = onComplete == null ? null
+                : new android.os.ResultReceiver(new Handler(Looper.getMainLooper())) {
+                    @Override protected void onReceiveResult(int code, android.os.Bundle data) {
+                        onComplete.accept(code == android.app.Activity.RESULT_OK);
+                    }
+                };
+        SignalService service = sInstance;
+        if (service != null && service.takeoverManager != null) {
+            service.requestOemRestore(result);
+        } else {
+            // Preserve the explicit request while a fresh service/installation is starting.
+            Intent request = new Intent(context, SignalService.class).setAction(ACTION_RESTORE_OEM_CAMERA);
+            if (result != null) request.putExtra(EXTRA_RESTORE_RESULT, result);
+            try { context.startForegroundService(request); }
+            catch (RuntimeException error) {
+                Log.w(TAG, "Could not start OEM restore", error);
+                if (result != null) result.send(android.app.Activity.RESULT_CANCELED, null);
+            }
+        }
+    }
+
+    private void requestOemRestore(android.os.ResultReceiver result) {
+        takeoverManager.requestRestore(restored -> {
+            if (result != null) result.send(restored
+                    ? android.app.Activity.RESULT_OK : android.app.Activity.RESULT_CANCELED, null);
+        });
+    }
+
     private static synchronized void setCameraAccessBlocked(Context context, boolean blocked) {
         SharedPreferences prefs = UiPrefs.getPrefs(context);
-        if (!blocked && UiPrefs.isOemAvmCoexistEnabled(prefs)
+        if (!blocked && prefs.getBoolean(UiPrefs.KEY_OEM_TAKEOVER_YIELD, false)) return;
+        if (!blocked && UiPrefs.shouldYieldToOem(prefs)
                 && (UiPrefs.isOemAvmActive(prefs) || isReverseActive())) return;
         boolean previous = prefs.getBoolean(UiPrefs.KEY_OEM_CAMERA_ACCESS_BLOCKED, false);
         if (blocked && !previous) RecordingService.pauseForOemRequest(context);
@@ -317,7 +391,8 @@ public class SignalService extends Service {
             oemOverlayRecovery.start();
             mainHandler.post(oemOverlayRestoreRunnable);
         }
-        boolean blocked = coexist && (requested || oemOverlayRecovery.isPending());
+        boolean blocked = UiPrefs.getPrefs(this).getBoolean(UiPrefs.KEY_OEM_TAKEOVER_YIELD, false)
+                || coexist && (requested || oemOverlayRecovery.isPending());
         boolean entering = blocked && !UiPrefs.getPrefs(this)
                 .getBoolean(UiPrefs.KEY_OEM_CAMERA_ACCESS_BLOCKED, false);
         setCameraAccessBlocked(this, blocked);
@@ -422,6 +497,7 @@ public class SignalService extends Service {
     public void onCreate() {
         super.onCreate();
         sInstance = this;
+        exclusiveCameraLease=new com.drivehub.kamera.birdseye.ExclusiveCameraLease(message->DevRuntimeLog.add("Camera ownership",message));
         ipkRearview = new IpkCameraOverlay(this);
         systemPerformanceOverlay = new SystemPerformanceOverlay(this);
         NotificationChannelHelper.ensureChannel(this, CHANNEL_ID, "MG4 Signal");
@@ -438,6 +514,21 @@ public class SignalService extends Service {
                 .setPriority(NotificationCompat.PRIORITY_LOW)
                 .build();
         startForeground(NOTIF_ID, n);
+        // Reserve camera devices as soon as the foreground service is established. This
+        // must not wait for model preparation, a visible Activity, R or a recorder.
+        if (takeoverManager == null) {
+            // Receiver preparation must not suspend healthy camera previews.
+            takeoverManager = new OemTakeoverManager(this, exclusiveCameraLease, () -> currentGear,
+                    () -> takeoverPresence.busy(readOemAvmForegroundState(),
+                            SystemPropertiesHelper.getString(OEM_LIFECYCLE_PROP), SystemClock.elapsedRealtime()),
+                    () -> mainHandler.post(() -> { if (sInstance == this) updateOverlayDecision(); }));
+        }
+        if (intent != null && ACTION_RESTORE_OEM_CAMERA.equals(intent.getAction())) {
+            requestOemRestore(intent.getParcelableExtra(EXTRA_RESTORE_RESULT));
+        }
+        registerOemCoexistListener();
+        applyOemCoexistState();
+        com.drivehub.kamera.birdseye.RivelaAssets.prewarm(getApplicationContext());
 
         syncPerformanceOverlayState();
 
@@ -446,8 +537,6 @@ public class SignalService extends Service {
             Log.w(TAG, "Car API listener unavailable, falling back to system property polling.");
             startPropertyPollingFallback();
         }
-        registerOemCoexistListener();
-        applyOemCoexistState();
         updateOverlayDecision();
         return START_STICKY;
     }
@@ -545,6 +634,7 @@ public class SignalService extends Service {
             DevRuntimeLog.add("SignalService", "Fresh lamp sample after OEM release: " + lamp);
         }
         reconcileOemAvmState();
+        updateParkingGear(gear);
         updateOverlayDecision();
     }
 
@@ -552,12 +642,13 @@ public class SignalService extends Service {
         currentGear = gear;
         updateOemCameraAccess();
         reconcileOemAvmState();
+        updateParkingGear(gear);
         updateOverlayDecision();
     }
 
     private boolean isOemCoexistActive() {
         try {
-            return UiPrefs.isOemAvmCoexistEnabled(UiPrefs.getPrefs(this));
+            return UiPrefs.shouldYieldToOem(UiPrefs.getPrefs(this));
         } catch (Throwable ignored) {
             return false;
         }
@@ -567,8 +658,16 @@ public class SignalService extends Service {
         if (oemCoexistPrefListener != null) return;
         SharedPreferences prefs = UiPrefs.getPrefs(this);
         oemCoexistPrefListener = (sp, key) -> {
-            if (UiPrefs.KEY_OEM_AVM_COEXIST.equals(key)) {
+            if (UiPrefs.KEY_OEM_TAKEOVER_YIELD.equals(key) || UiPrefs.KEY_OEM_AVM_COEXIST.equals(key)
+                    || UiPrefs.KEY_EXTERNAL_CAMERA_PAUSED.equals(key)) {
                 mainHandler.post(this::applyOemCoexistState);
+            } else if (UiPrefs.KEY_PARKING_AUTO_CLOSE.equals(key)
+                    || UiPrefs.KEY_PARKING_AUTO_CLOSE_SPEED.equals(key)
+                    || UiPrefs.KEY_PARKING_AUTO_OPEN_DRIVE.equals(key)) {
+                mainHandler.post(() -> {
+                    configureParkingAutomation();
+                    refreshParkingSpeedMonitoring();
+                });
             } else if (UiPrefs.KEY_DIGITAL_REARVIEW_DISPLAY_TARGET.equals(key)
                     || UiPrefs.KEY_DIGITAL_REARVIEW_IPK_SCREEN.equals(key)) {
                 requestRecheck();
@@ -596,16 +695,16 @@ public class SignalService extends Service {
 
     private void applyOemCoexistState() {
         updateOemCameraAccess();
-        if (isOemCoexistActive()) {
-            startOemLifecycleMonitor();
-        } else {
-            stopOemLifecycleMonitor();
+        // Gear changes must still be observed when CarLampManager is available and coexist is off.
+        startOemLifecycleMonitor();
+        if (!isOemCoexistActive()) {
             // OEM coexist is off — release any stuck latch and resume recording.
             if (isOemAvmLatchedActive()) {
                 setOemAvmActive(this, false);
                 RecordingService.resumeAfterOemRequest(this);
             }
         }
+        updateReverseLaunch(false);
     }
 
     private void startOemLifecycleMonitor() {
@@ -614,6 +713,8 @@ public class SignalService extends Service {
         oemLifecycleThread.start();
         oemLifecycleHandler = new Handler(oemLifecycleThread.getLooper());
         oemLifecycleMonitoring = true;
+        final int token=++oemMonitorGeneration;
+        final Handler monitor=oemLifecycleHandler;
         // The AVM sysprop is sticky across reboots — if the previous session ended with "Start"
         // (crash, force-kill) and AVM is no longer actually in the foreground, treating that
         // stale value as the baseline causes the next genuine open→close cycle to fire a
@@ -630,26 +731,28 @@ public class SignalService extends Service {
         lastOemGearSampleMs = 0;
         DevRuntimeLog.add("SignalService",
                 "OEM lifecycle monitor started, initial='" + initialState + "'");
-        oemLifecycleHandler.post(new Runnable() {
+        monitor.post(new Runnable() {
             @Override
             public void run() {
-                if (!oemLifecycleMonitoring) return;
+                if (!oemLifecycleMonitoring||token!=oemMonitorGeneration) return;
                 // CarLampManager may not emit a callback when only the gear changes.
                 int gear = SystemPropertiesHelper.getInt("arcsoft.avm.mCurCarGear", currentGear);
                 long sampledAt = SystemClock.elapsedRealtime();
-                if (gear != lastOemGear || (sampledAt - lastOemGearSampleMs >= 500
-                        && UiPrefs.isOemCameraAccessBlocked(UiPrefs.getPrefs(SignalService.this)))) {
+                if(!oemLifecycleMonitoring||token!=oemMonitorGeneration)return;
+                if (gear != lastOemGear || (sampledAt - lastOemGearSampleMs >= 250
+                        && (gear == REVERSE_GEAR_VALUE
+                        || UiPrefs.isOemCameraAccessBlocked(UiPrefs.getPrefs(SignalService.this))))) {
                     lastOemGear = gear;
                     lastOemGearSampleMs = sampledAt;
-                    mainHandler.post(() -> { if (oemLifecycleMonitoring) onGearStateSample(gear); });
+                    mainHandler.post(() -> { if (oemLifecycleMonitoring&&token==oemMonitorGeneration) onGearStateSample(gear); });
                 }
                 String state = SystemPropertiesHelper.getString(OEM_LIFECYCLE_PROP);
                 if (!state.equals(lastOemLifecycle)) {
                     String prev = lastOemLifecycle;
                     lastOemLifecycle = state;
-                    mainHandler.post(() -> onOemLifecycleChanged(prev, state));
+                    mainHandler.post(() -> {if(oemLifecycleMonitoring&&token==oemMonitorGeneration)onOemLifecycleChanged(prev,state);});
                 }
-                oemLifecycleHandler.postDelayed(this, OEM_LIFECYCLE_POLL_MS);
+                if(oemLifecycleMonitoring&&token==oemMonitorGeneration)monitor.postDelayed(this, OEM_LIFECYCLE_POLL_MS);
             }
         });
     }
@@ -657,7 +760,7 @@ public class SignalService extends Service {
     private void stopOemLifecycleMonitor() {
         if (oemLifecycleThread == null) return;
         DevRuntimeLog.add("SignalService", "OEM lifecycle monitor stopped");
-        oemLifecycleMonitoring = false;
+        oemLifecycleMonitoring = false;++oemMonitorGeneration;
         if (oemLifecycleHandler != null) {
             oemLifecycleHandler.removeCallbacksAndMessages(null);
         }
@@ -669,7 +772,8 @@ public class SignalService extends Service {
     }
 
     private void onOemLifecycleChanged(String prev, String next) {
-        if (!isOemCoexistActive()) return;
+        traceCameraEvent("OEM lifecycle " + prev + " -> " + next);
+        if (!isOemCoexistActive()) {updateReverseLaunch(OEM_LIFECYCLE_START.equals(next));return;}
         DevRuntimeLog.add("SignalService", "OEM lifecycle: '" + prev + "' => '" + next + "'");
         if (OEM_LIFECYCLE_START.equals(next)) {
             setOemAvmActive(this, true);
@@ -756,12 +860,143 @@ public class SignalService extends Service {
         else ipkRearview.hide();
     }
 
+    private boolean isParkingAutomationReady() {
+        OemTakeoverController.Snapshot ownership = takeoverSnapshot();
+        return ownership != null && ownership.state == OemTakeoverController.State.EXCLUSIVE
+                && ownership.receiverBlocked && !isOemCoexistActive()
+                && !UiPrefs.getPrefs(this).getBoolean(UiPrefs.KEY_EXTERNAL_CAMERA_PAUSED, false);
+    }
+
+    /** Main-thread only. Keep the existing reverse launch and dismissal policy. */
+    private void updateReverseLaunch(boolean oemStarting) {
+        boolean ready = isParkingAutomationReady();
+        configureParkingAutomation();
+        if (!ready) cancelParkingAutomation("camera access unavailable");
+        ReverseLaunchPolicy.Decision decision = reverseLaunch.update(!ready, currentGear,
+                MainActivity.isMainVisible(), false, ready, SystemClock.elapsedRealtime());
+        if(decision.showCamera) {
+            openAutomaticParking(CameraIndex.REAR, "R");
+        }
+    }
+
+    private void configureParkingAutomation() {
+        SharedPreferences prefs = UiPrefs.getPrefs(this);
+        parkingAutomation.configure(UiPrefs.isParkingAutoCloseEnabled(prefs),
+                UiPrefs.getParkingAutoCloseSpeedKmh(prefs));
+    }
+
+    private void updateParkingGear(int gear) {
+        configureParkingAutomation();
+        boolean ready = isParkingAutomationReady();
+        if (!ready) cancelParkingAutomation("camera access unavailable");
+        if (parkingAutomation.onGear(ready,
+                UiPrefs.isParkingAutoOpenDriveEnabled(UiPrefs.getPrefs(this)), gear,
+                MainActivity.isMainVisible())) openAutomaticParking(CameraIndex.FRONT, "P -> D");
+        if (parkingAutomation.session() == null) mainHandler.removeCallbacks(parkingSpeedRunnable);
+    }
+
+    private void openAutomaticParking(CameraIndex camera, String reason) {
+        String session = parkingAutomation.session();
+        if (session == null) {
+            session = java.util.UUID.randomUUID().toString();
+            parkingAutomation.begin(session);
+        }
+        try {
+            startActivity(MainActivity.showAutomaticParkingIntent(this, camera.getVideoIndex(), session));
+            DevRuntimeLog.add(TAG, "Parking automatic open: " + reason);
+        } catch (RuntimeException error) {
+            cancelParkingAutomation("opening failed");
+            Log.w(TAG, "Parking camera launch failed", error);
+        }
+    }
+
+    private void refreshParkingSpeedMonitoring() {
+        mainHandler.removeCallbacks(parkingSpeedRunnable);
+        if (parkingAutomation.shouldPollSpeed()) mainHandler.postDelayed(parkingSpeedRunnable, PARKING_SPEED_POLL_MS);
+    }
+
+    private void pollParkingSpeed() {
+        onParkingSpeedSample(VehicleSpeedReader.readSpeedKmhOrNaN());
+        refreshParkingSpeedMonitoring();
+    }
+
+    private void onParkingSpeedSample(float speedKmh) {
+        if (!isParkingAutomationReady()) {
+            cancelParkingAutomation("camera access unavailable");
+            return;
+        }
+        configureParkingAutomation();
+        if (parkingAutomation.onSpeed(speedKmh)) {
+            sendBroadcast(new Intent(ACTION_CLOSE_PARKING).setPackage(getPackageName())
+                    .putExtra(EXTRA_PARKING_SESSION, parkingAutomation.session()));
+        }
+    }
+
+    private void cancelParkingAutomation(String reason) {
+        if (parkingAutomation.session() != null) DevRuntimeLog.add(TAG, "Parking session ended: " + reason);
+        parkingAutomation.cancel();
+        mainHandler.removeCallbacks(parkingSpeedRunnable);
+    }
+
+    /** Activity callbacks and the speed policy share the main thread. */
+    public static boolean onParkingActivityShown(String session) {
+        SignalService inst = sInstance;
+        if (inst == null) return false;
+        if (session == null || !inst.isParkingAutomationReady()) {
+            inst.cancelParkingAutomation("manual view or camera handoff");
+            return false;
+        }
+        boolean accepted = inst.parkingAutomation.shown(session);
+        if (accepted) {
+            inst.configureParkingAutomation();
+            inst.refreshParkingSpeedMonitoring();
+        }
+        return accepted;
+    }
+
+    public static void onParkingActivityStopped(String session, boolean recreating) {
+        SignalService inst = sInstance;
+        if (inst == null || !inst.parkingAutomation.matches(session)) return;
+        if (recreating) {
+            inst.parkingAutomation.recreating(session);
+            inst.mainHandler.removeCallbacks(inst.parkingSpeedRunnable);
+        } else {
+            inst.cancelParkingAutomation("view closed or backgrounded");
+            inst.reverseLaunch.dismiss();
+        }
+    }
+
+    public static boolean closeAutomaticParkingSession(String session) {
+        SignalService inst = sInstance;
+        if (inst == null || !inst.isParkingAutomationReady()) return false;
+        inst.configureParkingAutomation();
+        if (!inst.parkingAutomation.canClose(session)) return false;
+        DevRuntimeLog.add(TAG, "Parking automatic close: speed threshold reached");
+        inst.cancelParkingAutomation("automatic close");
+        inst.reverseLaunch.dismiss();
+        return true;
+    }
+
+    public static void onMainClosedByUser() {
+        SignalService inst=sInstance;
+        if(inst!=null) {
+            inst.cancelParkingAutomation("manual close");
+            inst.reverseLaunch.dismiss();
+        }
+    }
+
+    public static void onExclusiveOemStart() {
+        SignalService inst=sInstance;
+        if(inst!=null)inst.mainHandler.post(()->{if(!inst.isOemCoexistActive())inst.updateReverseLaunch(true);});
+    }
+
     private void updateOverlayDecision() {
         try { updateOverlayDecisionForCameraAccess(); }
         finally { CameraHandoffController.demand("signal-policy", false); }
     }
 
     private void updateOverlayDecisionForCameraAccess() {
+        updateReverseLaunch(false);
         // OEM ownership takes priority over main routing, including reverse and Settings.
         if (updateOemCameraAccess()) return;
         if (oemOverlayRecovery.isPending()) return;
@@ -811,10 +1046,7 @@ public class SignalService extends Service {
             mainHandler.removeCallbacks(hideRunnable);
             clearOverlayShownTimestamp();
             OverlayService.hideOverlay(this);
-            if (nextMode == 4 || nextMode == 0) {
-                Log.i(TAG, "Main visible => no route (mode " + nextMode + ")");
-                return;
-            }
+            // Signal off must restore the gear view rather than leave a side camera selected.
             CameraIndex targetCamera = (nextMode == 3) ? CameraIndex.REAR
                     : (nextMode == 1) ? CameraIndex.LEFT
                     : (nextMode == 2) ? CameraIndex.RIGHT
@@ -850,7 +1082,7 @@ public class SignalService extends Service {
 
         if (nextMode == 3) { // reverse
             currentMode = nextMode;
-            // No overlay is wanted for reverse: hide it if present and leave only OEM/main screen behavior.
+            // Full MainActivity handles exclusive R; coexist leaves the OEM in control.
             mainHandler.removeCallbacks(hideRunnable);
             clearOverlayShownTimestamp();
             OverlayService.hideOverlay(this);
@@ -1137,12 +1369,15 @@ public class SignalService extends Service {
             pollThread = null;
         }
         stopOemLifecycleMonitor();
+        if (takeoverManager != null) { takeoverManager.close(); takeoverManager = null; }
+        if(exclusiveCameraLease!=null){exclusiveCameraLease.close();exclusiveCameraLease=null;}
         unregisterOemCoexistListener();
         mainHandler.removeCallbacks(hideRunnable);
         mainHandler.removeCallbacks(rearviewRestoreRunnable);
         mainHandler.removeCallbacks(signalRestoreRunnable);
         mainHandler.removeCallbacks(laneChangeSpeedRunnable);
         mainHandler.removeCallbacks(oemOverlayRestoreRunnable);
+        cancelParkingAutomation("service stopped");
         oemOverlayRecovery.cancel();
         hideCameraOverlays();
         if (ipkRearview != null) { ipkRearview.close(); ipkRearview = null; }

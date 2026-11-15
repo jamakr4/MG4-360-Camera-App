@@ -1,0 +1,6 @@
+<resources>
+    <item name="surroundMode2d" type="id"/>
+    <item name="surroundMode3d" type="id"/>
+    <item name="surroundDebugSurface" type="id"/>
+    <item name="surroundDebugPdc" type="id"/>
+</resources>

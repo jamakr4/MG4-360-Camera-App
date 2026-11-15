@@ -37,6 +37,7 @@ public class BootReceiver extends BroadcastReceiver {
         }
 
         try {
+            // Its foreground start also preloads static Birdseye CPU assets once per process.
             SignalService.start(context);
         } catch (Exception e) {
             Log.w(TAG, "Failed to start SignalService on boot", e);

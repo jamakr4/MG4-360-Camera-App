@@ -16,6 +16,9 @@ public final class CameraProbe {
     public static native void releaseCameraPreviewsForHandoff();
     /** Real open device count, in-flight open count, effective blocked flag. Never probes devices. */
     public static native int[] cameraOwnershipSnapshot();
+    /** L/R/F/rear: fd open, consumers, leases, valid-frame age ms, errno, frame count. No pixels. */
+    public static native long[] cameraHealth();
+    public static native String drainCameraEvents();
 
     /** Probes /dev/video0..maxIndex-1 and returns a human-readable summary. */
     public static native String probeAll(int maxIndex);
@@ -27,6 +30,13 @@ public final class CameraProbe {
 
     /** Detaches the preview consumer from the given /dev/video index. */
     public static native void detachPreview(int videoIndex);
+
+    /**
+     * Capture age in ms of the last valid frame posted by the current main preview output.
+     * Returns -1 before its first post, after detaching, or if its output worker stopped.
+     * Independent of Birdseye, extra preview sinks and the camera's raw capture health.
+     */
+    public static native long mainPreviewFrameAgeMs(int videoIndex);
 
     /** Additional display output; attaching/detaching it leaves the main preview intact. */
     public static native boolean attachPreviewSink(int videoIndex, int sinkId,

@@ -69,7 +69,7 @@ public class OemCameraAccessInstrumentedTest {
         } finally { restore(context, prefs, original); }
     }
 
-    @Test public void reverseHoldsOwnershipUntilCoexistenceIsDisabled() {
+    @Test public void leavingReverseAndDisablingCoexistenceDoesNotLeaveAPreflightCameraPause() {
         Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
         SharedPreferences prefs = UiPrefs.getPrefs(context);
         Map<String, ?> original = prefs.getAll();
@@ -92,9 +92,10 @@ public class OemCameraAccessInstrumentedTest {
                         new OemAvmReceiver().onReceive(activity, new Intent(STOP));
                         SignalService.refreshCameraAccess(activity);
                         assertTrue("OEM stop must not release cameras in R", CameraProbe.isOemCameraAccessBlocked());
+                        gear.setInt(service,4);
                         prefs.edit().putBoolean(UiPrefs.KEY_OEM_AVM_COEXIST, false).apply();
                         SignalService.refreshCameraAccess(activity);
-                        assertFalse(CameraProbe.isOemCameraAccessBlocked());
+                        assertFalse("Receiver preparation must not black out the existing preview", CameraProbe.isOemCameraAccessBlocked());
                         new OemAvmReceiver().onReceive(activity, new Intent(START));
                         assertFalse(CameraProbe.isOemCameraAccessBlocked());
                         assertFalse(UiPrefs.isOemCameraAccessBlocked(prefs));
@@ -126,23 +127,47 @@ public class OemCameraAccessInstrumentedTest {
         } finally { restore(context, prefs, original); }
     }
 
+    @Test public void missingOemServiceDoesNotBlankNormalCameraAccessOrCauseBackgroundPingPong() {
+        Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        SharedPreferences prefs = UiPrefs.getPrefs(context);
+        Map<String, ?> original = prefs.getAll();
+        prepare(prefs);
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            await(SignalService::isRunning);
+            scenario.onActivity(activity -> UiPrefs.setOemAvmCoexistEnabled(prefs, false));
+            await(() -> SignalService.takeoverSnapshot() != null
+                    && SignalService.takeoverSnapshot().state == com.drivehub.kamera.signal.OemTakeoverController.State.ERROR);
+            scenario.moveToState(androidx.lifecycle.Lifecycle.State.CREATED);
+            new OemAvmReceiver().onReceive(context, new Intent(START));
+            SystemClock.sleep(700);
+            assertFalse(MainActivity.isMainVisible());
+            assertFalse(CameraProbe.isOemCameraAccessBlocked());
+            long[] health = CameraProbe.cameraHealth();
+            assertEquals(24, health.length);
+            for (int camera = 0; camera < 4; camera++) assertEquals(0, health[camera * 6]);
+            scenario.onActivity(activity -> UiPrefs.setOemAvmCoexistEnabled(prefs, true));
+            await(() -> !prefs.getBoolean(UiPrefs.KEY_OEM_TAKEOVER_YIELD, false));
+        } finally { restore(context, prefs, original); }
+    }
+
     private static void prepare(SharedPreferences prefs) {
         assertTrue(prefs.edit().putBoolean(DashcamSettingsController.KEY_ENABLED, false)
-                .putBoolean(UiPrefs.KEY_OEM_AVM_COEXIST, false)
+                .putBoolean(UiPrefs.KEY_OEM_AVM_COEXIST, true)
+                .putBoolean(UiPrefs.KEY_OEM_TAKEOVER_YIELD, false)
                 .putBoolean(UiPrefs.KEY_OEM_AVM_ACTIVE, false)
                 .putBoolean(UiPrefs.KEY_OEM_CAMERA_ACCESS_BLOCKED, false).commit());
         CameraProbe.setOemCameraAccessBlocked(false);
     }
 
     private static void restore(Context context, SharedPreferences prefs, Map<String, ?> original) {
-        prefs.edit().putBoolean(UiPrefs.KEY_OEM_AVM_COEXIST, false).commit();
+        prefs.edit().putBoolean(UiPrefs.KEY_OEM_AVM_COEXIST, true).commit();
         InstrumentationRegistry.getInstrumentation().runOnMainSync(() -> {
             SignalService.setOemAvmActive(context, false);
             SignalService.refreshCameraAccess(context);
         });
         SharedPreferences.Editor editor = prefs.edit();
         for (String key : new String[]{DashcamSettingsController.KEY_ENABLED, UiPrefs.KEY_OEM_AVM_COEXIST,
-                UiPrefs.KEY_OEM_AVM_ACTIVE, UiPrefs.KEY_OEM_CAMERA_ACCESS_BLOCKED}) {
+                UiPrefs.KEY_OEM_AVM_ACTIVE, UiPrefs.KEY_OEM_CAMERA_ACCESS_BLOCKED, UiPrefs.KEY_OEM_TAKEOVER_YIELD}) {
             if (original.containsKey(key)) editor.putBoolean(key, (Boolean) original.get(key));
             else editor.remove(key);
         }

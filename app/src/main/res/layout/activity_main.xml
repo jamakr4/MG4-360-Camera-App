@@ -1,173 +1,186 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<com.drivehub.kamera.birdseye.MainCameraLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/main"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@android:color/black">
 
-    <androidx.constraintlayout.widget.Guideline
-        android:id="@+id/sideCameraWidthLimit"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        app:layout_constraintGuide_percent="0.4" />
-
     <com.drivehub.kamera.side.SideCameraPanel
         android:id="@+id/sideCameraPanel"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        app:layout_constraintDimensionRatio="540:640"
-        app:layout_constraintHorizontal_bias="0"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toStartOf="@id/sideCameraWidthLimit" />
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
 
-    <SurfaceView
-        android:id="@+id/surfaceView"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:layout_margin="0dp"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toEndOf="@id/sideCameraPanel"
-        app:layout_constraintEnd_toEndOf="parent" />
+    <com.drivehub.kamera.birdseye.BirdseyeView
+        android:id="@+id/birdseyeView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
 
-    <TextView
-        android:id="@+id/mainPreviewOemPaused"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:background="@android:color/black"
-        android:gravity="center"
-        android:padding="24dp"
-        android:text="@string/side_camera_oem_paused"
-        android:textColor="@android:color/white"
-        android:textSize="20sp"
-        android:accessibilityLiveRegion="polite"
-        android:visibility="gone"
-        app:layout_constraintStart_toStartOf="@id/surfaceView"
-        app:layout_constraintEnd_toEndOf="@id/surfaceView"
-        app:layout_constraintTop_toTopOf="@id/surfaceView"
-        app:layout_constraintBottom_toBottomOf="@id/surfaceView" />
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/mainCameraPanel"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clipChildren="true">
 
-    <TextView
-        android:id="@+id/tvStatus"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_margin="8dp"
-        android:text="@string/main_camera_label_right"
-        android:textColor="@android:color/white"
-        android:textSize="12sp"
-        android:visibility="gone"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        <SurfaceView
+            android:id="@+id/surfaceView"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_margin="0dp"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent" />
 
-    <LinearLayout
-        android:id="@+id/recordingStatusPill"
-        android:layout_width="wrap_content"
-        android:layout_height="34dp"
-        android:layout_marginTop="18dp"
-        android:layout_marginEnd="22dp"
-        android:background="@drawable/bg_recording_status_pill"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:paddingStart="12dp"
-        android:paddingEnd="12dp"
-        android:visibility="gone"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toTopOf="parent">
+        <com.drivehub.kamera.parking.PdcOverlayView
+            android:id="@+id/pdcOverlay"
+            android:layout_width="0dp" android:layout_height="0dp"
+            app:layout_constraintStart_toStartOf="@id/surfaceView" app:layout_constraintEnd_toEndOf="@id/surfaceView"
+            app:layout_constraintTop_toTopOf="@id/surfaceView" app:layout_constraintBottom_toBottomOf="@id/surfaceView" />
 
-        <View
-            android:id="@+id/recordingStatusDot"
-            android:layout_width="9dp"
-            android:layout_height="9dp"
-            android:layout_marginEnd="8dp"
-            android:background="@drawable/bg_recording_status_dot" />
+        <TextView android:id="@+id/pdcStatus" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:background="#CC10151C" android:textColor="#FFFFFF" android:textSize="18sp"
+            android:gravity="center" app:layout_constrainedWidth="true"
+            android:padding="8dp" android:visibility="gone" android:layout_marginBottom="12dp"
+            android:accessibilityLiveRegion="polite"
+            app:layout_constraintBottom_toTopOf="@id/btnTriggerEventSave"
+            app:layout_constraintStart_toStartOf="parent" app:layout_constraintEnd_toEndOf="parent" />
 
         <TextView
-            android:id="@+id/tvRecordingStatus"
+            android:id="@+id/mainPreviewOemPaused"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:background="@android:color/black"
+            android:gravity="center"
+            android:padding="24dp"
+            android:text="@string/side_camera_oem_paused"
+            android:textColor="@android:color/white"
+            android:textSize="20sp"
+            android:accessibilityLiveRegion="polite"
+            android:visibility="gone"
+            app:layout_constraintStart_toStartOf="@id/surfaceView"
+            app:layout_constraintEnd_toEndOf="@id/surfaceView"
+            app:layout_constraintTop_toTopOf="@id/surfaceView"
+            app:layout_constraintBottom_toBottomOf="@id/surfaceView" />
+
+        <TextView
+            android:id="@+id/tvStatus"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:singleLine="true"
+            android:layout_margin="8dp"
+            android:text="@string/main_camera_label_right"
             android:textColor="@android:color/white"
-            android:textSize="14sp"
-            android:textStyle="bold" />
+            android:textSize="12sp"
+            android:visibility="gone"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
 
-    </LinearLayout>
+        <LinearLayout
+            android:id="@+id/recordingStatusPill"
+            android:layout_width="wrap_content"
+            android:layout_height="34dp"
+            android:layout_marginTop="18dp"
+            android:layout_marginEnd="22dp"
+            android:background="@drawable/bg_recording_status_pill"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:visibility="gone"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent">
 
-    <ImageView
-        android:id="@+id/bg_tishi"
-        android:layout_width="0dp"
-        android:layout_height="84dp"
-        android:src="@drawable/bg_tishi"
-        android:scaleType="fitXY"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintStart_toStartOf="@id/surfaceView"
-        app:layout_constraintEnd_toEndOf="parent" />
+            <View
+                android:id="@+id/recordingStatusDot"
+                android:layout_width="9dp"
+                android:layout_height="9dp"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/bg_recording_status_dot" />
 
-    <RelativeLayout
-        android:id="@+id/warningBanner"
-        android:layout_width="0dp"
-        android:layout_height="84dp"
-        android:gravity="center"
-        app:layout_constraintTop_toTopOf="@id/bg_tishi"
-        app:layout_constraintBottom_toBottomOf="@id/bg_tishi"
-        app:layout_constraintStart_toStartOf="@id/bg_tishi"
-        app:layout_constraintEnd_toEndOf="@id/bg_tishi">
+            <TextView
+                android:id="@+id/tvRecordingStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:singleLine="true"
+                android:textColor="@android:color/white"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+        </LinearLayout>
 
         <ImageView
-            android:id="@+id/eyeImage"
-            android:layout_width="28dp"
-            android:layout_height="28dp"
-            android:layout_centerVertical="true"
-            android:layout_marginEnd="12dp"
-            android:src="@drawable/ic_warning_visibility"
-            android:layout_toStartOf="@+id/alertTextView" />
+            android:id="@+id/bg_tishi"
+            android:layout_width="0dp"
+            android:layout_height="84dp"
+            android:src="@drawable/bg_tishi"
+            android:scaleType="fitXY"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="@id/surfaceView"
+            app:layout_constraintEnd_toEndOf="parent" />
 
-        <TextView
-            android:id="@+id/alertTextView"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_centerInParent="true"
-            android:text="@string/safety_warning_text"
-            android:textColor="@color/white"
-            android:textSize="24sp"
-            android:textStyle="bold"
-            android:singleLine="true" />
+        <RelativeLayout
+            android:id="@+id/warningBanner"
+            android:layout_width="0dp"
+            android:layout_height="84dp"
+            android:gravity="center"
+            app:layout_constraintTop_toTopOf="@id/bg_tishi"
+            app:layout_constraintBottom_toBottomOf="@id/bg_tishi"
+            app:layout_constraintStart_toStartOf="@id/bg_tishi"
+            app:layout_constraintEnd_toEndOf="@id/bg_tishi">
 
-    </RelativeLayout>
+            <ImageView
+                android:id="@+id/eyeImage"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:layout_centerVertical="true"
+                android:layout_marginEnd="12dp"
+                android:src="@drawable/ic_warning_visibility"
+                android:layout_toStartOf="@+id/alertTextView" />
 
-    <Button
-        android:id="@+id/btnTriggerEventSave"
-        android:layout_width="300dp"
-        android:layout_height="62dp"
-        android:layout_marginBottom="24dp"
-        android:background="@drawable/bg_recording_test_button"
-        android:paddingStart="22dp"
-        android:paddingEnd="22dp"
-        android:text="@string/main_button_trigger_event_save"
-        android:textColor="@android:color/white"
-        android:textSize="18sp"
-        android:textStyle="bold"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="@id/surfaceView" />
+            <TextView
+                android:id="@+id/alertTextView"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerInParent="true"
+                android:text="@string/safety_warning_text"
+                android:textColor="@color/white"
+                android:textSize="24sp"
+                android:textStyle="bold"
+                android:singleLine="true" />
 
-    <Button
-        android:id="@+id/btnRecordTestClip"
-        android:layout_width="300dp"
-        android:layout_height="62dp"
-        android:layout_marginBottom="108dp"
-        android:background="@drawable/bg_recording_test_button"
-        android:paddingStart="22dp"
-        android:paddingEnd="22dp"
-        android:text="@string/main_button_record_test_30s"
-        android:textColor="@android:color/white"
-        android:textSize="18sp"
-        android:textStyle="bold"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="@id/surfaceView" />
+        </RelativeLayout>
 
-</androidx.constraintlayout.widget.ConstraintLayout>
+        <Button
+            android:id="@+id/btnTriggerEventSave"
+            style="@style/SideCameraModeButton"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_marginStart="16dp"
+            android:layout_marginEnd="8dp"
+            android:layout_marginBottom="0dp"
+            android:background="@drawable/bg_recording_test_button"
+            android:text="@string/main_button_trigger_event_save"
+            android:textColor="@android:color/white"
+            app:layout_constraintHorizontal_chainStyle="packed"
+            app:layout_goneMarginEnd="16dp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/btnRecordTestClip"
+            app:layout_constraintStart_toStartOf="parent" />
+
+        <Button
+            android:id="@+id/btnRecordTestClip"
+            style="@style/SideCameraModeButton"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="16dp"
+            android:background="@drawable/bg_recording_test_button"
+            android:text="@string/main_button_record_test_30s"
+            android:textColor="@android:color/white"
+            app:layout_constraintTop_toTopOf="@id/btnTriggerEventSave"
+            app:layout_constraintBottom_toBottomOf="@id/btnTriggerEventSave"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toEndOf="@id/btnTriggerEventSave" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+</com.drivehub.kamera.birdseye.MainCameraLayout>

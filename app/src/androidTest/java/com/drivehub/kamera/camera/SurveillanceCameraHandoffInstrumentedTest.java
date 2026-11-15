@@ -13,6 +13,7 @@ import com.drivehub.kamera.dashcam.RecordingService;
 import com.drivehub.kamera.dashcam.SurveillanceSession;
 import com.drivehub.kamera.dashcam.SurveillanceStore;
 import com.drivehub.kamera.remote.RemoteRecording;
+import com.drivehub.kamera.signal.SignalService;
 import java.lang.reflect.Field;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.Test;
@@ -25,6 +26,10 @@ public class SurveillanceCameraHandoffInstrumentedTest {
     @Test public void recoveryCannotReportIdleWhileWaitingForTheRecorderToStart() throws Exception {
         assertFalse("Fixture requires an idle recording service", RecordingService.isRunning());
         Context target = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        target.stopService(new Intent(target, SignalService.class));
+        long until=SystemClock.elapsedRealtime()+3000;
+        while(SignalService.isRunning()&&SystemClock.elapsedRealtime()<until)SystemClock.sleep(20);
+        assertFalse("Fixture must exclude an unrelated background camera reservation",SignalService.isRunning());
         SharedPreferences prefs = target.getSharedPreferences("surveillance-handoff-isolated-test", Context.MODE_PRIVATE);
         Field field = CameraHandoffController.class.getDeclaredField("STATE");
         field.setAccessible(true);

@@ -78,6 +78,7 @@ public final class SettingsDialogController {
     };
 
     private Dialog dialog;
+    private Dialog oemDisableWarning;
     private Views views;
 
     public SettingsDialogController(
@@ -133,6 +134,7 @@ public final class SettingsDialogController {
 
         SharedPreferences prefs = UiPrefs.getPrefs(activity);
         views = bindViews(prefs);
+        wireOemCameraControls();
         wireParkingSettings(prefs);
         wireSubControllers(prefs);
         wireRearviewDisplaySettings(prefs);
@@ -155,6 +157,7 @@ public final class SettingsDialogController {
     }
 
     private void handleDismiss() {
+        if (oemDisableWarning != null) oemDisableWarning.dismiss();
         MainActivity.setSettingsDialogOpen(false);
         devStatusHandler.removeCallbacks(devStatusRefreshRunnable);
         dashcam.onDismiss();
@@ -195,8 +198,6 @@ public final class SettingsDialogController {
         v.etSignalCompactRight = dialog.findViewById(R.id.etSignalCompactRight);
         v.swDashcamEnabled = dialog.findViewById(R.id.switchDashcamEnabled);
         v.swSafetyWarning = dialog.findViewById(R.id.switchSafetyWarning);
-        v.swParkingFrontWheelAlignment = dialog.findViewById(R.id.switchParkingFrontWheelAlignment);
-        v.swParkingRearWheelAlignment = dialog.findViewById(R.id.switchParkingRearWheelAlignment);
         v.swParkingHighlightMissingAreas = dialog.findViewById(R.id.switchParkingHighlightMissingAreas);
         v.swShowStatusBar = dialog.findViewById(R.id.switchShowStatusBar);
         v.swSmoothEntry = dialog.findViewById(R.id.switchSmoothEntry);
@@ -342,19 +343,109 @@ public final class SettingsDialogController {
         }
         if (v.swOemAvmCoexist != null) {
             v.swOemAvmCoexist.setChecked(UiPrefs.isOemAvmCoexistEnabled(prefs));
-            v.swOemAvmCoexist.setOnCheckedChangeListener((btn, checked) ->
-                    UiPrefs.setOemAvmCoexistEnabled(prefs, checked));
+            v.swOemAvmCoexist.setOnCheckedChangeListener((btn, checked) -> {
+                // Initial binding and confirmed/programmatic updates need no confirmation.
+                if (checked == UiPrefs.isOemAvmCoexistEnabled(prefs)) return;
+                if (checked) {
+                    UiPrefs.setOemAvmCoexistEnabled(prefs, true);
+                } else {
+                    // Keep OEM access enabled until the user explicitly confirms.
+                    btn.setChecked(true);
+                    showOemDisableWarning(prefs);
+                }
+            });
         }
         return v;
     }
 
+    private void showOemDisableWarning(SharedPreferences prefs) {
+        if (oemDisableWarning != null) return;
+        Dialog warning = new Dialog(activity);
+        warning.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        warning.setContentView(R.layout.dialog_oem_camera_warning);
+        Window window = warning.getWindow();
+        if (window != null) window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+
+        TextView message = warning.findViewById(R.id.tvOemDisableWarningMessage);
+        message.setText(activity.getString(R.string.settings_oem_disable_warning_message,
+                activity.getString(R.string.parking_oem_restore)));
+        warning.findViewById(R.id.btnOemDisableCancel).setOnClickListener(view -> warning.dismiss());
+        Button confirm = warning.findViewById(R.id.btnOemDisableConfirm);
+        int accent = UiPrefs.getAccentColorInt(prefs);
+        confirm.setBackgroundTintList(android.content.res.ColorStateList.valueOf(accent));
+        confirm.setTextColor(UiPrefs.isLightColor(accent) ? 0xFF111111 : Color.WHITE);
+        confirm.setOnClickListener(view -> {
+            // The preference changes before the switch, so its listener does not warn again.
+            UiPrefs.setOemAvmCoexistEnabled(prefs, false);
+            if (views != null) views.swOemAvmCoexist.setChecked(false);
+            warning.dismiss();
+        });
+        warning.setOnDismissListener(dismissed -> oemDisableWarning = null);
+        oemDisableWarning = warning;
+        AppSystemBars.showDialog(warning);
+        if (window != null) {
+            float density = activity.getResources().getDisplayMetrics().density;
+            int screenWidth = activity.getResources().getDisplayMetrics().widthPixels;
+            int width = Math.min((int) (600 * density), screenWidth - (int) (48 * density));
+            window.setLayout(width, WindowManager.LayoutParams.WRAP_CONTENT);
+        }
+    }
+
+    private void wireOemCameraControls() {
+        dialog.findViewById(R.id.btnSettingsRestoreOem).setOnClickListener(view -> {
+            TextView status = dialog.findViewById(R.id.tvSettingsRestoreOemStatus);
+            status.setText(R.string.settings_oem_restore_running);
+            status.setVisibility(View.VISIBLE);
+            // Keep the button enabled, including when Allow OEM was already on.
+            SignalService.restoreOemCamera(activity, restored -> {
+                if (!status.isAttachedToWindow()) return;
+                status.setText(restored ? R.string.settings_oem_restore_success : R.string.settings_oem_restore_failed);
+            });
+            if (views.swOemAvmCoexist != null) views.swOemAvmCoexist.setChecked(true);
+        });
+        dialog.findViewById(R.id.btnDevSaveOemDiagnostic).setOnClickListener(view -> {
+            view.setEnabled(false);
+            new Thread(() -> {
+                String result;
+                try { result=com.drivehub.kamera.signal.OemTakeoverManager.exportDiagnostic(activity).getAbsolutePath(); }
+                catch(Exception error){ result=error.getClass().getSimpleName()+": "+error.getMessage(); }
+                String message=result;
+                activity.runOnUiThread(() -> {
+                    view.setEnabled(true);
+                    if(activity.isFinishing()||activity.isDestroyed())return;
+                    new androidx.appcompat.app.AlertDialog.Builder(activity)
+                            .setTitle(R.string.parking_oem_save_diagnostic).setMessage(message)
+                            .setPositiveButton(android.R.string.ok,null).show();
+                });
+            },"OEM-diagnostic-export").start();
+        });
+        dialog.findViewById(R.id.btnDevCopyOemDiagnostic).setOnClickListener(view -> {
+            new Thread(() -> {
+                String text = com.drivehub.kamera.signal.OemTakeoverManager.diagnosticText(activity);
+                activity.runOnUiThread(() -> {
+                    android.content.ClipboardManager clipboard = (android.content.ClipboardManager)
+                            activity.getSystemService(android.content.Context.CLIPBOARD_SERVICE);
+                    if (clipboard != null) {
+                        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("OEM camera diagnostics", text));
+                        android.widget.Toast.makeText(activity, R.string.parking_oem_diagnostic_copied,
+                                android.widget.Toast.LENGTH_SHORT).show();
+                    }
+                });
+            }, "OEM-diagnostic-copy").start();
+        });
+    }
+
     private void wireParkingSettings(SharedPreferences prefs) {
-        views.swParkingFrontWheelAlignment.setChecked(UiPrefs.isParkingFrontWheelAlignmentEnabled(prefs));
-        views.swParkingRearWheelAlignment.setChecked(UiPrefs.isParkingRearWheelAlignmentEnabled(prefs));
-        views.swParkingFrontWheelAlignment.setOnCheckedChangeListener((button, enabled) ->
-                UiPrefs.setParkingFrontWheelAlignmentEnabled(prefs, enabled));
-        views.swParkingRearWheelAlignment.setOnCheckedChangeListener((button, enabled) ->
-                UiPrefs.setParkingRearWheelAlignmentEnabled(prefs, enabled));
+        ParkingAutomationSettings.bind(dialog, prefs);
+        SegmentedControl sideCorrection=dialog.findViewById(R.id.segParkingSideCorrection);
+        sideCorrection.check(UiPrefs.isParkingSideCorrectionEnabled(prefs)?R.id.segParkingSideStraight:R.id.segParkingSideNone);
+        sideCorrection.getChildAt(0).setContentDescription(activity.getString(R.string.settings_parking_side_correction)+": "+activity.getString(R.string.settings_parking_alignment_none));
+        sideCorrection.getChildAt(1).setContentDescription(activity.getString(R.string.settings_parking_side_correction)+": "+activity.getString(R.string.settings_parking_alignment_straight));
+        sideCorrection.addOnButtonCheckedListener((group,id,checked)->{
+            if(checked)UiPrefs.setParkingSideCorrectionEnabled(prefs,id==R.id.segParkingSideStraight);
+        });
+        wireWheelMode(prefs,true,R.id.segParkingFrontWheelAlignment,R.string.settings_parking_front_axle);
+        wireWheelMode(prefs,false,R.id.segParkingRearWheelAlignment,R.string.settings_parking_rear_axle);
         views.swParkingHighlightMissingAreas.setChecked(UiPrefs.isParkingHighlightMissingAreasEnabled(prefs));
         views.swParkingHighlightMissingAreas.setOnCheckedChangeListener((button, enabled) ->
                 UiPrefs.setParkingHighlightMissingAreasEnabled(prefs, enabled));
@@ -368,6 +459,16 @@ public final class SettingsDialogController {
             chevron.setRotation(expanded ? 180 : 0);
             ViewCompat.setStateDescription(row, activity.getString(expanded
                     ? R.string.settings_options_expanded : R.string.settings_options_collapsed));
+        });
+    }
+
+    private void wireWheelMode(SharedPreferences prefs,boolean front,int groupId,int axleLabel){
+        SegmentedControl group=dialog.findViewById(groupId);
+        com.drivehub.kamera.side.WheelAlignmentMode[] modes=com.drivehub.kamera.side.WheelAlignmentMode.values();
+        group.check(group.getChildAt(UiPrefs.getParkingWheelMode(prefs,front).code).getId());
+        for(int i=0;i<modes.length;i++)group.getChildAt(i).setContentDescription(activity.getString(axleLabel)+": "+modes[i].id);
+        group.addOnButtonCheckedListener((control,id,checked)->{
+            if(checked)for(int i=0;i<modes.length;i++)if(control.getChildAt(i).getId()==id){UiPrefs.setParkingWheelMode(prefs,front,modes[i]);break;}
         });
     }
 
@@ -485,6 +586,11 @@ public final class SettingsDialogController {
                 dialog.findViewById(R.id.btnDevParkingFrontWheelAngleReset),
                 dialog.findViewById(R.id.etDevParkingRearWheelAngle),
                 dialog.findViewById(R.id.btnDevParkingRearWheelAngleReset));
+        dev.bindSteering(prefs,dialog.findViewById(R.id.etDevSteeringScale),
+                dialog.findViewById(R.id.swDevSteeringInvert),dialog.findViewById(R.id.btnDevSteeringReset));
+        com.drivehub.kamera.dev.CameraSnapshotExporter.bind(activity,dialog.findViewById(R.id.btnDevCameraSnapshots));
+        dev.bindModelSafety(activity,prefs,dialog.findViewById(R.id.swDevModelPrewarm),
+                dialog.findViewById(R.id.tvDevModelSafety),dialog.findViewById(R.id.btnDevModelSafetyReset));
         views.btnDevOemCaptures.setOnClickListener(v -> com.drivehub.kamera.dev.OemCapturesDialog.show(activity));
     }
 
@@ -512,14 +618,16 @@ public final class SettingsDialogController {
                         views.swBannerPauseResume,
                         views.swBannerErrorRecovered,
                         views.swSafetyWarning,
-                        views.swParkingFrontWheelAlignment,
-                        views.swParkingRearWheelAlignment,
                         views.swParkingHighlightMissingAreas,
+                        dialog.findViewById(R.id.switchParkingAutoClose),
+                        dialog.findViewById(R.id.switchParkingAutoOpenDrive),
                         views.swShowStatusBar,
                         views.swSmoothEntry,
                         views.swLockTileResizing,
                         views.swLockTileMoving,
                         views.swDevPerformanceOverlay,
+                        dialog.findViewById(R.id.swDevModelPrewarm),
+                        dialog.findViewById(R.id.swDevSteeringInvert),
                         views.swAllowBetaUpdates
                 },
                 views.dialogClose,
@@ -560,6 +668,9 @@ public final class SettingsDialogController {
             DevRuntimeLog.add("UI", "Dev runtime log cleared");
             if (views.tvDevStatusEventLog != null) {
                 views.tvDevStatusEventLog.setText(DevRuntimeLog.snapshot());
+                TextView pdc=dialog.findViewById(R.id.tvDevStatusPdc);
+                if(pdc!=null)pdc.setText(com.drivehub.kamera.parking.PdcReader.diagnostic());
+                refreshSteeringStatus();
             }
         });
     }
@@ -723,6 +834,18 @@ public final class SettingsDialogController {
                         : R.string.settings_status_inactive));
         views.tvDevStatusRecordsPath.setText(recordsDir.getAbsolutePath());
         views.tvDevStatusEventLog.setText(DevRuntimeLog.snapshot());
+        refreshSteeringStatus();
+        TextView pdc=dialog.findViewById(R.id.tvDevStatusPdc);
+        if(pdc!=null)pdc.setText(com.drivehub.kamera.parking.PdcReader.diagnostic());
+    }
+
+    private void refreshSteeringStatus() {
+        TextView rendering=dialog.findViewById(R.id.tvDevStatusBirdseye);
+        if(rendering!=null)rendering.setText(com.drivehub.kamera.birdseye.BirdseyeRenderer.timingStatus());
+        TextView steering=dialog.findViewById(R.id.tvDevStatusSteering);
+        SharedPreferences prefs=UiPrefs.getPrefs(activity);
+        if(steering!=null)steering.setText(com.drivehub.kamera.steering.SteeringReader.diagnostic(
+                UiPrefs.getSteeringScale(prefs),UiPrefs.isSteeringInverted(prefs)));
     }
 
     private String readCameraProbeSummary() {
@@ -770,8 +893,6 @@ public final class SettingsDialogController {
         EditText etSignalCompactRight;
         Switch swDashcamEnabled;
         Switch swSafetyWarning;
-        Switch swParkingFrontWheelAlignment;
-        Switch swParkingRearWheelAlignment;
         Switch swParkingHighlightMissingAreas;
         Switch swShowStatusBar;
         Switch swSmoothEntry;

@@ -26,11 +26,16 @@ public final class SideCameraPanel extends ViewGroup {
     private final TextView leftFailure, rightFailure;
     private final Button wheelsButton, sidesButton;
     private boolean wheels;
+    private boolean displaying;
+    private AdvancedWheelProjection advanced;
     private final SharedPreferences.OnSharedPreferenceChangeListener preferencesListener = (p, key) -> {
         if (UiPrefs.KEY_MAIN_SIDE_CAMERA_WHEELS.equals(key) || UiPrefs.KEY_ACCENT_COLOR.equals(key)) {
             updateMode();
         } else if (UiPrefs.KEY_PARKING_FRONT_WHEEL_ALIGNMENT.equals(key)
                 || UiPrefs.KEY_PARKING_REAR_WHEEL_ALIGNMENT.equals(key)
+                || UiPrefs.KEY_PARKING_FRONT_WHEEL_MODE.equals(key)
+                || UiPrefs.KEY_PARKING_REAR_WHEEL_MODE.equals(key)
+                || UiPrefs.KEY_PARKING_SIDE_CORRECTION.equals(key)
                 || UiPrefs.KEY_PARKING_HIGHLIGHT_MISSING_AREAS.equals(key)
                 || UiPrefs.KEY_DEV_PARKING_FRONT_WHEEL_ANGLE.equals(key)
                 || UiPrefs.KEY_DEV_PARKING_REAR_WHEEL_ANGLE.equals(key)) {
@@ -46,6 +51,7 @@ public final class SideCameraPanel extends ViewGroup {
         setBackgroundColor(Color.BLACK);
         LayoutInflater.from(context).inflate(R.layout.view_side_cameras, this, true);
         prefs = UiPrefs.getPrefs(context);
+        createProjectionLoader();
         cameraView = findViewById(R.id.sideCameraView);
         leftFailure = findViewById(R.id.leftCameraFailure);
         rightFailure = findViewById(R.id.rightCameraFailure);
@@ -62,6 +68,7 @@ public final class SideCameraPanel extends ViewGroup {
     }
 
     public void resumeDisplay() {
+        displaying=true;if(advanced==null)createProjectionLoader();
         prefs.registerOnSharedPreferenceChangeListener(preferencesListener);
         updateMode();
         updateWheelAlignment();
@@ -70,6 +77,7 @@ public final class SideCameraPanel extends ViewGroup {
     }
 
     public void pauseDisplay() {
+        displaying=false;if(advanced!=null)advanced.setActive(false);
         prefs.unregisterOnSharedPreferenceChangeListener(preferencesListener);
         cameraView.pauseDisplay();
     }
@@ -84,6 +92,7 @@ public final class SideCameraPanel extends ViewGroup {
         cameraView.setWheelsMode(wheels);
         styleButton(wheelsButton, wheels);
         styleButton(sidesButton, !wheels);
+        updateProjectionState();
     }
 
     private void updateOemState() {
@@ -91,14 +100,33 @@ public final class SideCameraPanel extends ViewGroup {
         leftFailure.setText(yielded ? R.string.side_camera_oem_paused : R.string.side_camera_left_missing);
         rightFailure.setText(yielded ? R.string.side_camera_oem_paused : R.string.side_camera_right_missing);
         cameraView.yieldToOem(yielded);
+        updateProjectionState();
     }
 
     private void updateWheelAlignment() {
-        SideCameraNative.setWheelAlignment(UiPrefs.isParkingFrontWheelAlignmentEnabled(prefs),
-                UiPrefs.isParkingRearWheelAlignmentEnabled(prefs),
+        SideCameraNative.setWheelRendering(UiPrefs.getParkingWheelMode(prefs,true).code,
+                UiPrefs.getParkingWheelMode(prefs,false).code,
                 UiPrefs.getDevParkingFrontWheelAngle(prefs), UiPrefs.getDevParkingRearWheelAngle(prefs));
+        SideCameraNative.setSideCorrection(UiPrefs.isParkingSideCorrectionEnabled(prefs));
         SideCameraNative.setHighlightMissingAreas(UiPrefs.isParkingHighlightMissingAreasEnabled(prefs));
+        updateProjectionState();
     }
+
+    private void createProjectionLoader(){
+        advanced=new AdvancedWheelProjection(new AdvancedWheelProjection.Access(){
+            public com.drivehub.kamera.birdseye.BirdseyeCalibration load()throws java.io.IOException{
+                return com.drivehub.kamera.birdseye.BirdseyeCalibration.load(java.nio.file.Paths.get(com.drivehub.kamera.birdseye.BirdseyeCalibration.VEHICLE_PATH));
+            }
+            public void session(int token){SideCameraNative.setAdvancedSession(token);}
+            public boolean maps(int token,String key,float[][] maps){return SideCameraNative.setAdvancedMaps(token,key,
+                    maps==null?null:maps[0],maps==null?null:maps[1],maps==null?null:maps[2],maps==null?null:maps[3],maps==null?null:maps[4],maps==null?null:maps[5]);}
+        },message->com.drivehub.kamera.dev.DevRuntimeLog.add("Curbside",message));
+    }
+    private void updateProjectionState(){
+        if(advanced!=null)advanced.setActive(displaying&&!UiPrefs.isOemCameraAccessBlocked(prefs)
+                &&(wheels?(UiPrefs.getParkingWheelMode(prefs,true)==WheelAlignmentMode.ADVANCED||UiPrefs.getParkingWheelMode(prefs,false)==WheelAlignmentMode.ADVANCED):UiPrefs.isParkingSideCorrectionEnabled(prefs)));
+    }
+    @Override protected void onDetachedFromWindow(){if(advanced!=null){advanced.close();advanced=null;}super.onDetachedFromWindow();}
 
     private void styleButton(Button button, boolean selected) {
         int accent = UiPrefs.getAccentColorInt(prefs);

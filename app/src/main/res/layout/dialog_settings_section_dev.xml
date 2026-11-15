@@ -1,10 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/sectionDev"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:visibility="gone">
+
+    <TextView style="@style/DrivehubSettingsCardLabel" android:layout_width="wrap_content"
+        android:layout_height="wrap_content" android:layout_marginBottom="8dp" android:text="@string/settings_dev_snapshot_title" />
+    <TextView style="@style/DrivehubSettingsCaption" android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:text="@string/settings_dev_snapshot_hint" />
+    <Button android:id="@+id/btnDevCameraSnapshots" style="@style/DrivehubDialogButtonSecondary"
+        android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="48dp"
+        android:layout_marginTop="8dp" android:layout_marginBottom="22dp" android:text="@string/settings_dev_snapshot_button" />
 
     <TextView
         style="@style/DrivehubSettingsCardLabel"
@@ -578,6 +587,49 @@
 
     </LinearLayout>
 
+    <TextView
+        style="@style/DrivehubSettingsCardLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="22dp"
+        android:layout_marginBottom="8dp"
+        android:text="@string/settings_dev_camera_diagnostics" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_settings_inline_card"
+        android:orientation="vertical"
+        android:paddingStart="18dp"
+        android:paddingTop="14dp"
+        android:paddingEnd="18dp"
+        android:paddingBottom="14dp">
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/btnDevSaveOemDiagnostic"
+            style="@style/DrivehubDialogButtonSecondary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="0dp"
+            android:backgroundTint="@null"
+            android:minHeight="48dp"
+            android:text="@string/parking_oem_save_diagnostic"
+            android:textAllCaps="false"
+            app:backgroundTint="@null" />
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/btnDevCopyOemDiagnostic"
+            style="@style/DrivehubDialogButtonSecondary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:backgroundTint="@null"
+            android:minHeight="48dp"
+            android:text="@string/parking_oem_copy_diagnostic"
+            android:textAllCaps="false"
+            app:backgroundTint="@null" />
+    </LinearLayout>
+
     <!-- ============ FACTORY CAMERA CAPTURES ============ -->
     <TextView
         style="@style/DrivehubSettingsCardLabel"
@@ -613,4 +665,29 @@
             android:text="@string/dashcam_oem_captures" />
     </LinearLayout>
 
+    <TextView style="@style/DrivehubSettingsCardLabel" android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:layout_marginTop="16dp" android:text="@string/settings_dev_steering" />
+    <TextView style="@style/DrivehubSettingsBodyMuted" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:text="@string/settings_dev_steering_hint" />
+    <TextView style="@style/DrivehubSettingsBodyMuted" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="8dp" android:labelFor="@+id/etDevSteeringScale" android:text="@string/settings_dev_steering_scale" />
+    <EditText android:id="@id/etDevSteeringScale" style="@style/DrivehubSettingsSliderValue"
+        android:layout_width="120dp" android:layout_height="48dp" android:layout_marginStart="0dp"
+        android:digits="0123456789.," android:maxLength="8" android:selectAllOnFocus="true" android:importantForAutofill="no"
+        android:inputType="numberDecimal" android:singleLine="true" android:imeOptions="actionDone" />
+    <Switch android:id="@+id/swDevSteeringInvert" style="@style/DrivehubSettingsSwitch"
+        android:layout_width="match_parent" android:layout_height="48dp" android:textColor="@color/settings_text_primary"
+        android:text="@string/settings_dev_steering_invert" />
+    <Button android:id="@+id/btnDevSteeringReset" style="@style/DrivehubDialogButtonSecondary"
+        android:layout_width="wrap_content" android:layout_height="48dp" android:text="@string/settings_dev_steering_reset" />
+    <TextView style="@style/DrivehubSettingsCardLabel" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="16dp" android:text="@string/settings_model_guard_title" />
+    <TextView style="@style/DrivehubSettingsBodyMuted" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:text="@string/settings_model_guard_hint" />
+    <Switch android:id="@+id/swDevModelPrewarm" style="@style/DrivehubSettingsSwitch" android:layout_width="match_parent"
+        android:layout_height="48dp" android:textColor="@color/settings_text_primary" android:text="@string/settings_model_guard_auto" />
+    <TextView android:id="@+id/tvDevModelSafety" style="@style/DrivehubSettingsCreditsBody" android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:textIsSelectable="true" />
+    <Button android:id="@+id/btnDevModelSafetyReset" style="@style/DrivehubDialogButtonSecondary" android:layout_width="wrap_content"
+        android:layout_height="48dp" android:text="@string/settings_model_guard_reset" />
 </LinearLayout>

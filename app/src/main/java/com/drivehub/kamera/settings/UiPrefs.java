@@ -1,5 +1,6 @@
 package com.drivehub.kamera.settings;
 
+import com.drivehub.kamera.birdseye.BirdseyeCarColor;
 import com.drivehub.kamera.dashcam.DashcamSettingsController;
 import com.drivehub.kamera.camera.IpkRoutePolicy;
 import com.drivehub.kamera.signal.DigitalRearviewPolicy;
@@ -13,8 +14,43 @@ public final class UiPrefs {
     public static final String KEY_TILE_CORNER_RADIUS = "tileCornerRadius";
     public static final String KEY_ACCENT_COLOR = "accentColor";
     public static final String KEY_MAIN_SIDE_CAMERA_WHEELS = "main_surround_left_wheels";
+    public static final String KEY_PARKING_SURROUND_3D = "parkingSurround3d";
+    public static final String KEY_PARKING_AUTO_CLOSE = "parkingAutoClose";
+    public static final String KEY_PARKING_AUTO_CLOSE_SPEED = "parkingAutoCloseSpeedKmh";
+    public static final String KEY_PARKING_AUTO_OPEN_DRIVE = "parkingAutoOpenDrive";
+    public static final int DEFAULT_PARKING_AUTO_CLOSE_SPEED_KMH = 25;
+
+    public static boolean isParkingAutoCloseEnabled(SharedPreferences prefs) {
+        return prefs.getBoolean(KEY_PARKING_AUTO_CLOSE, true);
+    }
+
+    public static boolean isParkingAutoOpenDriveEnabled(SharedPreferences prefs) {
+        return prefs.getBoolean(KEY_PARKING_AUTO_OPEN_DRIVE, false);
+    }
+
+    public static int getParkingAutoCloseSpeedKmh(SharedPreferences prefs) {
+        return clampParkingAutoCloseSpeedKmh(prefs.getInt(KEY_PARKING_AUTO_CLOSE_SPEED,
+                DEFAULT_PARKING_AUTO_CLOSE_SPEED_KMH));
+    }
+
+    public static int clampParkingAutoCloseSpeedKmh(int speed) {
+        return Math.max(1, Math.min(130, speed));
+    }
+    public static final String KEY_MODEL_SAFETY_REVISION = "modelSafetyRevision";
+    public static final String KEY_DEV_STEERING_SCALE = "devSteeringScale";
+    public static final String KEY_DEV_STEERING_INVERT = "devSteeringInvert";
+    public static float getSteeringScale(SharedPreferences prefs) {
+        return com.drivehub.kamera.steering.SteeringMapping.scale(prefs.getFloat(KEY_DEV_STEERING_SCALE,
+                com.drivehub.kamera.steering.SteeringMapping.DEFAULT_SCALE));
+    }
+    public static boolean isSteeringInverted(SharedPreferences prefs) {
+        return prefs.getBoolean(KEY_DEV_STEERING_INVERT,false);
+    }
+    public static final String KEY_PARKING_BIRDSEYE_CAR_COLOR = "parkingBirdseyeCarColor";
     public static final String KEY_PARKING_FRONT_WHEEL_ALIGNMENT = "parkingFrontWheelAlignment";
     public static final String KEY_PARKING_REAR_WHEEL_ALIGNMENT = "parkingRearWheelAlignment";
+    public static final String KEY_PARKING_FRONT_WHEEL_MODE = "parkingFrontWheelAlignmentMode";
+    public static final String KEY_PARKING_REAR_WHEEL_MODE = "parkingRearWheelAlignmentMode";
     public static final String KEY_PARKING_HIGHLIGHT_MISSING_AREAS = "parkingHighlightMissingAreas";
     public static final String KEY_DEV_PARKING_FRONT_WHEEL_ANGLE = "devParkingFrontWheelAngle";
     public static final String KEY_DEV_PARKING_REAR_WHEEL_ANGLE = "devParkingRearWheelAngle";
@@ -72,6 +108,7 @@ public final class UiPrefs {
     public static final String KEY_SAFETY_WARNING = "safetyWarning";
     public static final String KEY_EXTERNAL_CAMERA_PAUSED = "externalCameraPaused";
     public static final String KEY_OEM_AVM_COEXIST = "oemCoexist";
+    public static final String KEY_OEM_TAKEOVER_YIELD = "oemTakeoverYield";
     public static final String KEY_OEM_AVM_ACTIVE = "oemAvmActive";
     public static final String KEY_OEM_CAMERA_ACCESS_BLOCKED = "oemCameraAccessBlocked";
     private static final String LEGACY_AVM_PREFS_NAME = "AVM_Settings";
@@ -217,20 +254,49 @@ public final class UiPrefs {
         return prefs.getBoolean(KEY_SAFETY_WARNING, true);
     }
 
+    public static BirdseyeCarColor getBirdseyeCarColor(SharedPreferences prefs) {
+        return BirdseyeCarColor.fromId(prefs.getString(KEY_PARKING_BIRDSEYE_CAR_COLOR, null));
+    }
+
+    public static void setBirdseyeCarColor(SharedPreferences prefs, BirdseyeCarColor color) {
+        prefs.edit().putString(KEY_PARKING_BIRDSEYE_CAR_COLOR, color.id).apply();
+    }
+
     public static boolean isParkingFrontWheelAlignmentEnabled(SharedPreferences prefs) {
-        return prefs.getBoolean(KEY_PARKING_FRONT_WHEEL_ALIGNMENT, false);
+        return getParkingWheelMode(prefs,true)!=com.drivehub.kamera.side.WheelAlignmentMode.NONE;
     }
 
     public static void setParkingFrontWheelAlignmentEnabled(SharedPreferences prefs, boolean enabled) {
-        prefs.edit().putBoolean(KEY_PARKING_FRONT_WHEEL_ALIGNMENT, enabled).apply();
+        setParkingWheelMode(prefs,true,enabled?com.drivehub.kamera.side.WheelAlignmentMode.BASIC:com.drivehub.kamera.side.WheelAlignmentMode.NONE);
     }
 
     public static boolean isParkingRearWheelAlignmentEnabled(SharedPreferences prefs) {
-        return prefs.getBoolean(KEY_PARKING_REAR_WHEEL_ALIGNMENT, true);
+        return getParkingWheelMode(prefs,false)!=com.drivehub.kamera.side.WheelAlignmentMode.NONE;
     }
 
     public static void setParkingRearWheelAlignmentEnabled(SharedPreferences prefs, boolean enabled) {
-        prefs.edit().putBoolean(KEY_PARKING_REAR_WHEEL_ALIGNMENT, enabled).apply();
+        setParkingWheelMode(prefs,false,enabled?com.drivehub.kamera.side.WheelAlignmentMode.BASIC:com.drivehub.kamera.side.WheelAlignmentMode.NONE);
+    }
+
+    public static com.drivehub.kamera.side.WheelAlignmentMode getParkingWheelMode(SharedPreferences prefs,boolean front){
+        boolean legacy=!front;String id=null;
+        try{legacy=prefs.getBoolean(front?KEY_PARKING_FRONT_WHEEL_ALIGNMENT:KEY_PARKING_REAR_WHEEL_ALIGNMENT,!front);}catch(ClassCastException ignored){}
+        try{id=prefs.getString(front?KEY_PARKING_FRONT_WHEEL_MODE:KEY_PARKING_REAR_WHEEL_MODE,null);}catch(ClassCastException ignored){}
+        return com.drivehub.kamera.side.WheelAlignmentMode.fromId(id,legacy);
+    }
+
+    public static void setParkingWheelMode(SharedPreferences prefs,boolean front,com.drivehub.kamera.side.WheelAlignmentMode mode){
+        java.util.Objects.requireNonNull(mode);
+        prefs.edit().putString(front?KEY_PARKING_FRONT_WHEEL_MODE:KEY_PARKING_REAR_WHEEL_MODE,mode.id)
+                .putBoolean(front?KEY_PARKING_FRONT_WHEEL_ALIGNMENT:KEY_PARKING_REAR_WHEEL_ALIGNMENT,mode!=com.drivehub.kamera.side.WheelAlignmentMode.NONE).apply();
+    }
+
+    public static final String KEY_PARKING_SIDE_CORRECTION = "parkingSideLensCorrection";
+    public static boolean isParkingSideCorrectionEnabled(SharedPreferences prefs) {
+        return prefs.getBoolean(KEY_PARKING_SIDE_CORRECTION,true);
+    }
+    public static void setParkingSideCorrectionEnabled(SharedPreferences prefs,boolean enabled) {
+        prefs.edit().putBoolean(KEY_PARKING_SIDE_CORRECTION,enabled).apply();
     }
 
     public static boolean isParkingHighlightMissingAreasEnabled(SharedPreferences prefs) {
@@ -296,15 +362,21 @@ public final class UiPrefs {
     }
 
     public static void setOemAvmCoexistEnabled(SharedPreferences prefs, boolean enabled) {
-        prefs.edit().putBoolean(KEY_OEM_AVM_COEXIST, enabled).apply();
+        SharedPreferences.Editor editor = prefs.edit().putBoolean(KEY_OEM_AVM_COEXIST, enabled);
+        editor.apply();
     }
 
     public static boolean isOemAvmActive(SharedPreferences prefs) {
         return prefs.getBoolean(KEY_OEM_AVM_ACTIVE, false);
     }
 
+    public static boolean shouldYieldToOem(SharedPreferences prefs) {
+        return isOemAvmCoexistEnabled(prefs) || prefs.getBoolean(KEY_OEM_TAKEOVER_YIELD, false);
+    }
+
     public static boolean isOemCameraAccessBlocked(SharedPreferences prefs) {
         return prefs.getBoolean(KEY_EXTERNAL_CAMERA_PAUSED, false)
+                || prefs.getBoolean(KEY_OEM_TAKEOVER_YIELD, false)
                 || isOemAvmCoexistEnabled(prefs) && (isOemAvmActive(prefs)
                 || prefs.getBoolean(KEY_OEM_CAMERA_ACCESS_BLOCKED, false));
     }

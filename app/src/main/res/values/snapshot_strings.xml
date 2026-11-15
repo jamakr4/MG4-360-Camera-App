@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_dev_snapshot_title">Camera snapshots</string>
+    <string name="settings_dev_snapshot_hint">Capture four fresh, unmirrored camera images without overlays. Saves PNGs, full UYVY frames, field/timing metadata and readable vehicle calibration under camera-snapshots in the selected recording folder. Cameras must be available to this app; recording stays unchanged.</string>
+    <string name="settings_dev_snapshot_button">Export four camera images</string>
+    <string name="settings_dev_snapshot_busy">Capturing and exporting…</string>
+    <string name="settings_dev_snapshot_success">Saved all four cameras:\n%1$s\n\nIncludes left/right/front/rear PNG + raw UYVY and manifest.json. PNGs spatially weave the fields; moving objects may show interlace artifacts. The raw frames allow other deinterlacing locally.</string>
+    <string name="settings_dev_snapshot_failed">Snapshot export failed:\n%1$s</string>
+    <string name="settings_dev_snapshot_copy">Copy folder path</string>
+</resources>

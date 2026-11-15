@@ -1,0 +1,3 @@
+newmtl body
+Kd 1 1 1
+map_Kd car.png

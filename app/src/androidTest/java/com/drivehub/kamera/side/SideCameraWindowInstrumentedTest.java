@@ -71,12 +71,13 @@ public class SideCameraWindowInstrumentedTest {
                                 AppSystemBars.contentInsets(transientBar, false));
                     }
                     activity.findViewById(R.id.modeWheels).performClick();
-                    for (int mask = 0; mask < 4; mask++) {
-                        UiPrefs.setParkingFrontWheelAlignmentEnabled(prefs, (mask & 1) != 0);
-                        UiPrefs.setParkingRearWheelAlignmentEnabled(prefs, (mask & 2) != 0);
-                        UiPrefs.setParkingHighlightMissingAreasEnabled(prefs, (mask & 1) != 0);
+                    for(WheelAlignmentMode front:WheelAlignmentMode.values())for(WheelAlignmentMode rear:WheelAlignmentMode.values()){
+                        UiPrefs.setParkingWheelMode(prefs,true,front);UiPrefs.setParkingWheelMode(prefs,false,rear);
+                        UiPrefs.setParkingHighlightMissingAreasEnabled(prefs,front==WheelAlignmentMode.ADVANCED);
                     }
                     activity.findViewById(R.id.modeSides).performClick();
+                    UiPrefs.setParkingSideCorrectionEnabled(prefs,false);
+                    UiPrefs.setParkingSideCorrectionEnabled(prefs,true);
                 });
                 InstrumentationRegistry.getInstrumentation().waitForIdleSync();
                 scenario.onActivity(activity -> {
@@ -90,9 +91,11 @@ public class SideCameraWindowInstrumentedTest {
                 });
             } finally {
                 android.content.SharedPreferences.Editor editor = prefs.edit();
-                for (String key : new String[]{UiPrefs.KEY_PARKING_FRONT_WHEEL_ALIGNMENT,
+                for (String key : new String[]{UiPrefs.KEY_PARKING_SIDE_CORRECTION,UiPrefs.KEY_MAIN_SIDE_CAMERA_WHEELS,UiPrefs.KEY_PARKING_FRONT_WHEEL_MODE,UiPrefs.KEY_PARKING_REAR_WHEEL_MODE,UiPrefs.KEY_PARKING_FRONT_WHEEL_ALIGNMENT,
                         UiPrefs.KEY_PARKING_REAR_WHEEL_ALIGNMENT, UiPrefs.KEY_PARKING_HIGHLIGHT_MISSING_AREAS}) {
-                    if (saved.containsKey(key)) editor.putBoolean(key, (Boolean) saved.get(key));
+                    Object value=saved.get(key);
+                    if(value instanceof Boolean)editor.putBoolean(key,(Boolean)value);
+                    else if(value instanceof String)editor.putString(key,(String)value);
                     else editor.remove(key);
                 }
                 assertTrue(editor.commit());

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_dev_camera_diagnostics">Kamera-Diagnose</string>
+    <string name="parking_oem_restore">OEM-Kamera wiederherstellen</string>
+    <string name="parking_oem_copy_diagnostic">Kamera-Diagnoseprotokoll kopieren</string>
+    <string name="parking_oem_diagnostic_copied">Kamera-Diagnoseprotokoll kopiert</string>
+    <string name="parking_oem_save_diagnostic">Kamera-Diagnoseprotokoll speichern</string>
+    <string name="settings_oem_disable_warning_title">OEM-360°-Kamera deaktivieren?</string>
+    <string name="settings_oem_disable_warning_message">Du bist dabei, die OEM-360°-Kamera-App zu deaktivieren!\n\nDiese Änderung kann nach Fahrzeugneustarts und sogar nach der Deinstallation dieser App bestehen bleiben.\n\nSchalte diese Einstellung vor der Deinstallation wieder ein oder verwende den Button „%1$s“ darunter in den Einstellungen. Andernfalls kann ein Werksreset erforderlich sein, um den OEM-Kamerazugriff wiederherzustellen.</string>
+    <string name="settings_oem_disable_confirm">OEM-Kamera deaktivieren</string>
+    <string name="settings_oem_disable_cancel">Abbrechen</string>
+    <string name="settings_oem_restore_running">OEM-Kamerazugriff wird wiederhergestellt …</string>
+    <string name="settings_oem_restore_success">OEM-Kamerazugriff wiederhergestellt.</string>
+    <string name="settings_oem_restore_failed">OEM-Kamerazugriff konnte nicht wiederhergestellt werden. Kamera-Diagnose im Entwicklermodus prüfen und erneut versuchen.</string>
+</resources>

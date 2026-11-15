@@ -7,6 +7,7 @@
 #include <string>
 #include <cstdint>
 #include <array>
+#include <vector>
 
 namespace camera_stream_manager {
 
@@ -19,6 +20,10 @@ void enableSideCameraPreviews();
 void setSideCameraWheelsMode(bool wheels);
 void setSideCameraWheelAlignment(bool frontEnabled, bool rearEnabled,
                                  float frontDegrees, float rearDegrees);
+void setSideCameraWheelRendering(int frontMode,int rearMode,float frontDegrees,float rearDegrees);
+void setSideAdvancedSession(int token);
+void setSideCameraCorrection(bool enabled);
+bool setSideAdvancedMaps(int token,const std::string& key,const side_camera_advanced::Inputs* uv);
 void setSideCameraHighlightMissingAreas(bool enabled);
 bool attachSideCameraPreview(JNIEnv* env, int side, jobject surface,
                              const side_camera_preview::Crops& crops);
@@ -26,10 +31,24 @@ void detachSideCameraPreview(int side);
 void detachSideCameraPreviews();
 int64_t sideCameraPreviewAgeMs(int side);
 
+// Birdseye field taps; capture does no conversion or GL work.
+bool attachBirdseye(int owner, int camera, bool fullSnapshot = false);
+// Ownership-only consumers: no image copies, conversion, GL or encoder.
+std::array<int64_t,24> cameraHealth();
+std::string drainCameraEvents();
+bool holdCamera(int owner,int camera);
+void releaseCameraHold(int owner);
+std::array<int64_t,6> copyBirdseyeSnapshot(int owner,int camera,uint8_t* into,size_t capacity,int64_t afterUs);
+void detachBirdseye(int owner);
+int64_t copyBirdseye(int owner, int camera, uint8_t* destination, size_t capacity, int64_t afterUs);
+int64_t birdseyeClockUs();
+
 bool attachPreview(JNIEnv* env, int videoIndex, jobject surface, bool enhanced = false);
 void detachPreview(int videoIndex);
+// Capture age of the last frame posted by the current main output, -1 if unavailable.
+int64_t mainPreviewFrameAgeMs(int videoIndex);
 void detachAllPreviews();
-// Independent preview outputs. Sink IDs do not address the legacy main preview.
+// Independent preview outputs. Sink IDs do not address the main preview's own output worker.
 bool attachPreviewSink(JNIEnv* env, int videoIndex, int sinkId, jobject surface);
 void detachPreviewSink(int videoIndex, int sinkId);
 int64_t previewSinkFrameAgeMs(int videoIndex, int sinkId);

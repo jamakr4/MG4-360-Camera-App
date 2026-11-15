@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_dev_steering">3D-Lenkwinkel vom Fahrzeug</string>
+    <string name="settings_dev_steering_hint">Live-Float 0x21601563. Startskalierung 14,77 ist eine visuelle Zuordnung, keine verifizierte Lenkübersetzung. Richtung und Skalierung am Fahrzeug prüfen. Fehlende oder veraltete Daten stellen die Räder gerade. Rohwerte stehen unter Dev Status. Nutzt das alte SAIC-Sensor-Abonnement, mit Property-Manager-Fallback auf neueren Systemen. Quelle und Verbindungsfehler stehen unter Dev Status.</string>
+    <string name="settings_dev_steering_scale">Sensorgrad pro Modellgrad (1–30)</string>
+    <string name="settings_dev_steering_invert">Lenkrichtung umkehren</string>
+    <string name="settings_dev_steering_reset">Lenkwinkel-Zuordnung zurücksetzen</string>
+</resources>

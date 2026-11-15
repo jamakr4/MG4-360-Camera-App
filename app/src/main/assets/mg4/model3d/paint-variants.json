@@ -1,0 +1,98 @@
+{
+  "source": "https://sketchfab.com/3d-models/2025-mg-mg4-glbmgmotorcommx-ee2e3b0e1a7b481cb2c08e6fc6d2ed9e",
+  "creator": "MattDoesBlender",
+  "license": "CC BY-NC-SA 4.0",
+  "license_url": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
+  "mesh_sha256": "06fc9937de92672581ec416dd8ae2ac15dd74fe33cc01ed5ff83422b59841308",
+  "resolution": [
+    1024,
+    1024
+  ],
+  "runtime_resolution": [
+    256,
+    256
+  ],
+  "paint_material": "blinn12.001",
+  "paint_slot": 33,
+  "paint_rect_uv": [
+    0.0625,
+    0.8125,
+    0.125,
+    0.875
+  ],
+  "note": "Only the body-paint cell changes. Black roof, glazing, trim, lamps and wheels are retained. Colors/finishes are screen approximations, not measured paint samples.",
+  "variants": {
+    "dover_white": {
+      "name": "Dover White / Arctic White",
+      "codes": "WSB / LIY",
+      "swatch": "#E8E9E5",
+      "metallic": 0.0,
+      "roughness": 0.24,
+      "finish": "gloss",
+      "sha256": "a1f02794a97ad62446ac8020e2ac1bb500494f01226e840525f9dcb80b81b089"
+    },
+    "andes_grey": {
+      "name": "Andes Grey / Cool Gray",
+      "codes": "5ZBY / PAG",
+      "swatch": "#747A80",
+      "metallic": 0.45,
+      "roughness": 0.23,
+      "finish": "gloss",
+      "sha256": "aff5b81641f84fcac6af91b5ab6220eca3dfa9264d7c5d9cf72ef084925a911a"
+    },
+    "pebble_black": {
+      "name": "Pebble Black / Black Knight",
+      "codes": "PBC",
+      "swatch": "#151719",
+      "metallic": 0.45,
+      "roughness": 0.22,
+      "finish": "gloss",
+      "sha256": "cd75264075313145b9080ca44b531d36c1698879df041fbd1a84306361cf9ace"
+    },
+    "diamond_red": {
+      "name": "Diamond Red / Topspeed Red",
+      "codes": "5ZAU / RSJ",
+      "swatch": "#BA132B",
+      "metallic": 0.4,
+      "roughness": 0.21,
+      "finish": "gloss",
+      "sha256": "c871359785180bea150dec4bcb1760aa9d12724060dc52aea1c0ca93c571f819"
+    },
+    "fizzy_orange": {
+      "name": "Fizzy Orange / Bubble Orange",
+      "codes": "NFZ / ZBP",
+      "swatch": "#F36F14",
+      "metallic": 0.0,
+      "roughness": 0.24,
+      "finish": "gloss",
+      "sha256": "6149aea7c9c6fd45bb898bd071e34bf63a7c6c22dfeaaee8fade5df5fe208b7c"
+    },
+    "piccadilly_blue": {
+      "name": "Piccadilly Blue / Brighton Blue",
+      "codes": "JAY / 5JAY",
+      "swatch": "#008BD8",
+      "metallic": 0.15,
+      "roughness": 0.13,
+      "finish": "gloss",
+      "sha256": "6da26535270927b6113dfafd2c5d75655186221e900872520fcb71e92d2dd906"
+    },
+    "cosmic_silver": {
+      "name": "Cosmic Silver / Medal Silver",
+      "codes": "MBC / SSA",
+      "swatch": "#B8BDC2",
+      "metallic": 0.7,
+      "roughness": 0.23,
+      "finish": "gloss",
+      "sha256": "e7fd02c26ad05c4d785a5117142d57177795f3a8a0445c4e33f5d12615b10aad"
+    },
+    "hunter_green": {
+      "name": "Hunter Green",
+      "codes": "5ZCK / ZCK / GWH;ZCK",
+      "swatch": "#4C604D",
+      "metallic": 0.0,
+      "roughness": 0.82,
+      "finish": "matte",
+      "sha256": "6b3002094fef082738f90c48a3230f6b7154268890c76afca7e4974720d9a557"
+    }
+  }
+}

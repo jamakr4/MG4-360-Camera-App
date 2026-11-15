@@ -1,0 +1,88 @@
+{
+  "source": "https://sketchfab.com/3d-models/2025-mg-mg4-glbmgmotorcommx-ee2e3b0e1a7b481cb2c08e6fc6d2ed9e",
+  "creator": "MattDoesBlender",
+  "license": "CC BY-NC-SA 4.0",
+  "material_note": "Eight prepared body-paint palettes with shared geometry; black roof and other materials retained",
+  "source_polygons": 1036472,
+  "triangles": 87995,
+  "atlas": [
+    1024,
+    1024
+  ],
+  "bounds_mm": [
+    [
+      -1044.9889371967352,
+      -2143.5,
+      -1575.1334928214549
+    ],
+    [
+      1044.9889371967352,
+      2143.5,
+      -0.0
+    ]
+  ],
+  "coordinates": "millimetres; X right; front -Y; Z down; ground 0; positive steering turns right",
+  "pivot_note": "Tire-bounds centers for visual animation, not measured steering axes",
+  "parts": [
+    {
+      "name": "body",
+      "triangles": 65996,
+      "pivot_mm": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "front_left",
+      "triangles": 5500,
+      "pivot_mm": [
+        -776.8410327392685,
+        -1270.5992592393206,
+        -350.62121029939505
+      ]
+    },
+    {
+      "name": "front_right",
+      "triangles": 5499,
+      "pivot_mm": [
+        776.8410327392685,
+        -1270.5992592393206,
+        -350.62121029939505
+      ]
+    },
+    {
+      "name": "rear_left",
+      "triangles": 5500,
+      "pivot_mm": [
+        -776.8410327392685,
+        1458.338328659134,
+        -376.1006825276493
+      ]
+    },
+    {
+      "name": "rear_right",
+      "triangles": 5500,
+      "pivot_mm": [
+        776.8410327392685,
+        1458.338328659134,
+        -376.1006825276493
+      ]
+    }
+  ],
+  "sha256": {
+    "car.obj": "06fc9937de92672581ec416dd8ae2ac15dd74fe33cc01ed5ff83422b59841308",
+    "car.mtl": "1ff74721f42afc0b10588252628aa2696e7612929ddd1a56fcad0e737468621c",
+    "car.png": "6da26535270927b6113dfafd2c5d75655186221e900872520fcb71e92d2dd906"
+  },
+  "paint_variants": "paint-variants.json",
+  "runtime_mesh": {
+    "file": "car.meshbin",
+    "format_version": 1,
+    "vertex_stride_floats": 8,
+    "vertices": 263985,
+    "bytes": 8447756,
+    "sha256": "d984ba431d71891e419860ecafd4a4a1b087c1257521f2c73dd74fa0169141db",
+    "source_sha256": "06fc9937de92672581ec416dd8ae2ac15dd74fe33cc01ed5ff83422b59841308"
+  }
+}

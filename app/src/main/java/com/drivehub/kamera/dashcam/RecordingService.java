@@ -559,7 +559,7 @@ public class RecordingService extends Service {
                 updateSurveillanceStorage();
             }
         }
-        if (UiPrefs.isOemAvmCoexistEnabled(prefs())) {
+        if (UiPrefs.shouldYieldToOem(prefs())) {
             Boolean foreground = null;
             try {
                 ActivityManager am = (ActivityManager) getSystemService(ACTIVITY_SERVICE);

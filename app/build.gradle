@@ -14,8 +14,8 @@ android {
         applicationId "com.drivehub.kamera"
         minSdk 28
         targetSdk 36
-        versionCode 44
-        versionName "0.8.15"
+        versionCode 62
+        versionName "0.9"
         buildConfigField "boolean", "IS_BETA", "true"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
@@ -44,6 +44,10 @@ android {
     sourceSets {
         // Local reference montage; keep private images out of release APKs.
         debug.assets.srcDir 'src/androidTest/assets/reference'
+    }
+    androidResources {
+        // Local export sources stay available to tools but are never runtime APK assets.
+        ignoreAssetsPattern = '!.svn:!.git:!CVS:!thumbs.db:!picasa.ini:!*~:car.obj:car.mtl'
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_11

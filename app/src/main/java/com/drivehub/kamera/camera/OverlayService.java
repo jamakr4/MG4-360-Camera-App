@@ -1,6 +1,7 @@
 package com.drivehub.kamera.camera;
 
 import com.drivehub.kamera.CameraProbe;
+import com.drivehub.kamera.MainActivity;
 import com.drivehub.kamera.R;
 
 import com.drivehub.kamera.helper.app.NotificationChannelHelper;
@@ -148,6 +149,10 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
     }
 
     public static void showOverlay(Context context, int cameraIndex, String overlayReason) {
+        if (MainActivity.shouldBlockOverlay()) {
+            hideOverlay(context);
+            return;
+        }
         CameraHandoffController.demand("overlay", true);
         Intent i = new Intent(context, OverlayService.class);
         i.putExtra(EXTRA_CAMERA_INDEX, cameraIndex);
@@ -207,6 +212,16 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
                 .setPriority(NotificationCompat.PRIORITY_LOW)
                 .build();
         startForeground(NOTIF_ID, notif);
+
+        // Recheck on delivery: a queued start or sticky restart may arrive after
+        // MainActivity (including its Settings dialog) has taken the foreground.
+        if (MainActivity.shouldBlockOverlay()) {
+            if (overlayView != null) overlayView.setVisibility(View.GONE);
+            sOverlayVisible = false;
+            stopPreview();
+            stopSelf();
+            return START_NOT_STICKY;
+        }
 
         if (intent != null && intent.getBooleanExtra(EXTRA_HIDE_WITH_FADE, false)) {
             fadeOutAndStop();

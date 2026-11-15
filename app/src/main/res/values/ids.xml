@@ -2,4 +2,5 @@
 <resources>
     <item name="tag_ota_update_info" type="id" />
     <item name="tag_system_bars_guard" type="id" />
+    <item name="surroundModeToggle" type="id" />
 </resources>

@@ -59,7 +59,10 @@ public final class PdcBars {
         for (int s = 0; s < 4; s++) {
             int v = levels[s];
             bands[s] = band(v);
-            dmm[s] = bands[s] < 0 ? -1 : (v == vMin && closestCm > 0 && closestCm < 255 ? closestCm : table.cm(v)) * 10.0;
+            int cm = bands[s] < 0 ? -1 : v == vMin && closestCm > 0 && closestCm < 255 ? closestCm : table.cm(v);
+            // Unknown/off is a state transition, never a distance to glide towards.
+            if (cm <= 0) { dmm[s] = -1; bands[s] = -1; }
+            else dmm[s] = cm * 10.0;
         }
     }
 

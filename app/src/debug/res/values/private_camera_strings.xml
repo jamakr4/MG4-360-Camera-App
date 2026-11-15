@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="birdseye_debug_private_recording">Recording</string>
+    <string name="birdseye_debug_private_synthetic">Test pattern</string>
+    <string name="birdseye_debug_private_curbside">Curbside</string>
+    <string name="birdseye_debug_private_loading">Loading local still / computing map…</string>
+    <string name="birdseye_debug_private_still_label">PRIVATE RECORDING · STILL IMAGE · PDC is simulated</string>
+    <string name="birdseye_debug_private_import_hint">No private capture loaded. Use tools/birdseye/load_private_capture.py to import a local snapshot into this debug app’s private files. Images are never bundled in an APK.</string>
+    <string name="birdseye_debug_private_failed">Private capture unavailable</string>
+    <string name="birdseye_debug_curbside_title">PRIVATE still · Curbside projection experiment</string>
+    <string name="birdseye_debug_curbside_hint">Parking aligns wheel-camera rays with the vehicle axis to keep the sill straight and retain the wheel. Whole side keeps the existing ground strip. Framing is automatic. Lens is the previous optical comparison; Ground allows four-point editing. No calibrated distance measurement.</string>
+    <string name="birdseye_debug_curbside_points">Original · drag points 1–4</string>
+    <string name="birdseye_debug_curbside_old">Current crop / rotation</string>
+    <string name="birdseye_debug_curbside_new">Corrected curbside crop</string>
+    <string name="birdseye_debug_curbside_front">Front wheel</string>
+    <string name="birdseye_debug_curbside_rear">Rear wheel</string>
+    <string name="birdseye_debug_curbside_reset">Automatic points</string>
+    <string name="birdseye_debug_curbside_coverage">Camera pixels covered: %1$.1f%% · private local curbside experiment</string>
+    <item name="privateDebugRecording" type="id"/>
+    <item name="privateDebugSynthetic" type="id"/>
+    <item name="privateDebugCurbside" type="id"/>
+    <item name="curbsideDebugSide" type="id"/>
+    <item name="curbsideDebugRegion" type="id"/>
+    <item name="curbsideDebugProjection" type="id"/>
+    <item name="curbsideDebugReset" type="id"/>
+    <item name="curbsideDebugStatus" type="id"/>
+    <item name="curbsideDebugInput" type="id"/>
+    <item name="curbsideDebugOutput" type="id"/>
+    <string name="birdseye_debug_curbside_lens">Lens / virtual camera</string>
+    <string name="birdseye_debug_curbside_ground">Ground / four points</string>
+    <string name="birdseye_debug_private_failed_detail">Private capture unavailable: %1$s</string>
+    <string name="birdseye_debug_curbside_side">Whole side</string>
+    <string name="birdseye_debug_curbside_parking">Parking / vehicle edge</string>
+    <string name="birdseye_debug_curbside_automatic_boundary">Original · automatic vehicle-aligned strip</string>
+</resources>

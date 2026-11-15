@@ -6,6 +6,7 @@
     <string name="settings_tab_settings">Einstellungen</string>
     <string name="settings_tab_parking">Parking</string>
     <string name="settings_parking_main_view">Hauptansicht</string>
+    <string name="settings_parking_car_color">MG4-Fahrzeugfarbe (2D / 3D)</string>
     <string name="settings_parking_wheel_alignment">Radansichten ausrichten</string>
     <string name="settings_parking_front_axle">Vorderachse</string>
     <string name="settings_parking_rear_axle">Hinterachse</string>
@@ -76,7 +77,7 @@
     <string name="settings_dashcam_storage_usb_limits_hint">Limits für Aufnahmen auf USB. Der interne Speicher behält seine eigenen, konservativeren Limits (siehe Dev-Einstellungen).</string>
     <string name="settings_section_oem_avm">OEM 360°-Kamera</string>
     <string name="settings_oem_avm_coexist">OEM-360°-App weiter nutzen</string>
-    <string name="settings_oem_avm_coexist_hint">Globale Einstellung für die werkseitige 360°-Kamera-App. Wenn aktiv, gibt die App bei Bedarf den Kamerazugriff frei, damit die OEM-Rueckfahr-/360°-Ansicht weiter starten kann. Wenn deaktiviert, haben die Custom-Features immer Vorrang und die OEM-360°-App wird parallel bewusst nicht unterstuetzt.</string>
+    <string name="settings_oem_avm_coexist_hint">Wenn aktiv, werden die Kameras bei Bedarf an die OEM-360°-Ansicht übergeben. Wenn deaktiviert, hält unsere App alle vier Kameras, auch im Hintergrund und ohne Aufnahme. R öffnet unsere Rückkameraansicht. Die Deaktivierung der OEM-Kamera bleibt nach Neustarts und nach der Deinstallation dieser App bestehen. Vor einer Deinstallation oder einem Fahrzeug-Firmwareupdate diese Option wieder einschalten oder „OEM-Kamera wiederherstellen“ verwenden.</string>
     <string name="settings_smooth_entry">Smooth Entry</string>
     <string name="settings_smooth_entry_hint">Blendet die Blinkerkamera und IPK-Kameravorschauen sanft ein und aus.</string>
     <string name="settings_lock_tile_resizing">Tile-Größe sperren</string>
@@ -125,6 +126,8 @@
     <string name="show_safety_warning">Sicherheitswarnung anzeigen</string>
     <string name="settings_section_open_source_credits">Open Source</string>
     <string name="settings_section_additional_credits">Weitere Credits</string>
+    <string name="settings_section_birdseye_credits">MG4-Birdseye-Grafik</string>
+    <string name="settings_credits_birdseye_body">Basiert auf „2025 MG MG4 (GLB)(mgmotor.com.mx)“ von MattDoesBlender.\nhttps://sketchfab.com/MattDoesBlender\n\nOriginalmodell:\nhttps://sketchfab.com/3d-models/2025-mg-mg4-glbmgmotorcommx-ee2e3b0e1a7b481cb2c08e6fc6d2ed9e\n\nLizenz: Creative Commons Namensnennung – Nicht-kommerziell – Weitergabe unter gleichen Bedingungen 4.0 International (CC BY-NC-SA 4.0).\nhttps://creativecommons.org/licenses/by-nc-sa/4.0/\n\nÄnderungen: orthografische Draufsicht, transparenter Hintergrund, Studiobeleuchtung, angepasste Glasmaterialien und acht Lackvarianten, darunter mattes Hunter Green; 3D-Laufzeitmodell auf etwa 88.000 Dreiecke mit acht vorbereiteten 1024-Pixel-Lackpaletten, erhaltenem schwarzem Dach, mattem Hunter Green und getrennten Radgruppen reduziert. Die abgeleiteten Grafiken stehen ebenfalls unter CC BY-NC-SA 4.0.</string>
     <string name="settings_credits_open_source_body">- OpenCV 4.9.0 (opencv.org) - Apache License 2.0&#10;- AndroidX AppCompat 1.7.1 - Apache License 2.0&#10;- AndroidX Activity 1.12.4 - Apache License 2.0&#10;- AndroidX ConstraintLayout 2.2.1 - Apache License 2.0&#10;- Material Components for Android 1.13.0 - Apache License 2.0&#10;- Icons basierend auf Google Material Symbols - Apache License 2.0</string>
     <string name="settings_credits_additional_body">- Danke an die Community aus den XDA Forums - MG4 Electric AAOS 9&#10;- Danke an merth4n für die Bereitstellung der Basisanwendung</string>
     <string name="settings_credits_sound_body">Sound-Attribution&#10;notification-sound-7062 von HenryCena82595&#10;https://freesound.org/s/731783/&#10;Lizenz: Attribution NonCommercial 4.0</string>
@@ -138,7 +141,7 @@
     <string name="settings_dev_parking_rear_angle">Drehwinkel Hinterachse</string>
     <string name="settings_dev_parking_front_reset">Vorderachse zurücksetzen</string>
     <string name="settings_dev_parking_rear_reset">Hinterachse zurücksetzen</string>
-    <string name="settings_dev_parking_wheel_angles_hint">Winkel der linken Radansicht (−180° bis +180°); rechts wird gegensinnig gedreht. Wirkt, wenn die jeweilige Achse unter Parking eingeschaltet ist.</string>
+    <string name="settings_dev_parking_wheel_angles_hint">Winkel der linken Radansicht (−180° bis +180°); rechts wird gegensinnig gedreht. Wirkt, wenn die jeweilige Achse unter Parking basic verwendet.</string>
     <string name="settings_reset">Reset</string>
     <string name="settings_angle_unit">°</string>
     <string name="settings_dev_performance_overlay_enabled">Systemleistung anzeigen</string>
@@ -388,4 +391,17 @@
     <string name="surveillance_state_paused">Pause für Werkskameras</string>
     <string name="surveillance_state_error">Fehler</string>
     <string name="surveillance_state_starting">startet</string>
+    <string name="birdseye_loading">2D-Draufsicht · Fahrzeugkalibrierung wird geladen…</string>
+    <string name="birdseye_calibration_missing">2D-Draufsicht nicht verfügbar\nFahrzeugkalibrierung fehlt oder ist ungültig\n/configure/camera_calibdata.bin</string>
+    <string name="birdseye_waiting">2D-Draufsicht · warte auf aktuelle Kamerabilder</string>
+    <string name="birdseye_render_failed">2D-Draufsicht · Darstellungsfehler</string>
+    <string name="birdseye_partial">Keine aktuellen Bilder: %1$s · Schraffur: ohne Bildabdeckung</string>
+    <string name="surround_mode_2d">2D-Draufsicht</string>
+    <string name="surround_mode_3d">3D-Rundumsicht</string>
+    <string name="surround_3d_failed">3D-Ansicht nicht verfügbar. Zurück zu 2D.</string>
+    <string name="settings_dev_status_pdc">Heck-PDC</string>
+    <string name="settings_section_rivela_credits">Rivela 360</string>
+    <string name="settings_credits_rivela_body">Andrew N / andneg7 — Rivela 360\nGeometrie der Heck-Parksensorbalken, Bodenprojektion, flüssige PDC-Animation, Fisheye-Kameramodell sowie Geometrie und Shader-Grundlage der 3D-Schüsselansicht. Aus dem Original-PR #102 integriert, als Beitrag unter GPL-3.0.\nhttps://github.com/andneg7/rivela360-mg4\nhttps://github.com/jamakr4/MG4-360-Camera-App/pull/102</string>
+    <string name="surround_3d_loading">3D-Ansicht wird geladen…</string>
+    <string name="birdseye_calibration_rechecking">Fahrzeugkalibrierung wird erneut gelesen…</string>
 </resources>

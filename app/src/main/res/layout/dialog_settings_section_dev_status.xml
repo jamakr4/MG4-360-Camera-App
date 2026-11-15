@@ -334,4 +334,15 @@
 
     </LinearLayout>
 
+    <TextView style="@style/DrivehubSettingsCardLabel" android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:layout_marginTop="16dp" android:text="@string/settings_dev_status_pdc" />
+    <TextView android:id="@+id/tvDevStatusPdc" style="@style/DrivehubSettingsCreditsBody"
+        android:layout_width="match_parent" android:layout_height="wrap_content" android:textIsSelectable="true" />
+    <TextView style="@style/DrivehubSettingsCardLabel" android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:layout_marginTop="16dp" android:text="@string/settings_dev_steering" />
+    <TextView android:id="@+id/tvDevStatusSteering" style="@style/DrivehubSettingsCreditsBody"
+        android:layout_width="match_parent" android:layout_height="wrap_content" android:textIsSelectable="true" />
+    <TextView android:id="@+id/tvDevStatusBirdseye" android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:textColor="@android:color/white"
+        android:textSize="13sp" android:paddingTop="12dp" />
 </LinearLayout>

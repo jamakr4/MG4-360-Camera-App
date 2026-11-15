@@ -31,25 +31,35 @@ public class CameraHandoffInstrumentedTest {
     private Map<String, ?> original;
     @Before public void prepare() {
         context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        stopBackgroundReservation();
         prefs = UiPrefs.getPrefs(context);
         original = new HashMap<>(prefs.getAll());
         assertTrue(prefs.edit().putBoolean(DashcamSettingsController.KEY_ENABLED, false)
                 .putBoolean(UiPrefs.KEY_DIGITAL_REARVIEW_ENABLED, false)
                 .putBoolean(UiPrefs.KEY_OEM_AVM_COEXIST, false)
                 .putBoolean(UiPrefs.KEY_OEM_AVM_ACTIVE, false)
+                .putBoolean(UiPrefs.KEY_OEM_TAKEOVER_YIELD, false)
                 .putBoolean(UiPrefs.KEY_OEM_CAMERA_ACCESS_BLOCKED, false).commit());
     }
     @After public void restore() throws Exception {
+        stopBackgroundReservation();
         request(CameraHandoffController.ACTION_RESUME);
         SharedPreferences.Editor edit = prefs.edit();
         for (String key : new String[]{DashcamSettingsController.KEY_ENABLED,
                 UiPrefs.KEY_DIGITAL_REARVIEW_ENABLED, UiPrefs.KEY_OEM_AVM_COEXIST,
-                UiPrefs.KEY_OEM_AVM_ACTIVE, UiPrefs.KEY_OEM_CAMERA_ACCESS_BLOCKED}) {
+                UiPrefs.KEY_OEM_AVM_ACTIVE, UiPrefs.KEY_OEM_CAMERA_ACCESS_BLOCKED,
+                UiPrefs.KEY_OEM_TAKEOVER_YIELD}) {
             if (original.containsKey(key)) edit.putBoolean(key, (Boolean) original.get(key));
             else edit.remove(key);
         }
         assertTrue(edit.commit());
         InstrumentationRegistry.getInstrumentation().runOnMainSync(() -> SignalService.refreshCameraAccess(context));
+    }
+    private void stopBackgroundReservation() {
+        context.stopService(new Intent(context, SignalService.class));
+        long until = SystemClock.elapsedRealtime() + 3000;
+        while (SignalService.isRunning() && SystemClock.elapsedRealtime() < until) SystemClock.sleep(20);
+        assertFalse("Idle handoff fixture must not keep the exclusive background lease", SignalService.isRunning());
     }
     @Test public void manifestReleaseAndResumeReturnActualOwnershipWithCoexistenceOff() throws Exception {
         Bundle release = request(CameraHandoffController.ACTION_RELEASE);

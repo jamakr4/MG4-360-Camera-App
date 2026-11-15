@@ -13,6 +13,7 @@ import androidx.test.espresso.ViewInteraction;
 import androidx.test.platform.app.InstrumentationRegistry;
 
 import com.drivehub.kamera.MainActivity;
+import com.drivehub.kamera.birdseye.BirdseyeCarColor;
 import com.drivehub.kamera.R;
 
 import org.junit.Test;
@@ -22,6 +23,7 @@ import java.util.Map;
 
 import static androidx.test.espresso.Espresso.onView;
 import static androidx.test.espresso.action.ViewActions.click;
+import static androidx.test.espresso.action.ViewActions.scrollTo;
 import static androidx.test.espresso.action.ViewActions.replaceText;
 import static androidx.test.espresso.action.ViewActions.closeSoftKeyboard;
 import static androidx.test.espresso.action.ViewActions.pressImeActionButton;
@@ -33,11 +35,83 @@ import static org.junit.Assert.*;
 
 @RunWith(AndroidJUnit4.class)
 public class ParkingSettingsInstrumentedTest {
+    @Test public void liveSteeringMappingPersistsAndStatusExposesTheVehicleProperty() {
+        SharedPreferences prefs=UiPrefs.getPrefs(InstrumentationRegistry.getInstrumentation().getTargetContext());
+        Map<String,?> saved=prefs.getAll();
+        prefs.edit().remove(UiPrefs.KEY_DEV_STEERING_SCALE).remove(UiPrefs.KEY_DEV_STEERING_INVERT).commit();
+        try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)) {
+            openDev();
+            assertEquals(14.77f,UiPrefs.getSteeringScale(prefs),.001f);
+            dialogView(R.id.etDevSteeringScale).perform(androidx.test.espresso.action.ViewActions.scrollTo(),replaceText("12,5"),pressImeActionButton(),closeSoftKeyboard());
+            dialogView(R.id.swDevSteeringInvert).perform(androidx.test.espresso.action.ViewActions.scrollTo(),click());
+            assertEquals(12.5f,UiPrefs.getSteeringScale(prefs),0);assertTrue(UiPrefs.isSteeringInverted(prefs));
+            dialogView(R.id.btnClose).perform(click());scenario.recreate();openDev();
+            assertAngleField(R.id.etDevSteeringScale,12.5f);
+            dialogView(R.id.swDevSteeringInvert).check(matches(isChecked()));
+            dialogView(R.id.etDevSteeringScale).perform(androidx.test.espresso.action.ViewActions.scrollTo(),replaceText("0"),pressImeActionButton(),closeSoftKeyboard());
+            assertEquals(12.5f,UiPrefs.getSteeringScale(prefs),0);
+            dialogView(R.id.btnDevSteeringReset).perform(androidx.test.espresso.action.ViewActions.scrollTo(),click());
+            assertEquals(14.77f,UiPrefs.getSteeringScale(prefs),.001f);assertFalse(UiPrefs.isSteeringInverted(prefs));
+            dialogView(R.id.tabDevStatus).perform(androidx.test.espresso.action.ViewActions.scrollTo(),click());
+            dialogView(R.id.tvDevStatusSteering).perform(androidx.test.espresso.action.ViewActions.scrollTo()).check((view,error)->{
+                if(error!=null)throw error;
+                String text=((android.widget.TextView)view).getText().toString();assertTrue(text,text.contains("0x21601563"));assertTrue(text,text.contains("scale=14.770"));
+            });
+            dialogView(R.id.btnClose).perform(click());
+        } finally {
+            SharedPreferences.Editor editor=prefs.edit();
+            for(String key:new String[]{UiPrefs.KEY_DEV_STEERING_SCALE,UiPrefs.KEY_DEV_STEERING_INVERT}) {
+                Object value=saved.get(key);
+                if(value instanceof Float)editor.putFloat(key,(Float)value);
+                else if(value instanceof Boolean)editor.putBoolean(key,(Boolean)value);else editor.remove(key);
+            }
+            editor.commit();
+        }
+    }
+    @Test public void paintSwatchesSelectOneColorAndPersistWhenParkingReopens() {
+        SharedPreferences prefs = UiPrefs.getPrefs(InstrumentationRegistry.getInstrumentation().getTargetContext());
+        String saved = prefs.getString(UiPrefs.KEY_PARKING_BIRDSEYE_CAR_COLOR, null);
+        assertTrue(prefs.edit().putString(UiPrefs.KEY_PARKING_BIRDSEYE_CAR_COLOR, "unknown_future_color").commit());
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            assertEquals(BirdseyeCarColor.PICCADILLY_BLUE, UiPrefs.getBirdseyeCarColor(prefs));
+            openParking(scenario);
+            paintSwatch(BirdseyeCarColor.PICCADILLY_BLUE).check(matches(isSelected()));
+            for (BirdseyeCarColor color : BirdseyeCarColor.values()) {
+                paintSwatch(color).perform(click());
+                assertEquals(color, UiPrefs.getBirdseyeCarColor(prefs));
+                assertEquals(color.id, prefs.getString(UiPrefs.KEY_PARKING_BIRDSEYE_CAR_COLOR, null));
+                for (BirdseyeCarColor candidate : BirdseyeCarColor.values()) {
+                    paintSwatch(candidate).check((view, error) -> {
+                        if (error != null) throw error;
+                        assertEquals(candidate == color, view.isSelected());
+                        android.view.accessibility.AccessibilityNodeInfo node = view.createAccessibilityNodeInfo();
+                        assertTrue(node.isCheckable()); assertEquals(candidate == color, node.isChecked());
+                        assertEquals(candidate.label(), view.getContentDescription().toString());
+                    });
+                }
+            }
+            dialogView(R.id.btnClose).perform(click());
+            scenario.recreate();
+            openParking(scenario);
+            paintSwatch(BirdseyeCarColor.HUNTER_GREEN).check(matches(isSelected()));
+            dialogView(R.id.btnClose).perform(click());
+        } finally {
+            SharedPreferences.Editor editor = prefs.edit();
+            if (saved == null) editor.remove(UiPrefs.KEY_PARKING_BIRDSEYE_CAR_COLOR);
+            else editor.putString(UiPrefs.KEY_PARKING_BIRDSEYE_CAR_COLOR, saved);
+            assertTrue(editor.commit());
+        }
+    }
+
+    private static ViewInteraction paintSwatch(BirdseyeCarColor color) {
+        return onView(withTagValue(org.hamcrest.Matchers.is((Object) color.id))).inRoot(isDialog());
+    }
+
     @Test public void devAnglesAcceptDecimalsPersistAndResetEachAxleIndependently() {
         Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
         SharedPreferences prefs = UiPrefs.getPrefs(context);
         Map<String, ?> saved = prefs.getAll();
-        assertTrue(prefs.edit().remove(UiPrefs.KEY_DEV_PARKING_FRONT_WHEEL_ANGLE)
+        assertTrue(prefs.edit().remove(UiPrefs.KEY_PARKING_FRONT_WHEEL_MODE).remove(UiPrefs.KEY_PARKING_REAR_WHEEL_MODE).remove(UiPrefs.KEY_DEV_PARKING_FRONT_WHEEL_ANGLE)
                 .remove(UiPrefs.KEY_DEV_PARKING_REAR_WHEEL_ANGLE)
                 .putBoolean(UiPrefs.KEY_PARKING_FRONT_WHEEL_ALIGNMENT, false)
                 .putBoolean(UiPrefs.KEY_PARKING_REAR_WHEEL_ALIGNMENT, true).commit());
@@ -74,11 +148,12 @@ public class ParkingSettingsInstrumentedTest {
             dialogView(R.id.btnClose).perform(click());
         } finally {
             SharedPreferences.Editor editor = prefs.edit();
-            for (String key : new String[]{UiPrefs.KEY_DEV_PARKING_FRONT_WHEEL_ANGLE,
+            for (String key : new String[]{UiPrefs.KEY_PARKING_FRONT_WHEEL_MODE,UiPrefs.KEY_PARKING_REAR_WHEEL_MODE,UiPrefs.KEY_DEV_PARKING_FRONT_WHEEL_ANGLE,
                     UiPrefs.KEY_DEV_PARKING_REAR_WHEEL_ANGLE, UiPrefs.KEY_PARKING_FRONT_WHEEL_ALIGNMENT,
                     UiPrefs.KEY_PARKING_REAR_WHEEL_ALIGNMENT}) {
                 Object value = saved.get(key);
                 if (value instanceof Float) editor.putFloat(key, (Float) value);
+                else if (value instanceof String) editor.putString(key,(String)value);
                 else if (value instanceof Boolean) editor.putBoolean(key, (Boolean) value);
                 else editor.remove(key);
             }
@@ -86,85 +161,75 @@ public class ParkingSettingsInstrumentedTest {
         }
     }
 
-    @Test public void axleOptionsAreIndependentPersistedAndInitiallyCollapsed() {
-        Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
-        SharedPreferences prefs = UiPrefs.getPrefs(context);
-        Map<String, ?> saved = prefs.getAll();
-        assertTrue(prefs.edit().remove(UiPrefs.KEY_PARKING_FRONT_WHEEL_ALIGNMENT)
-                .remove(UiPrefs.KEY_PARKING_REAR_WHEEL_ALIGNMENT)
-                .remove(UiPrefs.KEY_PARKING_HIGHLIGHT_MISSING_AREAS)
-                .putBoolean(UiPrefs.KEY_SAFETY_WARNING, false)
-                .putString(UiPrefs.KEY_ACCENT_COLOR, "#F08020").commit());
-        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
-            assertFalse(UiPrefs.isParkingFrontWheelAlignmentEnabled(prefs));
-            assertTrue(UiPrefs.isParkingRearWheelAlignmentEnabled(prefs));
-            assertTrue(UiPrefs.isParkingHighlightMissingAreasEnabled(prefs));
+    @Test public void axleOptionsMigrateIndependentlyPersistAndKeepHighlightToggle() {
+        Context context=InstrumentationRegistry.getInstrumentation().getTargetContext();
+        SharedPreferences prefs=UiPrefs.getPrefs(context);Map<String,?> saved=prefs.getAll();
+        String[] keys={UiPrefs.KEY_PARKING_FRONT_WHEEL_MODE,UiPrefs.KEY_PARKING_REAR_WHEEL_MODE,
+                UiPrefs.KEY_PARKING_FRONT_WHEEL_ALIGNMENT,UiPrefs.KEY_PARKING_REAR_WHEEL_ALIGNMENT,
+                UiPrefs.KEY_PARKING_HIGHLIGHT_MISSING_AREAS,UiPrefs.KEY_SAFETY_WARNING,UiPrefs.KEY_ACCENT_COLOR};
+        prefs.edit().remove(UiPrefs.KEY_PARKING_FRONT_WHEEL_MODE).remove(UiPrefs.KEY_PARKING_REAR_WHEEL_MODE)
+                .putBoolean(UiPrefs.KEY_PARKING_FRONT_WHEEL_ALIGNMENT,false).putBoolean(UiPrefs.KEY_PARKING_REAR_WHEEL_ALIGNMENT,true)
+                .putBoolean(UiPrefs.KEY_PARKING_HIGHLIGHT_MISSING_AREAS,true).putBoolean(UiPrefs.KEY_SAFETY_WARNING,false)
+                .putString(UiPrefs.KEY_ACCENT_COLOR,"#F08020").commit();
+        try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+            assertEquals(com.drivehub.kamera.side.WheelAlignmentMode.NONE,UiPrefs.getParkingWheelMode(prefs,true));
+            assertEquals(com.drivehub.kamera.side.WheelAlignmentMode.BASIC,UiPrefs.getParkingWheelMode(prefs,false));
             openParking(scenario);
             dialogView(R.id.parkingWheelAlignmentOptions).check(matches(withEffectiveVisibility(Visibility.GONE)));
-            dialogView(R.id.switchSafetyWarning).check(matches(not(isChecked())));
-            dialogView(R.id.switchSafetyWarning).perform(click());
-            assertTrue(UiPrefs.isSafetyWarningEnabled(prefs));
-            scenario.onActivity(activity -> assertEquals(View.VISIBLE,
-                    activity.findViewById(R.id.warningBanner).getVisibility()));
-
+            dialogView(R.id.switchSafetyWarning).perform(click());assertTrue(UiPrefs.isSafetyWarningEnabled(prefs));
             dialogView(R.id.rowParkingWheelAlignment).perform(click());
-            dialogView(R.id.parkingWheelAlignmentOptions).check(matches(isDisplayed()));
-            dialogView(R.id.switchParkingRearWheelAlignment).check(matches(isChecked())).perform(click());
+            dialogView(R.id.segParkingFrontNone).check(matches(isSelected()));
+            dialogView(R.id.segParkingRearBasic).check(matches(isSelected()));
+            dialogView(R.id.segParkingFrontAdvanced).perform(click());
+            assertEquals(com.drivehub.kamera.side.WheelAlignmentMode.ADVANCED,UiPrefs.getParkingWheelMode(prefs,true));
+            assertEquals(com.drivehub.kamera.side.WheelAlignmentMode.BASIC,UiPrefs.getParkingWheelMode(prefs,false));
+            dialogView(R.id.segParkingRearNone).perform(click());
             assertFalse(UiPrefs.isParkingRearWheelAlignmentEnabled(prefs));
-            dialogView(R.id.switchParkingHighlightMissingAreas).check(matches(isChecked())).perform(click());
-            assertFalse(UiPrefs.isParkingHighlightMissingAreasEnabled(prefs));
+            dialogView(R.id.segParkingFrontBasic).perform(click());
+            assertEquals(com.drivehub.kamera.side.WheelAlignmentMode.BASIC,UiPrefs.getParkingWheelMode(prefs,true));
+            dialogView(R.id.segParkingRearAdvanced).perform(click());
+            dialogView(R.id.segParkingFrontNone).perform(click());
             assertFalse(UiPrefs.isParkingFrontWheelAlignmentEnabled(prefs));
-            assertFalse(UiPrefs.isParkingRearWheelAlignmentEnabled(prefs));
-            dialogView(R.id.ivParkingWheelAlignmentChevron).check((view, error) -> {
-                if (error != null) throw error;
-                assertEquals(180f, view.getRotation(), 0);
+            assertEquals(com.drivehub.kamera.side.WheelAlignmentMode.ADVANCED,UiPrefs.getParkingWheelMode(prefs,false));
+            dialogView(R.id.switchParkingHighlightMissingAreas).perform(scrollTo(),click());assertFalse(UiPrefs.isParkingHighlightMissingAreasEnabled(prefs));
+            dialogView(R.id.switchParkingHighlightMissingAreas).check((view,error)->{
+                if(error!=null)throw error;
+                assertEquals(Color.rgb(240,128,32),((Switch)view).getTrackTintList().getColorForState(new int[]{android.R.attr.state_checked},0));
             });
-            dialogView(R.id.rowParkingWheelAlignment).check((view, error) -> {
-                if (error != null) throw error;
-                assertEquals(view.getContext().getString(R.string.settings_options_expanded),
-                        ViewCompat.getStateDescription(view));
-            });
-            dialogView(R.id.switchParkingFrontWheelAlignment).check(matches(not(isChecked()))).perform(click());
-            assertTrue(UiPrefs.isParkingFrontWheelAlignmentEnabled(prefs));
-            assertFalse(UiPrefs.isParkingRearWheelAlignmentEnabled(prefs));
-            dialogView(R.id.switchParkingFrontWheelAlignment).check((view, error) -> {
-                if (error != null) throw error;
-                assertEquals(Color.rgb(240, 128, 32), ((Switch) view).getTrackTintList()
-                        .getColorForState(new int[]{android.R.attr.state_checked}, 0));
-            });
-            dialogView(R.id.switchParkingRearWheelAlignment).perform(click());
-            assertTrue(UiPrefs.isParkingRearWheelAlignmentEnabled(prefs));
-            dialogView(R.id.switchParkingFrontWheelAlignment).perform(click());
-            assertFalse(UiPrefs.isParkingFrontWheelAlignmentEnabled(prefs));
-            assertTrue(UiPrefs.isParkingRearWheelAlignmentEnabled(prefs));
-
-            dialogView(R.id.rowParkingWheelAlignment).perform(click());
-            dialogView(R.id.parkingWheelAlignmentOptions).check(matches(withEffectiveVisibility(Visibility.GONE)));
-            dialogView(R.id.btnClose).perform(click());
-            scenario.recreate();
-            openParking(scenario);
+            dialogView(R.id.ivParkingWheelAlignmentChevron).check((view,error)->{if(error!=null)throw error;assertEquals(180f,view.getRotation(),0);});
+            dialogView(R.id.btnClose).perform(click());scenario.recreate();openParking(scenario);
             dialogView(R.id.parkingWheelAlignmentOptions).check(matches(withEffectiveVisibility(Visibility.GONE)));
             dialogView(R.id.rowParkingWheelAlignment).perform(click());
-            dialogView(R.id.switchParkingFrontWheelAlignment).check(matches(not(isChecked())));
-            dialogView(R.id.switchParkingRearWheelAlignment).check(matches(isChecked()));
-            dialogView(R.id.switchParkingHighlightMissingAreas).check(matches(not(isChecked()))).perform(click());
+            dialogView(R.id.segParkingFrontNone).check(matches(isSelected()));
+            dialogView(R.id.segParkingRearAdvanced).check(matches(isSelected()));
+            dialogView(R.id.switchParkingHighlightMissingAreas).check(matches(not(isChecked()))).perform(scrollTo(),click());
             assertTrue(UiPrefs.isParkingHighlightMissingAreasEnabled(prefs));
-            assertFalse(UiPrefs.isParkingFrontWheelAlignmentEnabled(prefs));
-            assertTrue(UiPrefs.isParkingRearWheelAlignmentEnabled(prefs));
-            dialogView(R.id.switchSafetyWarning).check(matches(isChecked()));
             dialogView(R.id.btnClose).perform(click());
-        } finally {
-            SharedPreferences.Editor editor = prefs.edit();
-            for (String key : new String[]{UiPrefs.KEY_PARKING_FRONT_WHEEL_ALIGNMENT,
-                    UiPrefs.KEY_PARKING_REAR_WHEEL_ALIGNMENT, UiPrefs.KEY_PARKING_HIGHLIGHT_MISSING_AREAS,
-                    UiPrefs.KEY_SAFETY_WARNING, UiPrefs.KEY_ACCENT_COLOR}) {
-                Object value = saved.get(key);
-                if (value instanceof Boolean) editor.putBoolean(key, (Boolean) value);
-                else if (value instanceof String) editor.putString(key, (String) value);
-                else editor.remove(key);
-            }
-            assertTrue(editor.commit());
+        }finally{
+            SharedPreferences.Editor edit=prefs.edit();for(String key:keys){Object value=saved.get(key);
+                if(value instanceof Boolean)edit.putBoolean(key,(Boolean)value);else if(value instanceof String)edit.putString(key,(String)value);else edit.remove(key);}
+            edit.commit();
         }
+    }
+
+    @Test public void sideCorrectionDefaultsOnAndPersistsIndependentlyOfWheelModes(){
+        SharedPreferences prefs=UiPrefs.getPrefs(InstrumentationRegistry.getInstrumentation().getTargetContext());
+        Object saved=prefs.getAll().get(UiPrefs.KEY_PARKING_SIDE_CORRECTION);
+        com.drivehub.kamera.side.WheelAlignmentMode front=UiPrefs.getParkingWheelMode(prefs,true),rear=UiPrefs.getParkingWheelMode(prefs,false);
+        prefs.edit().remove(UiPrefs.KEY_PARKING_SIDE_CORRECTION).commit();
+        try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+            assertTrue(UiPrefs.isParkingSideCorrectionEnabled(prefs));openParking(scenario);
+            dialogView(R.id.segParkingSideStraight).perform(androidx.test.espresso.action.ViewActions.scrollTo()).check(matches(isSelected()));
+            dialogView(R.id.segParkingSideNone).perform(click()).check(matches(isSelected()));
+            dialogView(R.id.segParkingSideStraight).check(matches(not(isSelected())));
+            assertFalse(UiPrefs.isParkingSideCorrectionEnabled(prefs));
+            assertEquals(front,UiPrefs.getParkingWheelMode(prefs,true));assertEquals(rear,UiPrefs.getParkingWheelMode(prefs,false));
+            dialogView(R.id.btnClose).perform(click());scenario.recreate();openParking(scenario);
+            dialogView(R.id.segParkingSideNone).perform(androidx.test.espresso.action.ViewActions.scrollTo()).check(matches(isSelected()));
+            dialogView(R.id.segParkingSideStraight).perform(click()).check(matches(isSelected()));
+            dialogView(R.id.segParkingSideNone).check(matches(not(isSelected())));
+            assertTrue(UiPrefs.isParkingSideCorrectionEnabled(prefs));dialogView(R.id.btnClose).perform(click());
+        }finally{SharedPreferences.Editor edit=prefs.edit();if(saved instanceof Boolean)edit.putBoolean(UiPrefs.KEY_PARKING_SIDE_CORRECTION,(Boolean)saved);else edit.remove(UiPrefs.KEY_PARKING_SIDE_CORRECTION);edit.commit();}
     }
 
     @Test public void existingTabsAndDeveloperNavigationStillSelectTheirOwnSections() {

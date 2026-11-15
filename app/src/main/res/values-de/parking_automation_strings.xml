@@ -1,0 +1,7 @@
+<resources>
+    <string name="parking_automation_title">Automatische Kameraansicht</string>
+    <string name="parking_auto_close">Automatisch schließen</string>
+    <string name="parking_auto_close_speed">Schließgeschwindigkeit (1–130 km/h)</string>
+    <string name="parking_auto_open_drive">Automatisch öffnen bei P → D</string>
+    <string name="parking_automation_hint">Wirkt nur bei ausgeschaltetem Allow OEM. Jeder direkte Wechsel P → D kann die Frontansicht öffnen. Automatisch geschlossen werden nur automatisch geöffnete Ansichten, nachdem das Tempo von unterhalb auf die eingestellte Schwelle steigt. Manuell geöffnete Ansichten bleiben offen.</string>
+</resources>

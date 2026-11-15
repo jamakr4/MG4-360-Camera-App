@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="shortcut_release_cameras">Libérer les caméras</string>
+    <string name="shortcut_resume_cameras">Réactiver les caméras</string>
+    <string name="remote_start_continuous">Démarrer l’enregistrement de surveillance</string>
+    <string name="remote_stop_continuous">Arrêter l’enregistrement de surveillance</string>
+    <string name="remote_query_state">Consulter l’état de la surveillance</string>
+    <string name="remote_test_usb_write">Tester le stockage USB</string>
+    <string name="surveillance_title">Enregistrement de surveillance</string>
+    <string name="surveillance_hint">MG4Control peut lancer un enregistrement de deux heures maximum dans un dossier séparé. Le réglage précédent de la dashcam est ensuite rétabli.</string>
+    <string name="surveillance_active_hint">Surveillance en cours. L’enregistrement normal de la dashcam est temporairement désactivé et sera rétabli à la fin.</string>
+    <string name="surveillance_directory_default">Dossier automatique : surveillance, à côté du dossier normal de la dashcam.</string>
+    <string name="surveillance_choose_directory">Choisir le dossier de surveillance</string>
+    <string name="surveillance_directory_invalid">Choisissez un dossier séparé, en dehors du stockage normal de la dashcam.</string>
+    <string name="notification_surveillance_starting">Démarrage de l’enregistrement de surveillance</string>
+    <string name="notification_surveillance_status">Surveillance : %1$s · %2$s</string>
+    <string name="surveillance_storage_very_low">Stockage très faible : moins de 1 Gio libre</string>
+    <string name="surveillance_storage_low">Stockage faible : moins de 3 Gio libres</string>
+    <string name="surveillance_storage_limited">Stockage limité pour deux heures : moins de 9 Gio libres</string>
+    <string name="surveillance_storage_ok">Stockage suffisant : au moins 9 Gio libres (estimation)</string>
+    <string name="surveillance_storage_unknown">Vérification de l’espace disponible</string>
+    <string name="surveillance_state_started">enregistrement en cours</string>
+    <string name="surveillance_state_paused">en pause pour les caméras d’origine</string>
+    <string name="surveillance_state_error">erreur</string>
+    <string name="surveillance_state_starting">démarrage</string>
+</resources>
