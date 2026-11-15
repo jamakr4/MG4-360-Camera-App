@@ -86,7 +86,7 @@ A community camera mod for the MG4 EV (AAOS 9, pre-2026 facelift), featuring liv
 </p>
 
 <p align="center">
-  <img src="images/wheels.jpg" alt="Four wheel camera close-ups for parking near the curb" width="36%">
+  <img src="images/Wheels.jpg" alt="Four wheel camera close-ups for parking near the curb" width="36%">
   <img src="images/sides.jpg" alt="Four wheel camera close-ups for parking near the curb" width="48%">
 </p>
 
