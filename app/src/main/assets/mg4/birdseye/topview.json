@@ -1,0 +1,61 @@
+{
+  "source": "https://sketchfab.com/3d-models/2025-mg-mg4-glbmgmotorcommx-ee2e3b0e1a7b481cb2c08e6fc6d2ed9e",
+  "creator": "MattDoesBlender",
+  "license": "CC BY-NC-SA 4.0",
+  "license_url": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
+  "projection": "orthographic",
+  "front": "image top; model negative Y",
+  "source_dimensions": [
+    0.3196086883544922,
+    0.6555871963500977,
+    0.24087652564048767
+  ],
+  "uniform_scale": 6.539175610787905,
+  "assumed_overall_length_m": 4.287,
+  "overall_image_bounds_normalized": {
+    "x0": 0.056804463267326355,
+    "x1": 0.9431955218315125,
+    "y0": 0.045454561710357666,
+    "y1": 0.9545454606413841
+  },
+  "body_image_bounds_normalized": {
+    "x0": 0.10512996464967728,
+    "x1": 0.8948700428009033,
+    "y0": 0.045828282833099365,
+    "y1": 0.9527695924043655
+  },
+  "devices": [
+    {
+      "name": "Apple M2 Pro",
+      "type": "CPU",
+      "use": false
+    },
+    {
+      "name": "Apple M2 Pro (GPU - 16 cores)",
+      "type": "METAL",
+      "use": true
+    }
+  ],
+  "resolution": [
+    768,
+    1536
+  ],
+  "changes": [
+    "Uniform normalization by assumed 4.287 m overall length; original aspect retained",
+    "Studio lighting and orthographic camera",
+    "Exterior lamps disabled; window material opaque/tinted for an overlay",
+    "Minimum material roughness 0.13",
+    "Original blue paint retained"
+  ],
+  "note": "Preview only. Model width, mirrors, physical footprint and placement require separate validation.",
+  "source_glb_sha256": "848a0724f8aea49374205e094e28d9672b08e78bee8c0cde0de8787dd93b8be3",
+  "source_archive_sha256": "c44c10f433985105187aeb5add98d7fc62e605c6e6592814088efc072cec8988",
+  "png_sha256": "146fa61891fd82f136296ea7ce1f646384ab9291e539da723a5b6e5be0ab9926",
+  "alpha_bbox_pixels": [
+    43,
+    69,
+    725,
+    1467
+  ],
+  "alpha_verified": "RGBA, transparent corners, opaque vehicle center"
+}

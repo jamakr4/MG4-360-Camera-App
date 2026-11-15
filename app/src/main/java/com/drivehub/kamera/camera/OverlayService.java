@@ -1,6 +1,7 @@
 package com.drivehub.kamera.camera;
 
 import com.drivehub.kamera.CameraProbe;
+import com.drivehub.kamera.MainActivity;
 import com.drivehub.kamera.R;
 
 import com.drivehub.kamera.helper.app.NotificationChannelHelper;
@@ -77,6 +78,7 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
     private WindowManager.LayoutParams overlayParams;
     private int cameraIndex = CameraIndex.FRONT.getVideoIndex();
     private int attachedPreviewCameraIndex = -1;
+    private long previewHandoffGeneration = -1;
     private String overlayReason = OVERLAY_REASON_SIGNAL;
     private boolean fadeOutPending;
 
@@ -147,6 +149,11 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
     }
 
     public static void showOverlay(Context context, int cameraIndex, String overlayReason) {
+        if (MainActivity.shouldBlockOverlay()) {
+            hideOverlay(context);
+            return;
+        }
+        CameraHandoffController.demand("overlay", true);
         Intent i = new Intent(context, OverlayService.class);
         i.putExtra(EXTRA_CAMERA_INDEX, cameraIndex);
         i.putExtra(EXTRA_OVERLAY_REASON, overlayReason);
@@ -154,6 +161,7 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
     }
 
     public static void hideOverlay(Context context) {
+        CameraHandoffController.demand("overlay", false);
         Intent i = new Intent(context, OverlayService.class);
         context.stopService(i);
     }
@@ -204,6 +212,16 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
                 .setPriority(NotificationCompat.PRIORITY_LOW)
                 .build();
         startForeground(NOTIF_ID, notif);
+
+        // Recheck on delivery: a queued start or sticky restart may arrive after
+        // MainActivity (including its Settings dialog) has taken the foreground.
+        if (MainActivity.shouldBlockOverlay()) {
+            if (overlayView != null) overlayView.setVisibility(View.GONE);
+            sOverlayVisible = false;
+            stopPreview();
+            stopSelf();
+            return START_NOT_STICKY;
+        }
 
         if (intent != null && intent.getBooleanExtra(EXTRA_HIDE_WITH_FADE, false)) {
             fadeOutAndStop();
@@ -803,6 +821,7 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
         if (windowManager != null && overlayView != null) {
             windowManager.removeView(overlayView);
         }
+        CameraHandoffController.demand("overlay", false);
         overlayView = null;
         textureView = null;
         sOverlayVisible = false;
@@ -845,26 +864,33 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
     }
 
     private void startPreview() {
+        long handoffGeneration = CameraHandoffController.generation();
         if (textureSurface == null || !textureSurface.isValid()) {
             return;
         }
         applyPreviewTransform();
-        if (attachedPreviewCameraIndex != -1 && attachedPreviewCameraIndex != cameraIndex) {
+        if (attachedPreviewCameraIndex != -1 && (attachedPreviewCameraIndex != cameraIndex
+                || previewHandoffGeneration != handoffGeneration)) {
             CameraProbe.detachPreview(attachedPreviewCameraIndex);
             attachedPreviewCameraIndex = -1;
         }
         if (attachedPreviewCameraIndex == cameraIndex) {
+            CameraHandoffController.ready("overlay", true, handoffGeneration);
             return;
         }
+        CameraHandoffController.ready("overlay", false, handoffGeneration);
         boolean enhanced = OVERLAY_REASON_SIGNAL.equals(overlayReason) && uiPrefs != null
                 && uiPrefs.getBoolean(UiPrefs.KEY_SIGNAL_ENHANCED_PREVIEW, false);
         if (enhanced ? CameraProbe.attachEnhancedPreview(cameraIndex, textureSurface)
                 : CameraProbe.attachPreview(cameraIndex, textureSurface)) {
             attachedPreviewCameraIndex = cameraIndex;
+            previewHandoffGeneration = handoffGeneration;
+            CameraHandoffController.ready("overlay", true, handoffGeneration);
         }
     }
 
     private void stopPreview() {
+        CameraHandoffController.ready("overlay", false, CameraHandoffController.generation());
         if (attachedPreviewCameraIndex == -1) return;
         CameraProbe.detachPreview(attachedPreviewCameraIndex);
         attachedPreviewCameraIndex = -1;

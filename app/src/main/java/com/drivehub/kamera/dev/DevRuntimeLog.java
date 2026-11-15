@@ -16,8 +16,9 @@ public final class DevRuntimeLog {
     }
 
     public static void add(String source, String message) {
-        String line = TIME_FORMAT.format(new Date()) + "  [" + source + "] " + message;
         synchronized (LOCK) {
+            // SimpleDateFormat is mutable; UI, recorder and takeover worker share this logger.
+            String line = TIME_FORMAT.format(new Date()) + "  [" + source + "] " + message;
             LINES.addLast(line);
             while (LINES.size() > MAX_LINES) {
                 LINES.removeFirst();

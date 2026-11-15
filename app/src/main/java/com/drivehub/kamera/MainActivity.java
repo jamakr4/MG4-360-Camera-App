@@ -1,6 +1,7 @@
 package com.drivehub.kamera;
 
 import com.drivehub.kamera.camera.CameraIndex;
+import com.drivehub.kamera.camera.CameraHandoffController;
 import com.drivehub.kamera.camera.OverlayService;
 import com.drivehub.kamera.dashcam.DashcamSettingsController;
 import com.drivehub.kamera.dashcam.RecordingService;
@@ -38,11 +39,81 @@ import androidx.core.view.WindowInsetsCompat;
 
 public class MainActivity extends AppCompatActivity implements SurfaceHolder.Callback {
 
+    public static final String ACTION_SHOW_CAMERA = "com.drivehub.kamera.action.SHOW_CAMERA";
+    public static final String ACTION_HARD_KEY_CLOSE = "com.android.systemui.ACTION_HARD_KEY_APP_CLOSE";
+    public static final String EXTRA_CLOSE_PACKAGE = "PACKAGE_NAME";
+    private static final String STATE_PARKING_SESSION = "automaticParkingSession";
+    private String parkingSession;
+
+    /** Automatic routes must show the camera, never toggle a visible Activity closed. */
+    public static Intent showCameraIntent(Context context, int videoIndex) {
+        return new Intent(context, MainActivity.class).setAction(ACTION_SHOW_CAMERA)
+                .putExtra(SignalService.EXTRA_CAMERA_INDEX,videoIndex)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP);
+    }
+
+    public static Intent showAutomaticParkingIntent(Context context, int videoIndex, String session) {
+        return showCameraIntent(context, videoIndex).putExtra(SignalService.EXTRA_PARKING_SESSION, session);
+    }
+
+    private final BroadcastReceiver parkingCloseReceiver = new BroadcastReceiver() {
+        @Override public void onReceive(Context context, Intent intent) {
+            if (intent == null || !SignalService.ACTION_CLOSE_PARKING.equals(intent.getAction())) return;
+            String session = intent.getStringExtra(SignalService.EXTRA_PARKING_SESSION);
+            if (previewResumed && parkingSession != null && parkingSession.equals(session)
+                    && SignalService.closeAutomaticParkingSession(session)) {
+                parkingSession = null;
+                finishAndRemoveTask();
+            }
+        }
+    };
+
+    private final BroadcastReceiver hardKeyCloseReceiver = new BroadcastReceiver() {
+        @Override public void onReceive(Context context,Intent intent) {
+            if(intent!=null&&ACTION_HARD_KEY_CLOSE.equals(intent.getAction())
+                    &&getPackageName().equals(intent.getStringExtra(EXTRA_CLOSE_PACKAGE)))closeFromUser();
+        }
+    };
+
+    @Override protected void onNewIntent(Intent intent) {
+        boolean wasVisible=sMainVisible&&!stoppedForLauncher; // Restart may call onStart before delivering the Intent.
+        super.onNewIntent(intent);
+        if(intent==null)return;
+        if(wasVisible&&Intent.ACTION_MAIN.equals(intent.getAction())
+                &&(intent.getFlags()&Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY)==0) {
+            closeFromUser();return;
+        }
+        String nextSession = ACTION_SHOW_CAMERA.equals(intent.getAction())
+                ? intent.getStringExtra(SignalService.EXTRA_PARKING_SESSION) : null;
+        // A delayed automatic launch must not take ownership of a manual view.
+        if (wasVisible && parkingSession == null) nextSession = null;
+        if (parkingSession != null && !parkingSession.equals(nextSession))
+            SignalService.onParkingActivityStopped(parkingSession, false);
+        parkingSession = nextSession;
+        setIntent(intent);
+        applyCameraIntent(intent);
+        if (previewResumed && !SignalService.onParkingActivityShown(parkingSession)) parkingSession = null;
+        if(tvStatus!=null)tvStatus.setText(getString(R.string.main_preview_status,cameraLabel(currentVideoIndex)));
+        startPreviewIfReady();
+    }
+
+    private void closeFromUser(){SignalService.onMainClosedByUser();finishAndRemoveTask();}
+
+    private void applyCameraIntent(Intent intent) {
+        if(intent==null||!ACTION_SHOW_CAMERA.equals(intent.getAction()))return;
+        int index=intent.getIntExtra(SignalService.EXTRA_CAMERA_INDEX,currentVideoIndex);
+        for(CameraIndex camera:CameraIndex.values())if(camera.getVideoIndex()==index){currentVideoIndex=index;return;}
+    }
+
     private static final int SWIPE_THRESHOLD_PX = 140;
     private static final int REQ_DASHCAM_USB_FOLDER = 1842;
 
     private SurfaceHolder surfaceHolder;
     private SideCameraPanel sideCameraPanel;
+    private com.drivehub.kamera.birdseye.BirdseyeView birdseyeView;
+    private com.drivehub.kamera.parking.PdcReader pdcReader;
+    private com.drivehub.kamera.steering.SteeringReader steeringReader;
+    private com.drivehub.kamera.parking.PdcOverlayView pdcOverlay;
     private TextView tvStatus;
     private View recordingStatusPill;
     private View recordingStatusDot;
@@ -51,8 +122,16 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private int currentVideoIndex = CameraIndex.FRONT.getVideoIndex();
     private int activePreviewCameraIndex = -1;
     private boolean previewRunning = false;
+    private long previewHandoffGeneration = -1;
     private boolean previewPausedForTestClip = false;
     private boolean previewResumed = false;
+    private final android.os.Handler previewRetryHandler=new android.os.Handler(android.os.Looper.getMainLooper());
+    private int previewRetryAttempts;
+    private final Runnable previewRetry=()->{
+        if(previewResumed&&SignalService.isReverseActive()
+                &&!UiPrefs.shouldYieldToOem(UiPrefs.getPrefs(this)))startPreviewIfReady();
+    };
+    private boolean stoppedForLauncher = true;
     private float downX = 0f;
     private float downY = 0f;
 
@@ -64,7 +143,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             this, appearanceController, otaController, this::applyWarningVisibility);
     private final SharedPreferences.OnSharedPreferenceChangeListener cameraAccessListener = (prefs, key) -> {
         if (UiPrefs.KEY_OEM_CAMERA_ACCESS_BLOCKED.equals(key) || UiPrefs.KEY_OEM_AVM_ACTIVE.equals(key)
-                || UiPrefs.KEY_OEM_AVM_COEXIST.equals(key)) startPreviewIfReady();
+                || UiPrefs.KEY_OEM_AVM_COEXIST.equals(key) || UiPrefs.KEY_EXTERNAL_CAMERA_PAUSED.equals(key)) startPreviewIfReady();
     };
 
     public static void setSettingsDialogOpen(boolean open) {
@@ -109,7 +188,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     }
 
     public static boolean shouldBlockOverlay() {
-        return sMainVisible && !sSettingsDialogOpen;
+        return sMainVisible || sSettingsDialogOpen;
     }
 
     @SuppressWarnings("deprecation")
@@ -158,6 +237,13 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        parkingSession = savedInstanceState != null ? savedInstanceState.getString(STATE_PARKING_SESSION)
+                : ACTION_SHOW_CAMERA.equals(getIntent().getAction())
+                ? getIntent().getStringExtra(SignalService.EXTRA_PARKING_SESSION) : null;
+        getOnBackPressedDispatcher().addCallback(this,new androidx.activity.OnBackPressedCallback(true){
+            @Override public void handleOnBackPressed(){closeFromUser();}
+        });
+        applyCameraIntent(getIntent());
         EdgeToEdge.enable(this);
         UiPrefs.migrateLegacyPrefsIfNeeded(this);
         SignalService.refreshCameraAccess(this);
@@ -171,6 +257,14 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         AppSystemBars.apply(getWindow());
 
         sideCameraPanel = findViewById(R.id.sideCameraPanel);
+        birdseyeView = findViewById(R.id.birdseyeView);
+        pdcOverlay=findViewById(R.id.pdcOverlay);
+        pdcOverlay.bind(birdseyeView::scene,birdseyeView.pdcGeometry(),findViewById(R.id.pdcStatus),
+                ()->SignalService.isReverseActive()&&currentVideoIndex==CameraIndex.REAR.getVideoIndex(),
+                ()->previewResumed&&previewRunning&&activePreviewCameraIndex==CameraIndex.REAR.getVideoIndex()
+                        ?CameraProbe.mainPreviewFrameAgeMs(CameraIndex.REAR.getVideoIndex()):-1);
+        pdcReader=new com.drivehub.kamera.parking.PdcReader(this,birdseyeView::setPdcSnapshot);
+        steeringReader=new com.drivehub.kamera.steering.SteeringReader(this,birdseyeView::setSteeringSnapshot);
         SurfaceView surfaceView = findViewById(R.id.surfaceView);
         surfaceHolder = surfaceView.getHolder();
         surfaceHolder.addCallback(this);
@@ -187,7 +281,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         btnSettings.setOnClickListener(v -> settingsDialog.show());
 
         ImageButton btnClose = sideCameraPanel.findViewById(R.id.btnClose);
-        btnClose.setOnClickListener(v -> finishAndRemoveTask());
+        btnClose.setOnClickListener(v -> closeFromUser());
 
         btnRecordTestClip = findViewById(R.id.btnRecordTestClip);
         btnRecordTestClip.setOnClickListener(v -> {
@@ -255,19 +349,33 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
     @Override
     protected void onResume() {
+        SignalService.traceCameraEvent("MainActivity onResume");
         super.onResume();
-        previewResumed = true;
+        previewResumed = true; stoppedForLauncher = false;
         SignalService.refreshCameraAccess(this);
         AppSystemBars.apply(getWindow());
+        if (!SignalService.onParkingActivityShown(parkingSession)) parkingSession = null;
+        if (RecordingService.isSurveillanceActive(this) && !RecordingService.isRunning()) {
+            try { RecordingService.startIfDashcamEnabled(this); }
+            catch (RuntimeException error) {
+                com.drivehub.kamera.remote.RemoteRecording.state(this, "error", "foreground_start_rejected", "", -1, "");
+            }
+        }
         sideCameraPanel.resumeDisplay();
+        birdseyeView.resumeDisplay();pdcReader.start();pdcOverlay.resumeDisplay();
+        steeringReader.start();
         startPreviewIfReady();
     }
 
     @Override
     protected void onPause() {
+        SignalService.traceCameraEvent("MainActivity onPause");
         previewResumed = false;
+        CameraHandoffController.demand("main", false);
         stopPreview();
         sideCameraPanel.pauseDisplay();
+        birdseyeView.pauseDisplay();pdcReader.stop();pdcOverlay.pauseDisplay();
+        steeringReader.stop();
         super.onPause();
     }
 
@@ -286,6 +394,10 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             sSettingsDialogOpen = true;
         }
         try {
+            ContextCompat.registerReceiver(this,hardKeyCloseReceiver,new IntentFilter(ACTION_HARD_KEY_CLOSE),
+                    ContextCompat.RECEIVER_EXPORTED);
+            ContextCompat.registerReceiver(this, parkingCloseReceiver,
+                    new IntentFilter(SignalService.ACTION_CLOSE_PARKING), ContextCompat.RECEIVER_NOT_EXPORTED);
             ContextCompat.registerReceiver(
                     this,
                     cameraRouteReceiver,
@@ -309,13 +421,18 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
     @Override
     protected void onStop() {
+        SignalService.traceCameraEvent("MainActivity onStop");
         super.onStop();
-        sMainVisible = false;
+        sMainVisible = false; stoppedForLauncher = true;
         sSettingsDialogOpen = false;
+        SignalService.onParkingActivityStopped(parkingSession, isChangingConfigurations());
+        if (!isChangingConfigurations()) parkingSession = null;
         UiPrefs.getPrefs(this).unregisterOnSharedPreferenceChangeListener(cameraAccessListener);
         // Re-apply signal/rearview overlay state once MainActivity stops blocking it.
         SignalService.requestRecheck();
         otaController.stop();
+        try { unregisterReceiver(hardKeyCloseReceiver); } catch (IllegalArgumentException ignored) { }
+        try { unregisterReceiver(parkingCloseReceiver); } catch (IllegalArgumentException ignored) { }
         try {
             unregisterReceiver(cameraRouteReceiver);
         } catch (Throwable ignored) {
@@ -326,11 +443,19 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         }
     }
 
+    @Override protected void onSaveInstanceState(Bundle state) {
+        state.putString(STATE_PARKING_SESSION, parkingSession);
+        super.onSaveInstanceState(state);
+    }
+
     @Override
     protected void onDestroy() {
+        SignalService.traceCameraEvent("MainActivity onDestroy");
         super.onDestroy();
         sMainVisible = false;
         otaController.stop();
+        if(pdcReader!=null)pdcReader.close();
+        if(steeringReader!=null)steeringReader.close();
         stopPreview();
     }
 
@@ -387,7 +512,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         boolean enabled = DashcamSettingsController.isTestRecordEnabled(prefs);
         int durationSec = DashcamSettingsController.getTestRecordDurationSec(prefs);
         btnRecordTestClip.setVisibility(enabled ? View.VISIBLE : View.GONE);
-        btnRecordTestClip.setEnabled(enabled);
+        btnRecordTestClip.setEnabled(enabled && !RecordingService.isSurveillanceActive(this));
         btnRecordTestClip.setText(getString(R.string.main_button_record_test_30s, durationSec));
     }
 
@@ -407,7 +532,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 || RecordingService.STATUS_STARTING.equals(status)
                 || RecordingService.STATUS_PAUSED_OEM.equals(status);
         btnRecordTestClip.setText(getString(R.string.main_button_record_test_30s, durationSec));
-        btnRecordTestClip.setEnabled(settingEnabled && !recordingInProgress);
+        btnRecordTestClip.setEnabled(settingEnabled && !recordingInProgress && !RecordingService.isSurveillanceActive(this));
     }
 
     private void restartPreviewAfterTestClipIfNeeded() {
@@ -417,6 +542,9 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     }
 
     private void startPreviewIfReady() {
+        CameraHandoffController.demand("main", previewResumed && !previewPausedForTestClip
+                && surfaceHolder != null && surfaceHolder.getSurface().isValid());
+        long handoffGeneration = CameraHandoffController.generation();
         boolean blocked = UiPrefs.isOemCameraAccessBlocked(UiPrefs.getPrefs(this));
         View pausedMessage = findViewById(R.id.mainPreviewOemPaused);
         if (pausedMessage != null) pausedMessage.setVisibility(blocked ? View.VISIBLE : View.GONE);
@@ -430,14 +558,29 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             if (tvStatus != null) tvStatus.setText(R.string.main_surface_not_ready);
             return;
         }
-        if (previewRunning && activePreviewCameraIndex == currentVideoIndex) return;
-        if (activePreviewCameraIndex != -1 && activePreviewCameraIndex != currentVideoIndex) {
+        if (previewRunning && activePreviewCameraIndex == currentVideoIndex
+                && previewHandoffGeneration == handoffGeneration) {
+            CameraHandoffController.ready("main", true, handoffGeneration);
+            return;
+        }
+        if (activePreviewCameraIndex != -1 && (activePreviewCameraIndex != currentVideoIndex
+                || previewHandoffGeneration != handoffGeneration)) {
             CameraProbe.detachPreview(activePreviewCameraIndex);
             activePreviewCameraIndex = -1;
         }
+        CameraHandoffController.ready("main", false, handoffGeneration);
         boolean ok = CameraProbe.attachPreview(currentVideoIndex, surfaceHolder.getSurface());
+        CameraHandoffController.ready("main", ok, handoffGeneration);
         previewRunning = ok;
+        previewHandoffGeneration = handoffGeneration;
         activePreviewCameraIndex = ok ? currentVideoIndex : -1;
+        previewRetryHandler.removeCallbacks(previewRetry);
+        if(ok)previewRetryAttempts=0;
+        else if(SignalService.isReverseActive()&&!UiPrefs.shouldYieldToOem(UiPrefs.getPrefs(this))
+                &&previewRetryAttempts<6) {
+            // OEM teardown can lag its close broadcast. Retry only this visible R session.
+            previewRetryAttempts++;previewRetryHandler.postDelayed(previewRetry,500);
+        }
         if (tvStatus != null) {
             tvStatus.setText(ok
                     ? getString(R.string.main_preview_status, cameraLabel(currentVideoIndex))
@@ -446,6 +589,8 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     }
 
     private void stopPreview() {
+        CameraHandoffController.ready("main", false, CameraHandoffController.generation());
+        previewRetryHandler.removeCallbacks(previewRetry);previewRetryAttempts=0;
         if (activePreviewCameraIndex == -1) return;
         CameraProbe.detachPreview(activePreviewCameraIndex);
         activePreviewCameraIndex = -1;
@@ -464,6 +609,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
     @Override
     public void surfaceDestroyed(SurfaceHolder holder) {
+        CameraHandoffController.demand("main", false);
         stopPreview();
     }
 

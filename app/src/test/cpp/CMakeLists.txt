@@ -12,3 +12,15 @@ if(ANDROID)
 endif()
 
 add_executable(latest_preview_frame_test latest_preview_frame_test.cpp)
+add_executable(camera_access_gate_test camera_access_gate_test.cpp)
+
+add_executable(birdseye_mailbox_test birdseye_mailbox_test.cpp)
+
+add_executable(camera_snapshot_mailbox_test camera_snapshot_mailbox_test.cpp)
+
+add_executable(side_camera_advanced_test side_camera_advanced_test.cpp)
+target_include_directories(side_camera_advanced_test PRIVATE ${OpenCV_INCLUDE_DIRS})
+target_link_libraries(side_camera_advanced_test ${OpenCV_LIBS})
+if(ANDROID)
+    target_link_libraries(side_camera_advanced_test log android)
+endif()

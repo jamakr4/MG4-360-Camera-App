@@ -1,0 +1,78 @@
+{
+  "source": "https://sketchfab.com/3d-models/2025-mg-mg4-glbmgmotorcommx-ee2e3b0e1a7b481cb2c08e6fc6d2ed9e",
+  "creator": "MattDoesBlender",
+  "license": "CC BY-NC-SA 4.0",
+  "license_url": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
+  "resolution": [
+    768,
+    1536
+  ],
+  "note": "Pre-rendered body-paint variations; user supplied paint names/codes; colors are screen approximations.",
+  "variants": {
+    "dover_white": {
+      "name": "Dover White / Arctic White",
+      "codes": "WSB / LIY",
+      "swatch": "#E8E9E5",
+      "metallic": 0.0,
+      "roughness": 0.24,
+      "sha256": "aef4031023f40427c8cb2d1bfe2a7eb4bf3659774253d878b0fc0da221d875a9"
+    },
+    "andes_grey": {
+      "name": "Andes Grey / Cool Gray",
+      "codes": "5ZBY / PAG",
+      "swatch": "#747A80",
+      "metallic": 0.45,
+      "roughness": 0.23,
+      "sha256": "f01b2246cfd317b108887f7acf2dac35b3aa3e3ec6fe1098ffa0d184526d66bf"
+    },
+    "pebble_black": {
+      "name": "Pebble Black / Black Knight",
+      "codes": "PBC",
+      "swatch": "#151719",
+      "metallic": 0.45,
+      "roughness": 0.22,
+      "sha256": "f452a238125447214e741f9d0e5dc4ee6d35483f67f366903d5577d74ae6a493"
+    },
+    "diamond_red": {
+      "name": "Diamond Red / Topspeed Red",
+      "codes": "5ZAU / RSJ",
+      "swatch": "#BA132B",
+      "metallic": 0.4,
+      "roughness": 0.21,
+      "sha256": "4bcbd1a07e6bdcc616b6070b9c211b3a93398126b4fd601f8a8fefa0508b43ec"
+    },
+    "fizzy_orange": {
+      "name": "Fizzy Orange / Bubble Orange",
+      "codes": "NFZ / ZBP",
+      "swatch": "#F36F14",
+      "metallic": 0.0,
+      "roughness": 0.24,
+      "sha256": "a72c9b3a85cd10588bfc7b64799b31d45e002678d6148f3c79abc841de832d0a"
+    },
+    "piccadilly_blue": {
+      "name": "Piccadilly Blue / Brighton Blue",
+      "codes": "JAY / 5JAY",
+      "swatch": "#008BD8",
+      "metallic": 0.15,
+      "roughness": 0.13,
+      "sha256": "146fa61891fd82f136296ea7ce1f646384ab9291e539da723a5b6e5be0ab9926"
+    },
+    "cosmic_silver": {
+      "name": "Cosmic Silver / Medal Silver",
+      "codes": "MBC / SSA",
+      "swatch": "#B8BDC2",
+      "metallic": 0.7,
+      "roughness": 0.23,
+      "sha256": "5d26b7dc1e840787dd27038db13f297bdbd86a94e669009c307bfd40f9b04583"
+    },
+    "hunter_green": {
+      "name": "Hunter Green",
+      "codes": "5ZCK / ZCK / GWH;ZCK",
+      "swatch": "#4C604D",
+      "metallic": 0.0,
+      "roughness": 0.82,
+      "finish": "matte",
+      "sha256": "b416f9c01958f839935c2f864ca5a77393e2af99c37488109b6052d1b741b782"
+    }
+  }
+}

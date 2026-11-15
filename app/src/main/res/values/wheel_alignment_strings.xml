@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_parking_alignment_none" translatable="false">none</string>
+    <string name="settings_parking_alignment_basic" translatable="false">basic</string>
+    <string name="settings_parking_alignment_advanced" translatable="false">advanced</string>
+    <string name="settings_parking_wheel_modes_hint">none keeps the original crop; basic rotates it; advanced aligns the sill with the vehicle axis while retaining the wheel area. Advanced requires vehicle calibration and falls back to basic if unavailable.</string>
+    <string name="settings_parking_side_correction">Side camera correction</string>
+    <string name="settings_parking_side_correction_hint">none keeps the original crop. straight aligns a ground strip with the vehicle to compare the side edge and kerb along its length. Without vehicle calibration it shows the original crop. Uses missing-area highlighting; no distance measurement.</string>
+    <string name="settings_parking_alignment_straight" translatable="false">straight</string>
+</resources>

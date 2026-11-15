@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_parking_wheel_modes_hint">none conserve le cadrage initial ; basic le fait pivoter ; advanced aligne le bas de caisse avec l’axe du véhicule tout en conservant la roue. Advanced nécessite l’étalonnage du véhicule ; sinon, basic est utilisé.</string>
+    <string name="settings_parking_side_correction">Correction des caméras latérales</string>
+    <string name="settings_parking_side_correction_hint">none conserve le cadrage original. straight aligne une bande du sol sur le véhicule pour comparer le bas de caisse et la bordure sur toute la longueur. Sans étalonnage, le cadrage original est affiché. Le surlignage des zones manquantes s’applique ; aucune mesure de distance.</string>
+</resources>

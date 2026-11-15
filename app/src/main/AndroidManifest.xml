@@ -7,6 +7,9 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.CHANGE_COMPONENT_ENABLED_STATE" tools:ignore="ProtectedPermissions" />
+    <queries><package android:name="com.saicmotor.hmi.aroundview" /></queries>
+    <uses-permission android:name="android.permission.REAL_GET_TASKS" tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
@@ -24,6 +27,7 @@
         tools:ignore="ProtectedPermissions" />
 
     <application
+        android:name=".camera.CameraHandoffApplication"
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -32,8 +36,10 @@
         android:roundIcon="@mipmap/drivehub_kamera"
         android:supportsRtl="true"
         android:theme="@style/Theme.DrivehubKamera">
+        <uses-library android:name="android.car" android:required="false" />
         <activity
             android:name=".MainActivity"
+            android:launchMode="singleTask"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -87,6 +93,43 @@
         </receiver>
 
         <receiver
+            android:name=".remote.StartContinuousReceiver"
+            android:exported="true"
+            android:label="@string/remote_start_continuous">
+            <intent-filter>
+                <action android:name="com.drivehub.kamera.action.START_CONTINUOUS" />
+                <action android:name="com.mg4.control.action.SHORTCUT" />
+            </intent-filter>
+        </receiver>
+        <receiver
+            android:name=".remote.StopContinuousReceiver"
+            android:exported="true"
+            android:label="@string/remote_stop_continuous">
+            <intent-filter>
+                <action android:name="com.drivehub.kamera.action.STOP_CONTINUOUS" />
+                <action android:name="com.mg4.control.action.SHORTCUT" />
+            </intent-filter>
+        </receiver>
+        <receiver
+            android:name=".remote.QueryStateReceiver"
+            android:exported="true"
+            android:label="@string/remote_query_state">
+            <intent-filter>
+                <action android:name="com.drivehub.kamera.action.QUERY_STATE" />
+                <action android:name="com.mg4.control.action.SHORTCUT" />
+            </intent-filter>
+        </receiver>
+        <receiver
+            android:name=".remote.TestUsbWriteReceiver"
+            android:exported="true"
+            android:label="@string/remote_test_usb_write">
+            <intent-filter>
+                <action android:name="com.drivehub.kamera.action.TEST_USB_WRITE" />
+                <action android:name="com.mg4.control.action.SHORTCUT" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
             android:name=".dashcam.DashcamEventTriggerReceiver"
             android:enabled="true"
             android:exported="true"
@@ -104,6 +147,26 @@
             android:label="@string/shortcut_toggle_digital_rearview">
             <intent-filter>
                 <action android:name="com.drivehub.kamera.action.SET_DIGITAL_REARVIEW" />
+                <action android:name="com.mg4.control.action.SHORTCUT" />
+            </intent-filter>
+        </receiver>
+        <receiver
+            android:name=".camera.CameraReleaseTriggerReceiver"
+            android:enabled="true"
+            android:exported="true"
+            android:label="@string/shortcut_release_cameras">
+            <intent-filter>
+                <action android:name="com.drivehub.kamera.action.RELEASE_CAMERAS" />
+                <action android:name="com.mg4.control.action.SHORTCUT" />
+            </intent-filter>
+        </receiver>
+        <receiver
+            android:name=".camera.CameraResumeTriggerReceiver"
+            android:enabled="true"
+            android:exported="true"
+            android:label="@string/shortcut_resume_cameras">
+            <intent-filter>
+                <action android:name="com.drivehub.kamera.action.RESUME_CAMERAS" />
                 <action android:name="com.mg4.control.action.SHORTCUT" />
             </intent-filter>
         </receiver>

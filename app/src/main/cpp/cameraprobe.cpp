@@ -111,6 +111,12 @@ Java_com_drivehub_kamera_CameraProbe_probeAll(JNIEnv* env, jclass /*clazz*/, jin
 
     for (int i = 0; i < maxIndex; i++) {
         std::string path = "/dev/video" + std::to_string(i);
+        auto& gate = camera_stream_manager::cameraAccessGate();
+        CameraOpening opening(gate);
+        if (!opening) {
+            summary << "Camera access blocked\n";
+            break;
+        }
         int fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
         if (fd < 0) {
             std::string message = path + " open FAILED: " + errnoStr();
@@ -119,8 +125,10 @@ Java_com_drivehub_kamera_CameraProbe_probeAll(JNIEnv* env, jclass /*clazz*/, jin
             continue;
         }
 
-        std::string result = probeOne(fd);
+        gate.opened();
+        std::string result = gate.blocked() ? "blocked" : probeOne(fd);
         close(fd);
+        gate.closed();
 
         std::string message = path + " " + result;
         logi("%s", message.c_str());
@@ -172,6 +180,11 @@ Java_com_drivehub_kamera_CameraProbe_detachPreviewSink(JNIEnv*, jclass, jint vid
 }
 
 extern "C" JNIEXPORT jlong JNICALL
+Java_com_drivehub_kamera_CameraProbe_mainPreviewFrameAgeMs(JNIEnv*, jclass, jint videoIndex) {
+    return camera_stream_manager::mainPreviewFrameAgeMs(videoIndex);
+}
+
+extern "C" JNIEXPORT jlong JNICALL
 Java_com_drivehub_kamera_CameraProbe_previewSinkFrameAgeMs(JNIEnv*, jclass, jint videoIndex, jint sinkId) {
     return camera_stream_manager::previewSinkFrameAgeMs(videoIndex, sinkId);
 }
@@ -193,4 +206,83 @@ Java_com_drivehub_kamera_CameraProbe_setOemCameraAccessBlocked(JNIEnv*, jclass, 
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_drivehub_kamera_CameraProbe_isOemCameraAccessBlocked(JNIEnv*, jclass) {
     return camera_stream_manager::isOemCameraAccessBlocked();
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_drivehub_kamera_CameraProbe_setExternalCameraAccessBlocked(JNIEnv*, jclass, jboolean blocked) {
+    camera_stream_manager::cameraAccessGate().setExternalBlocked(blocked);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_drivehub_kamera_CameraProbe_releaseCameraPreviewsForHandoff(JNIEnv*, jclass) {
+    camera_stream_manager::releaseCameraPreviewsForHandoff();
+}
+
+extern "C" JNIEXPORT jintArray JNICALL
+Java_com_drivehub_kamera_CameraProbe_cameraOwnershipSnapshot(JNIEnv* env, jclass) {
+    const auto state = camera_stream_manager::cameraAccessGate().snapshot();
+    const jint values[] = {state.devices, state.opening, state.blocked ? 1 : 0};
+    jintArray result = env->NewIntArray(3);
+    if (result != nullptr) env->SetIntArrayRegion(result, 0, 3, values);
+    return result;
+}
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_drivehub_kamera_birdseye_BirdseyeNative_attach(JNIEnv*, jclass, jint owner, jint camera) {
+    return camera_stream_manager::attachBirdseye(owner, camera);
+}
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_drivehub_kamera_birdseye_BirdseyeNative_hold(JNIEnv*,jclass,jint owner,jint camera){
+    try{return camera_stream_manager::holdCamera(owner,camera);}
+    catch(...){logw("Camera ownership request failed");return false;}
+}
+extern "C" JNIEXPORT void JNICALL
+Java_com_drivehub_kamera_birdseye_BirdseyeNative_releaseHold(JNIEnv*,jclass,jint owner){
+    try{camera_stream_manager::releaseCameraHold(owner);}
+    catch(...){logw("Camera ownership release failed");}
+}
+extern "C" JNIEXPORT void JNICALL
+Java_com_drivehub_kamera_birdseye_BirdseyeNative_detach(JNIEnv*, jclass, jint owner) {
+    camera_stream_manager::detachBirdseye(owner);
+}
+extern "C" JNIEXPORT jlong JNICALL
+Java_com_drivehub_kamera_birdseye_BirdseyeNative_copy(JNIEnv* env, jclass, jint owner, jint camera,
+                                                   jobject output, jlong afterUs) {
+    auto* data = static_cast<uint8_t*>(env->GetDirectBufferAddress(output));
+    const jlong size = env->GetDirectBufferCapacity(output);
+    if (!data || size < 0) return 0;
+    return camera_stream_manager::copyBirdseye(owner, camera, data, static_cast<size_t>(size), afterUs);
+}
+extern "C" JNIEXPORT jlong JNICALL
+Java_com_drivehub_kamera_birdseye_BirdseyeNative_clockUs(JNIEnv*, jclass) {
+    return camera_stream_manager::birdseyeClockUs();
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_drivehub_kamera_birdseye_BirdseyeNative_attachSnapshot(JNIEnv*,jclass,jint owner,jint camera) {
+    return camera_stream_manager::attachBirdseye(owner,camera,true);
+}
+extern "C" JNIEXPORT jlongArray JNICALL
+Java_com_drivehub_kamera_birdseye_BirdseyeNative_copySnapshot(JNIEnv* env,jclass,jint owner,jint camera,jobject buffer,jlong afterUs) {
+    auto* bytes=static_cast<uint8_t*>(env->GetDirectBufferAddress(buffer));
+    jlong capacity=env->GetDirectBufferCapacity(buffer);if(!bytes||capacity<0)return nullptr;
+    auto info=camera_stream_manager::copyBirdseyeSnapshot(owner,camera,bytes,static_cast<size_t>(capacity),afterUs);
+    if(info[0]<=0)return nullptr;
+    const jlong values[]={info[0],info[1],info[2],info[3],info[4],info[5]};
+    jlongArray result=env->NewLongArray(6);if(result)env->SetLongArrayRegion(result,0,6,values);return result;
+}
+
+// Order L/R/F/rear, six values each: descriptor open, consumers, leases, frame age ms, errno, frames.
+extern "C" JNIEXPORT jlongArray JNICALL
+Java_com_drivehub_kamera_CameraProbe_cameraHealth(JNIEnv* env, jclass) {
+    auto health = camera_stream_manager::cameraHealth();
+    jlong values[24];
+    for (size_t i=0;i<24;++i) values[i]=health[i];
+    jlongArray result=env->NewLongArray(24);
+    if(result) env->SetLongArrayRegion(result,0,24,values);
+    return result;
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_drivehub_kamera_CameraProbe_drainCameraEvents(JNIEnv* env, jclass) {
+    return env->NewStringUTF(camera_stream_manager::drainCameraEvents().c_str());
 }

@@ -28,6 +28,53 @@ public final class DevSettingsController {
 
     public DevSettingsController() {
     }
+    public void bindModelSafety(Context context,SharedPreferences prefs,Switch automatic,TextView status,Button reset) {
+        boolean[] syncing={false};
+        automatic.setChecked(com.drivehub.kamera.birdseye.ModelLoadSafety.automaticEnabled(context));
+        Runnable refresh=()->status.setText(com.drivehub.kamera.birdseye.ModelLoadSafety.status(context));refresh.run();
+        automatic.setOnCheckedChangeListener((view,checked)->{
+            if(syncing[0])return;
+            try{com.drivehub.kamera.birdseye.ModelLoadSafety.automatic(context,checked);}
+            catch(java.io.IOException|RuntimeException error){Toast.makeText(context,R.string.settings_model_guard_write_failed,Toast.LENGTH_LONG).show();}
+            syncing[0]=true;automatic.setChecked(com.drivehub.kamera.birdseye.ModelLoadSafety.automaticEnabled(context));syncing[0]=false;refresh.run();
+        });
+        reset.setOnClickListener(view->{
+            try {
+                com.drivehub.kamera.birdseye.ModelLoadSafety.reset(context);
+                prefs.edit().putBoolean(UiPrefs.KEY_PARKING_SURROUND_3D,false)
+                        .putLong(UiPrefs.KEY_MODEL_SAFETY_REVISION,System.nanoTime()).apply();
+                Toast.makeText(context,R.string.settings_model_guard_reset_done,Toast.LENGTH_LONG).show();
+            }catch(java.io.IOException|RuntimeException error){Toast.makeText(context,R.string.settings_model_guard_write_failed,Toast.LENGTH_LONG).show();}
+            syncing[0]=true;automatic.setChecked(com.drivehub.kamera.birdseye.ModelLoadSafety.automaticEnabled(context));syncing[0]=false;refresh.run();
+        });
+    }
+
+    public void bindSteering(SharedPreferences prefs, EditText scale, Switch invert, Button reset) {
+        setAngleField(scale,UiPrefs.getSteeringScale(prefs));
+        scale.addTextChangedListener(new SimpleTextWatcher() {
+            @Override public void afterTextChanged(Editable text) {
+                try {
+                    float value=Float.parseFloat(text.toString().trim().replace(',','.'));
+                    if(Float.isFinite(value)&&value>=1&&value<=30)
+                        prefs.edit().putFloat(UiPrefs.KEY_DEV_STEERING_SCALE,value).apply();
+                } catch(NumberFormatException ignored) { }
+            }
+        });
+        scale.setOnFocusChangeListener((view,focused)->{if(!focused)setAngleField(scale,UiPrefs.getSteeringScale(prefs));});
+        scale.setOnEditorActionListener((view,action,event)->{
+            if(action!=EditorInfo.IME_ACTION_DONE)return false;
+            setAngleField(scale,UiPrefs.getSteeringScale(prefs));scale.clearFocus();
+            InputMethodManager keyboard=(InputMethodManager)scale.getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+            if(keyboard!=null)keyboard.hideSoftInputFromWindow(scale.getWindowToken(),0);
+            return true;
+        });
+        invert.setChecked(UiPrefs.isSteeringInverted(prefs));
+        invert.setOnCheckedChangeListener((view,checked)->prefs.edit().putBoolean(UiPrefs.KEY_DEV_STEERING_INVERT,checked).apply());
+        reset.setOnClickListener(view->{
+            prefs.edit().remove(UiPrefs.KEY_DEV_STEERING_SCALE).remove(UiPrefs.KEY_DEV_STEERING_INVERT).apply();
+            setAngleField(scale,UiPrefs.getSteeringScale(prefs)); invert.setChecked(false);
+        });
+    }
 
     public void bindParkingWheelAngles(SharedPreferences prefs, EditText front, Button resetFront,
                                       EditText rear, Button resetRear) {

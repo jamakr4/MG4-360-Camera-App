@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_dev_snapshot_title">Kamerabilder für lokale Tests</string>
+    <string name="settings_dev_snapshot_hint">Vier frische, ungespiegelte Kamerabilder ohne Overlays speichern. PNGs, vollständige UYVY-Frames, Feld-/Zeitmetadaten und lesbare Fahrzeugkalibrierung landen unter camera-snapshots im gewählten Aufnahmeordner. Die Kameras müssen unserer App zur Verfügung stehen; die Aufnahme läuft unverändert weiter.</string>
+    <string name="settings_dev_snapshot_button">Vier Kamerabilder exportieren</string>
+    <string name="settings_dev_snapshot_busy">Bilder aufnehmen und exportieren…</string>
+    <string name="settings_dev_snapshot_success">Alle vier Kameras gespeichert:\n%1$s\n\nEnthält left/right/front/rear als PNG und UYVY sowie manifest.json. Die PNGs setzen die Halbbilder räumlich zusammen; bewegte Objekte können Kammartefakte zeigen. Die Rohframes erlauben anderes Deinterlacing am Rechner.</string>
+    <string name="settings_dev_snapshot_failed">Bilderexport fehlgeschlagen:\n%1$s</string>
+    <string name="settings_dev_snapshot_copy">Ordnerpfad kopieren</string>
+</resources>

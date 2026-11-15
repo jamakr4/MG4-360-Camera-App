@@ -1,6 +1,11 @@
 package com.drivehub.kamera.boot;
 
+import com.drivehub.kamera.camera.CameraHandoffController;
+
 import com.drivehub.kamera.dashcam.RecordingService;
+import com.drivehub.kamera.dashcam.SurveillanceSession;
+import com.drivehub.kamera.dashcam.SurveillanceStore;
+import com.drivehub.kamera.remote.RemoteRecording;
 import com.drivehub.kamera.signal.SignalService;
 
 import android.content.BroadcastReceiver;
@@ -18,13 +23,21 @@ public class BootReceiver extends BroadcastReceiver {
         if (!Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction()))
             return;
 
+        CameraHandoffController.onBoot(context);
+
         try {
+            SurveillanceSession session = SurveillanceStore.read(context);
+            if (session != null) {
+                SurveillanceStore.restore(context);
+                RemoteRecording.state(context, "stopped", "reboot", session.directory, -1, session.requestId);
+            }
             RecordingService.startIfDashcamEnabled(context);
         } catch (Exception e) {
             Log.w(TAG, "Failed to start RecordingService on boot", e);
         }
 
         try {
+            // Its foreground start also preloads static Birdseye CPU assets once per process.
             SignalService.start(context);
         } catch (Exception e) {
             Log.w(TAG, "Failed to start SignalService on boot", e);

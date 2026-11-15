@@ -41,4 +41,22 @@ int main() {
         assert(camera25fps.submit(i * 40000LL, [i] { return i; }));
         assert(camera25fps.take(last) && last == i);
     }
+
+    // Main/rear preview now uses this same queue. A worker stuck posting to its
+    // Surface must not hold the producer (camera capture / recorder / raw taps).
+    LatestPreviewFrame<int> rearDisplay(0);
+    std::promise<void> posting, releasePost;
+    auto released=releasePost.get_future();
+    assert(rearDisplay.submit(1, [] { return 1; }));
+    auto display=std::async(std::launch::async, [&] {
+        int frame;assert(rearDisplay.take(frame) && frame==1);
+        posting.set_value();released.wait();
+        assert(rearDisplay.take(frame) && frame==1000);
+    });
+    posting.get_future().wait();
+    auto capture=std::async(std::launch::async, [&] {
+        for(int i=2;i<=1000;i++)assert(rearDisplay.submit(i,[i]{return i;}));
+    });
+    assert(capture.wait_for(std::chrono::seconds(1))==std::future_status::ready);
+    capture.get();releasePost.set_value();display.get();rearDisplay.stop();
 }

@@ -4,6 +4,10 @@
     tools:remove="android:sharedUserId">
 
     <application>
+        <activity android:name=".birdseye.BirdseyeDebugActivity"
+            android:exported="true" android:label="Birdseye (Debug)" />
+        <activity android:name=".birdseye.CurbsideDebugActivity"
+            android:exported="true" android:label="Curbside (Debug)" />
         <activity
             android:name=".dev.WheelRotationDebugActivity"
             android:exported="true"
@@ -13,5 +17,8 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <service android:name=".signal.OemDataProbeDebugServices$NullService" android:exported="false" android:process=":oem_probe_fixture" />
+        <service android:name=".signal.OemDataProbeDebugServices$BinderService" android:exported="false" android:process=":oem_probe_fixture" />
+        <receiver android:name=".signal.OemDataProbeDebugServices$StartReceiver" android:enabled="true" android:exported="false" />
     </application>
 </manifest>

@@ -1,6 +1,8 @@
 #include "camera_stream_manager.h"
 #include "latest_preview_frame.h"
 #include "side_camera_preview.h"
+#include "birdseye_mailbox.h"
+#include "camera_snapshot_mailbox.h"
 
 #include <android/hardware_buffer.h>
 #include <android/log.h>
@@ -22,6 +24,7 @@
 #include <chrono>
 #include <condition_variable>
 #include <exception>
+#include <deque>
 #include <cstdarg>
 #include <cstdint>
 #include <ctime>
@@ -52,7 +55,7 @@ namespace camera_stream_manager
         static constexpr const char *TAG = "CameraStreamManager";
         static constexpr int PREVIEW_SELECT_TIMEOUT_US = 100000;
         static constexpr int STOP_WAIT_MS = 2500;
-        std::atomic<bool> gOemCameraAccessBlocked{false};
+        CameraAccessGate gCameraAccess;
 
         /**
          * How long a camera may be held open with nothing reading from it, while the recorder
@@ -77,8 +80,25 @@ namespace camera_stream_manager
         // The rear camera feed is flipped horizontally to match driver expectations.
         static constexpr int CAMERA_INDEX_REAR = 17;
 
+        int64_t healthNowUs() {
+            timespec time{}; clock_gettime(CLOCK_BOOTTIME, &time);
+            return time.tv_sec * 1000000LL + time.tv_nsec / 1000;
+        }
+        std::mutex gCameraEventMutex;
+        std::deque<std::string> gCameraEvents;
         void logPrint(int level, const char *fmt, va_list args)
         {
+            // Bounded, pixel-free diagnostics. Capture only ownership edges and native errors.
+            if (level >= ANDROID_LOG_WARN || std::strncmp(fmt, "camera-", 7) == 0) {
+                va_list copy; va_copy(copy, args);
+                char message[512]; std::vsnprintf(message, sizeof(message), fmt, copy); va_end(copy);
+                timespec clock{}; clock_gettime(CLOCK_BOOTTIME, &clock);
+                std::string event = "t=" + std::to_string(clock.tv_sec * 1000LL + clock.tv_nsec / 1000000)
+                        + " " + message;
+                std::lock_guard<std::mutex> lock(gCameraEventMutex);
+                gCameraEvents.push_back(std::move(event));
+                while (gCameraEvents.size() > 128) gCameraEvents.pop_front();
+            }
             __android_log_vprint(level, TAG, fmt, args);
         }
 
@@ -1034,6 +1054,7 @@ namespace camera_stream_manager
             virtual ~FrameConsumer() = default;
             virtual void processFrame(const cv::Mat &rgbaFrame) = 0;
             virtual bool isPreview() const { return false; }
+            virtual bool isCameraLease() const { return false; }
             virtual int64_t lastPreviewPostUs() const { return 0; }
             virtual std::array<int64_t, 4> previewStats() const { return {0, 0, 0, 0}; }
 
@@ -1049,10 +1070,16 @@ namespace camera_stream_manager
              * nobody else asks for it.
              */
             virtual bool wantsPackedFrame() const { return false; }
+            // Copy-only raw mailboxes publish before conversion, display or recorder work.
+            virtual bool isLatestFrameTap() const { return false; }
 
             /** The camera buffer, cropped, still in its capture format. Only called when
              *  {@link #wantsPackedFrame} returns true. */
             virtual void processPackedFrame(const cv::Mat & /*packedFrame*/) {}
+            virtual void processPackedFrameAt(const cv::Mat& frame, int64_t capturedUs,
+                                               uint32_t sequence, uint32_t field) {
+                processPackedFrame(frame);
+            }
 
             virtual void requestStop() = 0;
             virtual bool isStopRequested() const = 0;
@@ -1061,9 +1088,72 @@ namespace camera_stream_manager
             virtual void finalize() = 0;
         };
 
+        class BirdseyeTap final : public FrameConsumer {
+        public:
+            BirdseyeMailbox mailbox;
+            std::unique_ptr<CameraSnapshotMailbox> snapshot;
+            explicit BirdseyeTap(bool fullSnapshot=false):snapshot(fullSnapshot?new CameraSnapshotMailbox():nullptr){}
+            const int64_t createdUs = nowUs();
+            bool isPreview() const override { return true; }
+            bool wantsPackedFrame() const override { return true; }
+            bool isLatestFrameTap() const override { return true; }
+            void processFrame(const cv::Mat&) override {}
+            void processPackedFrameAt(const cv::Mat& frame, int64_t capturedUs,
+                                       uint32_t sequence, uint32_t field) override {
+                if (stopped_.load()) return;
+                if(snapshot){snapshot->submit(frame.data,frame.cols,frame.rows,frame.step,field,capturedUs,sequence);return;}
+                // MG4 reports NONE for its observed stacked TB buffers. Other explicit
+                // orders are handled spatially; unsupported single/alternate fields fail closed.
+                BirdseyeMailbox::Layout layout;
+                switch (field) {
+                    case V4L2_FIELD_ANY: case V4L2_FIELD_NONE: case V4L2_FIELD_SEQ_TB:
+                        layout = BirdseyeMailbox::Layout::STACKED_TOP_FIRST; break;
+                    case V4L2_FIELD_SEQ_BT:
+                        layout = BirdseyeMailbox::Layout::STACKED_BOTTOM_FIRST; break;
+                    case V4L2_FIELD_INTERLACED: case V4L2_FIELD_INTERLACED_TB:
+                    case V4L2_FIELD_INTERLACED_BT:
+                        layout = BirdseyeMailbox::Layout::WOVEN; break;
+                    default: requestStop(); return;
+                }
+                if (frame.cols != 720 || frame.rows != 480) { requestStop(); return; }
+                mailbox.submit(frame.data, frame.cols, frame.rows, frame.step,
+                               layout, capturedUs, sequence);
+            }
+            void requestStop() override { stopped_.store(true); mailbox.stop(); if(snapshot)snapshot->stop(); }
+            bool isStopRequested() const override { return stopped_.load(); }
+            bool isFinalized() const override { return stopped_.load(); }
+            bool waitUntilStopped(int) override { return stopped_.load(); }
+            void finalize() override { requestStop(); }
+        private:
+            std::atomic<bool> stopped_{false};
+        };
+
+        // Keeps the device streaming without reading/copying its pixels. A window or recorder
+        // may come and go while this owner remains. The OEM gate releases it explicitly.
+        class CameraLeaseTap final : public FrameConsumer {
+        public:
+            bool wantsPackedFrame() const override{return true;}
+            bool isLatestFrameTap() const override{return true;}
+            bool isCameraLease() const override{return true;}
+            void processFrame(const cv::Mat&) override{}
+            void processPackedFrameAt(const cv::Mat&,int64_t,uint32_t,uint32_t) override{}
+            void requestStop()override{stopped_.store(true);}
+            bool isStopRequested()const override{return stopped_.load();}
+            bool isFinalized()const override{return stopped_.load();}
+            bool waitUntilStopped(int)override{return stopped_.load();}
+            void finalize()override{requestStop();}
+        private:
+            std::atomic<bool> stopped_{false};
+        };
+
         std::atomic<bool> gSideCameraWheels{false};
-        // Pack the two effective float angles into one atomic snapshot. Disabled axes use 0°.
-        std::atomic<uint64_t> gSideCameraWheelAlignment{0};
+        std::atomic<bool> gSideCameraCorrection{true};
+        struct SideWheelStyle {
+            int frontMode=0,rearMode=1;
+            float frontDegrees=16.5f,rearDegrees=-45.f;
+        };
+        std::shared_ptr<const SideWheelStyle> gSideWheelStyle=std::make_shared<const SideWheelStyle>();
+        side_camera_advanced::Registry gSideAdvanced;
         std::atomic<bool> gSideCameraHighlightMissingAreas{false};
 
         class ParallelPreviewConsumer final : public FrameConsumer,
@@ -1082,12 +1172,17 @@ namespace camera_stream_manager
             }
             bool isPreview() const override { return true; }
             int64_t lastPreviewPostUs() const override { return lastPostUs_.load(); }
+            int64_t presentedFrameUs() const {
+                return stopping_.load() ? 0 : lastPresentedFrameUs_.load();
+            }
             std::array<int64_t, 4> previewStats() const override {
                 return {lastPostUs_.load(), postedFrames_.load(), lastLatencyUs_.load() / 1000,
                         lastPostCostUs_.load() / 1000};
             }
             void processFrame(const cv::Mat &rgba) override {
-                const int64_t captured = nowUs();
+                processFrameAt(rgba, nowUs());
+            }
+            void processFrameAt(const cv::Mat &rgba, int64_t captured) {
                 frames_.submit(captured, [&] { return Frame{rgba.clone(), captured}; });
             }
             void requestStop() override {
@@ -1113,18 +1208,18 @@ namespace camera_stream_manager
                         if (nowUs() - frame.capturedUs > 250000) continue;
                         cv::Mat display = frame.rgba;
                         if (side_ >= 0) {
-                            const uint64_t settings = gSideCameraWheelAlignment.load();
-                            const uint32_t frontBits = static_cast<uint32_t>(settings);
-                            const uint32_t rearBits = static_cast<uint32_t>(settings >> 32);
-                            float frontDegrees, rearDegrees;
-                            std::memcpy(&frontDegrees, &frontBits, sizeof(frontDegrees));
-                            std::memcpy(&rearDegrees, &rearBits, sizeof(rearDegrees));
-                            const unsigned alignment = (frontDegrees != 0 ? side_camera_preview::ALIGN_FRONT : 0)
-                                    | (rearDegrees != 0 ? side_camera_preview::ALIGN_REAR : 0);
+                            auto settings=std::atomic_load(&gSideWheelStyle);
+                            float frontDegrees=settings->frontMode?settings->frontDegrees:0;
+                            float rearDegrees=settings->rearMode?settings->rearDegrees:0;
+                            const unsigned alignment=(frontDegrees!=0?side_camera_preview::ALIGN_FRONT:0)
+                                    |(rearDegrees!=0?side_camera_preview::ALIGN_REAR:0);
+                            const unsigned advancedAxes=(settings->frontMode==2?side_camera_preview::ALIGN_FRONT:0)
+                                    |(settings->rearMode==2?side_camera_preview::ALIGN_REAR:0);
+                            auto advanced=gSideAdvanced.current();
                             side_camera_preview::compose(frame.rgba, side_ == 0,
                                     gSideCameraWheels.load(), crops_, upright, composed,
                                     wheelTransforms, alignment, frontDegrees, rearDegrees,
-                                    gSideCameraHighlightMissingAreas.load());
+                                    gSideCameraHighlightMissingAreas.load(),advanced.get(),advancedAxes,gSideCameraCorrection.load());
                             display = composed;
                         }
                         if (display.cols != width || display.rows != height) {
@@ -1155,6 +1250,7 @@ namespace camera_stream_manager
                             lastPostCostUs_.store(posted - postStart);
                             postedFrames_.fetch_add(1);
                             lastPostUs_.store(posted);
+                            lastPresentedFrameUs_.store(frame.capturedUs);
                         }
                     }
                 } catch (const std::exception &e) {
@@ -1176,6 +1272,7 @@ namespace camera_stream_manager
             LatestPreviewFrame<Frame> frames_;
             std::atomic<bool> stopping_{false}, finished_{false};
             std::atomic<int64_t> lastPostUs_{0};
+            std::atomic<int64_t> lastPresentedFrameUs_{0};
             std::atomic<int64_t> postedFrames_{0}, lastLatencyUs_{0}, lastPostCostUs_{0};
             std::mutex doneMutex_;
             std::condition_variable done_;
@@ -2649,91 +2746,50 @@ namespace camera_stream_manager
 
             bool attachPreview(JNIEnv *env, jobject surface, bool enhanced)
             {
-                if (surface == nullptr)
-                {
-                    return false;
-                }
-
+                if (surface == nullptr) return false;
                 ANativeWindow *window = ANativeWindow_fromSurface(env, surface);
-                if (window == nullptr)
-                {
-                    logw("ANativeWindow_fromSurface failed for /dev/video%d", videoIndex_);
+                if (window == nullptr) return false;
+                std::shared_ptr<ParallelPreviewConsumer> preview;
+                try {
+                    preview = std::make_shared<ParallelPreviewConsumer>(window, videoIndex_ == CAMERA_INDEX_REAR);
+                    preview->start();
+                } catch (const std::exception &error) {
+                    if (preview) preview->requestStop();
+                    else ANativeWindow_release(window);
+                    loge("main preview worker failed: %s", error.what());
                     return false;
                 }
-
-                bool started = false;
+                std::shared_ptr<ParallelPreviewConsumer> previous;
+                bool started;
                 {
                     std::lock_guard<std::mutex> lock(mutex_);
-                    if (previewWindow_ != nullptr)
-                    {
-                        ANativeWindow_release(previewWindow_);
-                    }
-                    previewWindow_ = window;
+                    previous = std::move(mainPreview_);
+                    mainPreview_ = preview;
                     enhancedPreview_ = enhanced;
                     lumaTopPrev_.release();
                     stopRequested_.store(false);
                     started = ensureStartedLocked();
-                    if (started)
-                    {
-                        configurePreviewWindowLocked();
-                        // Pre-warm the BufferQueue: the first ANativeWindow_lock calls would
-                        // otherwise block while the consumer-side buffer pool is allocated lazily,
-                        // stealing budget from the capture thread (which is already saturated by
-                        // cvtColor + recording encoder). Three empty posts are enough to settle
-                        // the typical pool size on this device.
-                        for (int i = 0; i < 3; i++)
-                        {
-                            ANativeWindow_Buffer warmBuffer{};
-                            if (ANativeWindow_lock(previewWindow_, &warmBuffer, nullptr) == 0)
-                            {
-                                if (warmBuffer.bits != nullptr && warmBuffer.height > 0 && warmBuffer.stride > 0)
-                                {
-                                    std::memset(warmBuffer.bits, 0,
-                                                static_cast<size_t>(warmBuffer.stride) *
-                                                    static_cast<size_t>(warmBuffer.height) * 4U);
-                                }
-                                ANativeWindow_unlockAndPost(previewWindow_);
-                            }
-                        }
-                    }
+                    if (!started) mainPreview_.reset();
                 }
-
-                if (!started)
-                {
-                    std::lock_guard<std::mutex> lock(mutex_);
-                    if (previewWindow_ == window)
-                    {
-                        ANativeWindow_release(previewWindow_);
-                        previewWindow_ = nullptr;
-                    }
-                    else
-                    {
-                        ANativeWindow_release(window);
-                    }
-                }
+                if (previous) previous->requestStop();
+                if (!started) preview->requestStop();
                 return started;
             }
 
             void detachPreview()
             {
-                bool shouldStop = false;
+                std::shared_ptr<ParallelPreviewConsumer> preview;
+                bool shouldStop;
                 {
                     std::lock_guard<std::mutex> lock(mutex_);
-                    if (previewWindow_ != nullptr)
-                    {
-                        ANativeWindow_release(previewWindow_);
-                        previewWindow_ = nullptr;
-                    }
+                    preview = std::move(mainPreview_);
                     shouldStop = consumers_.empty() && !keepWarm_;
-                    if (shouldStop)
-                    {
-                        stopRequested_.store(true);
-                    }
+                    if (shouldStop) stopRequested_.store(true);
                 }
-                if (shouldStop)
-                {
-                    requestStopAndJoin();
-                }
+                // The output worker owns its Surface until any blocked post completes.
+                // It has no CameraSession/V4L2 buffer reference, so teardown never joins it.
+                if (preview) preview->requestStop();
+                if (shouldStop) requestStopAndJoin();
             }
 
             bool startRecording(int slot, const std::string &outputPath, int width, int height, int fps, int bitrate)
@@ -2756,7 +2812,7 @@ namespace camera_stream_manager
                     }
                     if (!sink->initialize(srcWidth_, srcHeight_))
                     {
-                        shouldStopAfterInitFailure = (previewWindow_ == nullptr && consumers_.empty());
+                        shouldStopAfterInitFailure = (mainPreview_ == nullptr && consumers_.empty());
                         if (shouldStopAfterInitFailure)
                         {
                             stopRequested_.store(true);
@@ -2785,6 +2841,21 @@ namespace camera_stream_manager
             bool hasConsumer(int consumerId) {
                 std::lock_guard<std::mutex> lock(mutex_);
                 return consumers_.find(consumerId) != consumers_.end();
+            }
+            std::array<int64_t,6> health() {
+                std::lock_guard<std::mutex> lock(mutex_);
+                int64_t leases = 0;
+                for (const auto& entry : consumers_) if (entry.second->isCameraLease()) ++leases;
+                const auto frame = lastValidFrameUs_.load();
+                return {fd_ >= 0 ? 1 : 0, static_cast<int64_t>(consumers_.size()) + (mainPreview_ ? 1 : 0),
+                        leases, frame > 0 && fd_ >= 0 ? (healthNowUs() - frame) / 1000 : -1,
+                        lastCaptureError_.load(), validFrames_.load()};
+            }
+
+            bool retainCameraLease(int id){
+                std::lock_guard<std::mutex> lock(mutex_);
+                auto found=consumers_.find(id);
+                return found!=consumers_.end()&&!found->second->isStopRequested()&&ensureStartedLocked();
             }
 
             bool attachConsumer(int consumerId, const std::shared_ptr<FrameConsumer> &consumer)
@@ -2821,6 +2892,11 @@ namespace camera_stream_manager
                 return it == consumers_.end() ? 0 : it->second->lastPreviewPostUs();
             }
 
+            int64_t mainPreviewFrameUs() {
+                std::lock_guard<std::mutex> lock(mutex_);
+                return mainPreview_ ? mainPreview_->presentedFrameUs() : 0;
+            }
+
             std::array<int64_t, 4> previewSnapshot(int id) {
                 std::lock_guard<std::mutex> lock(mutex_);
                 auto it = consumers_.find(id);
@@ -2836,6 +2912,12 @@ namespace camera_stream_manager
                         if (entry.second->isPreview()) ids.push_back(entry.first);
                 }
                 for (int id : ids) detachConsumer(id);
+            }
+            void detachCameraLeases(){
+                std::vector<int> ids;
+                {std::lock_guard<std::mutex> lock(mutex_);for(const auto& entry:consumers_)
+                    if(entry.second->isCameraLease())ids.push_back(entry.first);}
+                for(int id:ids)detachConsumer(id);
             }
 
             /**
@@ -2870,7 +2952,7 @@ namespace camera_stream_manager
                 bool shouldStop;
                 {
                     std::lock_guard<std::mutex> lock(mutex_);
-                    shouldStop = (previewWindow_ == nullptr && consumers_.empty() && !keepWarm_);
+                    shouldStop = (mainPreview_ == nullptr && consumers_.empty() && !keepWarm_);
                     if (shouldStop)
                     {
                         stopRequested_.store(true);
@@ -2903,7 +2985,7 @@ namespace camera_stream_manager
                 {
                     std::lock_guard<std::mutex> lock(mutex_);
                     consumers_.erase(consumerId);
-                    shouldStop = (previewWindow_ == nullptr && consumers_.empty() && !keepWarm_);
+                    shouldStop = (mainPreview_ == nullptr && consumers_.empty() && !keepWarm_);
                     if (shouldStop)
                     {
                         stopRequested_.store(true);
@@ -2919,7 +3001,7 @@ namespace camera_stream_manager
             bool isIdle()
             {
                 std::lock_guard<std::mutex> lock(mutex_);
-                return previewWindow_ == nullptr && consumers_.empty() && !running_.load()
+                return mainPreview_ == nullptr && consumers_.empty() && !running_.load()
                        && !keepWarm_;
             }
 
@@ -2946,7 +3028,7 @@ namespace camera_stream_manager
                 bool release = false;
                 {
                     std::lock_guard<std::mutex> lock(mutex_);
-                    warm = warm && !gOemCameraAccessBlocked.load();
+                    warm = warm && !gCameraAccess.blocked();
                     keepWarm_ = warm;
                     keepWarmDeadlineUs_ = warm ? nowUs() + KEEP_WARM_HOLD_MS * 1000LL : 0;
                     release = !warm && !hasConsumersLocked();
@@ -2960,7 +3042,7 @@ namespace camera_stream_manager
         private:
             bool hasConsumersLocked() const
             {
-                return previewWindow_ != nullptr || !consumers_.empty();
+                return mainPreview_ != nullptr || !consumers_.empty();
             }
 
             /**
@@ -2985,17 +3067,6 @@ namespace camera_stream_manager
                 }
             }
 
-            void configurePreviewWindowLocked()
-            {
-                if (previewWindow_ == nullptr || cropWidth_ <= 0 || fieldHeight_ <= 0)
-                {
-                    return;
-                }
-                // Match the window to the selected preview resolution.
-                ANativeWindow_setBuffersGeometry(previewWindow_, cropWidth_, enhancedPreview_ ? cropHeight_ : fieldHeight_,
-                                                 AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM);
-            }
-
             bool openCaptureLocked()
             {
                 if (fd_ >= 0)
@@ -3003,6 +3074,8 @@ namespace camera_stream_manager
                     return true;
                 }
 
+                CameraOpening opening(gCameraAccess);
+                if (!opening) return false;
                 const std::string devicePath = "/dev/video" + std::to_string(videoIndex_);
                 fd_ = open(devicePath.c_str(), O_RDWR | O_CLOEXEC);
                 if (fd_ < 0)
@@ -3011,6 +3084,11 @@ namespace camera_stream_manager
                     return false;
                 }
 
+                gCameraAccess.opened();
+                if (gCameraAccess.blocked()) {
+                    cleanupCaptureLocked();
+                    return false;
+                }
                 v4l2_format format{};
                 format.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
                 if (ioctl(fd_, VIDIOC_G_FMT, &format) < 0)
@@ -3021,6 +3099,7 @@ namespace camera_stream_manager
                 }
 
                 pixelFormat_ = format.fmt.pix.pixelformat;
+                fieldOrder_ = format.fmt.pix.field;
                 packedFormat_ = packedFormatFromFourcc(pixelFormat_);
                 if (packedFormat_ == PackedFormat::UNKNOWN)
                 {
@@ -3151,15 +3230,19 @@ namespace camera_stream_manager
             bool ensureStartedLocked()
             {
                 // This also covers an existing session: another consumer must not reclaim it.
-                if (gOemCameraAccessBlocked.load()) return false;
+                if (gCameraAccess.blocked()) return false;
                 if (running_.load())
                 {
                     return true;
                 }
                 if (!openCaptureLocked())
                 {
+                    lastCaptureError_.store(errno);
                     return false;
                 }
+                lastValidFrameUs_.store(0);
+                lastCaptureError_.store(0);
+                logi("camera-open video=%d fd=%d consumers=%zu", videoIndex_, fd_, consumers_.size());
                 stopRequested_.store(false);
                 running_.store(true);
                 if (worker_.joinable() && worker_.get_id() == std::this_thread::get_id())
@@ -3212,8 +3295,9 @@ namespace camera_stream_manager
                     // this ran from the capture loop's own housekeeping and stopped the camera
                     // anyway. Measured on a 21-minute drive: the cameras were down for 169 s of
                     // it, against 168 s of rotations. The hold held nothing.
-                    if (previewWindow_ == nullptr && consumers_.empty() && !keepWarm_)
+                    if (mainPreview_ == nullptr && consumers_.empty() && !keepWarm_)
                     {
+                        if (!stopRequested_.load()) logi("camera-stop video=%d reason=no-consumers", videoIndex_);
                         stopRequested_.store(true);
                     }
                 }
@@ -3316,41 +3400,11 @@ namespace camera_stream_manager
                 interpolated_.copyTo(oddLines, combMask_);
             }
 
-            bool hasPreviewLocked() const { return previewWindow_ != nullptr; }
+            bool hasPreviewLocked() const { return mainPreview_ != nullptr; }
 
-            void renderPreviewLocked(const cv::Mat &rgbaFrame)
+            void queuePreviewLocked(const cv::Mat &rgbaFrame, int64_t capturedUs)
             {
-                if (previewWindow_ == nullptr)
-                {
-                    return;
-                }
-
-                const cv::Mat *previewSource = &rgbaFrame;
-                if (videoIndex_ == CAMERA_INDEX_REAR)
-                {
-                    previewScratch_.create(rgbaFrame.rows, rgbaFrame.cols, rgbaFrame.type());
-                    cv::flip(rgbaFrame, previewScratch_, 1);
-                    previewSource = &previewScratch_;
-                }
-
-                ANativeWindow_Buffer outBuffer{};
-                if (ANativeWindow_lock(previewWindow_, &outBuffer, nullptr) != 0)
-                {
-                    return;
-                }
-
-                const int copyWidth = std::min(previewSource->cols, outBuffer.width);
-                const int copyHeight = std::min(previewSource->rows, outBuffer.height);
-                const uint8_t *src = previewSource->data;
-                uint8_t *dst = static_cast<uint8_t *>(outBuffer.bits);
-                const int srcStrideBytes = static_cast<int>(previewSource->step[0]);
-                const int dstStrideBytes = outBuffer.stride * 4;
-                for (int row = 0; row < copyHeight; row++)
-                {
-                    std::memcpy(dst + row * dstStrideBytes, src + row * srcStrideBytes, static_cast<size_t>(copyWidth) * 4U);
-                }
-
-                ANativeWindow_unlockAndPost(previewWindow_);
+                if (mainPreview_) mainPreview_->processFrameAt(rgbaFrame, capturedUs);
             }
 
             void threadLoop()
@@ -3433,9 +3487,29 @@ namespace camera_stream_manager
                         buffer.memory = V4L2_MEMORY_MMAP;
                         if (ioctl(fd, VIDIOC_DQBUF, &buffer) < 0)
                         {
+                            const int error = errno;
+                            if (lastCaptureError_.exchange(error) != error)
+                                loge("camera-dequeue video=%d errno=%d", videoIndex_, error);
                             continue;
                         }
                         const int64_t workStartUs = nowUs();
+
+                        // DQBUF may succeed with corrupt pixels. Recycle the buffer without
+                        // publishing it to any mailbox, display or recorder, and leave the
+                        // last valid-frame timestamp untouched so the usual timeout applies.
+                        if (buffer.flags & V4L2_BUF_FLAG_ERROR) {
+                            if (lastCaptureError_.exchange(EIO) != EIO)
+                                loge("camera-buffer video=%d flags=%#x reason=corrupt_frame", videoIndex_, buffer.flags);
+                            if (ioctl(fd, VIDIOC_QBUF, &buffer) < 0) {
+                                const int error = errno;
+                                lastCaptureError_.store(error);
+                                loge("camera-requeue video=%d errno=%d", videoIndex_, error);
+                                break;
+                            }
+                            countTimings(videoIndex_, nowUs() - workStartUs, waitedUs,
+                                         nowUs() - iterationStartUs);
+                            continue;
+                        }
 
                         if (buffer.index >= buffers_.size()
                             || srcStrideBytes_ < srcWidth_ * 2
@@ -3466,6 +3540,19 @@ namespace camera_stream_manager
                             }
                         }
 
+                        if (packedFormat_ == PackedFormat::UYVY) {
+                            lastValidFrameUs_.store(healthNowUs());
+                            lastCaptureError_.store(0);
+                            validFrames_.fetch_add(1);
+                        }
+
+                        for (const auto &consumer : consumers) {
+                            if (consumer == nullptr || !consumer->isLatestFrameTap()) continue;
+                            if (packedFormat_ != PackedFormat::UYVY) consumer->requestStop();
+                            else consumer->processPackedFrameAt(packedCrop, workStartUs, buffer.sequence,
+                                    buffer.field == V4L2_FIELD_ANY ? fieldOrder_ : buffer.field);
+                        }
+
                         if (needRgba)
                         {
                             std::lock_guard<std::mutex> lock(mutex_);
@@ -3481,12 +3568,12 @@ namespace camera_stream_manager
                                 rgbaScratch_.create(previewSrc.rows, cropWidth_, CV_8UC4);
                                 cv::cvtColor(previewSrc, rgbaScratch_, rgbaConversionCode(packedFormat_));
                             }
-                            renderPreviewLocked(rgbaScratch_);
+                            queuePreviewLocked(rgbaScratch_, workStartUs);
                         }
 
                         for (const auto &consumer : consumers)
                         {
-                            if (consumer == nullptr)
+                            if (consumer == nullptr || consumer->isLatestFrameTap())
                             {
                                 continue;
                             }
@@ -3496,7 +3583,8 @@ namespace camera_stream_manager
                                     loge("combined capture requires UYVY on /dev/video%d", videoIndex_);
                                     consumer->requestStop();
                                 } else {
-                                    consumer->processPackedFrame(packedCrop);
+                                    consumer->processPackedFrameAt(packedCrop, workStartUs, buffer.sequence,
+                                            buffer.field == V4L2_FIELD_ANY ? fieldOrder_ : buffer.field);
                                 }
                             }
                             else
@@ -3531,15 +3619,16 @@ namespace camera_stream_manager
                     // should have cleared it runs from this very loop.
                     keepWarm_ = false;
                     keepWarmDeadlineUs_ = 0;
-                    cleanupCaptureLocked();
+                    cleanupCaptureLocked("capture loop exit");
                     running_.store(false);
                 }
             }
 
-            void cleanupCaptureLocked()
+            void cleanupCaptureLocked(const char* reason = "capture setup failed")
             {
                 if (fd_ >= 0)
                 {
+                    logi("camera-close video=%d fd=%d consumers=%zu reason=%s", videoIndex_, fd_, consumers_.size(), reason);
                     v4l2_buf_type type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
                     ioctl(fd_, VIDIOC_STREAMOFF, &type);
                 }
@@ -3559,6 +3648,7 @@ namespace camera_stream_manager
                 {
                     close(fd_);
                     fd_ = -1;
+                    gCameraAccess.closed();
                 }
 
                 rgbaScratch_.release();
@@ -3617,7 +3707,7 @@ namespace camera_stream_manager
                 {
                     std::lock_guard<std::mutex> lock(mutex_);
                     running_.store(false);
-                    cleanupCaptureLocked();
+                    cleanupCaptureLocked("session stop");
                 }
             }
 
@@ -3635,10 +3725,13 @@ namespace camera_stream_manager
             int cropHeight_ = 0;
             /** Half of it: the height of one field, and of every scratch buffer below. */
             int fieldHeight_ = 0;
+            uint32_t fieldOrder_ = V4L2_FIELD_NONE;
             std::vector<MappedBuffer> buffers_;
-            ANativeWindow *previewWindow_ = nullptr;
+            std::shared_ptr<ParallelPreviewConsumer> mainPreview_;
             bool enhancedPreview_ = false;
             std::unordered_map<int, std::shared_ptr<FrameConsumer>> consumers_;
+            std::atomic<int64_t> lastValidFrameUs_{0}, validFrames_{0};
+            std::atomic<int> lastCaptureError_{0};
             std::atomic<bool> running_{false};
             std::atomic<bool> stopRequested_{false};
             /** Set while the recorder is between clips and means to come straight back. */
@@ -3656,7 +3749,6 @@ namespace camera_stream_manager
             cv::Mat lumaTopPrev_;
             cv::Mat motionDiff_;
             cv::Mat combMask_;
-            cv::Mat previewScratch_;
         };
 
         std::mutex gManagerMutex;
@@ -3733,6 +3825,142 @@ namespace camera_stream_manager
         constexpr int SIDE_CONSUMER_ID_BASE = 2100;
     }
 
+    namespace {
+        std::mutex gBirdseyeOwnerMutex;
+        constexpr int BIRDSEYE_VIDEO_INDICES[] = {16, 14, 15, 17};
+        // Each Activity owns separate IDs, including during recreation.
+        std::map<int, std::shared_ptr<BirdseyeTap>> gBirdseyeTaps;
+        std::map<int, std::shared_ptr<CameraLeaseTap>> gCameraLeases;
+        int birdseyeId(int owner, int camera) { return 10000 + owner * 4 + camera; }
+    }
+
+    std::string drainCameraEvents() {
+        std::lock_guard<std::mutex> lock(gCameraEventMutex);
+        std::string result;
+        for (const auto& event : gCameraEvents) result += event + "\n";
+        gCameraEvents.clear();
+        return result;
+    }
+
+    std::array<int64_t,24> cameraHealth() {
+        std::array<int64_t,24> result{};
+        for (int camera = 0; camera < 4; ++camera) {
+            result[camera * 6 + 3] = -1;
+            auto session = getSession(BIRDSEYE_VIDEO_INDICES[camera]);
+            if (session) {
+                auto health = session->health();
+                std::copy(health.begin(), health.end(), result.begin() + camera * 6);
+            }
+        }
+        return result;
+    }
+
+    bool holdCamera(int owner,int camera){
+        if(owner<1||owner>1000000||camera<0||camera>3)return false;
+        std::lock_guard<std::mutex> lock(gBirdseyeOwnerMutex);
+        if(gCameraAccess.blocked())return false;
+        int id=birdseyeId(owner,camera),video=BIRDSEYE_VIDEO_INDICES[camera];
+        auto session=getOrCreateSession(video);
+        auto found=gCameraLeases.find(id);
+        if(found!=gCameraLeases.end()){
+            auto tap=found->second;
+            // Holding the descriptor is independent of image freshness. Never reopen a
+            // running camera merely because frames stalled: that would let OEM race in.
+            if(!tap->isStopRequested()&&session->hasConsumer(id))return session->retainCameraLease(id);
+            session->detachConsumer(id);gCameraLeases.erase(found);
+        }
+        auto tap=std::make_shared<CameraLeaseTap>();
+        if(session->attachConsumer(id,tap)){
+            try{gCameraLeases.emplace(id,tap);return true;}
+            catch(...){session->detachConsumer(id);eraseSessionIfIdle(video,session);throw;}
+        }
+        tap->requestStop();eraseSessionIfIdle(video,session);return false;
+    }
+    void releaseCameraHold(int owner){
+        if(owner<1||owner>1000000)return;
+        std::lock_guard<std::mutex> lock(gBirdseyeOwnerMutex);
+        for(int camera=0;camera<4;camera++){
+            int id=birdseyeId(owner,camera),video=BIRDSEYE_VIDEO_INDICES[camera];
+            auto found=gCameraLeases.find(id);if(found==gCameraLeases.end())continue;
+            found->second->requestStop();
+            auto session=getSession(video);if(session){session->detachConsumer(id);eraseSessionIfIdle(video,session);}
+            gCameraLeases.erase(found);
+        }
+    }
+
+    bool attachBirdseye(int owner, int camera, bool fullSnapshot) {
+        if (owner < 1 || owner > 1000000 || camera < 0 || camera > 3) return false;
+        std::lock_guard<std::mutex> lock(gBirdseyeOwnerMutex);
+        if (gCameraAccess.blocked()) return false;
+        const int id = birdseyeId(owner, camera), video = BIRDSEYE_VIDEO_INDICES[camera];
+        auto session = getOrCreateSession(video);
+        auto found = gBirdseyeTaps.find(id);
+        if (found != gBirdseyeTaps.end()) {
+            auto tap = found->second;
+            const int64_t captured = tap->snapshot?tap->snapshot->capturedUs():tap->mailbox.capturedUs();
+            if (!tap->isStopRequested() && nowUs() - (captured ? captured : tap->createdUs) < 1500000)
+                return true;
+            session->detachConsumer(id);
+            gBirdseyeTaps.erase(found);
+        }
+        auto tap = std::make_shared<BirdseyeTap>(fullSnapshot);
+        if (session->attachConsumer(id, tap)) {
+            gBirdseyeTaps[id] = tap;
+            return true;
+        }
+        tap->requestStop();
+        eraseSessionIfIdle(video, session);
+        return false;
+    }
+
+    void detachBirdseye(int owner) {
+        if (owner < 1 || owner > 1000000) return;
+        std::lock_guard<std::mutex> lock(gBirdseyeOwnerMutex);
+        for (int camera = 0; camera < 4; ++camera) {
+            const int id = birdseyeId(owner, camera), video = BIRDSEYE_VIDEO_INDICES[camera];
+            auto found = gBirdseyeTaps.find(id);
+            if (found == gBirdseyeTaps.end()) continue;
+            found->second->requestStop();
+            auto session = getSession(video);
+            if (session) { session->detachConsumer(id); eraseSessionIfIdle(video, session); }
+            gBirdseyeTaps.erase(found);
+        }
+    }
+
+    int64_t copyBirdseye(int owner, int camera, uint8_t* destination, size_t capacity,
+                         int64_t afterUs) {
+        if (owner < 1 || owner > 1000000 || camera < 0 || camera > 3 || gCameraAccess.blocked()) return 0;
+        std::shared_ptr<BirdseyeTap> tap;
+        {
+            // No camera opening/teardown on the GL thread: skip a busy registry.
+            std::unique_lock<std::mutex> lock(gBirdseyeOwnerMutex, std::try_to_lock);
+            if (!lock) return 0;
+            auto it = gBirdseyeTaps.find(birdseyeId(owner, camera));
+            if (it == gBirdseyeTaps.end()) return 0;
+            tap = it->second;
+        }
+        BirdseyeMailbox::Info info;
+        if (!tap->mailbox.copy(destination, capacity, afterUs, info)
+                || gCameraAccess.blocked()) return 0;
+        return info.capturedUs;
+    }
+
+    std::array<int64_t,6> copyBirdseyeSnapshot(int owner,int camera,uint8_t* into,size_t capacity,int64_t afterUs) {
+        if(owner<1||owner>1000000||camera<0||camera>3||gCameraAccess.blocked())return {};
+        std::shared_ptr<BirdseyeTap> tap;
+        {
+            std::unique_lock<std::mutex> lock(gBirdseyeOwnerMutex,std::try_to_lock);
+            if(!lock)return {};
+            auto found=gBirdseyeTaps.find(birdseyeId(owner,camera));
+            if(found==gBirdseyeTaps.end())return {};tap=found->second;
+        }
+        CameraSnapshotMailbox::Info info;
+        if(!tap->snapshot||!tap->snapshot->copy(into,capacity,afterUs,info)||gCameraAccess.blocked())return {};
+        return {info.capturedUs,info.sequence,info.field,static_cast<int64_t>(info.sourceStride),720,480};
+    }
+
+    int64_t birdseyeClockUs() { return nowUs(); }
+
     void enableSideCameraPreviews() {
         std::lock_guard<std::mutex> lock(gSideCameraOwnerMutex);
         gSideCameraEnabled = true;
@@ -3742,15 +3970,25 @@ namespace camera_stream_manager
         gSideCameraWheels.store(wheels);
     }
 
-    void setSideCameraWheelAlignment(bool frontEnabled, bool rearEnabled,
-                                     float frontDegrees, float rearDegrees) {
-        frontDegrees = frontEnabled ? side_camera_preview::clampAngle(frontDegrees, 16.5f) : 0;
-        rearDegrees = rearEnabled ? side_camera_preview::clampAngle(rearDegrees, -45.f) : 0;
-        uint32_t frontBits, rearBits;
-        std::memcpy(&frontBits, &frontDegrees, sizeof(frontBits));
-        std::memcpy(&rearBits, &rearDegrees, sizeof(rearBits));
-        gSideCameraWheelAlignment.store(static_cast<uint64_t>(frontBits)
-                | (static_cast<uint64_t>(rearBits) << 32));
+    void setSideCameraWheelAlignment(bool frontEnabled,bool rearEnabled,float frontDegrees,float rearDegrees) {
+        setSideCameraWheelRendering(frontEnabled?1:0,rearEnabled?1:0,frontDegrees,rearDegrees);
+    }
+
+    void setSideCameraWheelRendering(int frontMode,int rearMode,float frontDegrees,float rearDegrees) {
+        auto style=std::make_shared<SideWheelStyle>();
+        style->frontMode=frontMode>=0&&frontMode<=2?frontMode:0;
+        style->rearMode=rearMode>=0&&rearMode<=2?rearMode:0;
+        style->frontDegrees=side_camera_preview::clampAngle(frontDegrees,16.5f);
+        style->rearDegrees=side_camera_preview::clampAngle(rearDegrees,-45.f);
+        std::atomic_store(&gSideWheelStyle,std::shared_ptr<const SideWheelStyle>(style));
+    }
+
+    void setSideCameraCorrection(bool enabled){gSideCameraCorrection.store(enabled);}
+    void setSideAdvancedSession(int token){gSideAdvanced.session(token);}
+    bool setSideAdvancedMaps(int token,const std::string& key,const side_camera_advanced::Inputs* uv){
+        if(!uv)return gSideAdvanced.activate(token,key);
+        try{return gSideAdvanced.install(token,std::make_shared<const side_camera_advanced::Maps>(key,*uv));}
+        catch(const std::exception& error){loge("Advanced curbside maps unavailable: %s",error.what());gSideAdvanced.activate(token,"");return false;}
     }
 
     int64_t sideCameraPreviewAgeMs(int side) {
@@ -3767,7 +4005,7 @@ namespace camera_stream_manager
 
     bool attachSideCameraPreview(JNIEnv* env, int side, jobject surface,
                                  const side_camera_preview::Crops& crops) {
-        if (gOemCameraAccessBlocked.load()) return false;
+        if (gCameraAccess.blocked()) return false;
         if (side < 0 || side > 1 || !surface || !side_camera_preview::valid(crops)) return false;
         std::lock_guard<std::mutex> lock(gSideCameraOwnerMutex);
         if (!gSideCameraEnabled) return false;
@@ -3819,7 +4057,7 @@ namespace camera_stream_manager
 
     bool attachPreview(JNIEnv *env, int videoIndex, jobject surface, bool enhanced)
     {
-        if (gOemCameraAccessBlocked.load()) return false;
+        if (gCameraAccess.blocked()) return false;
         auto session = getOrCreateSession(videoIndex);
         const bool ok = session->attachPreview(env, surface, enhanced);
         if (!ok)
@@ -3841,7 +4079,7 @@ namespace camera_stream_manager
     }
 
     bool attachPreviewSink(JNIEnv *env, int videoIndex, int sinkId, jobject surface) {
-        if (gOemCameraAccessBlocked.load()) return false;
+        if (gCameraAccess.blocked()) return false;
         if (sinkId < 0 || sinkId > 31 || surface == nullptr) return false;
         ANativeWindow *window = ANativeWindow_fromSurface(env, surface);
         if (window == nullptr) return false;
@@ -3856,6 +4094,14 @@ namespace camera_stream_manager
         consumer->requestStop();
         eraseSessionIfIdle(videoIndex, session);
         return false;
+    }
+
+    int64_t mainPreviewFrameAgeMs(int videoIndex) {
+        auto session = getSession(videoIndex);
+        if (session == nullptr) return -1;
+        const int64_t captured = session->mainPreviewFrameUs();
+        const int64_t now = nowUs();
+        return captured <= 0 || captured > now ? -1 : (now - captured) / 1000;
     }
 
     void detachPreviewSink(int videoIndex, int sinkId) {
@@ -3887,6 +4133,11 @@ namespace camera_stream_manager
     {
         // Close side reattachment while releasing every camera in parallel. Three sequential
         // capture joins can exceed the OEM startup budget when MainActivity owns three feeds.
+        std::lock_guard<std::mutex> birdseyeOwner(gBirdseyeOwnerMutex);
+        const bool releaseLeases=gCameraAccess.blocked();
+        if(releaseLeases){for(const auto& entry:gCameraLeases)entry.second->requestStop();gCameraLeases.clear();}
+        for (const auto& entry : gBirdseyeTaps) entry.second->requestStop();
+        gBirdseyeTaps.clear();
         std::lock_guard<std::mutex> sideOwner(gSideCameraOwnerMutex);
         gSideCameraEnabled = false;
         std::vector<std::pair<int, std::shared_ptr<CameraSession>>> sessions;
@@ -3900,7 +4151,8 @@ namespace camera_stream_manager
         }
         std::vector<std::thread> releases;
         for (const auto &entry : sessions) {
-            releases.emplace_back([entry] {
+            releases.emplace_back([entry,releaseLeases] {
+                if(releaseLeases)entry.second->detachCameraLeases();
                 entry.second->detachExtraPreviews();
                 entry.second->detachPreview();
                 eraseSessionIfIdle(entry.first, entry.second);
@@ -3910,17 +4162,24 @@ namespace camera_stream_manager
     }
 
     bool isOemCameraAccessBlocked() {
-        return gOemCameraAccessBlocked.load();
+        return gCameraAccess.blocked();
+    }
+
+    CameraAccessGate& cameraAccessGate() { return gCameraAccess; }
+
+    void releaseCameraPreviewsForHandoff() {
+        detachAllPreviews();
+        detachCombinedPreview();
+        releaseCombinedCameras();
     }
 
     void setOemCameraAccessBlocked(bool blocked) {
-        const bool previous = gOemCameraAccessBlocked.exchange(blocked);
-        if (blocked && !previous) {
+        const bool before = gCameraAccess.blocked();
+        const bool closing = gCameraAccess.setOemBlocked(blocked);
+        if (before != gCameraAccess.blocked()) logi("camera-gate blocked=%d", gCameraAccess.blocked());
+        if (closing) {
             const int64_t began = nowUs();
-            detachAllPreviews();
-            // A preview-only combined composer can hold all four cameras without a recorder.
-            detachCombinedPreview();
-            releaseCombinedCameras();
+            releaseCameraPreviewsForHandoff();
             logi("OEM camera gate closed; preview release ms=%lld", (nowUs() - began) / 1000);
         }
     }
@@ -3928,7 +4187,7 @@ namespace camera_stream_manager
     bool startRecording(JNIEnv * /*env*/, int slot, int videoIndex, const std::string &outputPath,
                         int width, int height, int fps, int bitrate)
     {
-        if (gOemCameraAccessBlocked.load()) return false;
+        if (gCameraAccess.blocked()) return false;
         auto session = getOrCreateSession(videoIndex);
         if (!session->startRecording(slot, outputPath, width, height, fps, bitrate))
         {
@@ -4027,9 +4286,9 @@ namespace camera_stream_manager
                                 int cellWidth, int cellHeight, int fps, int bitrate,
                                 const std::string &signature, bool showSpeed, int cameraMask)
     {
-        if (gOemCameraAccessBlocked.load()) return false;
+        if (gCameraAccess.blocked()) return false;
         std::lock_guard<std::mutex> combinedLock(gCombinedMutex);
-        if (gOemCameraAccessBlocked.load()) return false;
+        if (gCameraAccess.blocked()) return false;
         std::shared_ptr<CombinedRecordingSink> sink;
         if (gCombinedRecordingActive)
         {
@@ -4128,7 +4387,7 @@ namespace camera_stream_manager
                                int fps, const std::string &signature, bool showSpeed,
                                int cameraMask)
     {
-        if (gOemCameraAccessBlocked.load()) return false;
+        if (gCameraAccess.blocked()) return false;
         if (surface == nullptr)
         {
             return false;
@@ -4141,7 +4400,7 @@ namespace camera_stream_manager
         }
 
         std::lock_guard<std::mutex> combinedLock(gCombinedMutex);
-        if (gOemCameraAccessBlocked.load()) {
+        if (gCameraAccess.blocked()) {
             ANativeWindow_release(window);
             return false;
         }

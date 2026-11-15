@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Optional local tone: preserve it when present; the wildcard also permits clean builds. -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@raw/notification_sound_*" />

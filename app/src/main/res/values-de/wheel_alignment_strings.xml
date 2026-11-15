@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_parking_wheel_modes_hint">none behält den ursprünglichen Ausschnitt; basic dreht ihn; advanced richtet den Schweller an der Fahrzeugachse aus und erhält den Radbereich. Advanced benötigt die Fahrzeugkalibrierung und fällt sonst auf basic zurück.</string>
+    <string name="settings_parking_side_correction">Seitenkamera-Korrektur</string>
+    <string name="settings_parking_side_correction_hint">none zeigt den ursprünglichen Zuschnitt. straight richtet einen Bodenstreifen am Fahrzeug aus, um Seitenkante und Bordstein über die Länge zu vergleichen. Ohne Fahrzeugkalibrierung erscheint der ursprüngliche Zuschnitt. Die Markierung fehlender Bereiche gilt auch hier; keine Abstandsmessung.</string>
+</resources>

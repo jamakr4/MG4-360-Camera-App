@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_dev_camera_diagnostics">Diagnostic des caméras</string>
+    <string name="parking_oem_restore">Rétablir la caméra d’origine</string>
+    <string name="parking_oem_copy_diagnostic">Copier le journal de diagnostic</string>
+    <string name="parking_oem_diagnostic_copied">Journal de diagnostic copié</string>
+    <string name="parking_oem_save_diagnostic">Enregistrer le journal de diagnostic</string>
+    <string name="settings_oem_disable_warning_title">Désactiver la caméra 360° d’origine ?</string>
+    <string name="settings_oem_disable_warning_message">Vous êtes sur le point de désactiver l’application caméra 360° d’origine !\n\nCette modification peut persister après les redémarrages du véhicule et même après la désinstallation de cette application.\n\nAvant de désinstaller, réactivez cette option ou utilisez le bouton « %1$s » situé en dessous dans les paramètres. Sinon, une réinitialisation d’usine peut être nécessaire pour rétablir l’accès à la caméra d’origine.</string>
+    <string name="settings_oem_disable_confirm">Désactiver la caméra</string>
+    <string name="settings_oem_disable_cancel">Annuler</string>
+    <string name="settings_oem_restore_running">Rétablissement de l’accès à la caméra d’origine…</string>
+    <string name="settings_oem_restore_success">Accès à la caméra d’origine rétabli.</string>
+    <string name="settings_oem_restore_failed">Impossible de rétablir l’accès à la caméra d’origine. Consultez le diagnostic des caméras en mode développeur et réessayez.</string>
+</resources>

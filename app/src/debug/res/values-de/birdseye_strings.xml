@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="birdseye_debug_live_steering">Lenkwinkel vom Fahrzeug (live)</string>
+    <string name="birdseye_debug_steering_live_angle">Radeinschlag (Fahrzeug): %1$d° · %2$s</string>
+    <string name="birdseye_debug_steering_status">Fahrzeug-Rohwert: %1$.3f° · %2$s</string>
+    <string name="birdseye_synthetic_label">SYNTHETISCH · keine Fahrzeugaufnahme</string>
+    <string name="birdseye_debug_zoom_in">Hineinzoomen (3D)</string>
+    <string name="birdseye_debug_zoom_out">Herauszoomen (3D)</string>
+    <string name="birdseye_debug_pdc">Test-Heck-PDC: 50 / 80 / 110 / 140 cm</string>
+    <string name="birdseye_debug_steering">Radeinschlag (Test): %1$d° · %2$s</string>
+    <string name="birdseye_debug_left">links</string>
+    <string name="birdseye_debug_right">rechts</string>
+    <string name="birdseye_debug_straight">gerade</string>
+    <string name="birdseye_debug_steering_reset">Vorderräder geradestellen</string>
+</resources>

@@ -13,9 +13,9 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 
-final class DashcamFolderPicker {
+public final class DashcamFolderPicker {
 
-    interface Listener {
+    public interface Listener {
         void onFolderSelected(String absolutePath);
 
         void onUseDefault();
@@ -31,7 +31,7 @@ final class DashcamFolderPicker {
         this.listener = listener;
     }
 
-    static void show(Context context, String currentPath, Listener listener) {
+    public static void show(Context context, String currentPath, Listener listener) {
         new DashcamFolderPicker(context, listener).showDialog(resolvePickerStartDir(currentPath));
     }
 

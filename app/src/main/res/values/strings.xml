@@ -6,6 +6,7 @@
     <string name="settings_tab_settings">Settings</string>
     <string name="settings_tab_parking">Parking</string>
     <string name="settings_parking_main_view">Main view</string>
+    <string name="settings_parking_car_color">MG4 vehicle color (2D / 3D)</string>
     <string name="settings_parking_wheel_alignment">Align wheel views</string>
     <string name="settings_parking_front_axle">Front axle</string>
     <string name="settings_parking_rear_axle">Rear axle</string>
@@ -76,7 +77,7 @@
     <string name="settings_dashcam_storage_usb_limits_hint">Limits used while recording to USB. Internal storage keeps its own, more conservative limits (see Dev settings).</string>
     <string name="settings_section_oem_avm">OEM 360° AVM</string>
     <string name="settings_oem_avm_coexist">Allow OEM 360° camera app</string>
-    <string name="settings_oem_avm_coexist_hint">Global setting for the stock 360° camera app. When enabled, the app yields camera ownership where needed so the OEM reverse/360 view can still open. When disabled, all custom features keep priority and the OEM 360° app is intentionally not supported in parallel.</string>
+    <string name="settings_oem_avm_coexist_hint">When enabled, cameras are released when the OEM 360° view needs them. When disabled, this app reserves all four cameras, including in the background and without recording. Reverse gear opens our rear-camera view. OEM camera deactivation persists across restarts and after uninstalling this app. Re-enable this setting or use “Restore OEM camera” before uninstalling or updating vehicle firmware.</string>
     <string name="settings_smooth_entry">Smooth Entry</string>
     <string name="settings_smooth_entry_hint">Gently fades the turn-signal camera and IPK camera previews in and out.</string>
     <string name="settings_lock_tile_resizing">Lock tile resizing</string>
@@ -125,6 +126,8 @@
     <string name="show_safety_warning">Show safety warning</string>
     <string name="settings_section_open_source_credits">Open source</string>
     <string name="settings_section_additional_credits">Additional credits</string>
+    <string name="settings_section_birdseye_credits">MG4 Birdseye artwork</string>
+    <string name="settings_credits_birdseye_body">Based on “2025 MG MG4 (GLB)(mgmotor.com.mx)” by MattDoesBlender.\nhttps://sketchfab.com/MattDoesBlender\n\nOriginal model:\nhttps://sketchfab.com/3d-models/2025-mg-mg4-glbmgmotorcommx-ee2e3b0e1a7b481cb2c08e6fc6d2ed9e\n\nLicense: Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0).\nhttps://creativecommons.org/licenses/by-nc-sa/4.0/\n\nChanges: orthographic top-down rendering, transparent background, studio lighting, adjusted glass materials and eight paint variants, including matte Hunter Green; 3D runtime model reduced to approximately 88,000 triangles with eight prepared 1024-pixel paint palettes, a retained black roof, matte Hunter Green and separate wheel assemblies. The derived graphics are also licensed under CC BY-NC-SA 4.0.</string>
     <string name="settings_credits_open_source_body">- OpenCV 4.9.0 (opencv.org) - Apache License 2.0&#10;- AndroidX AppCompat 1.7.1 - Apache License 2.0&#10;- AndroidX Activity 1.12.4 - Apache License 2.0&#10;- AndroidX ConstraintLayout 2.2.1 - Apache License 2.0&#10;- Material Components for Android 1.13.0 - Apache License 2.0&#10;- Icons based on Google Material Symbols - Apache License 2.0</string>
     <string name="settings_credits_additional_body">- Thanks to the community from XDA Forums - MG4 Electric AAOS 9&#10;- Thanks to merth4n for providing the base application</string>
     <string name="settings_credits_sound_body">Sound attribution&#10;notification-sound-7062 by HenryCena82595&#10;https://freesound.org/s/731783/&#10;License: Attribution NonCommercial 4.0</string>
@@ -138,7 +141,7 @@
     <string name="settings_dev_parking_rear_angle">Rear axle rotation angle</string>
     <string name="settings_dev_parking_front_reset">Reset front axle angle</string>
     <string name="settings_dev_parking_rear_reset">Reset rear axle angle</string>
-    <string name="settings_dev_parking_wheel_angles_hint">Angle for the left wheel view (−180° to +180°); the right view rotates in the opposite direction. Applies when the corresponding axle is enabled under Parking.</string>
+    <string name="settings_dev_parking_wheel_angles_hint">Angle for the left wheel view (−180° to +180°); the right view rotates in the opposite direction. Applies when the corresponding axle uses basic under Parking.</string>
     <string name="settings_reset">Reset</string>
     <string name="settings_angle_unit">°</string>
     <string name="settings_dev_performance_overlay_enabled">Show system performance</string>
@@ -365,4 +368,42 @@
     <string name="side_camera_oem_paused">Paused for OEM 360°</string>
     <string name="side_camera_selected">Selected</string>
     <string name="side_camera_not_selected">Not selected</string>
+    <string name="shortcut_release_cameras">Release cameras</string>
+    <string name="shortcut_resume_cameras">Resume cameras</string>
+    <string name="remote_start_continuous">Start surveillance recording</string>
+    <string name="remote_stop_continuous">Stop surveillance recording</string>
+    <string name="remote_query_state">Query surveillance recording state</string>
+    <string name="remote_test_usb_write">Test USB recording storage</string>
+    <string name="surveillance_title">Surveillance recording</string>
+    <string name="surveillance_hint">MG4Control can start recording for up to 2 hours. Footage uses a separate folder. Normal dashcam recording resumes with its previous setting afterwards.</string>
+    <string name="surveillance_active_hint">Surveillance is active. Normal dashcam recording is temporarily disabled and will be restored when surveillance ends.</string>
+    <string name="surveillance_directory_default">Automatic folder: surveillance, beside the normal dashcam folder.</string>
+    <string name="surveillance_choose_directory">Choose surveillance folder</string>
+    <string name="surveillance_directory_invalid">Choose a separate folder outside normal dashcam storage.</string>
+    <string name="notification_surveillance_starting">Starting surveillance recording</string>
+    <string name="notification_surveillance_status">Surveillance: %1$s · %2$s</string>
+    <string name="surveillance_storage_very_low">Very low storage: less than 1 GiB free</string>
+    <string name="surveillance_storage_low">Low storage: less than 3 GiB free</string>
+    <string name="surveillance_storage_limited">Limited storage for two hours: less than 9 GiB free</string>
+    <string name="surveillance_storage_ok">Storage OK: at least 9 GiB free (estimate)</string>
+    <string name="surveillance_storage_unknown">Checking available storage</string>
+    <string name="surveillance_state_started">recording</string>
+    <string name="surveillance_state_paused">paused for factory cameras</string>
+    <string name="surveillance_state_error">error</string>
+    <string name="surveillance_state_starting">starting</string>
+    <string name="birdseye_loading">2D top view · loading vehicle calibration…</string>
+    <string name="birdseye_calibration_missing">2D top view unavailable\nVehicle calibration missing or invalid\n/configure/camera_calibdata.bin</string>
+    <string name="birdseye_waiting">2D top view · waiting for current camera images</string>
+    <string name="birdseye_render_failed">2D top view · rendering failed</string>
+    <string name="birdseye_partial">No current images: %1$s · hatching: no image coverage</string>
+    <string name="surround_mode_2d">2D top view</string>
+    <string name="surround_mode_3d">3D surround view</string>
+    <string name="surround_3d_failed">3D view unavailable. Returned to 2D.</string>
+    <string name="settings_dev_status_pdc">Rear PDC</string>
+    <string name="settings_section_rivela_credits">Rivela 360</string>
+    <string name="settings_credits_rivela_body">Andrew N / andneg7 — Rivela 360\nRear parking-sensor geometry, ground projection, smooth PDC animation, fisheye camera model and 3D bowl geometry/shader foundation. Integrated from original PR #102, contributed under GPL-3.0.\nhttps://github.com/andneg7/rivela360-mg4\nhttps://github.com/jamakr4/MG4-360-Camera-App/pull/102</string>
+    <string name="surround_3d_loading">Loading 3D view…</string>
+    <string name="surround_label_2d" translatable="false">2D</string>
+    <string name="surround_label_3d" translatable="false">3D</string>
+    <string name="birdseye_calibration_rechecking">Rechecking vehicle calibration…</string>
 </resources>

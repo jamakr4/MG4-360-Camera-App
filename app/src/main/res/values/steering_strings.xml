@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_dev_steering">3D vehicle steering</string>
+    <string name="settings_dev_steering_hint">Live Float 0x21601563. Initial scale 14.77 is a visual mapping, not a verified steering ratio. Check direction and scale on the vehicle. Missing or stale data straightens the wheels. Raw values appear under Dev Status. Uses the legacy SAIC sensor subscription, with a property-manager fallback on newer systems. Source and connection errors appear in Dev Status.</string>
+    <string name="settings_dev_steering_scale">Sensor degrees per model degree (1–30)</string>
+    <string name="settings_dev_steering_invert">Invert steering direction</string>
+    <string name="settings_dev_steering_reset">Reset steering mapping</string>
+</resources>

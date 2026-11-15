@@ -31,9 +31,11 @@ public class OemAvmReceiver extends BroadcastReceiver {
         if (action == null) {
             return;
         }
+        SignalService.traceCameraEvent("OEM broadcast " + action);
         SharedPreferences prefs = UiPrefs.getPrefs(context);
-        boolean coexistEnabled = UiPrefs.isOemAvmCoexistEnabled(prefs);
+        boolean coexistEnabled = UiPrefs.shouldYieldToOem(prefs);
         if (!coexistEnabled) {
+            if(ACTION_OEM_LAUNCH.equals(action)||ACTION_AVM_START.equals(action))SignalService.onExclusiveOemStart();
             return;
         }
         int startMessage = intent.getIntExtra(EXTRA_START_MESSAGE, Integer.MIN_VALUE);
@@ -55,13 +57,13 @@ public class OemAvmReceiver extends BroadcastReceiver {
             }
             Log.i(TAG, "OEM AVM start/launch received: " + action);
             SignalService.setOemAvmActive(context, true);
-            RecordingService.pauseForOemRequest(context);
+            RecordingService.pauseForOemRequest(context, ACTION_AVM_START.equals(action));
             return;
         }
         if (ACTION_AVM_STOP.equals(action)) {
             Log.i(TAG, "OEM AVM stop received");
             SignalService.setOemAvmActive(context, false);
-            RecordingService.resumeAfterOemRequest(context);
+            RecordingService.resumeAfterOemRequest(context, true);
         }
     }
 }
