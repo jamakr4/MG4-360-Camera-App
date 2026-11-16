@@ -1,7 +1,9 @@
 <resources>
     <string name="parking_automation_title">Vue caméra automatique</string>
+    <string name="parking_auto_close_on_park">Fermer automatiquement en P</string>
+    <string name="parking_auto_close_on_park_hint">Ferme toute vue caméra ouverte lors du passage en P, même ouverte manuellement, quel que soit le réglage Allow OEM. Vous pouvez rouvrir l’application en P.</string>
     <string name="parking_auto_close">Fermeture automatique</string>
     <string name="parking_auto_close_speed">Vitesse de fermeture (1–130 km/h)</string>
     <string name="parking_auto_open_drive">Ouverture automatique sur P → D</string>
-    <string name="parking_automation_hint">Actif uniquement si Allow OEM est désactivé. Chaque passage direct de P à D peut ouvrir la vue avant. Seules les vues ouvertes automatiquement se ferment, lorsque la vitesse passe de dessous au seuil choisi. Les vues ouvertes manuellement restent affichées.</string>
+    <string name="parking_automation_hint">Ces deux options nécessitent que Allow OEM soit désactivé. Chaque passage direct de P à D peut ouvrir la vue avant. La fermeture selon la vitesse concerne uniquement les vues ouvertes automatiquement, lorsque la vitesse passe de dessous au seuil choisi.</string>
 </resources>

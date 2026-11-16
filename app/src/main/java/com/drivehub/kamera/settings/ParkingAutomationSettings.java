@@ -14,10 +14,12 @@ final class ParkingAutomationSettings {
     static void bind(Dialog dialog, SharedPreferences prefs) {
         Switch close = dialog.findViewById(R.id.switchParkingAutoClose);
         Switch drive = dialog.findViewById(R.id.switchParkingAutoOpenDrive);
+        Switch park = dialog.findViewById(R.id.switchParkingAutoCloseOnPark);
         EditText speed = dialog.findViewById(R.id.etParkingAutoCloseSpeed);
         speed.setText(String.valueOf(UiPrefs.getParkingAutoCloseSpeedKmh(prefs)));
         close.setChecked(UiPrefs.isParkingAutoCloseEnabled(prefs));
         drive.setChecked(UiPrefs.isParkingAutoOpenDriveEnabled(prefs));
+        park.setChecked(UiPrefs.isParkingAutoCloseOnParkEnabled(prefs));
         enabled(speed, close.isChecked());
         close.setOnCheckedChangeListener((button, checked) -> {
             prefs.edit().putBoolean(UiPrefs.KEY_PARKING_AUTO_CLOSE, checked).apply();
@@ -25,6 +27,8 @@ final class ParkingAutomationSettings {
         });
         drive.setOnCheckedChangeListener((button, checked) ->
                 prefs.edit().putBoolean(UiPrefs.KEY_PARKING_AUTO_OPEN_DRIVE, checked).apply());
+        park.setOnCheckedChangeListener((button, checked) ->
+                prefs.edit().putBoolean(UiPrefs.KEY_PARKING_AUTO_CLOSE_ON_PARK, checked).apply());
         speed.addTextChangedListener(new SimpleTextWatcher() {
             @Override public void afterTextChanged(android.text.Editable text) {
                 try {

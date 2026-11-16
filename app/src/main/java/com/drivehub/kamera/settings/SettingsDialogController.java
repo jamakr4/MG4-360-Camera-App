@@ -100,6 +100,10 @@ public final class SettingsDialogController {
         return dialog != null;
     }
 
+    public void dismiss() {
+        if (dialog != null) dialog.dismiss();
+    }
+
     /**
      * Forwards a fresh recording-status snapshot into the dialog. No-op when closed.
      */
@@ -621,6 +625,7 @@ public final class SettingsDialogController {
                         views.swParkingHighlightMissingAreas,
                         dialog.findViewById(R.id.switchParkingAutoClose),
                         dialog.findViewById(R.id.switchParkingAutoOpenDrive),
+                        dialog.findViewById(R.id.switchParkingAutoCloseOnPark),
                         views.swShowStatusBar,
                         views.swSmoothEntry,
                         views.swLockTileResizing,

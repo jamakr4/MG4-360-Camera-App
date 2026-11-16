@@ -36,6 +36,7 @@ public class ParkingAutomationInstrumentedTest {
     private OemTakeoverManager manager;
     private OemTakeoverController originalController;
     private final String[] keys = {UiPrefs.KEY_PARKING_AUTO_CLOSE, UiPrefs.KEY_PARKING_AUTO_OPEN_DRIVE,
+            UiPrefs.KEY_PARKING_AUTO_CLOSE_ON_PARK,
             UiPrefs.KEY_PARKING_AUTO_CLOSE_SPEED, UiPrefs.KEY_EXTERNAL_CAMERA_PAUSED,
             DashcamSettingsController.KEY_ENABLED, UiPrefs.KEY_OEM_AVM_COEXIST, UiPrefs.KEY_OEM_AVM_ACTIVE,
             UiPrefs.KEY_OEM_CAMERA_ACCESS_BLOCKED, UiPrefs.KEY_OEM_TAKEOVER_YIELD,
@@ -86,6 +87,7 @@ public class ParkingAutomationInstrumentedTest {
     @Before public void exclusiveCameraFixture() throws Exception {
         prefs = UiPrefs.getPrefs(context); saved = prefs.getAll();
         prefs.edit().putBoolean(DashcamSettingsController.KEY_ENABLED, false)
+                .putBoolean(UiPrefs.KEY_PARKING_AUTO_CLOSE_ON_PARK, false)
                 .putBoolean(UiPrefs.KEY_OEM_AVM_COEXIST, true).putBoolean(UiPrefs.KEY_OEM_AVM_ACTIVE, false)
                 .putBoolean(UiPrefs.KEY_OEM_CAMERA_ACCESS_BLOCKED, false).putBoolean(UiPrefs.KEY_OEM_TAKEOVER_YIELD, false)
                 .putBoolean(UiPrefs.KEY_EXTERNAL_CAMERA_PAUSED, false).putBoolean(UiPrefs.KEY_PARKING_AUTO_CLOSE, true)
@@ -209,6 +211,34 @@ public class ParkingAutomationInstrumentedTest {
         prefs.edit().putBoolean(UiPrefs.KEY_EXTERNAL_CAMERA_PAUSED, true).commit();
         await(() -> policy().session() == null);
         staleClose(session); assertTrue(MainActivity.isMainVisible());
+    }
+
+    @Test public void parkClosesAutomaticDriveAndReverseAndDiscardsTheirSpeedSessions() {
+        prefs.edit().putBoolean(UiPrefs.KEY_PARKING_AUTO_CLOSE_ON_PARK, true).commit();
+        driveOpen(); String driveSession = policy().session();
+        gear(1); await(() -> !MainActivity.isMainVisible());
+        assertNull(policy().session()); assertTrue(SignalService.isRunning());
+        gear(1); assertFalse(MainActivity.isMainVisible());
+        try (ActivityScenario<MainActivity> manual = ActivityScenario.launch(MainActivity.class)) {
+            speed(0); speed(90); staleClose(driveSession);
+            assertTrue(MainActivity.isMainVisible());
+        }
+        gear(3); gear(2); SystemClock.sleep(ReverseLaunchPolicy.SETTLE_MS + 30); gear(2);
+        await(() -> visible() != null);
+        assertNotNull(policy().session());
+        gear(1); await(() -> !MainActivity.isMainVisible());
+        assertNull(policy().session()); assertTrue(SignalService.isRunning());
+    }
+
+    @Test public void parkAlsoClosesManualViewsWithOemDisabledAndBothOtherTogglesOff() {
+        prefs.edit().putBoolean(UiPrefs.KEY_PARKING_AUTO_CLOSE_ON_PARK, true)
+                .putBoolean(UiPrefs.KEY_PARKING_AUTO_CLOSE, false)
+                .putBoolean(UiPrefs.KEY_PARKING_AUTO_OPEN_DRIVE, false).commit();
+        try (ActivityScenario<MainActivity> manual = ActivityScenario.launch(MainActivity.class)) {
+            assertNull(policy().session()); gear(1);
+            await(() -> !MainActivity.isMainVisible());
+            assertTrue(SignalService.isRunning());
+        }
     }
 
     private final class VerifiedPorts implements OemTakeoverController.Ports {
