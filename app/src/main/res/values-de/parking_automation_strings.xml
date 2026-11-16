@@ -1,7 +1,9 @@
 <resources>
     <string name="parking_automation_title">Automatische Kameraansicht</string>
+    <string name="parking_auto_close_on_park">Beim Einlegen von P schließen</string>
+    <string name="parking_auto_close_on_park_hint">Schließt beim Wechsel nach P jede offene Kameraansicht, auch manuell geöffnete, unabhängig von Allow OEM. In P kannst du die App wieder öffnen.</string>
     <string name="parking_auto_close">Automatisch schließen</string>
     <string name="parking_auto_close_speed">Schließgeschwindigkeit (1–130 km/h)</string>
     <string name="parking_auto_open_drive">Automatisch öffnen bei P → D</string>
-    <string name="parking_automation_hint">Wirkt nur bei ausgeschaltetem Allow OEM. Jeder direkte Wechsel P → D kann die Frontansicht öffnen. Automatisch geschlossen werden nur automatisch geöffnete Ansichten, nachdem das Tempo von unterhalb auf die eingestellte Schwelle steigt. Manuell geöffnete Ansichten bleiben offen.</string>
+    <string name="parking_automation_hint">Diese beiden Optionen wirken nur bei ausgeschaltetem Allow OEM. Jeder direkte Wechsel P → D kann die Frontansicht öffnen. Das geschwindigkeitsabhängige Schließen gilt nur für automatisch geöffnete Ansichten, nachdem das Tempo von unterhalb auf die eingestellte Schwelle steigt.</string>
 </resources>

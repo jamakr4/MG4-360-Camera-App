@@ -10,6 +10,7 @@ import com.drivehub.kamera.settings.SettingsAppearanceController;
 import com.drivehub.kamera.settings.SettingsDialogController;
 import com.drivehub.kamera.settings.UiPrefs;
 import com.drivehub.kamera.signal.SignalService;
+import com.drivehub.kamera.signal.ParkClosePolicy;
 import com.drivehub.kamera.side.SideCameraPanel;
 import com.drivehub.kamera.ui.AppSystemBars;
 
@@ -43,7 +44,13 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     public static final String ACTION_HARD_KEY_CLOSE = "com.android.systemui.ACTION_HARD_KEY_APP_CLOSE";
     public static final String EXTRA_CLOSE_PACKAGE = "PACKAGE_NAME";
     private static final String STATE_PARKING_SESSION = "automaticParkingSession";
+    private static final String STATE_PARK_CLOSE_VIEW = "parkCloseView";
     private String parkingSession;
+    private String parkCloseViewId;
+    // Retained through configuration recreation, cleared when this view leaves the foreground.
+    private static volatile String sForegroundCameraViewId;
+
+    public static String foregroundCameraViewId() { return sForegroundCameraViewId; }
 
     /** Automatic routes must show the camera, never toggle a visible Activity closed. */
     public static Intent showCameraIntent(Context context, int videoIndex) {
@@ -63,10 +70,25 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             if (previewResumed && parkingSession != null && parkingSession.equals(session)
                     && SignalService.closeAutomaticParkingSession(session)) {
                 parkingSession = null;
-                finishAndRemoveTask();
+                finishMainView();
             }
         }
     };
+
+    private final BroadcastReceiver parkCloseReceiver = new BroadcastReceiver() {
+        @Override public void onReceive(Context context, Intent intent) {
+            if (intent == null || !SignalService.ACTION_CLOSE_ON_PARK.equals(intent.getAction())) return;
+            closeOnPark(intent.getStringExtra(SignalService.EXTRA_PARK_CLOSE_VIEW),
+                    intent.getStringExtra(SignalService.EXTRA_PARK_CLOSE_TRANSITION));
+        }
+    };
+
+    private boolean closeOnPark(String viewId, String transition) {
+        if (!previewResumed || isFinishing() || parkCloseViewId == null || !parkCloseViewId.equals(viewId)
+                || !SignalService.closeOnPark(viewId, transition)) return false;
+        finishMainView();
+        return true;
+    }
 
     private final BroadcastReceiver hardKeyCloseReceiver = new BroadcastReceiver() {
         @Override public void onReceive(Context context,Intent intent) {
@@ -97,7 +119,21 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         startPreviewIfReady();
     }
 
-    private void closeFromUser(){SignalService.onMainClosedByUser();finishAndRemoveTask();}
+    private void closeFromUser(){SignalService.onMainClosedByUser();finishMainView();}
+
+    private void finishMainView() {
+        endParkCloseView();
+        parkingSession = null;
+        settingsDialog.dismiss();
+        finishAndRemoveTask();
+    }
+
+    private void endParkCloseView() {
+        SignalService.onParkCloseViewStopped(parkCloseViewId);
+        if (parkCloseViewId != null && parkCloseViewId.equals(sForegroundCameraViewId))
+            sForegroundCameraViewId = null;
+        parkCloseViewId = null;
+    }
 
     private void applyCameraIntent(Intent intent) {
         if(intent==null||!ACTION_SHOW_CAMERA.equals(intent.getAction()))return;
@@ -237,6 +273,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        parkCloseViewId = savedInstanceState != null ? savedInstanceState.getString(STATE_PARK_CLOSE_VIEW) : null;
         parkingSession = savedInstanceState != null ? savedInstanceState.getString(STATE_PARKING_SESSION)
                 : ACTION_SHOW_CAMERA.equals(getIntent().getAction())
                 ? getIntent().getStringExtra(SignalService.EXTRA_PARKING_SESSION) : null;
@@ -352,6 +389,8 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         SignalService.traceCameraEvent("MainActivity onResume");
         super.onResume();
         previewResumed = true; stoppedForLauncher = false;
+        ParkClosePolicy.Request pending = SignalService.pendingParkClose(parkCloseViewId);
+        if (pending != null && closeOnPark(pending.viewId, pending.transition)) return;
         SignalService.refreshCameraAccess(this);
         AppSystemBars.apply(getWindow());
         if (!SignalService.onParkingActivityShown(parkingSession)) parkingSession = null;
@@ -389,6 +428,9 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     protected void onStart() {
         super.onStart();
         sMainVisible = true;
+        if (parkCloseViewId == null) parkCloseViewId = java.util.UUID.randomUUID().toString();
+        sForegroundCameraViewId = parkCloseViewId;
+        SignalService.onParkCloseViewStarted(parkCloseViewId);
         UiPrefs.getPrefs(this).registerOnSharedPreferenceChangeListener(cameraAccessListener);
         if (settingsDialog.isOpen()) {
             sSettingsDialogOpen = true;
@@ -398,6 +440,8 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                     ContextCompat.RECEIVER_EXPORTED);
             ContextCompat.registerReceiver(this, parkingCloseReceiver,
                     new IntentFilter(SignalService.ACTION_CLOSE_PARKING), ContextCompat.RECEIVER_NOT_EXPORTED);
+            ContextCompat.registerReceiver(this, parkCloseReceiver,
+                    new IntentFilter(SignalService.ACTION_CLOSE_ON_PARK), ContextCompat.RECEIVER_NOT_EXPORTED);
             ContextCompat.registerReceiver(
                     this,
                     cameraRouteReceiver,
@@ -426,6 +470,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         sMainVisible = false; stoppedForLauncher = true;
         sSettingsDialogOpen = false;
         SignalService.onParkingActivityStopped(parkingSession, isChangingConfigurations());
+        if (!isChangingConfigurations()) endParkCloseView();
         if (!isChangingConfigurations()) parkingSession = null;
         UiPrefs.getPrefs(this).unregisterOnSharedPreferenceChangeListener(cameraAccessListener);
         // Re-apply signal/rearview overlay state once MainActivity stops blocking it.
@@ -433,6 +478,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         otaController.stop();
         try { unregisterReceiver(hardKeyCloseReceiver); } catch (IllegalArgumentException ignored) { }
         try { unregisterReceiver(parkingCloseReceiver); } catch (IllegalArgumentException ignored) { }
+        try { unregisterReceiver(parkCloseReceiver); } catch (IllegalArgumentException ignored) { }
         try {
             unregisterReceiver(cameraRouteReceiver);
         } catch (Throwable ignored) {
@@ -445,6 +491,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
     @Override protected void onSaveInstanceState(Bundle state) {
         state.putString(STATE_PARKING_SESSION, parkingSession);
+        state.putString(STATE_PARK_CLOSE_VIEW, parkCloseViewId);
         super.onSaveInstanceState(state);
     }
 
@@ -452,6 +499,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     protected void onDestroy() {
         SignalService.traceCameraEvent("MainActivity onDestroy");
         super.onDestroy();
+        settingsDialog.dismiss();
         sMainVisible = false;
         otaController.stop();
         if(pdcReader!=null)pdcReader.close();

@@ -23,7 +23,7 @@ public class ParkingAutomationSettingsInstrumentedTest {
         SharedPreferences prefs = UiPrefs.getPrefs(InstrumentationRegistry.getInstrumentation().getTargetContext());
         Map<String, ?> saved = prefs.getAll();
         String[] keys = {UiPrefs.KEY_PARKING_AUTO_CLOSE, UiPrefs.KEY_PARKING_AUTO_OPEN_DRIVE,
-                UiPrefs.KEY_PARKING_AUTO_CLOSE_SPEED};
+                UiPrefs.KEY_PARKING_AUTO_CLOSE_SPEED, UiPrefs.KEY_PARKING_AUTO_CLOSE_ON_PARK};
         SharedPreferences.Editor clear = prefs.edit();
         for (String key : keys) clear.remove(key);
         clear.commit();
@@ -32,12 +32,17 @@ public class ParkingAutomationSettingsInstrumentedTest {
             onView(withId(R.id.switchParkingAutoClose)).inRoot(isDialog()).perform(scrollTo()).check(matches(isChecked()));
             onView(withId(R.id.etParkingAutoCloseSpeed)).inRoot(isDialog()).check(matches(withText("25"))).check(matches(isEnabled()));
             onView(withId(R.id.switchParkingAutoOpenDrive)).inRoot(isDialog()).perform(scrollTo()).check(matches(not(isChecked())));
+            onView(withId(R.id.switchParkingAutoCloseOnPark)).inRoot(isDialog()).perform(scrollTo()).check(matches(isChecked()));
+            assertTrue(UiPrefs.isParkingAutoCloseOnParkEnabled(prefs));
+            onView(withId(R.id.switchParkingAutoCloseOnPark)).inRoot(isDialog()).perform(click());
             onView(withId(R.id.etParkingAutoCloseSpeed)).inRoot(isDialog()).perform(scrollTo(), replaceText("41"), pressImeActionButton(), closeSoftKeyboard());
             onView(withId(R.id.switchParkingAutoOpenDrive)).inRoot(isDialog()).perform(scrollTo(), click());
             assertTrue(UiPrefs.isParkingAutoCloseEnabled(prefs));
             assertTrue(UiPrefs.isParkingAutoOpenDriveEnabled(prefs));
             assertEquals(41, UiPrefs.getParkingAutoCloseSpeedKmh(prefs));
             close(); scenario.recreate(); openParking();
+            onView(withId(R.id.switchParkingAutoCloseOnPark)).inRoot(isDialog()).perform(scrollTo()).check(matches(not(isChecked())));
+            assertFalse(UiPrefs.isParkingAutoCloseOnParkEnabled(prefs));
             onView(withId(R.id.switchParkingAutoClose)).inRoot(isDialog()).perform(scrollTo()).check(matches(isChecked()));
             onView(withId(R.id.etParkingAutoCloseSpeed)).inRoot(isDialog()).check(matches(withText("41"))).check(matches(isEnabled()));
             onView(withId(R.id.etParkingAutoCloseSpeed)).inRoot(isDialog()).perform(replaceText(""), closeSoftKeyboard());
@@ -50,7 +55,11 @@ public class ParkingAutomationSettingsInstrumentedTest {
             onView(withId(R.id.etParkingAutoCloseSpeed)).inRoot(isDialog()).check(matches(not(isEnabled())));
             assertTrue(UiPrefs.isParkingAutoOpenDriveEnabled(prefs));
             assertFalse(UiPrefs.isParkingAutoCloseEnabled(prefs));
+            onView(withId(R.id.switchParkingAutoCloseOnPark)).inRoot(isDialog()).perform(scrollTo(), click());
+            assertTrue(UiPrefs.isParkingAutoCloseOnParkEnabled(prefs));
+            assertFalse(UiPrefs.isParkingAutoCloseEnabled(prefs));
             close(); scenario.recreate(); openParking();
+            onView(withId(R.id.switchParkingAutoCloseOnPark)).inRoot(isDialog()).perform(scrollTo()).check(matches(isChecked()));
             onView(withId(R.id.switchParkingAutoClose)).inRoot(isDialog()).perform(scrollTo()).check(matches(not(isChecked())));
             onView(withId(R.id.etParkingAutoCloseSpeed)).inRoot(isDialog()).check(matches(not(isEnabled())));
             close();

@@ -1,8 +1,10 @@
 <resources>
     <string name="parking_automation_title">Automatic camera view</string>
+    <string name="parking_auto_close_on_park">Auto Close on P</string>
+    <string name="parking_auto_close_on_park_hint">Closes any open camera view when shifting into P, including manually opened views, regardless of Allow OEM. You can reopen the app while in P.</string>
     <string name="parking_auto_close">Auto Close</string>
     <string name="parking_auto_close_speed">Closing speed (1–130 km/h)</string>
     <string name="parking_auto_open_drive">Auto Open on P → D</string>
     <string name="parking_automation_speed_unit" translatable="false">km/h</string>
-    <string name="parking_automation_hint">Applies only with Allow OEM switched off. Each direct P → D shift can open the front view. Auto Close affects only automatically opened views, after speed rises from below to the selected threshold. Manual views stay open.</string>
+    <string name="parking_automation_hint">These two options apply only with Allow OEM switched off. Each direct P → D shift can open the front view. Speed-based Auto Close affects only automatically opened views, after speed rises from below to the selected threshold.</string>
 </resources>

@@ -252,6 +252,7 @@
             style="@style/DrivehubSettingsCardLabel"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:paddingStart="0dp"
             android:text="@string/parking_automation_title" />
 
         <LinearLayout
@@ -319,6 +320,35 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
             android:text="@string/parking_automation_hint" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:gravity="center_vertical"
+            android:minHeight="48dp"
+            android:orientation="horizontal">
+
+            <TextView
+                style="@style/DrivehubSettingsCardRowLabel"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:labelFor="@id/switchParkingAutoCloseOnPark"
+                android:text="@string/parking_auto_close_on_park" />
+
+            <Switch
+                android:id="@+id/switchParkingAutoCloseOnPark"
+                style="@style/DrivehubSettingsSwitch"
+                android:contentDescription="@string/parking_auto_close_on_park" />
+        </LinearLayout>
+
+        <TextView
+            style="@style/DrivehubSettingsCaption"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="@string/parking_auto_close_on_park_hint" />
     </LinearLayout>
 
 

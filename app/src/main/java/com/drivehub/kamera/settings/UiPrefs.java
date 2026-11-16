@@ -18,7 +18,12 @@ public final class UiPrefs {
     public static final String KEY_PARKING_AUTO_CLOSE = "parkingAutoClose";
     public static final String KEY_PARKING_AUTO_CLOSE_SPEED = "parkingAutoCloseSpeedKmh";
     public static final String KEY_PARKING_AUTO_OPEN_DRIVE = "parkingAutoOpenDrive";
+    public static final String KEY_PARKING_AUTO_CLOSE_ON_PARK = "parkingAutoCloseOnPark";
     public static final int DEFAULT_PARKING_AUTO_CLOSE_SPEED_KMH = 25;
+
+    public static boolean isParkingAutoCloseOnParkEnabled(SharedPreferences prefs) {
+        return prefs.getBoolean(KEY_PARKING_AUTO_CLOSE_ON_PARK, true);
+    }
 
     public static boolean isParkingAutoCloseEnabled(SharedPreferences prefs) {
         return prefs.getBoolean(KEY_PARKING_AUTO_CLOSE, true);

@@ -81,6 +81,9 @@ public class SignalService extends Service {
     public static final String EXTRA_CAMERA_INDEX = "camera_index";
     public static final String ACTION_CLOSE_PARKING = "com.drivehub.kamera.action.CLOSE_AUTO_PARKING";
     public static final String EXTRA_PARKING_SESSION = "parking_session";
+    public static final String ACTION_CLOSE_ON_PARK = "com.drivehub.kamera.action.CLOSE_ON_PARK";
+    public static final String EXTRA_PARK_CLOSE_VIEW = "park_close_view";
+    public static final String EXTRA_PARK_CLOSE_TRANSITION = "park_close_transition";
     private static final long PARKING_SPEED_POLL_MS = 250;
 
     private static volatile SignalService sInstance;
@@ -130,6 +133,7 @@ public class SignalService extends Service {
     private final Handler mainHandler = new Handler();
     private final ReverseLaunchPolicy reverseLaunch = new ReverseLaunchPolicy();
     private final ParkingAutomationPolicy parkingAutomation = new ParkingAutomationPolicy();
+    private final ParkClosePolicy parkClose = new ParkClosePolicy();
     private final Runnable parkingSpeedRunnable = this::pollParkingSpeed;
     private final OemOverlayRecovery oemOverlayRecovery = new OemOverlayRecovery();
     private final Runnable oemOverlayRestoreRunnable = new Runnable() {
@@ -661,6 +665,11 @@ public class SignalService extends Service {
             if (UiPrefs.KEY_OEM_TAKEOVER_YIELD.equals(key) || UiPrefs.KEY_OEM_AVM_COEXIST.equals(key)
                     || UiPrefs.KEY_EXTERNAL_CAMERA_PAUSED.equals(key)) {
                 mainHandler.post(this::applyOemCoexistState);
+            } else if (UiPrefs.KEY_PARKING_AUTO_CLOSE_ON_PARK.equals(key)) {
+                boolean enabled = UiPrefs.isParkingAutoCloseOnParkEnabled(sp);
+                // Invalidate queued requests immediately when a UI toggle is switched off.
+                if (Looper.myLooper() == mainHandler.getLooper()) parkClose.configure(enabled);
+                else mainHandler.post(() -> parkClose.configure(enabled));
             } else if (UiPrefs.KEY_PARKING_AUTO_CLOSE.equals(key)
                     || UiPrefs.KEY_PARKING_AUTO_CLOSE_SPEED.equals(key)
                     || UiPrefs.KEY_PARKING_AUTO_OPEN_DRIVE.equals(key)) {
@@ -886,6 +895,14 @@ public class SignalService extends Service {
     }
 
     private void updateParkingGear(int gear) {
+        parkClose.configure(UiPrefs.isParkingAutoCloseOnParkEnabled(UiPrefs.getPrefs(this)));
+        ParkClosePolicy.Request close = parkClose.onGear(gear, MainActivity.foregroundCameraViewId());
+        if (close != null) {
+            DevRuntimeLog.add(TAG, "Parking close requested: P, transition=" + close.transition);
+            sendBroadcast(new Intent(ACTION_CLOSE_ON_PARK).setPackage(getPackageName())
+                    .putExtra(EXTRA_PARK_CLOSE_VIEW, close.viewId)
+                    .putExtra(EXTRA_PARK_CLOSE_TRANSITION, close.transition));
+        }
         configureParkingAutomation();
         boolean ready = isParkingAutomationReady();
         if (!ready) cancelParkingAutomation("camera access unavailable");
@@ -980,9 +997,40 @@ public class SignalService extends Service {
     public static void onMainClosedByUser() {
         SignalService inst=sInstance;
         if(inst!=null) {
+            inst.parkClose.viewStopped(MainActivity.foregroundCameraViewId());
             inst.cancelParkingAutomation("manual close");
             inst.reverseLaunch.dismiss();
         }
+    }
+
+    public static void onParkCloseViewStarted(String viewId) {
+        SignalService inst = sInstance;
+        if (inst != null) inst.parkClose.viewStarted(viewId);
+    }
+
+    public static void onParkCloseViewStopped(String viewId) {
+        SignalService inst = sInstance;
+        if (inst != null) inst.parkClose.viewStopped(viewId);
+    }
+
+    public static ParkClosePolicy.Request pendingParkClose(String viewId) {
+        SignalService inst = sInstance;
+        if (inst == null || viewId == null || !viewId.equals(MainActivity.foregroundCameraViewId())) return null;
+        inst.parkClose.configure(UiPrefs.isParkingAutoCloseOnParkEnabled(UiPrefs.getPrefs(inst)));
+        return inst.parkClose.pendingFor(viewId);
+    }
+
+    /** Main-thread only; P-close is independent of automatic-session and OEM ownership checks. */
+    public static boolean closeOnPark(String viewId, String transition) {
+        SignalService inst = sInstance;
+        if (inst == null || inst.currentGear != 1 || viewId == null
+                || !viewId.equals(MainActivity.foregroundCameraViewId())) return false;
+        inst.parkClose.configure(UiPrefs.isParkingAutoCloseOnParkEnabled(UiPrefs.getPrefs(inst)));
+        if (!inst.parkClose.consume(viewId, transition)) return false;
+        DevRuntimeLog.add(TAG, "Parking automatic close: P, transition=" + transition);
+        inst.cancelParkingAutomation("P");
+        inst.reverseLaunch.dismiss();
+        return true;
     }
 
     public static void onExclusiveOemStart() {
@@ -1378,6 +1426,7 @@ public class SignalService extends Service {
         mainHandler.removeCallbacks(laneChangeSpeedRunnable);
         mainHandler.removeCallbacks(oemOverlayRestoreRunnable);
         cancelParkingAutomation("service stopped");
+        parkClose.reset();
         oemOverlayRecovery.cancel();
         hideCameraOverlays();
         if (ipkRearview != null) { ipkRearview.close(); ipkRearview = null; }
