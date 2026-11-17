@@ -212,6 +212,8 @@ The app uses the full screen width, with the SAIC side navigation hidden in the 
 
 The main screen has a left camera panel, the single-camera preview in the center, and an experimental **2D/3D surround view** on the right. Select **Wheels** for four wheel close-ups (front wheels above, rear wheels below), or **Sides** for two tall side views. The selected mode is saved.
 
+In reverse, rear PDC reads all four sectors together from the OEM system property `arcsoft.avm.mPdcBackObsShow`, with minimum distance from `arcsoft.avm.mBackObsClosestDistance` and status from `arcsoft.avm.ID_PDC_FRONT_REAR_STS`. An unknown or invalid sector hides only its own bar; valid sectors remain visible. Missing minimum distance retains the existing estimated level positions. These properties depend on the stock `CarManagerServer` publishing vehicle data.
+
 Under **Parking → MG4 vehicle color**, eight color circles select the pre-rendered vehicle graphic (white, grey, black, red, orange, blue, silver or matte Hunter Green). The selection is saved and applies immediately to the Birdseye view.
 
 ![Eight pre-rendered MG4 vehicle colors, including matte Hunter Green](images/color-variants.png)

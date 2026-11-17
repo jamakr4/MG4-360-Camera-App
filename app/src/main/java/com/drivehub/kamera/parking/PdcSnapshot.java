@@ -47,11 +47,13 @@ public final class PdcSnapshot {
         return false;
     }
 
+    /** Invalid sectors have no spatial bar; valid neighbours keep their levels. */
     public int[] spatialLevels() {
-        for (int v : levels)
-            if (v < 0)
-                return new int[4];
-        return levels.clone();
+        int[] spatial = levels.clone();
+        for (int i = 0; i < spatial.length; i++)
+            if (spatial[i] < 0)
+                spatial[i] = 0;
+        return spatial;
     }
 
     public String diagnostic(long nowMs) {

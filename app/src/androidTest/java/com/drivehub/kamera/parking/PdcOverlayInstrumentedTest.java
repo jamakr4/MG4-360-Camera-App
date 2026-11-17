@@ -140,6 +140,13 @@ public class PdcOverlayInstrumentedTest {
                 assertEquals("PDC  ●   ●   ●   ●   80 cm", fixture.status.getText().toString());
                 assertEquals("PDC 1, 3, 6, 9; 80 cm", fixture.status.getContentDescription().toString());
 
+                fixture.geometry.set(new PdcSnapshot(new int[]{1, -1, 255, 9}, 80, 0, SystemClock.elapsedRealtime()));
+                fixture.overlay.updateStatus();
+                assertEquals(2, fixture.geometry.bars(fixture.scene.car, SystemClock.elapsedRealtime()).size());
+                assertTrue(fixture.drawnPixels() > 0);
+                assertEquals("PDC  ●   –   –   ●   80 cm", fixture.status.getText().toString());
+                assertEquals("PDC 1, –, –, 9; 80 cm", fixture.status.getContentDescription().toString());
+
                 fixture.geometry.set(new PdcSnapshot(new int[]{2, 2, 0, 0}, 90, 0, SystemClock.elapsedRealtime()));
                 fixture.overlay.updateStatus();
                 assertEquals("PDC  ●   ●   ○   ○   90 cm", fixture.status.getText().toString());

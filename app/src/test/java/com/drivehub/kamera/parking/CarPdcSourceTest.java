@@ -81,17 +81,18 @@ public class CarPdcSourceTest {
         assertEquals(Collections.singletonList("parkingassistance"),car.requested);
     }
 
-    public static class PartialParking extends Parking {
+    public static class PartialParking extends FourSectors {
         @Override public Object getProperty(Class<?> type,int property,int area){
             if(property==PdcReader.SECTORS[0])throw new SecurityException("one sector unavailable");
             return super.getProperty(type,property,area);
         }
     }
-    @Test public void oneFailedSectorStaysUnknownWithoutSwitchingManagersOrInventingSpatialBars() {
+    @Test public void oneFailedSectorStaysUnknownWithoutSwitchingManagersOrHidingValidBars() {
         Car car=new Car(new PartialParking(),new Modern());car.connected=true;
         CarPdcSource source=new CarPdcSource(new CarServiceConnection(()->car,()->100L),()->100L);
         PdcSnapshot value=source.read();assertEquals(-1,value.level(0));assertEquals(80,value.closestCm);
-        assertArrayEquals(new int[4],value.spatialLevels());
+        assertArrayEquals(new int[]{0,3,6,9},value.spatialLevels());
+        assertEquals(3,new PdcGeometryTestHelper().bars(value));
         source.read();assertEquals(0,car.disconnects);
         assertEquals(Collections.singletonList("parkingassistance"),car.requested);
     }

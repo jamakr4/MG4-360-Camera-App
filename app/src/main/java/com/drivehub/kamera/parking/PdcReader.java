@@ -10,8 +10,8 @@ import com.drivehub.kamera.dev.DevRuntimeLog;
 import java.util.function.BooleanSupplier;
 
 /**
- * Six read-only properties; asynchronous connection and all IPC stay off the UI
- * thread.
+ * Polls rear sectors, minimum distance and status from OEM system properties off
+ * the UI thread.
  */
 public final class PdcReader {
     public static final int STATUS = 0x2140b970, CLOSEST_CM = 0x2140b97b;
@@ -49,7 +49,7 @@ public final class PdcReader {
     private String lastState = "";
 
     public PdcReader(Context context, Listener listener) {
-        this(new CarPdcSource(context), SignalService::isReverseActive, listener);
+        this(new SystemPropertyPdcSource(), SignalService::isReverseActive, listener);
     }
 
     PdcReader(Source source, BooleanSupplier reverse, Listener listener) {

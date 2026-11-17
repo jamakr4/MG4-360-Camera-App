@@ -14,7 +14,7 @@ public class PdcGeometryTest {
         assertTrue(invalidSample.diagnostic(1000).contains("raw=[255, 2, 0, 9] closest=255cm"));
         assertTrue(s.fresh(1500));assertFalse(s.fresh(1501));assertFalse(s.fresh(999));
         for(int invalid:new int[]{0,255,-1,999})assertEquals(-1,new PdcSnapshot(values,invalid,0,1000).closestCm);
-        assertArrayEquals(new int[4],new PdcSnapshot(new int[]{1,-1,0,0},30,0,1000).spatialLevels());
+        assertArrayEquals(new int[]{1,0,0,0},new PdcSnapshot(new int[]{1,-1,0,0},30,0,1000).spatialLevels());
         assertArrayEquals(new int[]{1,0,0,0},new PdcSnapshot(new int[]{1,0,0,0},0,0,1000).spatialLevels());
     }
     @Test public void explicitlyUnknownTableStillKeepsOnlyClosestLevelSectors() {
@@ -85,10 +85,36 @@ public class PdcGeometryTest {
             assertTrue(g.bars(CAR,1501).isEmpty());assertFalse(g.hasEstimatedPositions(1501));
         }
     }
-    @Test public void rivelaTableStillClearsUnknownSectorsAndPausedSnapshots() {
+    @Test public void invalidSectorsClearOnlyTheirOwnBarsAndRecoverIndependently() {
+        for(int sector=0;sector<4;sector++)for(int invalid:new int[]{-1,10,255}) {
+            PdcGeometry g=new PdcGeometry();int[] levels={1,3,6,9};
+            g.set(new PdcSnapshot(levels,80,0,1000));
+            List<PdcBars.Bar> original=g.bars(CAR,1000);assertEquals(4,original.size());
+            levels[sector]=invalid;g.set(new PdcSnapshot(levels,80,0,1100));
+            List<PdcBars.Bar> partial=g.bars(CAR,1100);assertEquals(3,partial.size());
+            int visible=0;
+            for(int i=0;i<4;i++)if(i!=sector) {
+                PdcBars.Bar bar=partial.get(visible++);
+                assertEquals(original.get(i).color,bar.color);
+                // The surviving bands remain in their physical sectors even if the nearest level changes.
+                assertEquals(Math.atan2(original.get(i).xy[0],original.get(i).xy[1]-(CAR.rear()-1500)),
+                        Math.atan2(bar.xy[0],bar.xy[1]-(CAR.rear()-1500)),1e-6);
+            }
+            levels[sector]=new int[]{1,3,6,9}[sector];g.set(new PdcSnapshot(levels,80,0,1200));
+            assertEquals(4,g.bars(CAR,1200).size());
+        }
+    }
+    @Test public void multipleUnknownSectorsKeepTheRemainingBars() {
+        PdcGeometry g=new PdcGeometry();
+        g.set(new PdcSnapshot(new int[]{1,-1,255,9},80,0,1000));
+        List<PdcBars.Bar> bars=g.bars(CAR,1000);assertEquals(2,bars.size());
+        assertEquals(0xFFFF0000,bars.get(0).color);assertEquals(0xFF00FF00,bars.get(1).color);
+        assertTrue(g.hasEstimatedPositions(1000));
+    }
+    @Test public void rivelaTableStillClearsFullyUnknownOffAndPausedSnapshots() {
         PdcGeometry g=new PdcGeometry();
         for(PdcSnapshot sample:new PdcSnapshot[]{
-                new PdcSnapshot(new int[]{1,-1,3,9},80,0,1000),
+                new PdcSnapshot(new int[]{-1,255,10,-1},80,0,1000),
                 new PdcSnapshot(new int[4],80,0,1000),PdcSnapshot.EMPTY}) {
             g.set(sample);assertTrue(g.bars(CAR,1000).isEmpty());assertFalse(g.hasEstimatedPositions(1000));
         }
