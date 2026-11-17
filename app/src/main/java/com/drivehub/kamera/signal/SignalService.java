@@ -1090,10 +1090,12 @@ public class SignalService extends Service {
         // If MainActivity is visible, do not use the overlay; route the main preview camera instead.
         // The mirror's infotainment output is paused while our app UI is visible.
         if (MainActivity.shouldBlockOverlay()) {
+            OverlayService.hideOverlay(this);
+            if (delaySignalExit(previousMode, nextMode, false)) return;
             currentMode = nextMode;
             mainHandler.removeCallbacks(hideRunnable);
-            clearOverlayShownTimestamp();
-            OverlayService.hideOverlay(this);
+            if (nextMode == 1 || nextMode == 2) markOverlayShownNow();
+            else clearOverlayShownTimestamp();
             // Signal off must restore the gear view rather than leave a side camera selected.
             CameraIndex targetCamera = (nextMode == 3) ? CameraIndex.REAR
                     : (nextMode == 1) ? CameraIndex.LEFT
@@ -1149,16 +1151,7 @@ public class SignalService extends Service {
             return;
         }
 
-        if ((previousMode == 1 || previousMode == 2) && (nextMode == 0 || nextMode == 4)) {
-            currentMode = -2;
-            // For mode 0: respect both hideDelay and minShowTime.
-            // For mode 4 (rearview): only respect minShowTime — no artificial gap before the mirror.
-            long delayMs = nextMode == 4 ? computeRemainingMinShowMs() : computeOverlayHideDelayMs();
-            mainHandler.removeCallbacks(hideRunnable);
-            mainHandler.postDelayed(hideRunnable, delayMs);
-            Log.i(TAG, "Signal/gear off => will reapply overlay state after " + delayMs + "ms");
-            return;
-        }
+        if (delaySignalExit(previousMode, nextMode, nextMode == 4)) return;
 
         currentMode = nextMode;
         mainHandler.removeCallbacks(hideRunnable);
@@ -1184,6 +1177,19 @@ public class SignalService extends Service {
             }
             Log.i(TAG, "No active overlay mode => overlay hide");
         }
+    }
+
+    /** Main preview and floating tile share the same short-indication timing. */
+    private boolean delaySignalExit(int previousMode, int nextMode, boolean returningToRearview) {
+        if ((previousMode != 1 && previousMode != 2) || (nextMode != 0 && nextMode != 4))
+            return false;
+        currentMode = -2;
+        // Switching to the floating mirror only waits for the remaining minimum on-time.
+        long delayMs = returningToRearview ? computeRemainingMinShowMs() : computeOverlayHideDelayMs();
+        mainHandler.removeCallbacks(hideRunnable);
+        mainHandler.postDelayed(hideRunnable, delayMs);
+        Log.i(TAG, "Signal off => will reapply camera state after " + delayMs + "ms");
+        return true;
     }
 
     private void maybeTriggerDashcamEventForHazards(int previousLamp) {

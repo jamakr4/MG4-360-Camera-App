@@ -289,7 +289,7 @@ To use it:
 Important:
 
 - Disable the OEM SAIC indicator camera popup first, otherwise both systems may compete.
-- While the main app is open, the app can route the signal camera into the main preview instead of showing the floating overlay.
+- While the main app is open, the app can route the signal camera into the main preview instead of showing the floating overlay. The same **Minimum on-time**, **Overlay hide delay** and **Rotate side cameras to driving direction** settings apply there. The complete rotated image fits inside the central panel; reverse gear immediately takes priority over a pending signal-camera delay.
 
 <p align="center">
   <img src="images/setting%231.jpg" alt="OEM SAIC 360 camera settings step 1" width="48%">

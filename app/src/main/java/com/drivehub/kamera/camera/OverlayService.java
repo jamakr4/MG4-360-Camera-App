@@ -619,7 +619,7 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
         if (!shouldRotatePreviewToDrivingDirection()) {
             return 0f;
         }
-        return CameraIndex.fromVideoIndex(cameraIndex) == CameraIndex.LEFT ? -90f : 90f;
+        return CameraIndex.fromVideoIndex(cameraIndex).drivingDirectionRotationDegrees();
     }
 
     private void updateOverlayPresentation(boolean persist) {
