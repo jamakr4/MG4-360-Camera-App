@@ -1,0 +1,10 @@
+<resources>
+    <string name="guidelines_title">Trajectoires 2D/3D</string>
+    <string name="guidelines_speed_threshold">Seuil de vitesse</string>
+    <string name="guidelines_speed_description">Seuil de vitesse des trajectoires (0–130 km/h)</string>
+    <string name="guidelines_speed_hint">Masquer les trajectoires au-dessus de cette vitesse. Si la vitesse est indisponible, elles restent masquées. Le bouton des trajectoires permet toujours de les activer ou désactiver.</string>
+    <string name="guidelines_style">Style</string>
+    <string name="guidelines_style_lines">Lignes</string>
+    <string name="guidelines_style_simple">Simple</string>
+    <string name="guidelines_style_hint">Les deux styles utilisent 2060 mm, rétroviseurs compris. Lignes : quatre courbes bleu clair. Simple : deux bords extérieurs avec une surface bleue translucide.</string>
+</resources>

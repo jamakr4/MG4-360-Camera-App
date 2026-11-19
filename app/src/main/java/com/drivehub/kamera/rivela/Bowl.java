@@ -30,6 +30,18 @@ public final class Bowl {
 
     private Bowl(float[] v, short[] idx, int nx, int ny) { vertices = v; indices = idx; this.nx = nx; this.ny = ny; }
 
+    /** Inverse of build's superellipse rings, for an orthographic top-view lookup mesh. */
+    public static double surfaceZ(CarFrame car,double x,double y,double flatMm,double curveMm) {
+        double ax=Math.abs(x-car.centerX),ay=Math.abs(y-car.centerY),a=car.width/2+40,b=car.length/2+40;
+        double lo=0,hi=Math.hypot(ax,ay);
+        for(int i=0;i<36;i++) {
+            double d=(lo+hi)/2,rx=ax/(a+d),ry=ay/(b+d),xx=rx*rx,yy=ry*ry;
+            if(xx*xx*xx+yy*yy*yy>1)lo=d;else hi=d;
+        }
+        double rise=Math.max(0,hi-flatMm);
+        return -rise*rise/(2*curveMm);
+    }
+
     /** cams in the order LEFT, RIGHT, FRONT, REAR. Rivela 360 uses nTheta = 144, nRing = 56. */
     public static Bowl build(FisheyeCamera[] cams, CarFrame car, int nTheta, int nRing, double flatMm, double curveMm) {
         int nx = nTheta + 1, ny = nRing;
@@ -65,7 +77,7 @@ public final class Bowl {
     }
 
     /** Which camera "owns" a ground position: side, front/rear, or a smooth blend around the corners. */
-    static double[] preference(CarFrame car, double X, double Y, double front, double rear, double halfWid) {
+    public static double[] preference(CarFrame car, double X, double Y, double front, double rear, double halfWid) {
         double[] pref = new double[4];
         double exs = Math.abs(X - car.centerX) - halfWid, eyF = front - Y, eyR = Y - rear;
         int side = X < car.centerX ? LEFT : RIGHT;

@@ -23,35 +23,54 @@ public final class BirdseyeRenderer implements GLSurfaceView.Renderer {
     }
     private final Frames frames;
     private final BirdseyeCarArtwork.Source artworkSource;
+    private final java.util.function.LongSupplier guideClock;
+    private final GuidelineAnimation guideAnimation;
+    private final GuidelineFrame guideFrame=new GuidelineFrame();
     private final ByteBuffer upload = ByteBuffer.allocateDirect(720*240*2).order(ByteOrder.nativeOrder());
     private final long[] capturedUs = new long[4];
     private final int[] textures = new int[5], buffers = new int[2];
     private final int[] attributes = new int[5];
     private volatile BirdseyeMesh requestedMesh;
+    private volatile BirdseyeMesh wideMesh;
+    public volatile boolean wideRequested,wideActive;
+    public volatile String wideError;
     private BirdseyeMesh uploadedMesh;
     private volatile BirdseyeCarColor requestedCarColor = BirdseyeCarColor.PICCADILLY_BLUE;
     private BirdseyeCarColor uploadedCarColor;
     private int program, freshUniform, width=450, height=640;
     public volatile boolean threeDRequested, threeDActive, depthAvailable;
     public volatile String threeDError;
+    public volatile ThreeDFailure threeDFailure;
     private volatile RivelaScene scene;
     private volatile VehicleModel model;
     private com.drivehub.kamera.parking.PdcGeometry pdcGeometry;
     public final OrbitCamera orbit=new OrbitCamera();
     public final WheelSteering steering=new WheelSteering();
+    private volatile boolean wheelGuidePreview;
+    volatile float guideProgress,outgoingGuideProgress;
+    private volatile com.drivehub.kamera.steering.WheelGuides.Style guideStyle=com.drivehub.kamera.steering.WheelGuides.Style.SIMPLE;
+    private volatile com.drivehub.kamera.steering.WheelGuides.Direction guideDirection=com.drivehub.kamera.steering.WheelGuides.Direction.REVERSE;
+    public void setWheelGuidePreview(boolean enabled){wheelGuidePreview=enabled;}
+    public void setBlueGuideCorridor(boolean enabled){guideStyle=enabled?com.drivehub.kamera.steering.WheelGuides.Style.SIMPLE:com.drivehub.kamera.steering.WheelGuides.Style.LINES;}
+    public void setGuideStyle(com.drivehub.kamera.steering.WheelGuides.Style style){guideStyle=java.util.Objects.requireNonNull(style);}
+    public void setGuideDirection(com.drivehub.kamera.steering.WheelGuides.Direction direction){guideDirection=java.util.Objects.requireNonNull(direction);}
     private RivelaBowlPass bowlPass;
     private PdcGroundPass pdcPass;
+    private WheelGuidePass guidePass;
+    private BirdseyeCarPass carPass;
+    private BirdseyeCarGeometry carArtworkGeometry;
     private boolean pdcUnavailable;
+    private boolean guidesUnavailable;
     private final float[] topMvp=new float[16];
     public void setScene(RivelaScene scene) { this.scene=scene; }
     public void setModel(VehicleModel model) { this.model=model; }
     public void setPdcGeometry(com.drivehub.kamera.parking.PdcGeometry geometry) { pdcGeometry=geometry; }
-    public void setThreeD(boolean enabled) { threeDRequested=enabled; if(enabled)threeDError=null; }
-    public void failThreeD(String message) { threeDError=message;threeDRequested=false; }
+    public void setThreeD(boolean enabled) { if(enabled){threeDError=null;threeDFailure=null;}threeDRequested=enabled; }
+    public void failThreeD(ThreeDFailure failure) { threeDFailure=failure;threeDError=failure.getMessage();threeDRequested=false; }
 
     private volatile int resetGeneration;
     private int appliedGeneration;
-    public volatile int freshMask;
+    public volatile int freshMask,displayMask;
     public volatile String error;
     public volatile long renderedFrames, lastDrawCpuUs, lastDrawElapsedMs;
     public volatile int contextGeneration;
@@ -82,24 +101,31 @@ public final class BirdseyeRenderer implements GLSurfaceView.Renderer {
         this(frames, assets == null ? (BirdseyeCarArtwork.Source)null : color -> BirdseyeCarArtwork.load(assets, color));
     }
     BirdseyeRenderer(Frames frames, BirdseyeCarArtwork.Source artworkSource) {
+        this(frames,artworkSource,SystemClock::elapsedRealtime,GuidelineAnimation.DURATION_MS);
+    }
+    BirdseyeRenderer(Frames frames,BirdseyeCarArtwork.Source artworkSource,
+                     java.util.function.LongSupplier guideClock,long guideDurationMs) {
         this.frames = frames; this.artworkSource = artworkSource;
+        this.guideClock=guideClock;guideAnimation=new GuidelineAnimation(guideDurationMs);
     }
     public void setCarColor(BirdseyeCarColor color) {
         requestedCarColor = color == null ? BirdseyeCarColor.PICCADILLY_BLUE : color;
     }
     public void setMesh(BirdseyeMesh mesh) { requestedMesh = mesh; invalidateFrames(); }
-    public void invalidateFrames() { resetGeneration++; freshMask = 0; }
+    public void setWideMesh(BirdseyeMesh mesh,String error){wideMesh=mesh;wideError=error;}
+    public void setWide(boolean enabled){wideRequested=enabled;}
+    public void invalidateFrames() { resetGeneration++; freshMask = 0; displayMask = 0; }
 
     private static final String VERTEX =
             "attribute vec2 aPosition;\n" +
             "attribute vec3 aCam0,aCam1,aCam2,aCam3;\n" +
-            "varying vec3 vCam0,vCam1,vCam2,vCam3; varying vec2 vGround;\n" +
+            "uniform vec2 uGroundHalf;varying vec3 vCam0,vCam1,vCam2,vCam3; varying vec2 vGround;\n" +
             "void main(){gl_Position=vec4(aPosition,0.0,1.0);" +
-            "vGround=aPosition*vec2(" + BirdseyeMesh.GROUND_WIDTH/2 + "," + -BirdseyeMesh.GROUND_HEIGHT/2 + ");" +
+            "vGround=aPosition*uGroundHalf;" +
             "vCam0=aCam0;vCam1=aCam1;vCam2=aCam2;vCam3=aCam3;}";
     private static final String FRAGMENT =
             "#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n" +
-            "uniform sampler2D uCam0,uCam1,uCam2,uCam3,uCar; uniform vec4 uFresh,uCarRect; uniform float uCarReady;\n" +
+            "uniform sampler2D uCam0,uCam1,uCam2,uCam3; uniform vec4 uFresh; uniform float uCarReady;\n" +
             "varying vec3 vCam0,vCam1,vCam2,vCam3; varying vec2 vGround;\n" +
             // Reference (u,v) -> top-field (u,v/2). Top-field pixels occupy rows
             // 0,2,...478; interpolate between those actual positions, clamp the last line.
@@ -116,21 +142,21 @@ public final class BirdseyeRenderer implements GLSurfaceView.Renderer {
             "if(w.y>0.0)color+=w.y*camera(uCam1,vCam1.xy);" +
             "if(w.z>0.0)color+=w.z*camera(uCam2,vCam2.xy);" +
             "if(w.w>0.0)color+=w.w*camera(uCam3,vCam3.xy);color/=sum;}}" +
-            // PNG row zero is the vehicle front. Bitmap data is uploaded without premultiplication.
-            "if(uCarReady>0.5){vec2 uv=(vGround-uCarRect.xy)/uCarRect.zw;" +
-            "if(uv.x>=0.0 && uv.x<=1.0 && uv.y>=0.0 && uv.y<=1.0){" +
-            "vec4 artwork=texture2D(uCar,uv);color=mix(color,artwork.rgb,artwork.a);}}" +
             "gl_FragColor=vec4(color,1.0);}";
 
 
     @Override public void onSurfaceCreated(GL10 gl, EGLConfig config) {
+        guideAnimation.reset();
+        guideFrame.reset();guideProgress=outgoingGuideProgress=0;
         program = 0; uploadedMesh = null; error = null; hasCarArtwork = false; uploadedCarColor = null;
-        bowlPass=null;pdcPass=null;pdcUnavailable=false;threeDActive=false;
+        bowlPass=null;pdcPass=null;guidePass=null;carPass=null;carArtworkGeometry=null;
+        pdcUnavailable=false;guidesUnavailable=false;threeDActive=false;
         int[] depth=new int[1];GLES20.glGetIntegerv(GLES20.GL_DEPTH_BITS,depth,0);depthAvailable=depth[0]>=16;
-        Arrays.fill(capturedUs, 0); freshMask = 0;
+        Arrays.fill(capturedUs, 0); freshMask = 0; displayMask = 0;
         statsStartedNs=0;statsFrames=0;statsSubmitUs=0;Arrays.fill(statsUploads,0);
         try {
             program = link(VERTEX, FRAGMENT);
+            carPass=new BirdseyeCarPass();
             attributes[0] = GLES20.glGetAttribLocation(program, "aPosition");
             for (int i = 0; i < 4; i++) attributes[i+1] = GLES20.glGetAttribLocation(program, "aCam"+i);
             freshUniform = GLES20.glGetUniformLocation(program, "uFresh");
@@ -170,8 +196,10 @@ public final class BirdseyeRenderer implements GLSurfaceView.Renderer {
             if (generation != appliedGeneration) {
                 Arrays.fill(capturedUs, 0); appliedGeneration = generation;
             }
-            BirdseyeMesh mesh = requestedMesh;
+            boolean useWide=wideRequested&&wideMesh!=null;
+            BirdseyeMesh mesh = useWide?wideMesh:requestedMesh;
             GLES20.glUseProgram(program);
+            GLES20.glUniform2f(GLES20.glGetUniformLocation(program,"uGroundHalf"),mesh.groundWidth/2,-mesh.groundHeight/2);
             BirdseyeCarColor color=requestedCarColor;
             if (color != uploadedCarColor) uploadCarArtwork(color);
             if (mesh != uploadedMesh) {
@@ -201,18 +229,35 @@ public final class BirdseyeRenderer implements GLSurfaceView.Renderer {
             GLES20.glActiveTexture(GLES20.GL_TEXTURE4);
             GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textures[4]);
             // Check permission/generation again after the copies to invalidate a concurrent handoff.
-            int mask = allowed && frames.allowed() && generation == resetGeneration
-                    ? BirdseyeFrameHealth.freshMask(capturedUs, frames.clockUs()) : 0;
+            int mask = 0,visibleMask = 0;
+            if (allowed && frames.allowed() && generation == resetGeneration) {
+                long nowUs = frames.clockUs();
+                mask = BirdseyeFrameHealth.freshMask(capturedUs, nowUs);
+                visibleMask = BirdseyeFrameHealth.displayMask(capturedUs, nowUs);
+            }
             boolean drewThreeD=false;
             RivelaScene currentScene=scene;VehicleModel currentModel=model;
+            WheelSteering.Angles angles=steering.angles();
+            com.drivehub.kamera.steering.WheelGuides.Style style=guideStyle;
+            com.drivehub.kamera.steering.WheelGuides.Direction direction=angles.guidanceDirection!=null?angles.guidanceDirection:guideDirection;
+            int guideCameraMask=direction==com.drivehub.kamera.steering.WheelGuides.Direction.FORWARD?4:8;
+            guideProgress=guideAnimation.update(wheelGuidePreview,
+                    currentScene!=null&&angles.guidanceAvailable&&(mask&guideCameraMask)!=0,direction,guideClock.getAsLong());
+            if((mask&4)==0)guideAnimation.invalidate(com.drivehub.kamera.steering.WheelGuides.Direction.FORWARD);
+            if((mask&8)==0)guideAnimation.invalidate(com.drivehub.kamera.steering.WheelGuides.Direction.REVERSE);
+            guideFrame.update(angles,style,direction,guideAnimation);
+            outgoingGuideProgress=guideFrame.outgoing().level;
             if(threeDRequested&&currentScene!=null&&currentScene.bowl()!=null&&currentModel!=null) {
+                ThreeDFailure.Kind stage=ThreeDFailure.Kind.DEPTH;
                 try {
                     if(!depthAvailable)throw new IllegalStateException("No 16-bit depth buffer");
+                    stage=ThreeDFailure.Kind.GPU_SETUP;
                     if(bowlPass==null)bowlPass=new RivelaBowlPass();
-                    bowlPass.draw(width,height,currentScene,currentModel,color,textures,mask,orbit,steering.degrees(),pdcGeometry,SystemClock.elapsedRealtime());
+                    stage=ThreeDFailure.Kind.GPU_DRAW;
+                    bowlPass.draw(width,height,currentScene,currentModel,color,textures,visibleMask,mask,orbit,angles,pdcGeometry,SystemClock.elapsedRealtime(),guideFrame);
                     drewThreeD=true;
-                } catch(RuntimeException failure) {
-                    failThreeD(failure.getMessage());
+                } catch(RuntimeException|OutOfMemoryError failure) {
+                    failThreeD(ThreeDFailure.at(stage,failure));
                     if(bowlPass!=null){bowlPass.close();bowlPass=null;}
                     GLES20.glDisable(GLES20.GL_DEPTH_TEST);RivelaBowlPass.disableAttributes();
                     for(int drain=0;drain<16&&GLES20.glGetError()!=GLES20.GL_NO_ERROR;drain++){}
@@ -220,9 +265,9 @@ public final class BirdseyeRenderer implements GLSurfaceView.Renderer {
                 }
             }
             if(!drewThreeD) {
-            GLES20.glUseProgram(program);GLES20.glDisable(GLES20.GL_DEPTH_TEST);
+            GLES20.glUseProgram(program);GLES20.glDisable(GLES20.GL_DEPTH_TEST);GLES20.glDisable(GLES20.GL_BLEND);
             GLES20.glActiveTexture(GLES20.GL_TEXTURE4);GLES20.glBindTexture(GLES20.GL_TEXTURE_2D,textures[4]);
-            GLES20.glUniform4f(freshUniform, mask&1, (mask>>1)&1, (mask>>2)&1, (mask>>3)&1);
+            GLES20.glUniform4f(freshUniform, visibleMask&1, (visibleMask>>1)&1, (visibleMask>>2)&1, (visibleMask>>3)&1);
             GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, buffers[0]);
             GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, buffers[1]);
             for (int i = 0; i < 5; i++) {
@@ -232,12 +277,14 @@ public final class BirdseyeRenderer implements GLSurfaceView.Renderer {
             }
             GLES20.glDrawElements(GLES20.GL_TRIANGLES, mesh.indexCount, GLES20.GL_UNSIGNED_SHORT, 0);
             RivelaBowlPass.disableAttributes();
+            if(currentScene!=null) {
+                float cx=(float)currentScene.car.centerX,cy=(float)currentScene.car.centerY;
+                android.opengl.Matrix.orthoM(topMvp,0,cx-mesh.groundWidth/2,cx+mesh.groundWidth/2,
+                        cy+mesh.groundHeight/2,cy-mesh.groundHeight/2,-100,100);
+            }
             if(currentScene!=null&&pdcGeometry!=null&&(mask&8)!=0&&!pdcUnavailable) {
                 try {
                 if(pdcPass==null)pdcPass=new PdcGroundPass();
-                float cx=(float)currentScene.car.centerX,cy=(float)currentScene.car.centerY;
-                android.opengl.Matrix.orthoM(topMvp,0,cx-BirdseyeMesh.GROUND_WIDTH/2,cx+BirdseyeMesh.GROUND_WIDTH/2,
-                        cy+BirdseyeMesh.GROUND_HEIGHT/2,cy-BirdseyeMesh.GROUND_HEIGHT/2,-100,100);
                 pdcPass.draw(topMvp,currentScene,pdcGeometry.bars(currentScene.car,SystemClock.elapsedRealtime()));
                 } catch(RuntimeException optionalOverlayFailure) {
                     pdcUnavailable=true;
@@ -247,10 +294,26 @@ public final class BirdseyeRenderer implements GLSurfaceView.Renderer {
                     Log.w("Birdseye","PDC overlay unavailable; keeping camera view",optionalOverlayFailure);
                 }
             }
+            if(currentScene!=null&&guideFrame.visible()&&!guidesUnavailable) {
+                try {
+                    if(guidePass==null)guidePass=new WheelGuidePass();
+                    guidePass.draw(topMvp,currentScene,guideFrame,!hasCarArtwork);
+                }catch(RuntimeException optionalOverlayFailure) {
+                    guidesUnavailable=true;
+                    if(guidePass!=null){guidePass.close();guidePass=null;}
+                    RivelaBowlPass.disableAttributes();GLES20.glDisable(GLES20.GL_BLEND);GLES20.glDepthMask(true);
+                    for(int drain=0;drain<16&&GLES20.glGetError()!=GLES20.GL_NO_ERROR;drain++){}
+                    Log.w("Birdseye","Steering overlay unavailable; keeping camera view",optionalOverlayFailure);
+                }
+            }
+            // Compose the car once, above every ground overlay and with its original alpha silhouette.
+            if(hasCarArtwork)carPass.draw(textures[4],carArtworkGeometry,mesh.groundWidth,mesh.groundHeight);
             }
             checkGl();
             threeDActive=drewThreeD; // Publish completed-frame state, never an in-flight false pulse.
-            freshMask = mask; renderedFrames++; lastDrawElapsedMs = SystemClock.elapsedRealtime();
+            wideActive=!drewThreeD&&useWide;
+            freshMask = mask;displayMask = visibleMask;
+            renderedFrames++; lastDrawElapsedMs = SystemClock.elapsedRealtime();
         } catch (RuntimeException e) { fail(e); }
         lastDrawCpuUs = (System.nanoTime()-start)/1000;
         recordTiming(System.nanoTime());
@@ -263,7 +326,6 @@ public final class BirdseyeRenderer implements GLSurfaceView.Renderer {
         GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR);
         GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE);
         GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE);
-        GLES20.glUniform1i(GLES20.glGetUniformLocation(program,"uCar"),4);
         uploadCarArtwork(requestedCarColor);
     }
 
@@ -271,19 +333,18 @@ public final class BirdseyeRenderer implements GLSurfaceView.Renderer {
     private void uploadCarArtwork(BirdseyeCarColor color) {
         uploadedCarColor = color;
         hasCarArtwork = false;
+        carArtworkGeometry=null;
         GLES20.glActiveTexture(GLES20.GL_TEXTURE4);
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textures[4]);
         int ready = GLES20.glGetUniformLocation(program,"uCarReady");
         GLES20.glUniform1f(ready,0);
-        GLES20.glUniform4f(GLES20.glGetUniformLocation(program,"uCarRect"),-1,-1,2,2);
         transparentCarTexture();
         BirdseyeCarArtwork artwork = null;
         try {
             if (artworkSource == null || (artwork = artworkSource.load(color)) == null) return;
             GLUtils.texImage2D(GLES20.GL_TEXTURE_2D,0,artwork.bitmap,0);
             checkGl();
-            BirdseyeCarGeometry g = artwork.geometry;
-            GLES20.glUniform4f(GLES20.glGetUniformLocation(program,"uCarRect"),g.leftMm,g.topMm,g.widthMm,g.heightMm);
+            carArtworkGeometry=artwork.geometry;
             GLES20.glUniform1f(ready,1);
             hasCarArtwork = true;
         } catch (RuntimeException e) {
@@ -297,7 +358,7 @@ public final class BirdseyeRenderer implements GLSurfaceView.Renderer {
                 GLES20.GL_RGBA,GLES20.GL_UNSIGNED_BYTE,ByteBuffer.allocateDirect(4));
     }
 
-    private void fail(RuntimeException e) { error = e.getMessage(); freshMask = 0; }
+    private void fail(RuntimeException e) { error = e.getMessage(); freshMask = 0; displayMask = 0; }
     private static void checkGl() {
         int error = GLES20.glGetError();
         if (error != GLES20.GL_NO_ERROR) throw new IllegalStateException("GLES error 0x"+Integer.toHexString(error));

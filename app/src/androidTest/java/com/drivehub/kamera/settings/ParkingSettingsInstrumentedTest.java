@@ -35,37 +35,52 @@ import static org.junit.Assert.*;
 
 @RunWith(AndroidJUnit4.class)
 public class ParkingSettingsInstrumentedTest {
-    @Test public void liveSteeringMappingPersistsAndStatusExposesTheVehicleProperty() {
+    @Test public void guidelineDefaultsAndSelectionsPersistAcrossReopening() {
         SharedPreferences prefs=UiPrefs.getPrefs(InstrumentationRegistry.getInstrumentation().getTargetContext());
         Map<String,?> saved=prefs.getAll();
-        prefs.edit().remove(UiPrefs.KEY_DEV_STEERING_SCALE).remove(UiPrefs.KEY_DEV_STEERING_INVERT).commit();
+        String[] keys={UiPrefs.KEY_PARKING_GUIDE_SPEED_LIMIT,UiPrefs.KEY_PARKING_GUIDE_SPEED_KMH,UiPrefs.KEY_PARKING_GUIDE_STYLE};
+        SharedPreferences.Editor clear=prefs.edit();for(String key:keys)clear.remove(key);clear.commit();
+        try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)) {
+            openParking(scenario);
+            dialogView(R.id.switchGuidelineSpeedLimit).perform(scrollTo()).check(matches(isChecked()));
+            dialogView(R.id.etGuidelineSpeed).check(matches(withText("25"))).check(matches(isEnabled()));
+            dialogView(R.id.segGuidelineSimple).perform(scrollTo()).check(matches(isSelected()));
+            dialogView(R.id.etGuidelineSpeed).perform(replaceText("18"),pressImeActionButton(),closeSoftKeyboard());
+            dialogView(R.id.segGuidelineLines).perform(scrollTo(),click()).check(matches(isSelected()));
+            assertEquals(18,UiPrefs.getParkingGuideSpeedKmh(prefs));assertTrue(UiPrefs.isParkingGuideSpeedLimitEnabled(prefs));
+            assertEquals(com.drivehub.kamera.steering.WheelGuides.Style.LINES,UiPrefs.getParkingGuideStyle(prefs));
+            dialogView(R.id.btnClose).perform(click());scenario.recreate();openParking(scenario);
+            dialogView(R.id.etGuidelineSpeed).perform(scrollTo()).check(matches(withText("18"))).check(matches(isEnabled()));
+            dialogView(R.id.segGuidelineLines).perform(scrollTo()).check(matches(isSelected()));
+            dialogView(R.id.switchGuidelineSpeedLimit).perform(scrollTo(),click());
+            dialogView(R.id.etGuidelineSpeed).check(matches(not(isEnabled())));
+            dialogView(R.id.segGuidelineSimple).perform(scrollTo(),click()).check(matches(isSelected()));
+            dialogView(R.id.btnClose).perform(click());
+        }finally {
+            SharedPreferences.Editor edit=prefs.edit();
+            for(String key:keys){Object value=saved.get(key);if(value instanceof Boolean)edit.putBoolean(key,(Boolean)value);
+                else if(value instanceof Integer)edit.putInt(key,(Integer)value);else if(value instanceof String)edit.putString(key,(String)value);else edit.remove(key);}
+            edit.commit();
+        }
+    }
+    @Test public void sharedSteeringModelAndGearAreExplainedInDevStatus() {
         try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)) {
             openDev();
-            assertEquals(14.77f,UiPrefs.getSteeringScale(prefs),.001f);
-            dialogView(R.id.etDevSteeringScale).perform(androidx.test.espresso.action.ViewActions.scrollTo(),replaceText("12,5"),pressImeActionButton(),closeSoftKeyboard());
-            dialogView(R.id.swDevSteeringInvert).perform(androidx.test.espresso.action.ViewActions.scrollTo(),click());
-            assertEquals(12.5f,UiPrefs.getSteeringScale(prefs),0);assertTrue(UiPrefs.isSteeringInverted(prefs));
+            onView(withText(R.string.settings_dev_steering_hint)).inRoot(isDialog()).perform(scrollTo())
+                    .check((view,error)->{
+                        if(error!=null)throw error;
+                        String hint=((android.widget.TextView)view).getText().toString();
+                        assertTrue(hint.contains("OEM"));assertFalse(hint.contains("14.77"));
+                    });
             dialogView(R.id.btnClose).perform(click());scenario.recreate();openDev();
-            assertAngleField(R.id.etDevSteeringScale,12.5f);
-            dialogView(R.id.swDevSteeringInvert).check(matches(isChecked()));
-            dialogView(R.id.etDevSteeringScale).perform(androidx.test.espresso.action.ViewActions.scrollTo(),replaceText("0"),pressImeActionButton(),closeSoftKeyboard());
-            assertEquals(12.5f,UiPrefs.getSteeringScale(prefs),0);
-            dialogView(R.id.btnDevSteeringReset).perform(androidx.test.espresso.action.ViewActions.scrollTo(),click());
-            assertEquals(14.77f,UiPrefs.getSteeringScale(prefs),.001f);assertFalse(UiPrefs.isSteeringInverted(prefs));
-            dialogView(R.id.tabDevStatus).perform(androidx.test.espresso.action.ViewActions.scrollTo(),click());
-            dialogView(R.id.tvDevStatusSteering).perform(androidx.test.espresso.action.ViewActions.scrollTo()).check((view,error)->{
+            dialogView(R.id.tabDevStatus).perform(scrollTo(),click());
+            dialogView(R.id.tvDevStatusSteering).perform(scrollTo()).check((view,error)->{
                 if(error!=null)throw error;
-                String text=((android.widget.TextView)view).getText().toString();assertTrue(text,text.contains("0x21601563"));assertTrue(text,text.contains("scale=14.770"));
+                String text=((android.widget.TextView)view).getText().toString();
+                assertTrue(text,text.contains("0x21601563"));assertTrue(text,text.contains("OEM radius model"));
+                assertTrue(text,text.contains("left/right="));assertTrue(text,text.contains("gear="));assertFalse(text,text.contains("scale="));
             });
             dialogView(R.id.btnClose).perform(click());
-        } finally {
-            SharedPreferences.Editor editor=prefs.edit();
-            for(String key:new String[]{UiPrefs.KEY_DEV_STEERING_SCALE,UiPrefs.KEY_DEV_STEERING_INVERT}) {
-                Object value=saved.get(key);
-                if(value instanceof Float)editor.putFloat(key,(Float)value);
-                else if(value instanceof Boolean)editor.putBoolean(key,(Boolean)value);else editor.remove(key);
-            }
-            editor.commit();
         }
     }
     @Test public void paintSwatchesSelectOneColorAndPersistWhenParkingReopens() {
@@ -177,18 +192,18 @@ public class ParkingSettingsInstrumentedTest {
             openParking(scenario);
             dialogView(R.id.parkingWheelAlignmentOptions).check(matches(withEffectiveVisibility(Visibility.GONE)));
             dialogView(R.id.switchSafetyWarning).perform(click());assertTrue(UiPrefs.isSafetyWarningEnabled(prefs));
-            dialogView(R.id.rowParkingWheelAlignment).perform(click());
+            dialogView(R.id.rowParkingWheelAlignment).perform(scrollTo(),click());
             dialogView(R.id.segParkingFrontNone).check(matches(isSelected()));
             dialogView(R.id.segParkingRearBasic).check(matches(isSelected()));
-            dialogView(R.id.segParkingFrontAdvanced).perform(click());
+            dialogView(R.id.segParkingFrontAdvanced).perform(scrollTo(),click());
             assertEquals(com.drivehub.kamera.side.WheelAlignmentMode.ADVANCED,UiPrefs.getParkingWheelMode(prefs,true));
             assertEquals(com.drivehub.kamera.side.WheelAlignmentMode.BASIC,UiPrefs.getParkingWheelMode(prefs,false));
-            dialogView(R.id.segParkingRearNone).perform(click());
+            dialogView(R.id.segParkingRearNone).perform(scrollTo(),click());
             assertFalse(UiPrefs.isParkingRearWheelAlignmentEnabled(prefs));
-            dialogView(R.id.segParkingFrontBasic).perform(click());
+            dialogView(R.id.segParkingFrontBasic).perform(scrollTo(),click());
             assertEquals(com.drivehub.kamera.side.WheelAlignmentMode.BASIC,UiPrefs.getParkingWheelMode(prefs,true));
-            dialogView(R.id.segParkingRearAdvanced).perform(click());
-            dialogView(R.id.segParkingFrontNone).perform(click());
+            dialogView(R.id.segParkingRearAdvanced).perform(scrollTo(),click());
+            dialogView(R.id.segParkingFrontNone).perform(scrollTo(),click());
             assertFalse(UiPrefs.isParkingFrontWheelAlignmentEnabled(prefs));
             assertEquals(com.drivehub.kamera.side.WheelAlignmentMode.ADVANCED,UiPrefs.getParkingWheelMode(prefs,false));
             dialogView(R.id.switchParkingHighlightMissingAreas).perform(scrollTo(),click());assertFalse(UiPrefs.isParkingHighlightMissingAreasEnabled(prefs));
@@ -199,7 +214,7 @@ public class ParkingSettingsInstrumentedTest {
             dialogView(R.id.ivParkingWheelAlignmentChevron).check((view,error)->{if(error!=null)throw error;assertEquals(180f,view.getRotation(),0);});
             dialogView(R.id.btnClose).perform(click());scenario.recreate();openParking(scenario);
             dialogView(R.id.parkingWheelAlignmentOptions).check(matches(withEffectiveVisibility(Visibility.GONE)));
-            dialogView(R.id.rowParkingWheelAlignment).perform(click());
+            dialogView(R.id.rowParkingWheelAlignment).perform(scrollTo(),click());
             dialogView(R.id.segParkingFrontNone).check(matches(isSelected()));
             dialogView(R.id.segParkingRearAdvanced).check(matches(isSelected()));
             dialogView(R.id.switchParkingHighlightMissingAreas).check(matches(not(isChecked()))).perform(scrollTo(),click());

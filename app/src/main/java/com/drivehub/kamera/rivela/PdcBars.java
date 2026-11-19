@@ -41,7 +41,7 @@ public final class PdcBars {
         public final int color;
         public final float widthMm;
         public final double[] xy;
-        Bar(int color, float widthMm, double[] xy) { this.color = color; this.widthMm = widthMm; this.xy = xy; }
+        public Bar(int color, float widthMm, double[] xy) { this.color = color; this.widthMm = widthMm; this.xy = xy; }
     }
 
     /** 0 red, 1 yellow, 2 green, -1 nothing */

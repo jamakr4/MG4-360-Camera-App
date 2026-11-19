@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_dev_steering">Řízení vozu ve 2D / 3D</string>
+    <string name="settings_dev_steering_hint">2D a 3D používají charakteristiku řízení OEM se samostatnými úhly levého a pravého kola. Modrá dráha se zobrazuje při R nebo D s aktuálními údaji řízení a kamer; při P a N je skrytá. Při chybějících údajích řízení zůstane poslední poloha kol a dráha se skryje. Zadní křivky při D jsou vizuální spojnice k předním koncovým bodům, nikoli skutečné dráhy zadních kol. Předpokládaný rozchod a zarovnání modelu je nutné ověřit ve voze. Diagnostika zobrazuje surový vstup, zdroj, cílové úhly a zařazený stupeň.</string>
+    <string name="settings_dev_steering_scale">Stupně snímače na stupeň modelu (1–30)</string>
+    <string name="settings_dev_steering_invert">Obrátit směr řízení</string>
+    <string name="settings_dev_steering_reset">Obnovit převod řízení</string>
+</resources>

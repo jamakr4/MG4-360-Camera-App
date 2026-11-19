@@ -119,6 +119,8 @@ public class SignalService extends Service {
     private int lastLamp = Integer.MIN_VALUE;
     private int currentLamp = 0;
     private volatile int currentGear = 0;
+    private volatile com.drivehub.kamera.steering.GearSnapshot guidanceGear=com.drivehub.kamera.steering.GearSnapshot.EMPTY;
+    private volatile com.drivehub.kamera.steering.VehicleMotionSnapshot vehicleMotion=com.drivehub.kamera.steering.VehicleMotionSnapshot.EMPTY;
     private int currentMode = -1; // -1:init, 0:none, 1:left, 2:right, 3:reverse, 4:rearview
     // A lamp value read while the OEM AVM owns the screen can be stale by the time its
     // Activity is closed. Do not let that value resurrect our signal overlay; wait for a
@@ -291,6 +293,16 @@ public class SignalService extends Service {
     public static boolean isReverseActive() {
         SignalService inst = sInstance;
         return inst != null && inst.currentGear == REVERSE_GEAR_VALUE;
+    }
+
+    /** Immutable read from the existing gear worker; no property access on UI/GL threads. */
+    public static com.drivehub.kamera.steering.GearSnapshot guidanceGear() {
+        SignalService inst=sInstance;
+        return inst!=null&&inst.oemLifecycleMonitoring?inst.guidanceGear:com.drivehub.kamera.steering.GearSnapshot.EMPTY;
+    }
+    public static com.drivehub.kamera.steering.VehicleMotionSnapshot vehicleMotion() {
+        SignalService inst=sInstance;
+        return inst!=null&&inst.oemLifecycleMonitoring?inst.vehicleMotion:com.drivehub.kamera.steering.VehicleMotionSnapshot.EMPTY;
     }
 
     /** Synchronize ownership before an Activity creates/resumes its preview surfaces. */
@@ -722,6 +734,8 @@ public class SignalService extends Service {
         oemLifecycleThread.start();
         oemLifecycleHandler = new Handler(oemLifecycleThread.getLooper());
         oemLifecycleMonitoring = true;
+        guidanceGear=com.drivehub.kamera.steering.GearSnapshot.EMPTY;
+        vehicleMotion=com.drivehub.kamera.steering.VehicleMotionSnapshot.EMPTY;
         final int token=++oemMonitorGeneration;
         final Handler monitor=oemLifecycleHandler;
         // The AVM sysprop is sticky across reboots — if the previous session ended with "Start"
@@ -745,9 +759,13 @@ public class SignalService extends Service {
             public void run() {
                 if (!oemLifecycleMonitoring||token!=oemMonitorGeneration) return;
                 // CarLampManager may not emit a callback when only the gear changes.
-                int gear = SystemPropertiesHelper.getInt("arcsoft.avm.mCurCarGear", currentGear);
+                int rawGear = SystemPropertiesHelper.getInt("arcsoft.avm.mCurCarGear", Integer.MIN_VALUE);
+                int gear = rawGear==Integer.MIN_VALUE?currentGear:rawGear;
+                float speedKmh=VehicleSpeedReader.readSpeedKmhOrNaN();
                 long sampledAt = SystemClock.elapsedRealtime();
                 if(!oemLifecycleMonitoring||token!=oemMonitorGeneration)return;
+                guidanceGear=com.drivehub.kamera.steering.GearSnapshot.value(rawGear,sampledAt);
+                vehicleMotion=com.drivehub.kamera.steering.VehicleMotionSnapshot.value(speedKmh,rawGear,sampledAt);
                 if (gear != lastOemGear || (sampledAt - lastOemGearSampleMs >= 250
                         && (gear == REVERSE_GEAR_VALUE
                         || UiPrefs.isOemCameraAccessBlocked(UiPrefs.getPrefs(SignalService.this))))) {
@@ -770,6 +788,8 @@ public class SignalService extends Service {
         if (oemLifecycleThread == null) return;
         DevRuntimeLog.add("SignalService", "OEM lifecycle monitor stopped");
         oemLifecycleMonitoring = false;++oemMonitorGeneration;
+        guidanceGear=com.drivehub.kamera.steering.GearSnapshot.EMPTY;
+        vehicleMotion=com.drivehub.kamera.steering.VehicleMotionSnapshot.EMPTY;
         if (oemLifecycleHandler != null) {
             oemLifecycleHandler.removeCallbacksAndMessages(null);
         }

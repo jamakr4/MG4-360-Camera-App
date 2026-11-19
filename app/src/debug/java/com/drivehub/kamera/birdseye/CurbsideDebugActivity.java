@@ -1,6 +1,7 @@
 package com.drivehub.kamera.birdseye;
 
 import android.app.*;
+import android.content.Intent;
 import android.os.*;
 import android.graphics.*;
 import android.view.*;
@@ -25,7 +26,10 @@ public final class CurbsideDebugActivity extends Activity {
     @Override public void onCreate(Bundle state){
         super.onCreate(state);
         LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setPadding(12,8,12,8);root.setBackgroundColor(0xFF10151C);
-        TextView title=text(R.string.birdseye_debug_curbside_title);title.setTextSize(19);root.addView(title);
+        LinearLayout header=new LinearLayout(this);header.setGravity(Gravity.CENTER_VERTICAL);
+        TextView title=text(R.string.birdseye_debug_curbside_title);title.setTextSize(19);header.addView(title,new LinearLayout.LayoutParams(0,-2,1));
+        Button birdseye=new Button(this);birdseye.setId(R.id.curbsideDebugBirdseye);birdseye.setText(R.string.birdseye_debug_back_to_surround);birdseye.setTextSize(12);
+        birdseye.setContentDescription(getString(R.string.birdseye_debug_back_to_surround_description));birdseye.setOnClickListener(v->returnToBirdseye());header.addView(birdseye);root.addView(header);
         TextView hint=text(R.string.birdseye_debug_curbside_hint);hint.setTextSize(12);root.addView(hint);
         LinearLayout controls=new LinearLayout(this);
         Button source=new Button(this);source.setText(R.string.birdseye_debug_private_recording);source.setOnClickListener(v->choose());controls.addView(source);
@@ -52,6 +56,13 @@ public final class CurbsideDebugActivity extends Activity {
         setContentView(root);
         String id=state!=null?state.getString(PrivateCameraCapture.EXTRA_SET):getIntent().getStringExtra(PrivateCameraCapture.EXTRA_SET);
         if(id!=null)load(id);else {String[] available=PrivateCameraCapture.available(this);if(available.length>0)load(available[0]);}
+    }
+    private void returnToBirdseye(){
+        Intent intent=new Intent(this,BirdseyeDebugActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        if(capture!=null)intent.putExtra(PrivateCameraCapture.EXTRA_SET,capture.id);
+        startActivity(intent);
+        finish();
     }
     private ArrayAdapter<String> choices(String[] items){
         return new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,items){

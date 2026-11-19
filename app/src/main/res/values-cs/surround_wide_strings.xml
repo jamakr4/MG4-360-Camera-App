@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="surround_label_wide">Široký</string>
+    <string name="surround_label_normal">Normální</string>
+    <string name="surround_mode_wide">Přepnout na široký 2D pohled</string>
+    <string name="surround_mode_normal">Přepnout na běžný 2D pohled</string>
+    <string name="surround_wide_failed">Široký pohled není dostupný. Používá se běžný pohled.</string>
+</resources>

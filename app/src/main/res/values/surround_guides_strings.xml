@@ -1,0 +1,4 @@
+<resources>
+    <string name="surround_guides_hide">Hide driving path</string>
+    <string name="surround_guides_show">Show driving path</string>
+</resources>

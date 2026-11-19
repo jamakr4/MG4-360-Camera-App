@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_dev_snapshot_title">Snímky kamer</string>
+    <string name="settings_dev_snapshot_hint">Zachytí čtyři aktuální nezrcadlené obrazy kamer bez překryvných prvků. Uloží PNG, celé snímky UYVY, metadata půlsnímků a časování i čitelnou kalibraci vozu do camera-snapshots ve vybrané složce záznamů. Kamery musí být dostupné této aplikaci; nahrávání se nemění.</string>
+    <string name="settings_dev_snapshot_button">Exportovat obrazy čtyř kamer</string>
+    <string name="settings_dev_snapshot_busy">Pořizuji a exportuji snímky…</string>
+    <string name="settings_dev_snapshot_success">Všechny čtyři kamery uloženy:\n%1$s\n\nObsahuje levý/pravý/přední/zadní obraz PNG, surové UYVY a manifest.json. PNG prostorově prokládají půlsnímky; pohybující se objekty mohou mít artefakty prokládání. Surové snímky umožňují místní použití jiných metod odstranění prokládání.</string>
+    <string name="settings_dev_snapshot_failed">Export snímků selhal:\n%1$s</string>
+    <string name="settings_dev_snapshot_copy">Kopírovat cestu ke složce</string>
+</resources>

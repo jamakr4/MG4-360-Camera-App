@@ -496,7 +496,7 @@ public class OverlayService extends Service implements TextureView.SurfaceTextur
         btnDismissOverlay.setImageResource(R.drawable.ic_close);
         btnDismissOverlay.setColorFilter(0xFFFFFFFF);
         btnDismissOverlay.setPadding(dpToPx(20), dpToPx(20), dpToPx(20), dpToPx(20));
-        btnDismissOverlay.setContentDescription("Close overlay");
+        btnDismissOverlay.setContentDescription(getString(R.string.settings_dialog_close));
         btnDismissOverlay.setOnClickListener(v -> {
             if (OVERLAY_REASON_DIGITAL_REARVIEW.equals(overlayReason) && uiPrefs != null) {
                 UiPrefs.setDigitalRearviewEnabled(uiPrefs, false);

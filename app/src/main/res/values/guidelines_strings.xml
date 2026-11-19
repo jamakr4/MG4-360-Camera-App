@@ -1,0 +1,10 @@
+<resources>
+    <string name="guidelines_title">Guidelines 2D/3D</string>
+    <string name="guidelines_speed_threshold">Speed threshold</string>
+    <string name="guidelines_speed_description">Guidelines speed threshold (0–130 km/h)</string>
+    <string name="guidelines_speed_hint">Hide guidelines above this speed. If speed is unavailable, guidelines stay hidden. The main path button remains the on/off switch.</string>
+    <string name="guidelines_style">Style</string>
+    <string name="guidelines_style_lines">Lines</string>
+    <string name="guidelines_style_simple">Simple</string>
+    <string name="guidelines_style_hint">Both styles use 2060 mm including mirrors. Lines: four light-blue clearance curves. Simple: two outer edges with a translucent blue fill.</string>
+</resources>

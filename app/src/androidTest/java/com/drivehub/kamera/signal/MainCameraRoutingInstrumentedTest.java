@@ -120,17 +120,17 @@ public class MainCameraRoutingInstrumentedTest {
         }
     }
 
-    @Test public void bothSidesRotateInsideThePanelAndLivePreferenceChangesRestoreTheOriginalView() throws Exception {
+    @Test public void surfaceViewKeepsTheOriginalOrientationAcrossCameraAndPreferenceChanges() throws Exception {
         try (Fixture f = new Fixture()) {
             f.prefs.edit().putBoolean(UiPrefs.KEY_OVERLAY_ROTATE_TO_DRIVING_DIRECTION,true).commit();
             sample(f.service,TurnSignal.LEFT,4); assertCamera(f.scenario,CameraIndex.LEFT);
-            assertOrientation(f.scenario,-90);
+            assertOrientation(f.scenario,0);
             f.prefs.edit().putBoolean(UiPrefs.KEY_OVERLAY_ROTATE_TO_DRIVING_DIRECTION,false).commit();
             assertOrientation(f.scenario,0);
             f.prefs.edit().putBoolean(UiPrefs.KEY_OVERLAY_ROTATE_TO_DRIVING_DIRECTION,true).commit();
-            assertOrientation(f.scenario,-90);
+            assertOrientation(f.scenario,0);
             sample(f.service,TurnSignal.RIGHT,4); assertCamera(f.scenario,CameraIndex.RIGHT);
-            assertOrientation(f.scenario,90);
+            assertOrientation(f.scenario,0);
             sample(f.service,TurnSignal.OFF,4); assertCamera(f.scenario,CameraIndex.FRONT);
             assertOrientation(f.scenario,0);
             sample(f.service,TurnSignal.LEFT,4); assertCamera(f.scenario,CameraIndex.LEFT);
@@ -139,19 +139,19 @@ public class MainCameraRoutingInstrumentedTest {
         }
     }
 
-    @Test public void rotatedSurfaceActuallyDisplaysAllFourImageCorners() throws Exception {
+    @Test public void surfaceViewActuallyDisplaysAllFourUnrotatedImageCorners() throws Exception {
         try (Fixture f = new Fixture()) {
             f.prefs.edit().putBoolean(UiPrefs.KEY_OVERLAY_ROTATE_TO_DRIVING_DIRECTION,true).commit();
             for (TurnSignal signal : new TurnSignal[]{TurnSignal.LEFT,TurnSignal.RIGHT}) {
                 sample(f.service,signal,4);
                 assertCamera(f.scenario,signal==TurnSignal.LEFT?CameraIndex.LEFT:CameraIndex.RIGHT);
-                assertOrientation(f.scenario,signal==TurnSignal.LEFT?-90:90);
+                assertOrientation(f.scenario,0);
                 assertRenderedCorners(f.scenario);
             }
         }
     }
 
-    @Test public void swipesKeepTheirScreenDirectionWhenTheSideImageIsRotated() throws Exception {
+    @Test public void swipesKeepTheirScreenDirectionForSideCameras() throws Exception {
         try (Fixture f = new Fixture()) {
             f.prefs.edit().putBoolean(UiPrefs.KEY_OVERLAY_ROTATE_TO_DRIVING_DIRECTION,true).commit();
             sample(f.service,TurnSignal.LEFT,4); assertCamera(f.scenario,CameraIndex.LEFT);
@@ -196,10 +196,10 @@ public class MainCameraRoutingInstrumentedTest {
     private static void assertOrientation(ActivityScenario<MainActivity> scenario, int expected) {
         InstrumentationRegistry.getInstrumentation().waitForIdleSync();
         scenario.onActivity(activity -> {
-            android.view.TextureView preview = activity.findViewById(R.id.surfaceView);
+            android.view.SurfaceView preview = activity.findViewById(R.id.surfaceView);
             assertTrue(preview.getWidth()>0 && preview.getHeight()>0);
             assertEquals(0,preview.getRotation(),0);
-            android.graphics.Matrix transform=preview.getTransform(null);
+            android.graphics.Matrix transform=preview.getMatrix();
             float[] corners = {0,0,preview.getWidth(),0,preview.getWidth(),preview.getHeight(),0,preview.getHeight()};
             transform.mapPoints(corners);
             assertEquals(expected,Math.toDegrees(Math.atan2(corners[3]-corners[1],corners[2]-corners[0])),.001);
@@ -223,8 +223,8 @@ public class MainCameraRoutingInstrumentedTest {
                 org.junit.Assume.assumeFalse("Synthetic frame test requires unavailable vehicle cameras",
                         field(MainActivity.class,"previewRunning").getBoolean(activity));
             } catch (Exception error) { throw new AssertionError(error); }
-            android.view.TextureView preview = activity.findViewById(R.id.surfaceView);
-            android.graphics.Canvas canvas = preview.lockCanvas();
+            android.view.SurfaceView preview = activity.findViewById(R.id.surfaceView);
+            android.graphics.Canvas canvas = preview.getHolder().lockCanvas();
             assertNotNull(canvas);
             try {
                 android.graphics.Paint paint = new android.graphics.Paint();
@@ -234,12 +234,12 @@ public class MainCameraRoutingInstrumentedTest {
                     canvas.drawRect(x*canvas.getWidth()/2f,y*canvas.getHeight()/2f,
                             (x+1)*canvas.getWidth()/2f,(y+1)*canvas.getHeight()/2f,paint);
                 }
-            } finally { preview.unlockCanvasAndPost(canvas); }
+            } finally { preview.getHolder().unlockCanvasAndPost(canvas); }
             float[] centers = {preview.getWidth()*.25f,preview.getHeight()*.25f,
                     preview.getWidth()*.75f,preview.getHeight()*.25f,
                     preview.getWidth()*.25f,preview.getHeight()*.75f,
                     preview.getWidth()*.75f,preview.getHeight()*.75f};
-            preview.getTransform(null).mapPoints(centers);
+            preview.getMatrix().mapPoints(centers);
             int[] parent = new int[2];
             ((android.view.View)preview.getParent()).getLocationOnScreen(parent);
             for (int i=0;i<centers.length;i+=2) {
@@ -260,7 +260,7 @@ public class MainCameraRoutingInstrumentedTest {
             if(java.util.Arrays.equals(colors,actual))return;
             SystemClock.sleep(100);
         } while(SystemClock.elapsedRealtime()<deadline);
-        assertArrayEquals("All four synthetic image corners must survive rotation",colors,actual);
+        assertArrayEquals("SurfaceView must display all four synthetic image corners",colors,actual);
     }
 
     private static final class Fixture implements AutoCloseable {

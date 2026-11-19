@@ -15,6 +15,22 @@ public final class UiPrefs {
     public static final String KEY_ACCENT_COLOR = "accentColor";
     public static final String KEY_MAIN_SIDE_CAMERA_WHEELS = "main_surround_left_wheels";
     public static final String KEY_PARKING_SURROUND_3D = "parkingSurround3d";
+    public static final String KEY_PARKING_SURROUND_WIDE = "parkingSurroundWide";
+    public static final String KEY_PARKING_SURROUND_GUIDES = "parkingSurroundGuides";
+    public static final String KEY_PARKING_GUIDE_SPEED_LIMIT = "parkingGuideSpeedLimit";
+    public static final String KEY_PARKING_GUIDE_SPEED_KMH = "parkingGuideSpeedKmh";
+    public static final String KEY_PARKING_GUIDE_STYLE = "parkingGuideStyle";
+    public static boolean isParkingGuideSpeedLimitEnabled(SharedPreferences prefs) {
+        return prefs.getBoolean(KEY_PARKING_GUIDE_SPEED_LIMIT,true);
+    }
+    public static int getParkingGuideSpeedKmh(SharedPreferences prefs) {
+        return com.drivehub.kamera.steering.GuidelinePolicy.clampSpeedKmh(prefs.getInt(KEY_PARKING_GUIDE_SPEED_KMH,
+                com.drivehub.kamera.steering.GuidelinePolicy.DEFAULT_SPEED_KMH));
+    }
+    public static com.drivehub.kamera.steering.WheelGuides.Style getParkingGuideStyle(SharedPreferences prefs) {
+        return "lines".equals(prefs.getString(KEY_PARKING_GUIDE_STYLE,"simple"))
+                ?com.drivehub.kamera.steering.WheelGuides.Style.LINES:com.drivehub.kamera.steering.WheelGuides.Style.SIMPLE;
+    }
     public static final String KEY_PARKING_AUTO_CLOSE = "parkingAutoClose";
     public static final String KEY_PARKING_AUTO_CLOSE_SPEED = "parkingAutoCloseSpeedKmh";
     public static final String KEY_PARKING_AUTO_OPEN_DRIVE = "parkingAutoOpenDrive";

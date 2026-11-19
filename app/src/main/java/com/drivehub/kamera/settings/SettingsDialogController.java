@@ -441,6 +441,7 @@ public final class SettingsDialogController {
 
     private void wireParkingSettings(SharedPreferences prefs) {
         ParkingAutomationSettings.bind(dialog, prefs);
+        GuidelineSettings.bind(dialog,prefs);
         SegmentedControl sideCorrection=dialog.findViewById(R.id.segParkingSideCorrection);
         sideCorrection.check(UiPrefs.isParkingSideCorrectionEnabled(prefs)?R.id.segParkingSideStraight:R.id.segParkingSideNone);
         sideCorrection.getChildAt(0).setContentDescription(activity.getString(R.string.settings_parking_side_correction)+": "+activity.getString(R.string.settings_parking_alignment_none));
@@ -590,8 +591,6 @@ public final class SettingsDialogController {
                 dialog.findViewById(R.id.btnDevParkingFrontWheelAngleReset),
                 dialog.findViewById(R.id.etDevParkingRearWheelAngle),
                 dialog.findViewById(R.id.btnDevParkingRearWheelAngleReset));
-        dev.bindSteering(prefs,dialog.findViewById(R.id.etDevSteeringScale),
-                dialog.findViewById(R.id.swDevSteeringInvert),dialog.findViewById(R.id.btnDevSteeringReset));
         com.drivehub.kamera.dev.CameraSnapshotExporter.bind(activity,dialog.findViewById(R.id.btnDevCameraSnapshots));
         dev.bindModelSafety(activity,prefs,dialog.findViewById(R.id.swDevModelPrewarm),
                 dialog.findViewById(R.id.tvDevModelSafety),dialog.findViewById(R.id.btnDevModelSafetyReset));
@@ -626,13 +625,13 @@ public final class SettingsDialogController {
                         dialog.findViewById(R.id.switchParkingAutoClose),
                         dialog.findViewById(R.id.switchParkingAutoOpenDrive),
                         dialog.findViewById(R.id.switchParkingAutoCloseOnPark),
+                        dialog.findViewById(R.id.switchGuidelineSpeedLimit),
                         views.swShowStatusBar,
                         views.swSmoothEntry,
                         views.swLockTileResizing,
                         views.swLockTileMoving,
                         views.swDevPerformanceOverlay,
                         dialog.findViewById(R.id.swDevModelPrewarm),
-                        dialog.findViewById(R.id.swDevSteeringInvert),
                         views.swAllowBetaUpdates
                 },
                 views.dialogClose,
@@ -848,9 +847,7 @@ public final class SettingsDialogController {
         TextView rendering=dialog.findViewById(R.id.tvDevStatusBirdseye);
         if(rendering!=null)rendering.setText(com.drivehub.kamera.birdseye.BirdseyeRenderer.timingStatus());
         TextView steering=dialog.findViewById(R.id.tvDevStatusSteering);
-        SharedPreferences prefs=UiPrefs.getPrefs(activity);
-        if(steering!=null)steering.setText(com.drivehub.kamera.steering.SteeringReader.diagnostic(
-                UiPrefs.getSteeringScale(prefs),UiPrefs.isSteeringInverted(prefs)));
+        if(steering!=null)steering.setText(com.drivehub.kamera.steering.SteeringReader.diagnostic());
     }
 
     private String readCameraProbeSummary() {

@@ -1,0 +1,4 @@
+<resources>
+    <string name="ota_download_title">Mise à jour 360 Cam</string>
+    <string name="ota_download_version">Téléchargement de la version %1$s</string>
+</resources>

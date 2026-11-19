@@ -121,12 +121,13 @@ public class BirdseyeGlesInstrumentedTest {
         int i=((H-1-y)*W+x)*4;
         return ((p.get(i)&255)<<16)|((p.get(i+1)&255)<<8)|(p.get(i+2)&255);
     }
-    private void save(ByteBuffer pixels) throws Exception {
+    private void save(ByteBuffer pixels) throws Exception {save(pixels,"birdseye-gles-synthetic.png");}
+    private void save(ByteBuffer pixels,String name) throws Exception {
         int[] rgb=new int[W*H];
         for(int y=0;y<H;y++)for(int x=0;x<W;x++)rgb[y*W+x]=0xFF000000|pixel(pixels,x,y);
         Bitmap image=Bitmap.createBitmap(rgb,W,H,Bitmap.Config.ARGB_8888);
         File file=new File(InstrumentationRegistry.getInstrumentation().getTargetContext()
-                .getFilesDir(),"birdseye-gles-synthetic.png");
+                .getFilesDir(),name);
         try(FileOutputStream out=new FileOutputStream(file)){assertTrue(image.compress(Bitmap.CompressFormat.PNG,100,out));}
         image.recycle();
     }
@@ -164,16 +165,18 @@ public class BirdseyeGlesInstrumentedTest {
             BirdseyeRenderer r=setup(frames,frames.calibration);assertEquals(15,r.freshMask);
             frames.missingMask=1;frames.fixedClockUs+=200_000;r.onDrawFrame(null);assertEquals(14,r.freshMask);
             frames.missingMask=15;frames.fixedClockUs+=600_000;r.onDrawFrame(null);assertEquals(0,r.freshMask);
+            assertEquals(15,r.displayMask);
+            frames.fixedClockUs+=BirdseyeFrameHealth.DISPLAY_HOLD_US;r.onDrawFrame(null);assertEquals(0,r.displayMask);
             int uncovered=pixel(read(),20,20);assertTrue(((uncovered>>8)&255)<60);
             frames.missingMask=0;frames.delayedUs[2]=200_000;frames.fixedClockUs+=50_000;
             r.onDrawFrame(null);assertEquals(11,r.freshMask);
-            frames.enabled=false;r.invalidateFrames();r.onDrawFrame(null);assertEquals(0,r.freshMask);
+            frames.enabled=false;r.invalidateFrames();r.onDrawFrame(null);assertEquals(0,r.freshMask);assertEquals(0,r.displayMask);
             frames.enabled=true;frames.delayedUs[2]=0;frames.fixedClockUs+=50_000;
             r.onDrawFrame(null);assertEquals(15,r.freshMask);
         }
         try(Pbuffer recreated=new Pbuffer()) {
             frames.missingMask=15;
-            BirdseyeRenderer r=setup(frames,frames.calibration);assertEquals(0,r.freshMask);
+            BirdseyeRenderer r=setup(frames,frames.calibration);assertEquals(0,r.freshMask);assertEquals(0,r.displayMask);
             frames.missingMask=0;frames.fixedClockUs+=50_000;r.onDrawFrame(null);assertEquals(15,r.freshMask);
         }
     }
@@ -237,6 +240,161 @@ public class BirdseyeGlesInstrumentedTest {
             assertEquals(context+1,loads.get());
         }
     }
+    private static BirdseyeRenderer stillRenderer(BirdseyeRenderer.Frames frames,BirdseyeCarArtwork.Source artwork) {
+        return new BirdseyeRenderer(frames,artwork,()->0L,0);
+    }
+    @Test public void normalWideSwitchPreservesMetricGuidesArtworkAndOriginalNormalImage() throws Exception {
+        BirdseyeSynthetic frames=new BirdseyeSynthetic();frames.fixedClockUs=1_000_000;
+        ProjectionAssets projection=ProjectionAssets.get(frames.calibration);assertNull(projection.wideError);assertNotNull(projection.wideMesh);
+        BirdseyeRenderer renderer=stillRenderer(frames,color->BirdseyeCarArtwork.load(InstrumentationRegistry.getInstrumentation().getTargetContext().getAssets(),color));
+        renderer.setMesh(projection.mesh);renderer.setWideMesh(projection.wideMesh,null);renderer.setScene(projection.scene);
+        renderer.setBlueGuideCorridor(true);renderer.setWheelGuidePreview(true);
+        ByteBuffer savedWide=null;
+        for(int context=0;context<2;context++)try(Pbuffer egl=new Pbuffer()) {
+            renderer.onSurfaceCreated(null,null);renderer.onSurfaceChanged(null,W,H);
+            if(context==1){renderer.onDrawFrame(null);assertTrue(renderer.wideActive);assertEquals(0,differences(savedWide,read()));continue;}
+            for(com.drivehub.kamera.steering.WheelGuides.Direction direction:com.drivehub.kamera.steering.WheelGuides.Direction.values()) {
+                renderer.steering.setSolution(new com.drivehub.kamera.steering.SteeringModel().solve(0),true,direction);
+                renderer.setWide(false);renderer.onDrawFrame(null);ByteBuffer normal=read();assertFalse(renderer.wideActive);
+                renderer.setWide(true);renderer.onDrawFrame(null);ByteBuffer wide=read();
+                assertTrue(renderer.wideActive);assertFalse(renderer.threeDActive);assertNull(renderer.error);
+                assertTrue(differences(normal,wide)>10000);
+                double y=direction==com.drivehub.kamera.steering.WheelGuides.Direction.REVERSE?3000:-3000;
+                for(double x:new double[]{-1030,1030})assertEquals(0x73D9FF,groundPixel(wide,x/2,y/2));
+                // Both halves of the opaque roof remain above the fill at the new image scale.
+                assertEquals(groundPixel(normal,0,0),groundPixel(wide,0,0));
+                save(wide,"birdseye-wide-"+direction+"-synthetic.png");
+                renderer.setWide(false);renderer.onDrawFrame(null);assertEquals(0,differences(normal,read()));
+                renderer.setWide(true);renderer.onDrawFrame(null);savedWide=read();
+            }
+        }
+        try(Pbuffer egl=new Pbuffer()) {
+            renderer.setWideMesh(null,"Unsupported wide calibration");renderer.onSurfaceCreated(null,null);renderer.onSurfaceChanged(null,W,H);
+            renderer.onDrawFrame(null);assertFalse(renderer.wideActive);assertNull(renderer.error);
+        }
+    }
+    @Test public void twoDGuidesUseMirrorWidthGroundProjectionAndNeedNoThreeDModelOrDepthBuffer() throws Exception {
+        BirdseyeSynthetic frames=new BirdseyeSynthetic();frames.fixedClockUs=1_000_000;
+        BirdseyeRenderer renderer=stillRenderer(frames,color->BirdseyeCarArtwork.load(InstrumentationRegistry.getInstrumentation().getTargetContext().getAssets(),color));
+        renderer.setMesh(new BirdseyeMesh(frames.calibration));renderer.setScene(new RivelaScene(frames.calibration));
+        renderer.setWheelGuidePreview(true);renderer.setBlueGuideCorridor(true);
+        com.drivehub.kamera.steering.SteeringModel model=new com.drivehub.kamera.steering.SteeringModel();
+        ByteBuffer beforeContextLoss=null;
+        for(int context=0;context<2;context++)try(Pbuffer egl=new Pbuffer()) {
+            renderer.onSurfaceCreated(null,null);renderer.onSurfaceChanged(null,W,H);
+            if(context==1) {
+                renderer.onDrawFrame(null);assertNull(renderer.error);
+                assertEquals(0,differences(beforeContextLoss,read()));continue;
+            }
+            for(com.drivehub.kamera.steering.WheelGuides.Direction direction:com.drivehub.kamera.steering.WheelGuides.Direction.values())
+                for(float raw:new float[]{-516.95f,516.95f,0}) {
+                    renderer.steering.setSolution(model.solve(raw),true,direction);
+                    renderer.onDrawFrame(null);ByteBuffer shown=read();
+                    assertNull(renderer.error);assertFalse(renderer.threeDActive);assertTrue(renderer.hasCarArtwork);
+                    renderer.setWheelGuidePreview(false);renderer.onDrawFrame(null);ByteBuffer ground=read();
+                    assertTrue("No 2D guides in "+direction+" at "+raw,differences(shown,ground)>300);
+                    // The opaque roof is above the ground fill; transparent ground remains visible beside it.
+                    assertEquals(groundPixel(ground,0,0),groundPixel(shown,0,0));
+                    if(raw==0) {
+                        double y=direction==com.drivehub.kamera.steering.WheelGuides.Direction.REVERSE?3000:-3000;
+                        for(double x:new double[]{-1030,1030})assertEquals(0x73D9FF,groundPixel(shown,x,y));
+                        assertBlend(groundPixel(ground,0,y),groundPixel(shown,0,y),1);
+                    }
+                    save(shown,"birdseye-guidance-2d-"+direction+"-"+(int)raw+"-synthetic.png");
+                    renderer.setWheelGuidePreview(true);renderer.onDrawFrame(null);
+                    assertEquals(0,differences(shown,read()));
+                    beforeContextLoss=shown;
+                }
+        }
+    }
+    @Test public void twoDGuidanceIsBelowOpaqueMirrorsAndStraightAlphaArtwork() {
+        BirdseyeSynthetic frames=new BirdseyeSynthetic();frames.fixedClockUs=1_000_000;
+        BirdseyeRenderer renderer=stillRenderer(frames,color->{
+            BirdseyeCarArtwork art=syntheticArtwork();
+            for(int y=24;y<29;y++)for(int x:new int[]{3,4,5,6,33,34,35,36})art.bitmap.setPixel(x,y,0xFFFFFFFF);
+            return art;
+        });
+        renderer.setMesh(new BirdseyeMesh(frames.calibration));renderer.setScene(new RivelaScene(frames.calibration));
+        renderer.setBlueGuideCorridor(true);
+        renderer.steering.setSolution(new com.drivehub.kamera.steering.SteeringModel().solve(0),true,
+                com.drivehub.kamera.steering.WheelGuides.Direction.FORWARD);
+        try(Pbuffer egl=new Pbuffer()) {
+            renderer.onSurfaceCreated(null,null);renderer.onSurfaceChanged(null,W,H);renderer.onDrawFrame(null);
+            ByteBuffer ground=read();renderer.setWheelGuidePreview(true);renderer.onDrawFrame(null);ByteBuffer shown=read();
+            assertNull(renderer.error);
+            for(double x:new double[]{-1030,1030}) {
+                assertEquals("Opaque mirror must cover the blue boundary",0xFFFFFF,groundPixel(shown,x,-900));
+                assertEquals(groundPixel(ground,x,-900),groundPixel(shown,x,-900));
+            }
+            assertEquals(0xFF0000,groundPixel(shown,-300,-1000));
+            assertBlend(groundPixel(ground,0,0),groundPixel(shown,0,0),1); // Transparent hole shows the fill.
+            int under=blend(BirdseyeSynthetic.groundColor(0,-900)),actual=groundPixel(shown,0,-900);
+            for(int shift=0;shift<24;shift+=8) {
+                int foreground=shift==8?255:0;
+                int expected=Math.round((foreground*128+((under>>shift)&255)*127)/255f);
+                assertEquals("Artwork alpha must be applied once above the fill",expected,(actual>>shift)&255,5);
+            }
+        }
+    }
+    @Test public void twoDGuidanceRequiresLiveGearSteeringAndTheCorrespondingCameraAndKeepsTheMissingCarMask() {
+        BirdseyeSynthetic frames=new BirdseyeSynthetic();frames.fixedClockUs=1_000_000;
+        BirdseyeRenderer renderer=stillRenderer(frames,null);
+        renderer.setMesh(new BirdseyeMesh(frames.calibration));renderer.setScene(new RivelaScene(frames.calibration));
+        renderer.setBlueGuideCorridor(true);
+        com.drivehub.kamera.steering.SteeringGuidance guidance=new com.drivehub.kamera.steering.SteeringGuidance();
+        try(Pbuffer egl=new Pbuffer()) {
+            renderer.onSurfaceCreated(null,null);renderer.onSurfaceChanged(null,W,H);
+            for(int gear:new int[]{2,4}) {
+                com.drivehub.kamera.steering.SteeringSnapshot steering=com.drivehub.kamera.steering.SteeringSnapshot.value(0,0,1000,1);
+                com.drivehub.kamera.steering.GearSnapshot fresh=com.drivehub.kamera.steering.GearSnapshot.value(gear,1000);
+                publish(renderer,guidance,steering,fresh,1000);
+                renderer.setGuideDirection(gear==2?com.drivehub.kamera.steering.WheelGuides.Direction.FORWARD:
+                        com.drivehub.kamera.steering.WheelGuides.Direction.REVERSE);
+                renderer.setWheelGuidePreview(true);renderer.onDrawFrame(null);ByteBuffer shown=read();
+                renderer.setWheelGuidePreview(false);renderer.onDrawFrame(null);
+                assertTrue(differences(shown,read())>300);assertEquals(0,groundPixel(shown,0,0));
+                for(int invalid:new int[]{0,1,3}) {
+                    publish(renderer,guidance,steering,com.drivehub.kamera.steering.GearSnapshot.value(invalid,1000),1000);
+                    assertGuidesHidden(renderer);
+                }
+                publish(renderer,guidance,steering,fresh,1501);assertGuidesHidden(renderer); // Both reads stale.
+                publish(renderer,guidance,com.drivehub.kamera.steering.SteeringSnapshot.EMPTY,fresh,1000);assertGuidesHidden(renderer);
+                publish(renderer,guidance,steering,fresh,1000);
+                // Losing an unrelated camera must not hide guides over the still-current driving camera.
+                frames.missingMask=gear==2?4:8;frames.fixedClockUs+=BirdseyeFrameHealth.MAX_AGE_US+1;
+                renderer.setWheelGuidePreview(true);renderer.onDrawFrame(null);shown=read();
+                renderer.setWheelGuidePreview(false);renderer.onDrawFrame(null);assertTrue(differences(shown,read())>300);
+                frames.missingMask=gear==2?8:4;frames.fixedClockUs+=BirdseyeFrameHealth.MAX_AGE_US+1;
+                assertGuidesHidden(renderer);
+                frames.missingMask=0;frames.fixedClockUs+=BirdseyeFrameHealth.MAX_AGE_US+1;
+            }
+            frames.enabled=false;assertGuidesHidden(renderer);assertNull(renderer.error);
+        }
+    }
+    private void publish(BirdseyeRenderer renderer,com.drivehub.kamera.steering.SteeringGuidance guidance,
+                         com.drivehub.kamera.steering.SteeringSnapshot steering,com.drivehub.kamera.steering.GearSnapshot gear,long now) {
+        com.drivehub.kamera.steering.SteeringGuidance.Frame frame=guidance.update(steering,gear,true,now);
+        renderer.steering.setSolution(frame.wheels,frame.guidanceAvailable,frame.direction);
+    }
+    private void assertGuidesHidden(BirdseyeRenderer renderer) {
+        renderer.setWheelGuidePreview(true);renderer.onDrawFrame(null);ByteBuffer hidden=read();
+        renderer.setWheelGuidePreview(false);renderer.onDrawFrame(null);assertEquals(0,differences(hidden,read()));
+    }
+    private int differences(ByteBuffer a,ByteBuffer b) {
+        int count=0;for(int y=0;y<H;y++)for(int x=0;x<W;x++)if(pixel(a,x,y)!=pixel(b,x,y))count++;
+        return count;
+    }
+    private int blend(int background) {
+        int output=0;
+        for(int shift=0;shift<24;shift+=8)output|=Math.round((((background>>shift)&255)*170+
+                ((com.drivehub.kamera.steering.WheelGuides.CORRIDOR_FILL_COLOR>>shift)&255)*85)/255f)<<shift;
+        return output;
+    }
+    private void assertBlend(int background,int actual,int tolerance) {
+        int expected=blend(background);
+        for(int shift=0;shift<24;shift+=8)assertEquals((expected>>shift)&255,(actual>>shift)&255,tolerance);
+    }
+
     @Test public void brokenOptionalArtworkKeepsFreshGroundAndBlackMask() {
         try(Pbuffer egl=new Pbuffer()) {
             BirdseyeSynthetic frames=new BirdseyeSynthetic();

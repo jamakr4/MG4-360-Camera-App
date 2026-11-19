@@ -20,13 +20,11 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
-import android.graphics.Matrix;
-import android.graphics.SurfaceTexture;
 import android.net.Uri;
 import android.os.Bundle;
 import android.view.MotionEvent;
-import android.view.Surface;
-import android.view.TextureView;
+import android.view.SurfaceHolder;
+import android.view.SurfaceView;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageButton;
@@ -40,7 +38,7 @@ import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
-public class MainActivity extends AppCompatActivity implements TextureView.SurfaceTextureListener {
+public class MainActivity extends AppCompatActivity implements SurfaceHolder.Callback {
 
     public static final String ACTION_SHOW_CAMERA = "com.drivehub.kamera.action.SHOW_CAMERA";
     public static final String ACTION_HARD_KEY_CLOSE = "com.android.systemui.ACTION_HARD_KEY_APP_CLOSE";
@@ -146,8 +144,7 @@ public class MainActivity extends AppCompatActivity implements TextureView.Surfa
     private static final int SWIPE_THRESHOLD_PX = 140;
     private static final int REQ_DASHCAM_USB_FOLDER = 1842;
 
-    private Surface previewSurface;
-    private TextureView surfaceView;
+    private SurfaceHolder surfaceHolder;
     private SideCameraPanel sideCameraPanel;
     private com.drivehub.kamera.birdseye.BirdseyeView birdseyeView;
     private com.drivehub.kamera.parking.PdcReader pdcReader;
@@ -183,7 +180,6 @@ public class MainActivity extends AppCompatActivity implements TextureView.Surfa
     private final SharedPreferences.OnSharedPreferenceChangeListener cameraAccessListener = (prefs, key) -> {
         if (UiPrefs.KEY_OEM_CAMERA_ACCESS_BLOCKED.equals(key) || UiPrefs.KEY_OEM_AVM_ACTIVE.equals(key)
                 || UiPrefs.KEY_OEM_AVM_COEXIST.equals(key) || UiPrefs.KEY_EXTERNAL_CAMERA_PAUSED.equals(key)) startPreviewIfReady();
-        else if (UiPrefs.KEY_OVERLAY_ROTATE_TO_DRIVING_DIRECTION.equals(key)) applyPreviewTransform();
     };
 
     public static void setSettingsDialogOpen(boolean open) {
@@ -306,8 +302,9 @@ public class MainActivity extends AppCompatActivity implements TextureView.Surfa
                         ?CameraProbe.mainPreviewFrameAgeMs(CameraIndex.REAR.getVideoIndex()):-1);
         pdcReader=new com.drivehub.kamera.parking.PdcReader(this,birdseyeView::setPdcSnapshot);
         steeringReader=new com.drivehub.kamera.steering.SteeringReader(this,birdseyeView::setSteeringSnapshot);
-        surfaceView = findViewById(R.id.surfaceView);
-        surfaceView.setSurfaceTextureListener(this);
+        SurfaceView surfaceView = findViewById(R.id.surfaceView);
+        surfaceHolder = surfaceView.getHolder();
+        surfaceHolder.addCallback(this);
 
         tvStatus = findViewById(R.id.tvStatus);
         if (tvStatus != null) {
@@ -508,7 +505,6 @@ public class MainActivity extends AppCompatActivity implements TextureView.Surfa
         if(pdcReader!=null)pdcReader.close();
         if(steeringReader!=null)steeringReader.close();
         stopPreview();
-        releasePreviewSurface();
     }
 
     private void applyWarningVisibility() {
@@ -593,25 +589,9 @@ public class MainActivity extends AppCompatActivity implements TextureView.Surfa
         startPreviewIfReady();
     }
 
-    private void applyPreviewTransform() {
-        if (surfaceView == null) return;
-        CameraIndex camera = CameraIndex.fromVideoIndex(currentVideoIndex);
-        int rotation = camera != null && UiPrefs.isOverlayRotationToDrivingDirectionEnabled(UiPrefs.getPrefs(this))
-                ? camera.drivingDirectionRotationDegrees() : 0;
-        int width = surfaceView.getWidth(), height = surfaceView.getHeight();
-        // Fit the complete turned image inside the fixed main panel without changing its proportions.
-        float scale = rotation != 0 && width > 0 && height > 0
-                ? Math.min(width / (float) height, height / (float) width) : 1f;
-        Matrix transform = new Matrix();
-        transform.setRotate(rotation, width / 2f, height / 2f);
-        transform.postScale(scale, scale, width / 2f, height / 2f);
-        surfaceView.setTransform(transform);
-    }
-
     private void startPreviewIfReady() {
-        applyPreviewTransform();
         CameraHandoffController.demand("main", previewResumed && !previewPausedForTestClip
-                && previewSurface != null && previewSurface.isValid());
+                && surfaceHolder != null && surfaceHolder.getSurface().isValid());
         long handoffGeneration = CameraHandoffController.generation();
         boolean blocked = UiPrefs.isOemCameraAccessBlocked(UiPrefs.getPrefs(this));
         View pausedMessage = findViewById(R.id.mainPreviewOemPaused);
@@ -621,7 +601,8 @@ public class MainActivity extends AppCompatActivity implements TextureView.Surfa
             if (blocked && tvStatus != null) tvStatus.setText(R.string.side_camera_oem_paused);
             return;
         }
-        if (previewSurface == null || !previewSurface.isValid()) {
+        if (surfaceHolder == null || surfaceHolder.getSurface() == null ||
+                !surfaceHolder.getSurface().isValid()) {
             if (tvStatus != null) tvStatus.setText(R.string.main_surface_not_ready);
             return;
         }
@@ -636,7 +617,7 @@ public class MainActivity extends AppCompatActivity implements TextureView.Surfa
             activePreviewCameraIndex = -1;
         }
         CameraHandoffController.ready("main", false, handoffGeneration);
-        boolean ok = CameraProbe.attachPreview(currentVideoIndex, previewSurface);
+        boolean ok = CameraProbe.attachPreview(currentVideoIndex, surfaceHolder.getSurface());
         CameraHandoffController.ready("main", ok, handoffGeneration);
         previewRunning = ok;
         previewHandoffGeneration = handoffGeneration;
@@ -666,32 +647,18 @@ public class MainActivity extends AppCompatActivity implements TextureView.Surfa
     }
 
     @Override
-    public void onSurfaceTextureAvailable(SurfaceTexture texture, int width, int height) {
-        previewSurface = new Surface(texture);
+    public void surfaceCreated(SurfaceHolder holder) {
         startPreviewIfReady();
     }
 
     @Override
-    public void onSurfaceTextureSizeChanged(SurfaceTexture texture, int width, int height) {
-        applyPreviewTransform();
+    public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
     }
 
     @Override
-    public boolean onSurfaceTextureDestroyed(SurfaceTexture texture) {
+    public void surfaceDestroyed(SurfaceHolder holder) {
         CameraHandoffController.demand("main", false);
         stopPreview();
-        releasePreviewSurface();
-        return true;
-    }
-
-    @Override public void onSurfaceTextureUpdated(SurfaceTexture texture) {
-    }
-
-    private void releasePreviewSurface() {
-        if (previewSurface != null) {
-            previewSurface.release();
-            previewSurface = null;
-        }
     }
 
     private String cameraLabel(int videoIndex) {
