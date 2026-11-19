@@ -54,6 +54,30 @@ public class BirdseyeGlesInstrumentedTest {
         GLES20.glReadPixels(0,0,W,H,GLES20.GL_RGBA,GLES20.GL_UNSIGNED_BYTE,pixels);
         assertEquals(GLES20.GL_NO_ERROR,GLES20.glGetError());return pixels;
     }
+    @Test public void rearSelfBodyContourIsFiniteOnMediumpGles() {
+        try(Pbuffer egl=new Pbuffer()) {
+            int program=GlPrograms.link("attribute vec2 p;void main(){gl_Position=vec4(p,0.0,1.0);}",
+                    "precision mediump float;uniform vec2 uv;"+BirdseyeRearMask.GLSL
+                            +"void main(){gl_FragColor=vec4(rearBodyVisibility(uv),0.0,0.0,1.0);}");
+            java.nio.FloatBuffer quad=ByteBuffer.allocateDirect(8*4).order(java.nio.ByteOrder.nativeOrder()).asFloatBuffer();
+            quad.put(new float[]{-1,-1,1,-1,-1,1,1,1}).flip();
+            int position=GLES20.glGetAttribLocation(program,"p");
+            try {
+                GLES20.glUseProgram(program);GLES20.glViewport(0,0,1,1);
+                GLES20.glEnableVertexAttribArray(position);
+                GLES20.glVertexAttribPointer(position,2,GLES20.GL_FLOAT,false,0,quad);
+                ByteBuffer pixel=ByteBuffer.allocateDirect(4);
+                for(float[] uv:new float[][]{{350,390},{350,460},{350,414},{100,390},
+                        {0,300},{719,300},{-10000,300},{10000,460}}) {
+                    GLES20.glUniform2f(GLES20.glGetUniformLocation(program,"uv"),uv[0],uv[1]);
+                    GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP,0,4);pixel.position(0);
+                    GLES20.glReadPixels(0,0,1,1,GLES20.GL_RGBA,GLES20.GL_UNSIGNED_BYTE,pixel);
+                    assertEquals(Math.round(BirdseyeRearMask.visibility(uv[0],uv[1])*255),pixel.get(0)&255,8);
+                }
+                assertEquals(GLES20.GL_NO_ERROR,GLES20.glGetError());
+            } finally {GLES20.glDisableVertexAttribArray(position);GLES20.glDeleteProgram(program);}
+        }
+    }
     @Test public void linearPackedSamplerMatchesFourTapReferenceAtParityRowsAndBorders() {
         // High-frequency luma/chroma reveal accidental interpolation between
         // packed columns, even/odd Y selection and clamping errors at field edges.
