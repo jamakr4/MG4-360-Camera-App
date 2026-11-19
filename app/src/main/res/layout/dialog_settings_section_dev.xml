@@ -669,17 +669,6 @@
         android:layout_marginTop="16dp" android:text="@string/settings_dev_steering" />
     <TextView style="@style/DrivehubSettingsBodyMuted" android:layout_width="match_parent" android:layout_height="wrap_content"
         android:text="@string/settings_dev_steering_hint" />
-    <TextView style="@style/DrivehubSettingsBodyMuted" android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:layout_marginTop="8dp" android:labelFor="@+id/etDevSteeringScale" android:text="@string/settings_dev_steering_scale" />
-    <EditText android:id="@id/etDevSteeringScale" style="@style/DrivehubSettingsSliderValue"
-        android:layout_width="120dp" android:layout_height="48dp" android:layout_marginStart="0dp"
-        android:digits="0123456789.," android:maxLength="8" android:selectAllOnFocus="true" android:importantForAutofill="no"
-        android:inputType="numberDecimal" android:singleLine="true" android:imeOptions="actionDone" />
-    <Switch android:id="@+id/swDevSteeringInvert" style="@style/DrivehubSettingsSwitch"
-        android:layout_width="match_parent" android:layout_height="48dp" android:textColor="@color/settings_text_primary"
-        android:text="@string/settings_dev_steering_invert" />
-    <Button android:id="@+id/btnDevSteeringReset" style="@style/DrivehubDialogButtonSecondary"
-        android:layout_width="wrap_content" android:layout_height="48dp" android:text="@string/settings_dev_steering_reset" />
     <TextView style="@style/DrivehubSettingsCardLabel" android:layout_width="match_parent" android:layout_height="wrap_content"
         android:layout_marginTop="16dp" android:text="@string/settings_model_guard_title" />
     <TextView style="@style/DrivehubSettingsBodyMuted" android:layout_width="match_parent" android:layout_height="wrap_content"

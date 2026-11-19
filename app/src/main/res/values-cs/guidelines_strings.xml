@@ -1,0 +1,10 @@
+<resources>
+    <string name="guidelines_title">Jízdní dráhy 2D/3D</string>
+    <string name="guidelines_speed_threshold">Rychlostní limit</string>
+    <string name="guidelines_speed_description">Rychlostní limit jízdních drah (0–130 km/h)</string>
+    <string name="guidelines_speed_hint">Nad touto rychlostí se dráhy skryjí. Pokud rychlost není dostupná, zůstanou skryté. Hlavní tlačítko drah nadále slouží k zapnutí a vypnutí.</string>
+    <string name="guidelines_style">Styl</string>
+    <string name="guidelines_style_lines">Čáry</string>
+    <string name="guidelines_style_simple">Jednoduchý</string>
+    <string name="guidelines_style_hint">Oba styly používají šířku 2060 mm včetně zrcátek. Čáry: čtyři světle modré křivky. Jednoduchý: dva vnější okraje s průsvitnou modrou výplní.</string>
+</resources>

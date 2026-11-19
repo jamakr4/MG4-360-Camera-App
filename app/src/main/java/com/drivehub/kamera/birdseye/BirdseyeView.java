@@ -16,6 +16,7 @@ import android.view.Gravity;
 import android.widget.FrameLayout;
 import android.widget.TextView;
 import android.widget.Button;
+import android.widget.ImageButton;
 import android.widget.Toast;
 import android.view.GestureDetector;
 import android.view.ScaleGestureDetector;
@@ -23,7 +24,8 @@ import android.view.MotionEvent;
 import com.drivehub.kamera.parking.PdcGeometry;
 import com.drivehub.kamera.parking.PdcSnapshot;
 import com.drivehub.kamera.steering.SteeringSnapshot;
-import com.drivehub.kamera.steering.SteeringPose;
+import com.drivehub.kamera.steering.SteeringGuidance;
+import com.drivehub.kamera.steering.GearSnapshot;
 
 import com.drivehub.kamera.CameraProbe;
 import com.drivehub.kamera.camera.CameraHandoffController;
@@ -55,37 +57,105 @@ public final class BirdseyeView extends FrameLayout {
     private boolean calibrationRetrying;
     private final PdcGeometry pdc=new PdcGeometry();
     private SteeringSnapshot steeringSnapshot=SteeringSnapshot.EMPTY;
-    private final SteeringPose steeringPose=new SteeringPose();
+    private final SteeringGuidance steeringGuidance=new SteeringGuidance();
     private volatile RivelaScene scene;
-    private Button modeToggle;
+    private Button modeToggle,wideToggle;
+    private ImageButton guidesToggle;
+    private boolean guidesEnabled=true,guideSpeedLimitEnabled;
+    private int guideSpeedKmh=com.drivehub.kamera.steering.GuidelinePolicy.DEFAULT_SPEED_KMH;
     private final java.util.concurrent.atomic.AtomicBoolean preparing3d=new java.util.concurrent.atomic.AtomicBoolean();
     public PdcGeometry pdcGeometry() { return pdc; }
     public RivelaScene scene() { return scene; }
     public void setPdcSnapshot(PdcSnapshot snapshot) { pdc.set(snapshot); }
     public void setSteeringSnapshot(SteeringSnapshot snapshot) { steeringSnapshot=snapshot; }
+    private void updateSteeringFrame() {
+        updateSteeringFrame(com.drivehub.kamera.signal.SignalService.guidanceGear(),
+                com.drivehub.kamera.signal.SignalService.vehicleMotion(),SystemClock.elapsedRealtime());
+    }
+    void updateSteeringFrame(GearSnapshot gear,long nowMs) {
+        updateSteeringFrame(gear,com.drivehub.kamera.steering.VehicleMotionSnapshot.EMPTY,nowMs);
+    }
+    void updateSteeringFrame(GearSnapshot gear,com.drivehub.kamera.steering.VehicleMotionSnapshot motion,long nowMs) {
+        SteeringGuidance.Frame frame=steeringGuidance.update(steeringSnapshot,gear,resumed&&!blocked&&!renderFailed,nowMs);
+        renderer.steering.setSolution(frame.wheels,frame.guidanceAvailable,frame.direction);
+        updateGuideVisibility(motion,nowMs);
+    }
     public boolean rearFrameFresh() { return resumed&&!blocked&&source.ready&&(renderer.freshMask&8)!=0
             &&SystemClock.elapsedRealtime()-renderer.lastDrawElapsedMs<=500; }
     private void applyMode() {
-        boolean safe=ModelLoadSafety.blocked(getContext());
+        ThreeDFailure protection=ModelLoadSafety.blockedFailure(getContext());
+        boolean safe=protection!=null;
+        if(safe&&prefs.getBoolean(UiPrefs.KEY_PARKING_SURROUND_3D,false)) {
+            prefs.edit().putBoolean(UiPrefs.KEY_PARKING_SURROUND_3D,false).apply();
+            showThreeDFailure(protection);
+        }
         boolean mode=prefs.getBoolean(UiPrefs.KEY_PARKING_SURROUND_3D,false)&&!safe;
         renderer.setThreeD(mode);
+        boolean wide=prefs.getBoolean(UiPrefs.KEY_PARKING_SURROUND_WIDE,false);
+        renderer.setWide(wide);
+        if(wideToggle!=null){
+            wideToggle.setVisibility(mode?GONE:VISIBLE);wideToggle.setSelected(wide);
+            wideToggle.setText(wide?R.string.surround_label_normal:R.string.surround_label_wide);
+            wideToggle.setContentDescription(getContext().getString(wide?R.string.surround_mode_normal:R.string.surround_mode_wide));
+        }
         if (modeToggle != null) {
             modeToggle.setText(mode ? R.string.surround_label_2d : R.string.surround_label_3d);
             modeToggle.setContentDescription(getContext().getString(mode ? R.string.surround_mode_2d : R.string.surround_mode_3d));
-            modeToggle.setEnabled(mode || !safe);
-            modeToggle.setAlpha(modeToggle.isEnabled() ? 1f : .55f);
+            // A blocked 3D button explains the reason without bypassing startup protection.
+            modeToggle.setAlpha(safe ? .55f : 1f);
             styleModeToggle();
         }
+        if(guidesToggle!=null) {
+            LayoutParams beside=(LayoutParams)(mode?modeToggle:wideToggle).getLayoutParams();
+            LayoutParams params=(LayoutParams)guidesToggle.getLayoutParams();
+            params.rightMargin=beside.rightMargin+beside.width+Math.round(8*getResources().getDisplayMetrics().density);
+            guidesToggle.setLayoutParams(params);
+        }
+        applyGuides();
         if(mode)prepareThreeD();
     }
+    private void applyGuides() {
+        boolean enabled=prefs.getBoolean(UiPrefs.KEY_PARKING_SURROUND_GUIDES,true);
+        guidesEnabled=enabled;
+        guideSpeedLimitEnabled=UiPrefs.isParkingGuideSpeedLimitEnabled(prefs);
+        guideSpeedKmh=UiPrefs.getParkingGuideSpeedKmh(prefs);
+        renderer.setGuideStyle(UiPrefs.getParkingGuideStyle(prefs));
+        updateGuideVisibility(com.drivehub.kamera.signal.SignalService.vehicleMotion(),SystemClock.elapsedRealtime());
+        if(guidesToggle!=null) {
+            guidesToggle.setSelected(enabled);
+            String action=getContext().getString(enabled?R.string.surround_guides_hide:R.string.surround_guides_show);
+            guidesToggle.setContentDescription(action);guidesToggle.setTooltipText(action);
+            styleGuidesToggle();
+        }
+        gl.requestRender();
+    }
+    private void updateGuideVisibility(com.drivehub.kamera.steering.VehicleMotionSnapshot motion,long nowMs) {
+        renderer.setWheelGuidePreview(com.drivehub.kamera.steering.GuidelinePolicy.visible(
+                guidesEnabled,guideSpeedLimitEnabled,guideSpeedKmh,motion,nowMs));
+    }
     private void styleModeToggle() {
+        styleToggle(modeToggle);if(wideToggle!=null)styleToggle(wideToggle);
+        if(guidesToggle!=null)styleGuidesToggle();
+    }
+    private void styleToggle(Button button) {
         int accent = UiPrefs.getAccentColorInt(prefs);
         GradientDrawable background = new GradientDrawable();
         background.setColor(accent);
         background.setCornerRadius(8 * getResources().getDisplayMetrics().density);
-        modeToggle.setBackgroundTintList(null);
-        modeToggle.setBackground(new RippleDrawable(ColorStateList.valueOf(0x40FFFFFF), background, null));
-        modeToggle.setTextColor(UiPrefs.isLightColor(accent) ? 0xFF111111 : Color.WHITE);
+        button.setBackgroundTintList(null);
+        button.setBackground(new RippleDrawable(ColorStateList.valueOf(0x40FFFFFF), background, null));
+        button.setTextColor(UiPrefs.isLightColor(accent) ? 0xFF111111 : Color.WHITE);
+    }
+    private void styleGuidesToggle() {
+        int accent=UiPrefs.getAccentColorInt(prefs);
+        boolean on=guidesToggle.isSelected();
+        GradientDrawable background=new GradientDrawable();
+        background.setColor(on?accent:0xE610151C);
+        background.setCornerRadius(8*getResources().getDisplayMetrics().density);
+        if(!on)background.setStroke(Math.round(2*getResources().getDisplayMetrics().density),accent);
+        guidesToggle.setBackgroundTintList(null);
+        guidesToggle.setBackground(new RippleDrawable(ColorStateList.valueOf(0x40FFFFFF),background,null));
+        guidesToggle.setImageTintList(ColorStateList.valueOf(on?(UiPrefs.isLightColor(accent)?0xFF111111:Color.WHITE):accent));
     }
     private void prepareThreeD() {
         RivelaScene requested=scene;
@@ -94,11 +164,17 @@ public final class BirdseyeView extends FrameLayout {
             preparing3d.set(false);
             if(!resumed||!renderer.threeDRequested)return;
             if(scene!=requested){prepareThreeD();return;}
-            if(error!=null)renderer.failThreeD(error.getMessage());else renderer.setModel(model);
+            if(error!=null)renderer.failThreeD(ThreeDFailure.at(ThreeDFailure.Kind.MODEL,error));else renderer.setModel(model);
         });
     }
+    private void showThreeDFailure(ThreeDFailure failure) {
+        failure.report(getContext());
+        Toast.makeText(getContext(),failure.userMessage(getContext()),Toast.LENGTH_LONG).show();
+    }
     private final SharedPreferences.OnSharedPreferenceChangeListener preferences = (p, key) -> {
-        if(UiPrefs.KEY_PARKING_SURROUND_3D.equals(key)||UiPrefs.KEY_MODEL_SAFETY_REVISION.equals(key))applyMode();
+        if(UiPrefs.KEY_PARKING_SURROUND_3D.equals(key)||UiPrefs.KEY_PARKING_SURROUND_WIDE.equals(key)||UiPrefs.KEY_MODEL_SAFETY_REVISION.equals(key))applyMode();
+        if(UiPrefs.KEY_PARKING_SURROUND_GUIDES.equals(key)||UiPrefs.KEY_PARKING_GUIDE_SPEED_LIMIT.equals(key)
+                ||UiPrefs.KEY_PARKING_GUIDE_SPEED_KMH.equals(key)||UiPrefs.KEY_PARKING_GUIDE_STYLE.equals(key))applyGuides();
         if (UiPrefs.KEY_ACCENT_COLOR.equals(key)) styleModeToggle();
         if (UiPrefs.KEY_PARKING_BIRDSEYE_CAR_COLOR.equals(key)) {
             renderer.setCarColor(UiPrefs.getBirdseyeCarColor(p));
@@ -109,13 +185,15 @@ public final class BirdseyeView extends FrameLayout {
     private final Runnable tick = new Runnable() {
         @Override public void run() {
             if (!resumed) return;
-            renderer.steering.setDegrees(steeringPose.update(steeringSnapshot,SystemClock.elapsedRealtime(),
-                    UiPrefs.getSteeringScale(prefs),UiPrefs.isSteeringInverted(prefs)));
             if(!com.drivehub.kamera.signal.SignalService.isReverseActive())pdc.set(PdcSnapshot.EMPTY);
             if(renderer.threeDError!=null&&prefs.getBoolean(UiPrefs.KEY_PARKING_SURROUND_3D,false)) {
-                Log.w("Birdseye","3D fallback: "+renderer.threeDError);
+                ThreeDFailure failure=renderer.threeDFailure;
                 prefs.edit().putBoolean(UiPrefs.KEY_PARKING_SURROUND_3D,false).apply();
-                Toast.makeText(getContext(),R.string.surround_3d_failed,Toast.LENGTH_LONG).show();
+                if(failure!=null)showThreeDFailure(failure);
+            }
+            if(renderer.wideError!=null&&prefs.getBoolean(UiPrefs.KEY_PARKING_SURROUND_WIDE,false)) {
+                prefs.edit().putBoolean(UiPrefs.KEY_PARKING_SURROUND_WIDE,false).apply();
+                Toast.makeText(getContext(),R.string.surround_wide_failed,Toast.LENGTH_LONG).show();
             }
             if (lastContext != renderer.contextGeneration) {
                 lastContext = renderer.contextGeneration;
@@ -130,10 +208,12 @@ public final class BirdseyeView extends FrameLayout {
                 stopSource(); showMessage(R.string.birdseye_render_failed);
             }
             gl.setContinuousRendering(!blocked && source.ready && !renderFailed);
-            // A wedged GL/BufferQueue must not leave its last texture labelled live.
-            int mask = SystemClock.elapsedRealtime()-renderer.lastDrawElapsedMs > 500 ? 0 : renderer.freshMask;
-            CameraHandoffController.ready("birdseye", !blocked && source.ready && !renderFailed && mask != 0,
+            long drawAgeMs = SystemClock.elapsedRealtime()-renderer.lastDrawElapsedMs;
+            int fresh = drawAgeMs > 500 ? 0 : renderer.freshMask;
+            CameraHandoffController.ready("birdseye", !blocked && source.ready && !renderFailed && fresh != 0,
                     handoffGeneration);
+            // Retain the camera image through short gaps; predictions and handoff still require fresh data.
+            int mask = drawAgeMs > BirdseyeFrameHealth.DISPLAY_HOLD_US/1000 ? 0 : renderer.displayMask;
             int displayState=mask|(calibrationRetrying?16:0);
             if (displayState != lastMask && !blocked && source.ready && !renderFailed) {
                 lastMask = displayState;
@@ -170,6 +250,7 @@ public final class BirdseyeView extends FrameLayout {
             if (!ready) stopSource();
             else if (resumed && !blocked && !renderFailed) startSource();
         });
+        gl.setBeforeFrame(this::updateSteeringFrame);
         gl.setContinuousRendering(false);
         addView(gl, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
         cameraWarning = text(context, 12);
@@ -194,8 +275,31 @@ public final class BirdseyeView extends FrameLayout {
         LayoutParams toggleParams = new LayoutParams(size*3/2, size, Gravity.TOP|Gravity.END);
         toggleParams.topMargin = toggleParams.rightMargin = Math.round(8*getResources().getDisplayMetrics().density);
         addView(modeToggle, toggleParams);
-        modeToggle.setOnClickListener(v -> prefs.edit().putBoolean(UiPrefs.KEY_PARKING_SURROUND_3D,
-                !prefs.getBoolean(UiPrefs.KEY_PARKING_SURROUND_3D, false)).apply());
+        modeToggle.setOnClickListener(v -> {
+            boolean enable=!prefs.getBoolean(UiPrefs.KEY_PARKING_SURROUND_3D,false);
+            ThreeDFailure protection=enable?ModelLoadSafety.blockedFailure(getContext()):null;
+            if(protection!=null){showThreeDFailure(protection);return;}
+            prefs.edit().putBoolean(UiPrefs.KEY_PARKING_SURROUND_3D,enable).apply();
+        });
+        wideToggle=new Button(context);wideToggle.setId(R.id.surroundWideToggle);
+        wideToggle.setAllCaps(false);wideToggle.setSingleLine(true);wideToggle.setTextSize(18);
+        wideToggle.setTypeface(wideToggle.getTypeface(),Typeface.BOLD);
+        wideToggle.setMinWidth(0);wideToggle.setMinHeight(0);wideToggle.setPadding(0,0,0,0);
+        LayoutParams wideParams=new LayoutParams(size*2,size,Gravity.TOP|Gravity.END);
+        wideParams.topMargin=toggleParams.topMargin;
+        wideParams.rightMargin=toggleParams.rightMargin+size*3/2+Math.round(8*getResources().getDisplayMetrics().density);
+        addView(wideToggle,wideParams);
+        wideToggle.setOnClickListener(v->prefs.edit().putBoolean(UiPrefs.KEY_PARKING_SURROUND_WIDE,
+                !prefs.getBoolean(UiPrefs.KEY_PARKING_SURROUND_WIDE,false)).apply());
+        guidesToggle=new ImageButton(context);guidesToggle.setId(R.id.surroundGuidesToggle);
+        guidesToggle.setImageResource(R.drawable.ic_horizontal_distribute);
+        int iconPadding=Math.round(12*getResources().getDisplayMetrics().density);
+        guidesToggle.setPadding(iconPadding,iconPadding,iconPadding,iconPadding);
+        LayoutParams guidesParams=new LayoutParams(size,size,Gravity.TOP|Gravity.END);
+        guidesParams.topMargin=toggleParams.topMargin;
+        addView(guidesToggle,guidesParams);
+        guidesToggle.setOnClickListener(v->prefs.edit().putBoolean(UiPrefs.KEY_PARKING_SURROUND_GUIDES,
+                !prefs.getBoolean(UiPrefs.KEY_PARKING_SURROUND_GUIDES,true)).apply());
         GestureDetector gestures=new GestureDetector(context,new GestureDetector.SimpleOnGestureListener(){
             @Override public boolean onDown(MotionEvent e){return true;}
             @Override public boolean onDoubleTap(MotionEvent e){renderer.orbit.reset();return true;}
@@ -233,7 +337,8 @@ public final class BirdseyeView extends FrameLayout {
         if (!resumed) return;
         resumed = false;
         CameraHandoffController.demand("birdseye", false);
-        steeringSnapshot=SteeringSnapshot.EMPTY; steeringPose.reset(); renderer.steering.setDegrees(0);
+        steeringSnapshot=SteeringSnapshot.EMPTY;steeringGuidance.reset();
+        updateSteeringFrame(GearSnapshot.EMPTY,SystemClock.elapsedRealtime());
         prefs.unregisterOnSharedPreferenceChangeListener(preferences);
         main.removeCallbacks(tick); stopSource();
         gl.onPause();
@@ -281,7 +386,7 @@ public final class BirdseyeView extends FrameLayout {
                     main.post(() -> {
                         if (generation != token) return;
                         scene=projection.scene;renderer.setScene(projection.scene);
-                        renderer.setMesh(projection.mesh); source.ready = true; lastMask = -1;
+                        renderer.setMesh(projection.mesh);renderer.setWideMesh(projection.wideMesh,projection.wideError); source.ready = true; lastMask = -1;
                         if(renderer.threeDRequested)prepareThreeD();
                         showMessage(R.string.birdseye_waiting);
                         Log.i("Birdseye", "Vehicle calibration SHA-256="+c.sha256);

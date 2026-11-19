@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_model_guard_title">Ochrana spouštění 3D</string>
+    <string name="settings_model_guard_hint">Každý proces předem zaznamená zahájení načítání modelu. Po 60 sekundách stabilního běhu se pokus potvrdí. Pět nepotvrzených spuštění vypne načítání modelu a ponechá dostupné 2D. Započítat se mohou i předčasná běžná ukončení procesu. Ochranu obnovte až po ověření příčiny; poté je nutné vybrat 3D ručně.</string>
+    <string name="settings_model_guard_auto">Automaticky přednačíst model při spuštění</string>
+    <string name="settings_model_guard_reset">Obnovit ochranu spouštění 3D</string>
+    <string name="settings_model_guard_reset_done">Ochrana obnovena. Pro vyzkoušení vyberte 3D ručně. Je-li automatické přednačítání zapnuté, obnoví se při příštím spuštění procesu.</string>
+    <string name="settings_model_guard_write_failed">Ochranu spouštění se nepodařilo uložit. Ponechte 3D vypnuté a zkontrolujte úložiště.</string>
+</resources>

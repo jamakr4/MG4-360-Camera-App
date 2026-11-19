@@ -27,6 +27,7 @@ public final class BirdseyeSurface extends TextureView implements TextureView.Su
     private SurfaceTexture texture;
     private Run run;
     private boolean resumed, continuous = true, dirty = true, framePosted;
+    private Runnable beforeFrame;
     private final Choreographer choreographer = Choreographer.getInstance();
     private long displayCallbacks;
     private static volatile String latestPresentation = "Birdseye output: no completed timing sample";
@@ -38,6 +39,7 @@ public final class BirdseyeSurface extends TextureView implements TextureView.Su
     private final Choreographer.FrameCallback frame = time -> {
         framePosted = false;
         if (canDraw() && (continuous || dirty)) {
+            if (beforeFrame != null) beforeFrame.run();
             displayCallbacks++;
             dirty = false;
             run.draw(time); // One pending GL job at most; a slow GPU never builds a queue.
@@ -54,6 +56,8 @@ public final class BirdseyeSurface extends TextureView implements TextureView.Su
     public void onResume() { resumed = true; dirty = true; startIfReady(); scheduleFrame(); }
     public void onPause() { resumed = false; cancelFrame(); if (run != null) run.stop(); }
     public void requestRender() { dirty = true; scheduleFrame(); }
+    /** UI-thread snapshot update before submitting the next coalesced EGL render. */
+    public void setBeforeFrame(Runnable update) { beforeFrame = update; }
     public void setContinuousRendering(boolean enabled) { continuous = enabled; scheduleFrame(); }
     long displayCallbacks() { return displayCallbacks; }
     private boolean canDraw() { return resumed && texture != null && run != null && !run.stopped; }

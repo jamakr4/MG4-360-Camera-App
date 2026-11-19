@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="surround_guides_hide">Masquer la trajectoire</string>
+    <string name="surround_guides_show">Afficher la trajectoire</string>
+</resources>

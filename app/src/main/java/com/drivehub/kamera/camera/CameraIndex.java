@@ -53,6 +53,11 @@ public enum CameraIndex {
         return this == LEFT || this == RIGHT;
     }
 
+    /** Same driving-direction orientation for the main preview and the signal tile. */
+    public int drivingDirectionRotationDegrees() {
+        return this == LEFT ? -90 : this == RIGHT ? 90 : 0;
+    }
+
     /**
      * Looks up the enum constant for the given hardware video index.
      *

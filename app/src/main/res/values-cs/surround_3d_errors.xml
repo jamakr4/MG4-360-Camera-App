@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="surround_3d_failed_detail">3D není dostupné [%1$s]: %2$s Zůstává aktivní 2D. Podrobnosti: Dev → Ochrana spouštění 3D.</string>
+    <string name="surround_3d_error_guard">Ochrana je aktivní po pěti nepotvrzených spuštěních procesu.</string>
+    <string name="surround_3d_error_storage">Záznam ochrany spouštění 3D se nepodařilo přečíst nebo uložit.</string>
+    <string name="surround_3d_error_projection">3D projekci kamer se nepodařilo připravit z kalibrace vozidla.</string>
+    <string name="surround_3d_error_model">Model vozidla nebo jeho textury se nepodařilo načíst nebo ověřit.</string>
+    <string name="surround_3d_error_memory">Nedostatek paměti pro přípravu nebo zobrazení 3D.</string>
+    <string name="surround_3d_error_depth">Grafický kontext nemá vhodnou hloubkovou paměť pro 3D.</string>
+    <string name="surround_3d_error_gpu_setup">Nepodařilo se inicializovat 3D shadery nebo grafické prostředky.</string>
+    <string name="surround_3d_error_gpu_draw">Při vykreslování 3D došlo ke grafické chybě.</string>
+    <string name="surround_3d_last_error">Poslední chyba 3D: %1$s · Aplikace %2$s</string>
+</resources>

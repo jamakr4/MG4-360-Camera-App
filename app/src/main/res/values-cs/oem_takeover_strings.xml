@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_dev_camera_diagnostics">Diagnostika kamer</string>
+    <string name="parking_oem_restore">Obnovit originální kameru</string>
+    <string name="parking_oem_copy_diagnostic">Kopírovat diagnostický protokol kamer</string>
+    <string name="parking_oem_diagnostic_copied">Diagnostický protokol kamer zkopírován</string>
+    <string name="parking_oem_save_diagnostic">Uložit diagnostický protokol kamer</string>
+    <string name="settings_oem_disable_warning_title">Vypnout originální 360° kameru?</string>
+    <string name="settings_oem_disable_warning_message">Chystáte se vypnout originální aplikaci 360° kamery!\n\nTato změna může přetrvat po restartu vozu i po odinstalování této aplikace.\n\nPřed odinstalováním toto nastavení znovu zapněte nebo použijte tlačítko „%1$s“ pod ním v Nastavení. Jinak může být pro obnovení přístupu k originální kameře nutné obnovit tovární nastavení.</string>
+    <string name="settings_oem_disable_confirm">Vypnout originální kameru</string>
+    <string name="settings_oem_disable_cancel">Zrušit</string>
+    <string name="settings_oem_restore_running">Obnovuji přístup k originální kameře…</string>
+    <string name="settings_oem_restore_success">Přístup k originální kameře obnoven.</string>
+    <string name="settings_oem_restore_failed">Přístup k originální kameře se nepodařilo obnovit. Zkontrolujte diagnostiku kamer ve vývojářském režimu a zkuste to znovu.</string>
+</resources>

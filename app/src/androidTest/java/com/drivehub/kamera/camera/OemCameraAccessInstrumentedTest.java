@@ -42,10 +42,12 @@ public class OemCameraAccessInstrumentedTest {
                 new OemAvmReceiver().onReceive(activity, new Intent(START));
                 assertTrue(CameraProbe.isOemCameraAccessBlocked());
                 Surface surface = ((SurfaceView) activity.findViewById(R.id.surfaceView)).getHolder().getSurface();
-                assertFalse(CameraProbe.attachPreview(17, surface));
-                assertFalse(CameraProbe.attachEnhancedPreview(16, surface));
-                assertFalse(CameraProbe.attachPreviewSink(17, 12, surface));
-                assertFalse(CameraProbe.attachCombinedPreview(surface, 720, 480, 25, "", false, 15));
+                {
+                    assertFalse(CameraProbe.attachPreview(17, surface));
+                    assertFalse(CameraProbe.attachEnhancedPreview(16, surface));
+                    assertFalse(CameraProbe.attachPreviewSink(17, 12, surface));
+                    assertFalse(CameraProbe.attachCombinedPreview(surface, 720, 480, 25, "", false, 15));
+                }
                 String output = new java.io.File(activity.getCacheDir(), "oem-blocked-test.mp4").getPath();
                 assertFalse(CameraProbe.startMp4Record(0, 17, output, 720, 480, 25, 9000000));
                 assertFalse(CameraProbe.startCombinedMp4Record(output, 720, 480, 25, 9000000, "", false, 15));

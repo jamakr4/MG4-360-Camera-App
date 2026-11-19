@@ -1,0 +1,10 @@
+<resources>
+    <string name="guidelines_title">Fahrspuren 2D/3D</string>
+    <string name="guidelines_speed_threshold">Geschwindigkeitsgrenze</string>
+    <string name="guidelines_speed_description">Geschwindigkeitsgrenze für Fahrspuren (0–130 km/h)</string>
+    <string name="guidelines_speed_hint">Fahrspuren oberhalb dieser Geschwindigkeit ausblenden. Ohne aktuelle Geschwindigkeit bleiben sie ausgeblendet. Der Spur-Button bleibt der Ein-/Ausschalter.</string>
+    <string name="guidelines_style">Stil</string>
+    <string name="guidelines_style_lines">Linien</string>
+    <string name="guidelines_style_simple">Einfach</string>
+    <string name="guidelines_style_hint">Beide Stile nutzen 2060 mm inklusive Spiegel. Linien: vier hellblaue Kurven. Einfach: zwei äußere Linien mit transparenter blauer Fläche.</string>
+</resources>

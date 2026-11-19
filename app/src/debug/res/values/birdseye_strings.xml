@@ -1,5 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="birdseye_debug_speed">Speed: %1$.1f km/h</string>
+    <string name="birdseye_debug_guide_speed_limit">Test guidelines speed threshold (%1$d km/h)</string>
+    <item name="surroundDebugGuideSpeedLimit" type="id"/>
+    <string name="birdseye_debug_speed_unavailable">Speed unavailable</string>
+    <item name="surroundDebugGuideSpeed" type="id"/>
+    <string name="birdseye_debug_blue_corridor">Blue track area (transparent)</string>
+    <string name="birdseye_debug_blue_forward_horizon">Blue clearance area: 2060 mm including mirrors.\nRear display curves join the front endpoints; steering model unchanged.</string>
+    <string name="birdseye_debug_blue_reverse_horizon">Blue clearance area: 2060 mm including mirrors.\nOEM endpoint depths; steering model unchanged.</string>
+    <item name="surroundDebugBlueCorridor" type="id"/>
+    <string name="birdseye_debug_reverse_guides">Guidelines (2D / 3D test)</string>
+    <string name="birdseye_debug_guide_reverse">Reverse (R)</string>
+    <string name="birdseye_debug_guide_park">Park (P)</string>
+    <string name="birdseye_debug_park_horizon">Park: guidelines animate out.</string>
+    <item name="surroundDebugGuidePark" type="id"/>
+    <string name="birdseye_debug_guide_forward">Forward (D)</string>
+    <string name="birdseye_debug_forward_horizon">Four light-blue curves: 2060 mm including mirrors.\nRear display curves share the front endpoints; steering model unchanged.</string>
+    <string name="birdseye_debug_reverse_horizon">Four light-blue curves: 2060 mm including mirrors.\nOEM endpoint depths; endpoints do not represent a single vehicle pose.</string>
+    <item name="surroundDebugGuideReverse" type="id"/>
+    <item name="surroundDebugGuideForward" type="id"/>
+    <item name="surroundDebugReverseGuides" type="id"/>
+    <string name="birdseye_debug_sensor_angle">Sensor: %1$.2f° · %2$s</string>
+    <string name="birdseye_debug_sensor_missing">Sensor: unavailable</string>
+    <string name="birdseye_debug_model_values">OEM curve: %1$.2f°\nDisplay κ: %2$.5f /m · R: %3$s\nWheels left / right: %4$.2f° / %5$.2f°</string>
+    <string name="birdseye_debug_steering_unavailable">Steering unavailable · last valid pose, or neutral before first sample</string>
+    <string name="birdseye_debug_interrupt_steering">Interrupt steering signal (test)</string>
+    <string name="birdseye_debug_model_note">OEM radius reference · 1450 mm front/rear effective track assumed · not vehicle validated.\nMesh still uses ≈2729 mm wheelbase / 1554 mm track; registration follows this test.</string>
+    <item name="surroundDebugSteeringFullLeft" type="id"/>
+    <item name="surroundDebugSteeringMidLeft" type="id"/>
+    <item name="surroundDebugSteeringMidRight" type="id"/>
+    <item name="surroundDebugSteeringFullRight" type="id"/>
+    <item name="surroundDebugSteeringUnavailable" type="id"/>
     <string name="birdseye_debug_live_steering">Vehicle steering (live)</string>
     <string name="birdseye_debug_steering_live_angle">Front-wheel angle (vehicle): %1$d° · %2$s</string>
     <string name="birdseye_debug_steering_status">Vehicle raw: %1$.3f° · %2$s</string>

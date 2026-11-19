@@ -61,13 +61,14 @@ public final class SteeringReader {
         });
         if (token==generation) io.postDelayed(()->tick(token),POLL_MS);
     }
-    public static String diagnostic(float scale,boolean invert) {
+    public static String diagnostic() {
         SteeringSnapshot s=latest;
         long now=SystemClock.elapsedRealtime();
+        SteeringModel.Solution target=new SteeringModel().solve(s.rawDegrees);
+        GearSnapshot gear=com.drivehub.kamera.signal.SignalService.guidanceGear();
         return String.format(Locale.ROOT,
-                "0x21601563 / Float (sensor or property API)\n%s%s\nraw=%.3f° → model=%.2f°; scale=%.3f; invert=%s\nread age=%d ms; sensor timestamp=%d ns",
-                s.state,s.available&&!s.fresh(now)?" (stale)":"",s.rawDegrees,
-                s.fresh(now)?SteeringMapping.degrees(s.rawDegrees,scale,invert):0,
-                SteeringMapping.scale(scale),invert,Math.max(0,now-s.readElapsedMs),s.sensorTimestampNs);
+                "0x21601563 / Float (sensor or property API)\n%s%s\nraw=%.3f°; OEM radius model\ntarget k=%.5f /m; left/right=%.2f° / %.2f°\ngear=%d; guidance direction=%s\nread age=%d ms; sensor timestamp=%d ns",
+                s.state,s.available&&!s.fresh(now)?" (stale)":"",s.rawDegrees,target.curvaturePerMm*1000,
+                target.leftDegrees,target.rightDegrees,gear.gear,gear.direction(now),Math.max(0,now-s.readElapsedMs),s.sensorTimestampNs);
     }
 }

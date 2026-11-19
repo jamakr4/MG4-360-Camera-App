@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="surround_label_wide">Wide</string>
+    <string name="surround_label_normal">Normal</string>
+    <string name="surround_mode_wide">Switch to wide 2D view</string>
+    <string name="surround_mode_normal">Switch to normal 2D view</string>
+    <string name="surround_wide_failed">Wide view unavailable. Using normal view.</string>
+</resources>

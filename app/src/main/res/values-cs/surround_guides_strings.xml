@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="surround_guides_hide">Skrýt jízdní dráhu</string>
+    <string name="surround_guides_show">Zobrazit jízdní dráhu</string>
+</resources>

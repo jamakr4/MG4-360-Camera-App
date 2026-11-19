@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_parking_wheel_modes_hint">Režim none zachová původní výřez; basic jej otočí; advanced zarovná práh s osou vozu a zachová oblast kola. Advanced vyžaduje kalibraci vozu; bez ní se použije basic.</string>
+    <string name="settings_parking_side_correction">Korekce bočních kamer</string>
+    <string name="settings_parking_side_correction_hint">Režim none zachová původní výřez. Režim straight zarovná pruh vozovky s vozem pro porovnání boku a obrubníku po celé délce. Bez kalibrace vozu zobrazí původní výřez. Používá zvýraznění chybějících oblastí; neměří vzdálenost.</string>
+</resources>

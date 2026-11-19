@@ -1,0 +1,4 @@
+<resources>
+    <string name="ota_download_title">Aktualizace 360 Cam</string>
+    <string name="ota_download_version">Stahuji verzi %1$s</string>
+</resources>

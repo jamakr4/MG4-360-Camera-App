@@ -5,11 +5,19 @@ import com.drivehub.kamera.rivela.FisheyeCamera;
 /** Adapter for PR #102; the independently validated calibration parser stays unchanged. */
 public final class RivelaScene {
     public static final int BOWL_THETA=144,BOWL_RINGS=56;
+    public static final double GUIDANCE_FLAT_MM=4000;
     public final BirdseyeCalibration calibration;
     public final CarFrame car;
     private final FisheyeCamera[] cameras=new FisheyeCamera[4];
     private volatile Bowl bowl;
+    private final double flatMm;
     public RivelaScene(BirdseyeCalibration calibration) {
+        this(calibration,Bowl.FLAT_MM);
+    }
+    /** Extend flat calibrated ground for distance guides without moving an existing scene's mesh. */
+    public RivelaScene(BirdseyeCalibration calibration,double flatMm) {
+        if(!Double.isFinite(flatMm)||flatMm<0||flatMm>Bowl.MAX_MM)throw new IllegalArgumentException("Invalid flat ground extent");
+        this.flatMm=flatMm;
         this.calibration=calibration;
         for(int i=0;i<4;i++) {
             BirdseyeCalibration.CameraParameters c=calibration.cameraParameters(i);
@@ -22,6 +30,12 @@ public final class RivelaScene {
     /** Scene IO worker only, never capture/UI/GL. Validate the extended lens range independently. */
     public synchronized void prepareBowl() {
         if(bowl!=null)return;
+        validateBowlLenses();
+        Bowl built=Bowl.build(cameras,car,BOWL_THETA,BOWL_RINGS,flatMm,Bowl.CURVE_MM);
+        for(float f:built.vertices)if(!Float.isFinite(f))throw new IllegalArgumentException("Non-finite bowl vertex");
+        bowl=built;
+    }
+    public void validateBowlLenses() {
         for(FisheyeCamera c:cameras) {
             double previous=0;
             for(int j=1;j<=190;j++) {
@@ -31,8 +45,5 @@ public final class RivelaScene {
                 previous=radius;
             }
         }
-        Bowl built=Bowl.build(cameras,car,BOWL_THETA,BOWL_RINGS,Bowl.FLAT_MM,Bowl.CURVE_MM);
-        for(float f:built.vertices)if(!Float.isFinite(f))throw new IllegalArgumentException("Non-finite bowl vertex");
-        bowl=built;
     }
 }

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="surround_3d_failed_detail">3D nicht verfügbar [%1$s]: %2$s 2D bleibt aktiv. Details: Dev → 3D-Startschutz.</string>
+    <string name="surround_3d_error_guard">Der Startschutz ist nach fünf unbestätigten Prozessstarts aktiv.</string>
+    <string name="surround_3d_error_storage">Der Datensatz des 3D-Startschutzes konnte nicht gelesen oder gespeichert werden.</string>
+    <string name="surround_3d_error_projection">Die 3D-Kameraprojektion konnte aus der Fahrzeugkalibrierung nicht vorbereitet werden.</string>
+    <string name="surround_3d_error_model">Fahrzeugmodell oder Texturen konnten nicht geladen oder validiert werden.</string>
+    <string name="surround_3d_error_memory">Nicht genug Arbeitsspeicher zum Vorbereiten oder Anzeigen von 3D.</string>
+    <string name="surround_3d_error_depth">Der Grafikkontext hat keinen geeigneten Tiefenpuffer für 3D.</string>
+    <string name="surround_3d_error_gpu_setup">Die 3D-Shader oder Grafikressourcen konnten nicht initialisiert werden.</string>
+    <string name="surround_3d_error_gpu_draw">Beim Zeichnen der 3D-Ansicht ist ein Grafikfehler aufgetreten.</string>
+    <string name="surround_3d_last_error">Letzter 3D-Fehler: %1$s · App %2$s</string>
+</resources>

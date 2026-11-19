@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="surround_label_wide">Large</string>
+    <string name="surround_label_normal">Normal</string>
+    <string name="surround_mode_wide">Passer à la vue 2D large</string>
+    <string name="surround_mode_normal">Passer à la vue 2D normale</string>
+    <string name="surround_wide_failed">Vue large indisponible. Retour à la vue normale.</string>
+</resources>

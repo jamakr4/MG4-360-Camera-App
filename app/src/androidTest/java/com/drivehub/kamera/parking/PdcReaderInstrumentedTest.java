@@ -11,6 +11,29 @@ import static org.junit.Assert.*;
 public class PdcReaderInstrumentedTest {
     private void ui(Runnable job){InstrumentationRegistry.getInstrumentation().runOnMainSync(job);}
     private void await(java.util.function.BooleanSupplier condition){long end=SystemClock.elapsedRealtime()+4000;do{if(condition.getAsBoolean())return;SystemClock.sleep(20);}while(SystemClock.elapsedRealtime()<end);assertTrue(condition.getAsBoolean());}
+    @Test public void systemPropertiesArePolledOnlyInReverseAndPartialSamplesKeepTheirBars() {
+        AtomicBoolean reverse=new AtomicBoolean();AtomicInteger reads=new AtomicInteger();
+        AtomicReference<String> sectors=new AtomicReference<>("[1,3,6,9]");
+        AtomicReference<PdcSnapshot> latest=new AtomicReference<>(PdcSnapshot.EMPTY);
+        SystemPropertyPdcSource source=new SystemPropertyPdcSource(key->{
+            assertNotEquals(Looper.getMainLooper(),Looper.myLooper());reads.incrementAndGet();
+            if(key.equals(SystemPropertyPdcSource.SECTORS))return sectors.get();
+            return key.equals(SystemPropertyPdcSource.CLOSEST_CM)?"80":"2";
+        },SystemClock::elapsedRealtime);
+        PdcReader reader=new PdcReader(source,reverse::get,latest::set);
+        try {
+            ui(reader::start);SystemClock.sleep(150);assertEquals(0,reads.get());
+            reverse.set(true);await(()->latest.get().hasSectors());
+            assertArrayEquals(new int[]{1,3,6,9},latest.get().spatialLevels());
+            assertEquals(80,latest.get().closestCm);assertEquals(2,latest.get().status);
+            assertTrue(PdcReader.diagnostic().contains(SystemPropertyPdcSource.SECTORS));
+            sectors.set("[1,unknown,6,9]");await(()->latest.get().level(1)==-1);
+            PdcGeometry geometry=new PdcGeometry();geometry.set(latest.get());
+            assertEquals(3,geometry.bars(new com.drivehub.kamera.rivela.CarFrame(0,0,4287,1836),SystemClock.elapsedRealtime()).size());
+            reverse.set(false);await(()->!latest.get().hasSectors());
+            int stoppedReads=reads.get();SystemClock.sleep(150);assertEquals(stoppedReads,reads.get());
+        } finally {ui(reader::close);}
+    }
     public static class ParkingCar {
         final java.util.List<String> managers=new java.util.ArrayList<>();
         volatile int disconnected;

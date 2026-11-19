@@ -3,6 +3,8 @@
     <string name="birdseye_debug_private_recording">Aufnahme</string>
     <string name="birdseye_debug_private_synthetic">Testbild</string>
     <string name="birdseye_debug_private_curbside">Curbside</string>
+    <string name="birdseye_debug_back_to_surround">← 2D / 3D</string>
+    <string name="birdseye_debug_back_to_surround_description">Zurück zur 2D-/3D-Debugansicht</string>
     <string name="birdseye_debug_private_loading">Standbild laden / Projektion berechnen…</string>
     <string name="birdseye_debug_private_still_label">PRIVATE AUFNAHME · STANDBILD · PDC ist simuliert</string>
     <string name="birdseye_debug_private_import_hint">Noch keine private Aufnahme geladen. Mit tools/birdseye/load_private_capture.py einen lokalen Snapshot in den privaten Dateibereich dieser Debug-App importieren. Die Bilder liegen in keiner APK.</string>

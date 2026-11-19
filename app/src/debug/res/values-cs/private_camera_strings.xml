@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="birdseye_debug_private_recording">Záznam</string>
+    <string name="birdseye_debug_private_synthetic">Zkušební obraz</string>
+    <string name="birdseye_debug_private_curbside">Obrubník</string>
+    <string name="birdseye_debug_back_to_surround">← 2D / 3D</string>
+    <string name="birdseye_debug_back_to_surround_description">Zpět do ladicího zobrazení 2D/3D</string>
+    <string name="birdseye_debug_private_loading">Načítám místní snímek / počítám mapu…</string>
+    <string name="birdseye_debug_private_still_label">SOUKROMÝ ZÁZNAM · STATICKÝ SNÍMEK · PDC je simulováno</string>
+    <string name="birdseye_debug_private_import_hint">Není načten soukromý snímek. Nástrojem tools/birdseye/load_private_capture.py importujte místní snímek do soukromých souborů této ladicí aplikace. Obrazy se nikdy nepřibalují do APK.</string>
+    <string name="birdseye_debug_private_failed">Soukromý snímek není dostupný</string>
+    <string name="birdseye_debug_curbside_title">SOUKROMÝ snímek · zkouška projekce obrubníku</string>
+    <string name="birdseye_debug_curbside_hint">Režim parkování zarovná paprsky kamery kol s osou vozu, aby práh zůstal rovný a kolo viditelné. Celý bok zachová stávající pruh vozovky. Výřez se určí automaticky. Režim optiky je původní optické porovnání; režim vozovky umožňuje úpravu čtyř bodů. Bez kalibrovaného měření vzdálenosti.</string>
+    <string name="birdseye_debug_curbside_points">Původní · přetáhněte body 1–4</string>
+    <string name="birdseye_debug_curbside_old">Aktuální výřez / otočení</string>
+    <string name="birdseye_debug_curbside_new">Opravený výřez obrubníku</string>
+    <string name="birdseye_debug_curbside_front">Přední kolo</string>
+    <string name="birdseye_debug_curbside_rear">Zadní kolo</string>
+    <string name="birdseye_debug_curbside_reset">Automatické body</string>
+    <string name="birdseye_debug_curbside_coverage">Pokrytí pixely kamery: %1$.1f%% · soukromá místní zkouška obrubníku</string>
+    <string name="birdseye_debug_curbside_lens">Optika / virtuální kamera</string>
+    <string name="birdseye_debug_curbside_ground">Vozovka / čtyři body</string>
+    <string name="birdseye_debug_private_failed_detail">Soukromý snímek není dostupný: %1$s</string>
+    <string name="birdseye_debug_curbside_side">Celý bok</string>
+    <string name="birdseye_debug_curbside_parking">Parkování / hrana vozu</string>
+    <string name="birdseye_debug_curbside_automatic_boundary">Původní · automatický pruh zarovnaný s vozem</string>
+</resources>

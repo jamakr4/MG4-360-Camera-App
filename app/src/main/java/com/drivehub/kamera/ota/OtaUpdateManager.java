@@ -6,6 +6,7 @@ import android.net.Uri;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
+import com.drivehub.kamera.R;
 
 import java.io.File;
 import java.util.Locale;
@@ -139,8 +140,8 @@ final class OtaUpdateManager {
         File targetFile = preparePublicDownloadFile(fileName);
 
         DownloadManager.Request request = new DownloadManager.Request(Uri.parse(info.downloadUrl))
-                .setTitle("360 Cam Update")
-                .setDescription("Downloading version " + info.latestVersion)
+                .setTitle(context.getString(R.string.ota_download_title))
+                .setDescription(context.getString(R.string.ota_download_version, info.latestVersion))
                 .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
                 .setDestinationUri(Uri.fromFile(targetFile))
                 .setAllowedOverMetered(true)

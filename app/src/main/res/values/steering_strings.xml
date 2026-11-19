@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="settings_dev_steering">3D vehicle steering</string>
-    <string name="settings_dev_steering_hint">Live Float 0x21601563. Initial scale 14.77 is a visual mapping, not a verified steering ratio. Check direction and scale on the vehicle. Missing or stale data straightens the wheels. Raw values appear under Dev Status. Uses the legacy SAIC sensor subscription, with a property-manager fallback on newer systems. Source and connection errors appear in Dev Status.</string>
+    <string name="settings_dev_steering">2D / 3D vehicle steering</string>
+    <string name="settings_dev_steering_hint">2D and 3D use the OEM steering curve with separate left/right wheel angles. The blue track appears in R or D with current steering and camera data; it is hidden in P and N. Missing steering holds the last wheel pose and hides the track. The rear curves in D are visual guides to the front endpoints, not physical rear-wheel trajectories. Assumed track width and model alignment still need vehicle testing. Dev Status shows raw input, source, target angles and gear.</string>
     <string name="settings_dev_steering_scale">Sensor degrees per model degree (1–30)</string>
     <string name="settings_dev_steering_invert">Invert steering direction</string>
     <string name="settings_dev_steering_reset">Reset steering mapping</string>

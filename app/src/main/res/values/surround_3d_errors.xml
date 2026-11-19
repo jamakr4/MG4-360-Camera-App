@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="surround_3d_failed_detail">3D unavailable [%1$s]: %2$s Using 2D. Details: Dev → 3D startup protection.</string>
+    <string name="surround_3d_error_guard">Startup protection is active after five unconfirmed process starts.</string>
+    <string name="surround_3d_error_storage">The 3D startup protection record could not be read or saved.</string>
+    <string name="surround_3d_error_projection">The 3D camera projection could not be prepared from the vehicle calibration.</string>
+    <string name="surround_3d_error_model">The vehicle model or its textures could not be loaded or validated.</string>
+    <string name="surround_3d_error_memory">Not enough memory to prepare or display 3D.</string>
+    <string name="surround_3d_error_depth">The graphics context has no suitable depth buffer for 3D.</string>
+    <string name="surround_3d_error_gpu_setup">The 3D shaders or graphics resources could not be initialized.</string>
+    <string name="surround_3d_error_gpu_draw">An error occurred while drawing the 3D view.</string>
+    <string name="surround_3d_last_error">Last 3D error: %1$s · App %2$s</string>
+</resources>

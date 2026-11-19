@@ -14,7 +14,7 @@ A community camera mod for the MG4 EV (AAOS 9, pre-2026 facelift), featuring liv
   <img alt="Platform" src="https://img.shields.io/badge/platform-MG4%20AAOS%209-0a7f5a">
   <img alt="Downloads" src="https://img.shields.io/github/downloads/jamakr4/MG4-360-Camera-App/total?color=5e9f3a">
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-GPL--3.0-bd2c00"></a>
-  <img alt="Languages" src="https://img.shields.io/badge/languages-EN%20%7C%20DE%20%7C%20FR-4c566a">
+  <img alt="Languages" src="https://img.shields.io/badge/languages-EN%20%7C%20DE%20%7C%20FR%20%7C%20CS-4c566a">
   <img alt="Stars" src="https://img.shields.io/github/stars/jamakr4/MG4-360-Camera-App">
 </p>
 
@@ -47,7 +47,7 @@ A community camera mod for the MG4 EV (AAOS 9, pre-2026 facelift), featuring liv
 
 <p align="center">
   <a href="https://github.com/jamakr4/MG4-360-Camera-App/releases/latest"><img alt="Download latest APK" src="https://img.shields.io/badge/Download%20Latest%20APK-1F6FEB?style=for-the-badge&logo=android&logoColor=white&logoWidth=24"></a>
-  <a href="https://github.com/jamakr4/MG4-360-Camera-App/releases/tag/v0.9.1"><img alt="Download latest beta" src="https://img.shields.io/badge/Download%20Latest%20Beta-8B5CF6?style=for-the-badge&logo=android&logoColor=white&logoWidth=24"></a>
+  <a href="https://github.com/jamakr4/MG4-360-Camera-App/releases"><img alt="Download latest beta" src="https://img.shields.io/badge/Download%20Latest%20Beta-8B5CF6?style=for-the-badge&logo=android&logoColor=white&logoWidth=24"></a>
 </p>
 
 <h2 align="center">Lane change? No problem!</h2>
@@ -125,7 +125,7 @@ A community camera mod for the MG4 EV (AAOS 9, pre-2026 facelift), featuring liv
 - **Full Screen**: the app hides the (side) navigationbar and also the top bar on demand to get extra space.
 - **External trigger support**: send `com.drivehub.kamera.action.TRIGGER_DASHCAM_EVENT` from ADB or another app to save an event clip. Compatible [MG4Control](https://github.com/SliDeeN/MG4Control) versions also support direct `App function` shortcuts for **Save dashcam event** and **Toggle digital rearview**.
 - **Experimental surveillance recording**: compatible MG4Control versions can start a separate recording session for up to two hours, then restore the previous dashcam setting.
-- **Auto language selection**: English, German and French are selected automatically from the vehicle language.
+- **Auto language selection**: English, German, French and Czech (cs-CZ) are selected automatically from the vehicle language.
 
 > [!NOTE]
 > Some features may only be available in the latest beta version.
@@ -212,6 +212,8 @@ The app uses the full screen width, with the SAIC side navigation hidden in the 
 
 The main screen has a left camera panel, the single-camera preview in the center, and an experimental **2D/3D surround view** on the right. Select **Wheels** for four wheel close-ups (front wheels above, rear wheels below), or **Sides** for two tall side views. The selected mode is saved.
 
+In reverse, rear PDC reads all four sectors together from the OEM system property `arcsoft.avm.mPdcBackObsShow`, with minimum distance from `arcsoft.avm.mBackObsClosestDistance` and status from `arcsoft.avm.ID_PDC_FRONT_REAR_STS`. An unknown or invalid sector hides only its own bar; valid sectors remain visible. Missing minimum distance retains the existing estimated level positions. These properties depend on the stock `CarManagerServer` publishing vehicle data.
+
 Under **Parking → MG4 vehicle color**, eight color circles select the pre-rendered vehicle graphic (white, grey, black, red, orange, blue, silver or matte Hunter Green). The selection is saved and applies immediately to the Birdseye view.
 
 ![Eight pre-rendered MG4 vehicle colors, including matte Hunter Green](images/color-variants.png)
@@ -222,9 +224,17 @@ With valid vehicle artwork, the 2D view follows its transparent silhouette witho
 
 The 2D ground view requires the vehicle calibration at `/configure/camera_calibdata.bin` and current images from the four existing camera sessions. Missing calibration or camera images are shown explicitly. Its physical calibration, seams and recording performance still require vehicle testing; see [implementation and verification](docs/BIRDSEYE_2D_TEST.md) and the separate [offline preview](tools/birdseye/README.md).
 
-The right main panel starts in **2D** and can switch to **3D**. Drag to orbit, pinch to zoom, double-tap to reset. The eight Parking paint swatches apply immediately to both views, including matte Hunter Green in 3D; the black roof and other vehicle details remain unchanged. All 3D paint palettes are prepared in the app and share the same articulated model. Both views share the existing four camera sessions and use only the actual vehicle calibration at `/configure/camera_calibdata.bin`.
+The right main panel starts in **2D** and can switch to **3D**. The adjacent **Wide / Normal** button switches the 2D field of view and remembers the selection. Normal uses the flat ground plane; Wide samples the Rivela bowl from above at twice the visible width and height, retaining a 4 m flat floor around the body for the distance guides. The adjacent Horizontal Distribute icon toggles the driving path in both 2D and 3D and remembers the choice; the path starts enabled. The output retains the existing `TextureView` and owned EGL thread, with coalesced display-driven renders. Drag to orbit, pinch to zoom, double-tap to reset. The eight Parking paint swatches apply immediately to both views, including matte Hunter Green in 3D; the black roof and other vehicle details remain unchanged. All 3D paint palettes are prepared in the app and share the same articulated model. Both views share the existing four camera sessions and use only the actual vehicle calibration at `/configure/camera_calibdata.bin`.
 
-The 3D front wheels follow the read-only vehicle steering Float (`0x21601563`) while MainActivity is visible. On the legacy SAIC platform the reader subscribes through `CarSensorManager` and reads `CarSensorEvent.floatValues`; newer platforms can fall back to `CarPropertyManager`. Source and connection errors appear in Dev Status. Missing, invalid or stale data straightens them. **Dev** provides scale and direction controls; **Dev Status** shows raw readings. The initial factor 14.77 is a provisional visual mapping, not a verified steering ratio, and needs checking on the vehicle. In the synthetic debug view, **Vehicle steering (live)** switches between this reader and the manual test slider.
+The 3D wheels steer with the vehicle; speed-dependent rolling is disabled. The 3D front wheels and the 2D/3D blue track area use the shared OEM steering-curve/radius model with separate left/right wheel angles. The blue area uses the MG4’s 2060 mm width including mirrors as a visual width allowance; this does not alter the steering curve or the track used for the wheel angles. Steering Float `0x21601563` is read through the legacy SAIC `CarSensorManager`, with a `CarPropertyManager` fallback on newer systems. The area appears automatically in **2D and 3D** for **R** or **D**, using the existing read-only gear property `arcsoft.avm.mCurCarGear`. It is hidden in P/N, when gear or steering reads expire, or when the corresponding rear/front camera frame is unavailable. Missing steering holds the last wheel pose and hides the track. The 2D area uses the existing metric ground projection and is drawn below the vehicle artwork, including its mirrors and alpha silhouette. **The central camera image receives no new guidance overlay.** Dev Status reports the raw input, source, target wheel angles and gear; the old provisional scale/inversion controls have been replaced by the shared model.
+
+**Parking → Guidelines 2D/3D** provides a speed threshold, enabled by default at **25 km/h**. With the filter on, guides remain visible at the threshold, hide above it and return automatically below it; missing or stale speed also hides them. The main path button remains the independent on/off choice. **Lines** draws four light-blue clearance curves at **2060 mm mirror width**; **Simple** retains the mirror-width outer edges and translucent fill and is the default. These choices persist and apply to R/D in Normal, Wide and 3D. Guides build over **350 ms** in driving direction (D: rear to front; R: front to rear) and retract along the same sweep when the speed filter or path button hides them. Quick toggles reverse from the current position. When a path is already visible, direct D↔R changes blend the complete outgoing and incoming paths simultaneously on one 350 ms clock instead of replaying the build sweep; quick gear reversals continue from both current opacities. Invalid steering/gear or camera freshness still removes the prediction immediately. Both styles retain the **700 mm end fade**, including each of the four individual lines. The Debug Activity starts with the saved style (Simple by default), uses the same light-blue mirror-width curves and reveal, and offers P/R/D selection, a local speed-threshold test checkbox plus simulated speed in 2D and 3D. In Debug, P retracts the visible guidance over 350 ms; switching back during retraction continues from the current position. The selection survives recreation.
+
+Short camera gaps in **Normal, Wide and 3D** retain each camera's last uploaded image for up to **2 seconds**, independently of other cameras. The first returning image is uploaded immediately. Guidance, PDC and handoff readiness still require frames no older than **500 ms** and no more than **150 ms** behind the newest camera. Ownership loss and renderer errors invalidate the output immediately.
+
+The **Birdseye debug activity** uses the same model and offers a manual slider over ±516.95°, presets, radius diagnostics, opt-in live readings, an interruption test and blue-area versus individual-line comparison in both 2D and 3D. The test-speed slider exercises the guideline speed threshold in 2D and 3D; live mode uses the shared vehicle-motion snapshot. The live 3D floor extends 4 m from the vehicle so guide endpoints remain on flat projected ground. **The D rear curves are visual guides joining the front endpoints, not physical rear-wheel trajectories.** The assumed 1450 mm effective track and existing mesh registration still need vehicle validation.
+
+If 3D falls back to 2D, the message identifies startup protection, its storage record, camera projection, model/textures, memory, depth buffer or graphics initialization/drawing with a stable error code. **Dev → 3D startup protection** retains the last incident with time, app version, nested exception details and graphics status. A blocked 3D button explains the reason without bypassing protection.
 
 **Automatic camera view** under **Parking** offers speed-based **Auto Close**, on by default, and **Auto Open on P → D**, off by default. The latter opens the front view on each direct Park-to-Drive shift when **Allow OEM** is off. The existing automatic rear view on R remains available. **Auto Close** applies only to views opened by one of these automatic routes; its shared speed threshold defaults to **25 km/h** and accepts 1–130 km/h. It first waits for a valid speed below the threshold, and closes when speed subsequently reaches or exceeds it. Opening at a higher speed is allowed. Manually opened views are never speed-closed. Closing or leaving the camera view ends that automatic session; configuration recreation preserves it. Changing Auto Close or its threshold restarts the below-then-above observation. Closing the camera UI leaves enabled recording/background services running. Verify actual gear and speed behavior on the vehicle.
 
@@ -287,7 +297,7 @@ To use it:
 Important:
 
 - Disable the OEM SAIC indicator camera popup first, otherwise both systems may compete.
-- While the main app is open, the app can route the signal camera into the main preview instead of showing the floating overlay.
+- While the main app is open, the app can route the signal camera into the main preview instead of showing the floating overlay. The same **Minimum on-time** and **Overlay hide delay** settings apply there; reverse gear immediately takes priority over a pending signal-camera delay. The central preview uses the v0.9.1 **SurfaceView** path and original image orientation. **Rotate side cameras to driving direction** continues to apply to the floating signal overlay.
 
 <p align="center">
   <img src="images/setting%231.jpg" alt="OEM SAIC 360 camera settings step 1" width="48%">
@@ -390,7 +400,7 @@ With a version of [MG4Control](https://github.com/SliDeeN/MG4Control) that suppo
 - **Toggle digital rearview** — switches the digital rearview on or off each time the shortcut is triggered.
 - **Save dashcam event** — saves an event recording. If continuous recording is off, it starts a future-only event recording.
 
-The function names are shown in English or German according to the system language. No extras are needed. The companion trigger apps and existing broadcast actions remain supported; use MG4Control's `Broadcast` option if you want to set rearview explicitly with the Boolean `enabled` extra.
+The function names follow the system language. No extras are needed. The companion trigger apps and existing broadcast actions remain supported; use MG4Control's `Broadcast` option if you want to set rearview explicitly with the Boolean `enabled` extra.
 
 Integration reference: [MG4Control receiver discovery and invocation](https://github.com/SliDeeN/MG4Control/issues/172#issuecomment-6522784068).
 

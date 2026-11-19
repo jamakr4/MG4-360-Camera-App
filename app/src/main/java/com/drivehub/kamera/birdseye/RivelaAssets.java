@@ -55,7 +55,7 @@ public final class RivelaAssets {
     static WarmupResult warm(AssetManager assets,CalibrationLoader calibration) {
         long started=SystemClock.elapsedRealtime();boolean modelReady=false,projectionReady=false;
         try {model(assets);modelReady=true;}
-        catch(Exception|OutOfMemoryError error) {Log.w("RivelaAssets","Model warmup unavailable: "+error.getMessage());}
+        catch(Exception|OutOfMemoryError error) {Log.w("RivelaAssets","Model warmup unavailable",ThreeDFailure.at(ThreeDFailure.Kind.MODEL,error));}
         try {
             ProjectionAssets projection=ProjectionAssets.get(calibration.load());
             projection.scene.prepareBowl();projectionReady=true;
@@ -80,11 +80,19 @@ public final class RivelaAssets {
     public static void prepare(RivelaScene scene,Context context,Callback callback) {
         Context app=context.getApplicationContext();
         IO.execute(()->{
+            ThreeDFailure.Kind stage=ThreeDFailure.Kind.STARTUP_STORAGE;
             try {
-                if(!ModelLoadSafety.enter(app,false))throw new IOException("3D startup protection active; reset explicitly in Dev settings");
-                scene.prepareBowl();VehicleModel loaded=model(app.getAssets());ModelLoadSafety.loaded(app);
+                if(!ModelLoadSafety.enter(app,false)) {
+                    ThreeDFailure blocked=ModelLoadSafety.blockedFailure(app);
+                    throw blocked!=null?blocked:ThreeDFailure.at(ThreeDFailure.Kind.STARTUP_BLOCKED,new IllegalStateException("Startup attempt was refused"));
+                }
+                stage=ThreeDFailure.Kind.PROJECTION;scene.prepareBowl();
+                stage=ThreeDFailure.Kind.MODEL;VehicleModel loaded=model(app.getAssets());ModelLoadSafety.loaded(app);
                 MAIN.post(()->callback.ready(loaded,null));
-            } catch(Exception|OutOfMemoryError error) {MAIN.post(()->callback.ready(null,error));}
+            } catch(Exception|OutOfMemoryError error) {
+                ThreeDFailure failure=ThreeDFailure.at(stage,error);
+                MAIN.post(()->callback.ready(null,failure));
+            }
         });
     }
 }

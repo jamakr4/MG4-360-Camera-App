@@ -19,6 +19,7 @@ public final class ModelLoadSafety {
     private final StartupLoadGuard guard;
     private StartupLoadGuard.State ticket;
     private boolean acknowledgementQueued,storageFault;
+    private Throwable storageError;
     private ModelLoadSafety(Context context) {
         File base=new File(context.createDeviceProtectedStorageContext().getFilesDir(),"birdseye-startup-guard.bin");
         AtomicFile atomic=new AtomicFile(base);
@@ -53,7 +54,7 @@ public final class ModelLoadSafety {
                 if(automatic&&!state.automatic)return false;
                 if(safety.ticket!=null&&safety.ticket.serial==state.serial)return true;
                 safety.ticket=safety.guard.begin(automatic);return safety.ticket!=null;
-            }catch(IOException|RuntimeException error){safety.storageFault=true;Log.e("ModelLoadSafety","3D disabled: startup ledger unavailable",error);return false;}
+            }catch(IOException|RuntimeException error){safety.storageFault=true;safety.storageError=error;Log.e("ModelLoadSafety","3D disabled: startup ledger unavailable",error);return false;}
         }
     }
     static void loaded(Context context) {
@@ -66,29 +67,34 @@ public final class ModelLoadSafety {
                 synchronized(safety) {
                     if(safety.ticket!=expected)return;
                     try{safety.guard.stable(expected.serial);Log.i("ModelLoadSafety","Model startup confirmed stable");}
-                    catch(IOException|RuntimeException error){safety.storageFault=true;Log.e("ModelLoadSafety","Cannot confirm model startup",error);}
+                    catch(IOException|RuntimeException error){safety.storageFault=true;safety.storageError=error;Log.e("ModelLoadSafety","Cannot confirm model startup",error);}
                 }
             }),STABLE_MS);
         }
     }
     public static boolean blocked(Context context) {
+        return blockedFailure(context)!=null;
+    }
+    public static ThreeDFailure blockedFailure(Context context) {
         ModelLoadSafety safety=get(context);
         synchronized(safety) {
-            if(safety.storageFault)return true;
+            if(safety.storageFault)return ThreeDFailure.at(ThreeDFailure.Kind.STARTUP_STORAGE,safety.storageError);
             try {
                 StartupLoadGuard.State state=safety.guard.state();
-                return state.attempts>=StartupLoadGuard.LIMIT&&(safety.ticket==null||safety.ticket.serial!=state.serial);
-            }catch(IOException|RuntimeException error){safety.storageFault=true;return true;}
+                if(state.attempts>=StartupLoadGuard.LIMIT&&(safety.ticket==null||safety.ticket.serial!=state.serial))
+                    return ThreeDFailure.at(ThreeDFailure.Kind.STARTUP_BLOCKED,new IllegalStateException("Unconfirmed starts: "+state.attempts+"/"+StartupLoadGuard.LIMIT));
+                return null;
+            }catch(IOException|RuntimeException error){safety.storageFault=true;safety.storageError=error;return ThreeDFailure.at(ThreeDFailure.Kind.STARTUP_STORAGE,error);}
         }
     }
     public static boolean automaticEnabled(Context context) {
         ModelLoadSafety safety=get(context);synchronized(safety){try{return safety.guard.state().automatic;}catch(Exception error){return false;}}
     }
     public static void automatic(Context context,boolean enabled) throws IOException {
-        ModelLoadSafety safety=get(context);synchronized(safety){try{safety.guard.automatic(enabled);}catch(IOException|RuntimeException error){safety.storageFault=true;throw error;}}
+        ModelLoadSafety safety=get(context);synchronized(safety){try{safety.guard.automatic(enabled);}catch(IOException|RuntimeException error){safety.storageFault=true;safety.storageError=error;throw error;}}
     }
     public static void reset(Context context) throws IOException {
-        ModelLoadSafety safety=get(context);synchronized(safety){try{safety.guard.reset();safety.ticket=null;safety.acknowledgementQueued=false;safety.storageFault=false;}catch(IOException|RuntimeException error){safety.storageFault=true;throw error;}}
+        ModelLoadSafety safety=get(context);synchronized(safety){try{safety.guard.reset();safety.ticket=null;safety.acknowledgementQueued=false;safety.storageFault=false;safety.storageError=null;}catch(IOException|RuntimeException error){safety.storageFault=true;safety.storageError=error;throw error;}}
     }
     public static String status(Context context) {
         ModelLoadSafety safety=get(context);synchronized(safety){

@@ -82,11 +82,18 @@ public class BirdseyeSurfaceInstrumentedTest {
             }
             BirdseyeSurface[] other=new BirdseyeSurface[1];
             BirdseyeRenderer[] healthy=new BirdseyeRenderer[1];
+            java.util.concurrent.atomic.AtomicInteger updates=new java.util.concurrent.atomic.AtomicInteger();
+            AtomicBoolean updateOffUi=new AtomicBoolean();
             try {
                 scenario.onActivity(a->{
                     BirdseyeSynthetic frames=new BirdseyeSynthetic();
                     healthy[0]=new BirdseyeRenderer(frames);healthy[0].setMesh(new BirdseyeMesh(frames.calibration));
                     other[0]=new BirdseyeSurface(a,healthy[0],null);
+                    assertTrue(android.view.TextureView.class.isInstance(other[0]));
+                    other[0].setBeforeFrame(()->{
+                        updates.incrementAndGet();
+                        if(android.os.Looper.myLooper()!=android.os.Looper.getMainLooper())updateOffUi.set(true);
+                    });
                     ((FrameLayout)a.gl.getParent()).addView(other[0],new FrameLayout.LayoutParams(180,256,Gravity.END));
                     other[0].onResume();
                 });
@@ -97,6 +104,8 @@ public class BirdseyeSurfaceInstrumentedTest {
                 waitFor(scenario,a->a.renderer.error!=null);
                 waitFor(scenario,a->{other[0].requestRender();return healthy[0].renderedFrames>before+2;});
                 assertNull(healthy[0].error);assertEquals(15,healthy[0].freshMask);
+                assertTrue("Display frames must update the live pose",updates.get()>2);
+                assertFalse("Steering state belongs to the UI thread",updateOffUi.get());
             } finally {
                 scenario.onActivity(a->{if(other[0]!=null){other[0].onPause();((FrameLayout)other[0].getParent()).removeView(other[0]);}});
             }
