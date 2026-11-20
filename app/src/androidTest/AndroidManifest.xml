@@ -1,0 +1,10 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <activity android:name="com.drivehub.kamera.signal.AndroidAutoTakeoverActivity" android:exported="true"
+            android:taskAffinity="com.drivehub.kamera.test.projection" android:theme="@android:style/Theme.Material.NoActionBar" />
+        <activity android:name="com.drivehub.kamera.signal.CarPlayTakeoverActivity" android:exported="true"
+            android:taskAffinity="com.drivehub.kamera.test.projection" android:theme="@android:style/Theme.Material.NoActionBar" />
+        <activity android:name="com.drivehub.kamera.signal.OtherAppTakeoverActivity" android:exported="true"
+            android:taskAffinity="com.drivehub.kamera.test.projection" android:theme="@android:style/Theme.Material.NoActionBar" />
+    </application>
+</manifest>

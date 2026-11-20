@@ -1,0 +1,4 @@
+<resources>
+    <string name="parking_reverse_foreground">Garder la caméra au premier plan en R</string>
+    <string name="parking_reverse_foreground_hint">Rétablit la caméra si Android Auto, CarPlay ou une autre application prend le premier plan en R. Accueil ou la fermeture de la caméra annule la priorité jusqu’à sa réouverture ou une nouvelle sélection de R. Les écrans d’urgence et les écrans OEM protégés restent prioritaires. Après trois échecs, le rétablissement automatique est suspendu.</string>
+</resources>

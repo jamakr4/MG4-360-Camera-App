@@ -32,6 +32,10 @@ public final class UiPrefs {
                 ?com.drivehub.kamera.steering.WheelGuides.Style.LINES:com.drivehub.kamera.steering.WheelGuides.Style.SIMPLE;
     }
     public static final String KEY_PARKING_AUTO_CLOSE = "parkingAutoClose";
+    public static final String KEY_PARKING_REVERSE_FOREGROUND = "parkingReverseForeground";
+    public static boolean isParkingReverseForegroundEnabled(SharedPreferences prefs) {
+        return prefs.getBoolean(KEY_PARKING_REVERSE_FOREGROUND,true);
+    }
     public static final String KEY_PARKING_AUTO_CLOSE_SPEED = "parkingAutoCloseSpeedKmh";
     public static final String KEY_PARKING_AUTO_OPEN_DRIVE = "parkingAutoOpenDrive";
     public static final String KEY_PARKING_AUTO_CLOSE_ON_PARK = "parkingAutoCloseOnPark";

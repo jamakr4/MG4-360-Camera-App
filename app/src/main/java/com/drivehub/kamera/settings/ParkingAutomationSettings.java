@@ -15,11 +15,15 @@ final class ParkingAutomationSettings {
         Switch close = dialog.findViewById(R.id.switchParkingAutoClose);
         Switch drive = dialog.findViewById(R.id.switchParkingAutoOpenDrive);
         Switch park = dialog.findViewById(R.id.switchParkingAutoCloseOnPark);
+        Switch foreground=dialog.findViewById(R.id.switchParkingReverseForeground);
         EditText speed = dialog.findViewById(R.id.etParkingAutoCloseSpeed);
         speed.setText(String.valueOf(UiPrefs.getParkingAutoCloseSpeedKmh(prefs)));
         close.setChecked(UiPrefs.isParkingAutoCloseEnabled(prefs));
         drive.setChecked(UiPrefs.isParkingAutoOpenDriveEnabled(prefs));
         park.setChecked(UiPrefs.isParkingAutoCloseOnParkEnabled(prefs));
+        foreground.setChecked(UiPrefs.isParkingReverseForegroundEnabled(prefs));
+        foreground.setOnCheckedChangeListener((button,checked)->prefs.edit()
+                .putBoolean(UiPrefs.KEY_PARKING_REVERSE_FOREGROUND,checked).apply());
         enabled(speed, close.isChecked());
         close.setOnCheckedChangeListener((button, checked) -> {
             prefs.edit().putBoolean(UiPrefs.KEY_PARKING_AUTO_CLOSE, checked).apply();

@@ -625,6 +625,7 @@ public final class SettingsDialogController {
                         dialog.findViewById(R.id.switchParkingAutoClose),
                         dialog.findViewById(R.id.switchParkingAutoOpenDrive),
                         dialog.findViewById(R.id.switchParkingAutoCloseOnPark),
+                        dialog.findViewById(R.id.switchParkingReverseForeground),
                         dialog.findViewById(R.id.switchGuidelineSpeedLimit),
                         views.swShowStatusBar,
                         views.swSmoothEntry,
@@ -847,7 +848,7 @@ public final class SettingsDialogController {
         TextView rendering=dialog.findViewById(R.id.tvDevStatusBirdseye);
         if(rendering!=null)rendering.setText(com.drivehub.kamera.birdseye.BirdseyeRenderer.timingStatus());
         TextView steering=dialog.findViewById(R.id.tvDevStatusSteering);
-        if(steering!=null)steering.setText(com.drivehub.kamera.steering.SteeringReader.diagnostic());
+        if(steering!=null)steering.setText(com.drivehub.kamera.steering.SteeringReader.diagnostic()+"\n\n"+SignalService.reverseForegroundDiagnostic());
     }
 
     private String readCameraProbeSummary() {

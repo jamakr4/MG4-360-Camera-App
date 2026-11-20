@@ -46,11 +46,14 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private static final String STATE_PARKING_SESSION = "automaticParkingSession";
     private static final String STATE_PARK_CLOSE_VIEW = "parkCloseView";
     private String parkingSession;
+    private boolean reverseForegroundUserOpen;
     private String parkCloseViewId;
     // Retained through configuration recreation, cleared when this view leaves the foreground.
     private static volatile String sForegroundCameraViewId;
 
     public static String foregroundCameraViewId() { return sForegroundCameraViewId; }
+    private static java.lang.ref.WeakReference<MainActivity> resumedCamera=new java.lang.ref.WeakReference<>(null);
+    public static MainActivity resumedCameraActivity(){return resumedCamera.get();}
 
     /** Automatic routes must show the camera, never toggle a visible Activity closed. */
     public static Intent showCameraIntent(Context context, int videoIndex) {
@@ -105,6 +108,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 &&(intent.getFlags()&Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY)==0) {
             closeFromUser();return;
         }
+        reverseForegroundUserOpen=isUserCameraOpen(intent);
         String nextSession = ACTION_SHOW_CAMERA.equals(intent.getAction())
                 ? intent.getStringExtra(SignalService.EXTRA_PARKING_SESSION) : null;
         // A delayed automatic launch must not take ownership of a manual view.
@@ -120,6 +124,11 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     }
 
     private void closeFromUser(){SignalService.onMainClosedByUser();finishMainView();}
+
+    private static boolean isUserCameraOpen(Intent intent) {
+        return intent!=null&&(Intent.ACTION_MAIN.equals(intent.getAction())
+                ||ACTION_SHOW_CAMERA.equals(intent.getAction())&&!intent.hasExtra(SignalService.EXTRA_PARKING_SESSION));
+    }
 
     private void finishMainView() {
         endParkCloseView();
@@ -273,6 +282,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        reverseForegroundUserOpen=savedInstanceState==null&&isUserCameraOpen(getIntent());
         parkCloseViewId = savedInstanceState != null ? savedInstanceState.getString(STATE_PARK_CLOSE_VIEW) : null;
         parkingSession = savedInstanceState != null ? savedInstanceState.getString(STATE_PARKING_SESSION)
                 : ACTION_SHOW_CAMERA.equals(getIntent().getAction())
@@ -392,6 +402,9 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         ParkClosePolicy.Request pending = SignalService.pendingParkClose(parkCloseViewId);
         if (pending != null && closeOnPark(pending.viewId, pending.transition)) return;
         SignalService.refreshCameraAccess(this);
+        resumedCamera=new java.lang.ref.WeakReference<>(this);
+        SignalService.onMainCameraResumed(this,reverseForegroundUserOpen);
+        reverseForegroundUserOpen=false;
         AppSystemBars.apply(getWindow());
         if (!SignalService.onParkingActivityShown(parkingSession)) parkingSession = null;
         if (RecordingService.isSurveillanceActive(this) && !RecordingService.isRunning()) {
@@ -410,6 +423,8 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     protected void onPause() {
         SignalService.traceCameraEvent("MainActivity onPause");
         previewResumed = false;
+        if(resumedCamera.get()==this)resumedCamera.clear();
+        SignalService.onMainCameraPaused(this);
         CameraHandoffController.demand("main", false);
         stopPreview();
         sideCameraPanel.pauseDisplay();
@@ -469,9 +484,10 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         super.onStop();
         sMainVisible = false; stoppedForLauncher = true;
         sSettingsDialogOpen = false;
-        SignalService.onParkingActivityStopped(parkingSession, isChangingConfigurations());
+        boolean retainReverseSession=SignalService.retainReverseSession(this);
+        SignalService.onParkingActivityStopped(parkingSession, isChangingConfigurations(),retainReverseSession);
         if (!isChangingConfigurations()) endParkCloseView();
-        if (!isChangingConfigurations()) parkingSession = null;
+        if (!isChangingConfigurations()&&!retainReverseSession) parkingSession = null;
         UiPrefs.getPrefs(this).unregisterOnSharedPreferenceChangeListener(cameraAccessListener);
         // Re-apply signal/rearview overlay state once MainActivity stops blocking it.
         SignalService.requestRecheck();
