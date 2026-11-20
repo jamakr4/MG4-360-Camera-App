@@ -1,8 +1,0 @@
-<resources>
-    <string name="settings_model_guard_title">3D startup protection</string>
-    <string name="settings_model_guard_hint">Each process records model loading before it starts. After 60 stable seconds the attempt is confirmed. Five unconfirmed starts disable model loading and leave 2D available. Early normal process exits can also count. Reset deliberately after checking the cause; 3D then requires manual selection.</string>
-    <string name="settings_model_guard_auto">Preload model automatically at startup</string>
-    <string name="settings_model_guard_reset">Reset 3D startup protection</string>
-    <string name="settings_model_guard_reset_done">Protection reset. Select 3D manually to test it. Automatic preloading resumes on the next process start if enabled.</string>
-    <string name="settings_model_guard_write_failed">Startup protection could not be saved. Leave 3D disabled and check storage.</string>
-</resources>

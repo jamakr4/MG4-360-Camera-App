@@ -61,7 +61,6 @@ public final class UiPrefs {
     public static int clampParkingAutoCloseSpeedKmh(int speed) {
         return Math.max(1, Math.min(130, speed));
     }
-    public static final String KEY_MODEL_SAFETY_REVISION = "modelSafetyRevision";
     public static final String KEY_DEV_STEERING_SCALE = "devSteeringScale";
     public static final String KEY_DEV_STEERING_INVERT = "devSteeringInvert";
     public static float getSteeringScale(SharedPreferences prefs) {

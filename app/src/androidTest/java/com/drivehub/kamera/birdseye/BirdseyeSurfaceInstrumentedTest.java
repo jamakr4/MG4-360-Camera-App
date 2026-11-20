@@ -24,7 +24,7 @@ public class BirdseyeSurfaceInstrumentedTest {
         do {
             scenario.onActivity(a->{ready.set(condition.test(a));status.set("requested="+a.renderer.threeDRequested
                     +" active="+a.renderer.threeDActive+" depth="+a.renderer.depthAvailable+" error="+a.renderer.error
-                    +" 3dError="+a.renderer.threeDError+" prepare="+a.preparationError+" "+ModelLoadSafety.status(a));});
+                    +" 3dError="+a.renderer.threeDError+" prepare="+a.preparationError);});
             if(ready.get())return;
             SystemClock.sleep(25);
         } while(SystemClock.uptimeMillis()<deadline);

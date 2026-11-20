@@ -1,8 +1,0 @@
-<resources>
-    <string name="settings_model_guard_title">3D-Startschutz</string>
-    <string name="settings_model_guard_hint">Jeder Prozess speichert den Modell-Ladestart vorab. Nach 60 stabilen Sekunden wird er bestätigt. Fünf unbestätigte Starts sperren das Modellladen; 2D bleibt nutzbar. Auch frühe normale Prozessenden können mitzählen. Schutz erst nach Prüfung der Ursache bewusst zurücksetzen; danach 3D manuell wählen.</string>
-    <string name="settings_model_guard_auto">Modell beim Start automatisch vorladen</string>
-    <string name="settings_model_guard_reset">3D-Startschutz zurücksetzen</string>
-    <string name="settings_model_guard_reset_done">Schutz zurückgesetzt. 3D zum Testen manuell wählen. Automatisches Vorladen gilt beim nächsten Prozessstart, sofern aktiviert.</string>
-    <string name="settings_model_guard_write_failed">Startschutz konnte nicht gespeichert werden. 3D ausgeschaltet lassen und Speicher prüfen.</string>
-</resources>

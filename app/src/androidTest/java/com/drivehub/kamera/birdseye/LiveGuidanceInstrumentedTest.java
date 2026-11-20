@@ -98,7 +98,7 @@ public class LiveGuidanceInstrumentedTest {
                 BirdseyeView view=activity.findViewById(R.id.birdseyeView);BirdseyeRenderer renderer;
                 try{java.lang.reflect.Field field=BirdseyeView.class.getDeclaredField("renderer");field.setAccessible(true);renderer=(BirdseyeRenderer)field.get(view);}
                 catch(ReflectiveOperationException e){throw new AssertionError(e);}
-                assertTrue(ModelLoadSafety.status(activity),renderer.threeDRequested);
+                assertTrue("Saved 3D selection must be applied",renderer.threeDRequested);
                 long now=SystemClock.elapsedRealtime();view.setSteeringSnapshot(SteeringSnapshot.value(-516.95f,0,now,1));
                 view.updateSteeringFrame(GearSnapshot.value(2,now),now);
                 assertTrue(renderer.steering.angles().guidanceAvailable);

@@ -592,8 +592,7 @@ public final class SettingsDialogController {
                 dialog.findViewById(R.id.etDevParkingRearWheelAngle),
                 dialog.findViewById(R.id.btnDevParkingRearWheelAngleReset));
         com.drivehub.kamera.dev.CameraSnapshotExporter.bind(activity,dialog.findViewById(R.id.btnDevCameraSnapshots));
-        dev.bindModelSafety(activity,prefs,dialog.findViewById(R.id.swDevModelPrewarm),
-                dialog.findViewById(R.id.tvDevModelSafety),dialog.findViewById(R.id.btnDevModelSafetyReset));
+        dev.bindThreeDDiagnostics(activity,dialog.findViewById(R.id.tvDevThreeDDiagnostics));
         views.btnDevOemCaptures.setOnClickListener(v -> com.drivehub.kamera.dev.OemCapturesDialog.show(activity));
     }
 
@@ -632,7 +631,6 @@ public final class SettingsDialogController {
                         views.swLockTileResizing,
                         views.swLockTileMoving,
                         views.swDevPerformanceOverlay,
-                        dialog.findViewById(R.id.swDevModelPrewarm),
                         views.swAllowBetaUpdates
                 },
                 views.dialogClose,

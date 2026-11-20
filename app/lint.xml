@@ -3,6 +3,6 @@
     <!-- French was requested for the normal UI only. Dev/debug uses English fallback.
          Keep missing normal French strings and missing translations in other languages as errors. -->
     <issue id="MissingTranslation">
-        <ignore regexp='^"(?:settings_(?:dev_.*|tab_dev(?:_status)?|model_guard_.*)|performance_.*|birdseye_(?:debug_.*|synthetic_label))" is not translated in "fr" \(French\)$' />
+        <ignore regexp='^"(?:settings_(?:dev_.*|tab_dev(?:_status)?)|performance_.*|birdseye_(?:debug_.*|synthetic_label))" is not translated in "fr" \(French\)$' />
     </issue>
 </lint>

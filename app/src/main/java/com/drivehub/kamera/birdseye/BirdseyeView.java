@@ -83,13 +83,7 @@ public final class BirdseyeView extends FrameLayout {
     public boolean rearFrameFresh() { return resumed&&!blocked&&source.ready&&(renderer.freshMask&8)!=0
             &&SystemClock.elapsedRealtime()-renderer.lastDrawElapsedMs<=500; }
     private void applyMode() {
-        ThreeDFailure protection=ModelLoadSafety.blockedFailure(getContext());
-        boolean safe=protection!=null;
-        if(safe&&prefs.getBoolean(UiPrefs.KEY_PARKING_SURROUND_3D,false)) {
-            prefs.edit().putBoolean(UiPrefs.KEY_PARKING_SURROUND_3D,false).apply();
-            showThreeDFailure(protection);
-        }
-        boolean mode=prefs.getBoolean(UiPrefs.KEY_PARKING_SURROUND_3D,false)&&!safe;
+        boolean mode=prefs.getBoolean(UiPrefs.KEY_PARKING_SURROUND_3D,false);
         renderer.setThreeD(mode);
         boolean wide=prefs.getBoolean(UiPrefs.KEY_PARKING_SURROUND_WIDE,false);
         renderer.setWide(wide);
@@ -101,8 +95,6 @@ public final class BirdseyeView extends FrameLayout {
         if (modeToggle != null) {
             modeToggle.setText(mode ? R.string.surround_label_2d : R.string.surround_label_3d);
             modeToggle.setContentDescription(getContext().getString(mode ? R.string.surround_mode_2d : R.string.surround_mode_3d));
-            // A blocked 3D button explains the reason without bypassing startup protection.
-            modeToggle.setAlpha(safe ? .55f : 1f);
             styleModeToggle();
         }
         if(guidesToggle!=null) {
@@ -172,7 +164,7 @@ public final class BirdseyeView extends FrameLayout {
         Toast.makeText(getContext(),failure.userMessage(getContext()),Toast.LENGTH_LONG).show();
     }
     private final SharedPreferences.OnSharedPreferenceChangeListener preferences = (p, key) -> {
-        if(UiPrefs.KEY_PARKING_SURROUND_3D.equals(key)||UiPrefs.KEY_PARKING_SURROUND_WIDE.equals(key)||UiPrefs.KEY_MODEL_SAFETY_REVISION.equals(key))applyMode();
+        if(UiPrefs.KEY_PARKING_SURROUND_3D.equals(key)||UiPrefs.KEY_PARKING_SURROUND_WIDE.equals(key))applyMode();
         if(UiPrefs.KEY_PARKING_SURROUND_GUIDES.equals(key)||UiPrefs.KEY_PARKING_GUIDE_SPEED_LIMIT.equals(key)
                 ||UiPrefs.KEY_PARKING_GUIDE_SPEED_KMH.equals(key)||UiPrefs.KEY_PARKING_GUIDE_STYLE.equals(key))applyGuides();
         if (UiPrefs.KEY_ACCENT_COLOR.equals(key)) styleModeToggle();
@@ -277,8 +269,6 @@ public final class BirdseyeView extends FrameLayout {
         addView(modeToggle, toggleParams);
         modeToggle.setOnClickListener(v -> {
             boolean enable=!prefs.getBoolean(UiPrefs.KEY_PARKING_SURROUND_3D,false);
-            ThreeDFailure protection=enable?ModelLoadSafety.blockedFailure(getContext()):null;
-            if(protection!=null){showThreeDFailure(protection);return;}
             prefs.edit().putBoolean(UiPrefs.KEY_PARKING_SURROUND_3D,enable).apply();
         });
         wideToggle=new Button(context);wideToggle.setId(R.id.surroundWideToggle);
