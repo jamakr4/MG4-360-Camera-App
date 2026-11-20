@@ -67,10 +67,10 @@ public final class BirdseyeDebugActivity extends Activity {
     private boolean pdcEnabled;
     private final PdcGeometry pdc=SyntheticRearPdc.geometry();
     volatile String preparationError;
-    private void applyMode(){boolean safe=ModelLoadSafety.blocked(this);boolean mode=prefs.getBoolean(UiPrefs.KEY_PARKING_SURROUND_3D,false)&&!safe;renderer.setThreeD(mode);boolean wide=prefs.getBoolean(UiPrefs.KEY_PARKING_SURROUND_WIDE,false);renderer.setWide(wide);
+    private void applyMode(){boolean mode=prefs.getBoolean(UiPrefs.KEY_PARKING_SURROUND_3D,false);renderer.setThreeD(mode);boolean wide=prefs.getBoolean(UiPrefs.KEY_PARKING_SURROUND_WIDE,false);renderer.setWide(wide);
         if(wideToggle!=null){wideToggle.setVisibility(mode?android.view.View.GONE:android.view.View.VISIBLE);wideToggle.setSelected(wide);wideToggle.setText(wide?R.string.surround_label_normal:R.string.surround_label_wide);}
         if(speedSlider!=null)speedSlider.setEnabled(!liveSteering.isChecked());
-        if(twoD!=null){twoD.setSelected(!mode);threeD.setSelected(mode);threeD.setEnabled(!safe);zoomIn.setEnabled(mode);zoomOut.setEnabled(mode);boolean manual=!liveSteering.isChecked();steeringSlider.setEnabled(manual);steeringReset.setEnabled(manual);for(Button preset:steeringPresets)preset.setEnabled(manual);}}
+        if(twoD!=null){twoD.setSelected(!mode);threeD.setSelected(mode);zoomIn.setEnabled(mode);zoomOut.setEnabled(mode);boolean manual=!liveSteering.isChecked();steeringSlider.setEnabled(manual);steeringReset.setEnabled(manual);for(Button preset:steeringPresets)preset.setEnabled(manual);}}
     private void updateLiveSteering() {
         boolean live=liveSteering.isChecked();
         steeringPose.reset(); steeringSnapshot=SteeringSnapshot.EMPTY;
@@ -151,7 +151,7 @@ public final class BirdseyeDebugActivity extends Activity {
             // The shared scene already keeps the complete guide preview on flat ground.
             previewScene=projection.scene;
             renderer.setMesh(projection.mesh);renderer.setWideMesh(projection.wideMesh,projection.wideError);renderer.setScene(previewScene);
-            if(!ModelLoadSafety.blocked(this))RivelaAssets.prepare(previewScene,this,(model,error)->{
+            RivelaAssets.prepare(previewScene,this,(model,error)->{
                 if(destroyed)return;
                 if(error!=null){preparationError=error.toString();renderer.failThreeD(ThreeDFailure.at(ThreeDFailure.Kind.MODEL,error));}
                 else renderer.setModel(model);
@@ -339,7 +339,7 @@ public final class BirdseyeDebugActivity extends Activity {
         });
     }
     private void prepareRecordedModel(ProjectionAssets projection,int token){
-        if(!ModelLoadSafety.blocked(this))RivelaAssets.prepare(previewScene,this,(model,error)->{
+        RivelaAssets.prepare(previewScene,this,(model,error)->{
             if(destroyed||token!=sourceGeneration)return;
             if(error!=null){preparationError=error.toString();renderer.failThreeD(ThreeDFailure.at(ThreeDFailure.Kind.MODEL,error));}else renderer.setModel(model);
         });

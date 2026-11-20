@@ -28,28 +28,9 @@ public final class DevSettingsController {
 
     public DevSettingsController() {
     }
-    public void bindModelSafety(Context context,SharedPreferences prefs,Switch automatic,TextView status,Button reset) {
-        boolean[] syncing={false};
-        automatic.setChecked(com.drivehub.kamera.birdseye.ModelLoadSafety.automaticEnabled(context));
-        Runnable refresh=()->{
-            String last=com.drivehub.kamera.birdseye.ThreeDFailure.lastReport(context);
-            status.setText(com.drivehub.kamera.birdseye.ModelLoadSafety.status(context)+(last.isEmpty()?"":"\n\n"+last));
-        };refresh.run();
-        automatic.setOnCheckedChangeListener((view,checked)->{
-            if(syncing[0])return;
-            try{com.drivehub.kamera.birdseye.ModelLoadSafety.automatic(context,checked);}
-            catch(java.io.IOException|RuntimeException error){Toast.makeText(context,R.string.settings_model_guard_write_failed,Toast.LENGTH_LONG).show();}
-            syncing[0]=true;automatic.setChecked(com.drivehub.kamera.birdseye.ModelLoadSafety.automaticEnabled(context));syncing[0]=false;refresh.run();
-        });
-        reset.setOnClickListener(view->{
-            try {
-                com.drivehub.kamera.birdseye.ModelLoadSafety.reset(context);
-                prefs.edit().putBoolean(UiPrefs.KEY_PARKING_SURROUND_3D,false)
-                        .putLong(UiPrefs.KEY_MODEL_SAFETY_REVISION,System.nanoTime()).apply();
-                Toast.makeText(context,R.string.settings_model_guard_reset_done,Toast.LENGTH_LONG).show();
-            }catch(java.io.IOException|RuntimeException error){Toast.makeText(context,R.string.settings_model_guard_write_failed,Toast.LENGTH_LONG).show();}
-            syncing[0]=true;automatic.setChecked(com.drivehub.kamera.birdseye.ModelLoadSafety.automaticEnabled(context));syncing[0]=false;refresh.run();
-        });
+    public void bindThreeDDiagnostics(Context context,TextView status) {
+        String last=com.drivehub.kamera.birdseye.ThreeDFailure.lastReport(context);
+        status.setText(last.isEmpty()?context.getString(R.string.surround_3d_no_errors):last);
     }
 
     public void bindParkingWheelAngles(SharedPreferences prefs, EditText front, Button resetFront,

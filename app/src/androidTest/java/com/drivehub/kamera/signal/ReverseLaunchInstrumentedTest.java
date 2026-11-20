@@ -144,6 +144,114 @@ public class ReverseLaunchInstrumentedTest {
         public void log(String message){}
     }
 
+    /** Drives real lifecycle/task APIs with fresh synthetic gear on the emulator. */
+    private final class ForegroundHarness implements AutoCloseable {
+        final SharedPreferences prefs=UiPrefs.getPrefs(context);
+        final Map<String,?> saved=prefs.getAll();
+        final String[] keys={UiPrefs.KEY_PARKING_REVERSE_FOREGROUND,UiPrefs.KEY_OEM_AVM_COEXIST,UiPrefs.KEY_OEM_AVM_ACTIVE,
+                UiPrefs.KEY_OEM_CAMERA_ACCESS_BLOCKED,UiPrefs.KEY_OEM_TAKEOVER_YIELD,DashcamSettingsController.KEY_ENABLED,
+                UiPrefs.KEY_DIGITAL_REARVIEW_ENABLED,UiPrefs.KEY_OVERLAY_ON_SIGNAL};
+        final Handler handler=new Handler(android.os.Looper.getMainLooper());
+        final HandlerThread worker=new HandlerThread("Reverse-foreground-test");
+        final java.util.List<MainActivity> cameras=new java.util.ArrayList<>();
+        MainActivity setupCamera;
+        SignalService service;OemTakeoverManager manager;OemTakeoverController previous;
+        volatile int value=4;
+        final Runnable pump=new Runnable(){public void run(){
+            try {
+                field(SignalService.class,"guidanceGear").set(service,com.drivehub.kamera.steering.GearSnapshot.value(value,SystemClock.elapsedRealtime()));
+                invoke(service,"onGearStateSample",new Class[]{int.class},value);
+                ReverseForegroundController c=(ReverseForegroundController)field(SignalService.class,"reverseForeground").get(service);
+                Handler io=(Handler)field(SignalService.class,"oemLifecycleHandler").get(service);
+                if(c!=null)io.post(c::sampleOnWorker);
+                handler.postDelayed(this,75);
+            }catch(Exception e){throw new AssertionError(e);}
+        }};
+        ForegroundHarness() throws Exception {
+            // API 33 emulator uses an ordinary app UID; the actual MG4 runs our platform-signed system UID.
+            InstrumentationRegistry.getInstrumentation().getUiAutomation().adoptShellPermissionIdentity();
+            prefs.edit().putBoolean(UiPrefs.KEY_PARKING_REVERSE_FOREGROUND,true).putBoolean(UiPrefs.KEY_OEM_AVM_COEXIST,true)
+                    .putBoolean(UiPrefs.KEY_OEM_AVM_ACTIVE,false).putBoolean(UiPrefs.KEY_OEM_CAMERA_ACCESS_BLOCKED,false)
+                    .putBoolean(DashcamSettingsController.KEY_ENABLED,false).putBoolean(UiPrefs.KEY_DIGITAL_REARVIEW_ENABLED,false)
+                    .putBoolean(UiPrefs.KEY_OVERLAY_ON_SIGNAL,false).commit();
+            context.startActivity(MainActivity.showCameraIntent(context,CameraIndex.FRONT.getVideoIndex()));
+            await(()->resumedMain()!=null);setupCamera=resumedMain();await(SignalService::isRunning);
+            service=(SignalService)field(SignalService.class,"sInstance").get(null);
+            await(()->SignalService.takeoverSnapshot()!=null);
+            manager=(OemTakeoverManager)field(SignalService.class,"takeoverManager").get(service);
+            previous=(OemTakeoverController)field(OemTakeoverManager.class,"controller").get(manager);
+            field(OemTakeoverManager.class,"controller").set(manager,new OemTakeoverController(new VerifiedPorts()));
+            UiPrefs.setOemAvmCoexistEnabled(prefs,false);
+            await(()->SignalService.takeoverSnapshot().state==OemTakeoverController.State.EXCLUSIVE);
+            stopSamplers(service);worker.start();
+            field(SignalService.class,"oemLifecycleHandler").set(service,new Handler(worker.getLooper()));
+            main(pump);remember();
+        }
+        MainActivity remember(){MainActivity a=resumedMain();assertNotNull(a);if(!cameras.contains(a))cameras.add(a);return a;}
+        void reverse(){value=2;await(()->SignalService.reverseForegroundDiagnostic().contains("armed"));}
+        void interrupt(Class<?> type) {
+            Context fixtures=InstrumentationRegistry.getInstrumentation().getContext();
+            fixtures.startActivity(new Intent(fixtures,type).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_MULTIPLE_TASK));
+            await(()->resumedMain()==null);
+        }
+        void returned(MainActivity original) {
+            await(()->resumedMain()==original);
+            assertEquals(original.getTaskId(),remember().getTaskId());
+            SystemClock.sleep(2200); // Confirmation resets the failure budget, not each onResume.
+        }
+        @Override public void close() throws Exception {
+            main(()->handler.removeCallbacks(pump));
+            prefs.edit().putBoolean(UiPrefs.KEY_PARKING_REVERSE_FOREGROUND,false).commit();
+            for(MainActivity a:cameras)main(()->{if(!a.isDestroyed())a.finishAndRemoveTask();});
+            await(()->resumedMain()==null);
+            main(()->invoke(service,"stopOemLifecycleMonitor",new Class[]{}));worker.quitSafely();worker.join(3000);
+            prefs.edit().putBoolean(UiPrefs.KEY_OEM_AVM_COEXIST,true).commit();
+            await(()->SignalService.takeoverSnapshot().state==OemTakeoverController.State.OEM);
+            field(OemTakeoverManager.class,"controller").set(manager,previous);
+            SharedPreferences.Editor edit=prefs.edit();
+            for(String key:keys){Object v=saved.get(key);if(v instanceof Boolean)edit.putBoolean(key,(Boolean)v);else edit.remove(key);}edit.commit();
+            main(()->{invoke(service,"startPropertyPollingFallback",new Class[]{});invoke(service,"startOemLifecycleMonitor",new Class[]{});});
+            SignalService.refreshCameraAccess(context);
+            InstrumentationRegistry.getInstrumentation().getUiAutomation().dropShellPermissionIdentity();
+        }
+    }
+
+    @Test public void reverseForegroundRestoresSameManualTaskForAaCarPlayAndOtherApps() throws Exception {
+        try(ForegroundHarness h=new ForegroundHarness()) {
+            h.reverse();MainActivity original=h.remember();
+            assertNull(field(MainActivity.class,"parkingSession").get(original));
+            for(Class<?> type:new Class[]{AndroidAutoTakeoverActivity.class,CarPlayTakeoverActivity.class,OtherAppTakeoverActivity.class}) {
+                h.interrupt(type);h.returned(original);
+                assertNull("Manual views stay manual",field(MainActivity.class,"parkingSession").get(original));
+            }
+        }
+    }
+    @Test public void automaticReverseSessionSurvivesProjectionAndGearChangeCancelsReturn() throws Exception {
+        try(ForegroundHarness h=new ForegroundHarness()) {
+            main(h.setupCamera::finishAndRemoveTask);await(()->!MainActivity.isMainVisible());
+            h.value=2;await(()->resumedMain()!=null);MainActivity original=h.remember();
+            Object session=field(MainActivity.class,"parkingSession").get(original);assertNotNull(session);
+            h.interrupt(CarPlayTakeoverActivity.class);h.returned(original);
+            assertEquals(session,field(MainActivity.class,"parkingSession").get(original));
+            h.interrupt(AndroidAutoTakeoverActivity.class);h.value=4;SystemClock.sleep(1500);
+            assertNull("A stale R request must not reclaim the view in D",resumedMain());
+        }
+    }
+    @Test public void reverseForegroundHonoursHomeAndCanBeDisabled() throws Exception {
+        try(ForegroundHarness h=new ForegroundHarness()) {
+            h.reverse();MainActivity original=h.remember();
+            try(android.os.ParcelFileDescriptor result=InstrumentationRegistry.getInstrumentation().getUiAutomation().executeShellCommand("input keyevent 3")) {
+                try(java.io.InputStream in=new android.os.ParcelFileDescriptor.AutoCloseInputStream(result)){while(in.read()!=-1){}}
+            }
+            await(()->resumedMain()==null);SystemClock.sleep(1500);assertNull(resumedMain());
+            assertTrue(SignalService.reverseForegroundDiagnostic(),SignalService.reverseForegroundDiagnostic().contains("Home"));
+            context.startActivity(MainActivity.showCameraIntent(context,CameraIndex.REAR.getVideoIndex()));
+            await(()->resumedMain()==original);
+            h.prefs.edit().putBoolean(UiPrefs.KEY_PARKING_REVERSE_FOREGROUND,false).commit();
+            h.interrupt(AndroidAutoTakeoverActivity.class);SystemClock.sleep(1500);assertNull(resumedMain());
+        }
+    }
+
     @Test public void lifecycleMonitorCanStopAndRestartWhileItsWorkerIsSampling() throws Exception {
         try(ActivityScenario<MainActivity> setup=ActivityScenario.launch(MainActivity.class)) {
             await(SignalService::isRunning);SignalService service=(SignalService)field(SignalService.class,"sInstance").get(null);

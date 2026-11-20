@@ -35,6 +35,17 @@ import static org.junit.Assert.*;
 
 @RunWith(AndroidJUnit4.class)
 public class ParkingSettingsInstrumentedTest {
+    @Test public void reverseForegroundDefaultsOnAndPersistsWhenParkingReopens() {
+        SharedPreferences prefs=UiPrefs.getPrefs(InstrumentationRegistry.getInstrumentation().getTargetContext());
+        String key=UiPrefs.KEY_PARKING_REVERSE_FOREGROUND;boolean had=prefs.contains(key),saved=prefs.getBoolean(key,true);
+        prefs.edit().remove(key).commit();
+        try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)) {
+            openParking(scenario);dialogView(R.id.switchParkingReverseForeground).perform(scrollTo()).check(matches(isChecked())).perform(click());
+            assertFalse(UiPrefs.isParkingReverseForegroundEnabled(prefs));
+            dialogView(R.id.btnClose).perform(click());
+            openParking(scenario);dialogView(R.id.switchParkingReverseForeground).perform(scrollTo()).check(matches(not(isChecked())));
+        } finally {SharedPreferences.Editor edit=prefs.edit();if(had)edit.putBoolean(key,saved);else edit.remove(key);edit.commit();}
+    }
     @Test public void guidelineDefaultsAndSelectionsPersistAcrossReopening() {
         SharedPreferences prefs=UiPrefs.getPrefs(InstrumentationRegistry.getInstrumentation().getTargetContext());
         Map<String,?> saved=prefs.getAll();

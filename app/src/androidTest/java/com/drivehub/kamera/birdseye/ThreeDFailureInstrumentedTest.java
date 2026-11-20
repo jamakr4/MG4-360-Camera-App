@@ -19,9 +19,9 @@ public class ThreeDFailureInstrumentedTest {
         Context unwritable=new ContextWrapper(base) {
             @Override public SharedPreferences getSharedPreferences(String name,int mode){throw new IllegalStateException("Read-only test store");}
         };
-        ThreeDFailure failure=ThreeDFailure.at(ThreeDFailure.Kind.STARTUP_STORAGE,new IOException("Cannot read startup ledger"));
+        ThreeDFailure failure=ThreeDFailure.at(ThreeDFailure.Kind.MODEL,new IOException("Cannot load model texture"));
         failure.report(unwritable);
-        assertTrue(failure.userMessage(base).contains("3D-STORAGE"));
+        assertTrue(failure.userMessage(base).contains("3D-MODEL"));
     }
 
     @Test public void lastFailureSurvivesReopeningAndIncludesCauseVersionAndTime() {

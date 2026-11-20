@@ -1,0 +1,4 @@
+<resources>
+    <string name="parking_reverse_foreground">Keep camera in foreground in R</string>
+    <string name="parking_reverse_foreground_hint">Return to the camera if Android Auto, CarPlay or another app takes over in R. Home or closing the camera ends priority until you reopen it or select R again. Emergency and protected OEM screens take priority. After three failed returns, automatic recovery pauses.</string>
+</resources>

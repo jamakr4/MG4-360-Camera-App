@@ -592,8 +592,7 @@ public final class SettingsDialogController {
                 dialog.findViewById(R.id.etDevParkingRearWheelAngle),
                 dialog.findViewById(R.id.btnDevParkingRearWheelAngleReset));
         com.drivehub.kamera.dev.CameraSnapshotExporter.bind(activity,dialog.findViewById(R.id.btnDevCameraSnapshots));
-        dev.bindModelSafety(activity,prefs,dialog.findViewById(R.id.swDevModelPrewarm),
-                dialog.findViewById(R.id.tvDevModelSafety),dialog.findViewById(R.id.btnDevModelSafetyReset));
+        dev.bindThreeDDiagnostics(activity,dialog.findViewById(R.id.tvDevThreeDDiagnostics));
         views.btnDevOemCaptures.setOnClickListener(v -> com.drivehub.kamera.dev.OemCapturesDialog.show(activity));
     }
 
@@ -625,13 +624,13 @@ public final class SettingsDialogController {
                         dialog.findViewById(R.id.switchParkingAutoClose),
                         dialog.findViewById(R.id.switchParkingAutoOpenDrive),
                         dialog.findViewById(R.id.switchParkingAutoCloseOnPark),
+                        dialog.findViewById(R.id.switchParkingReverseForeground),
                         dialog.findViewById(R.id.switchGuidelineSpeedLimit),
                         views.swShowStatusBar,
                         views.swSmoothEntry,
                         views.swLockTileResizing,
                         views.swLockTileMoving,
                         views.swDevPerformanceOverlay,
-                        dialog.findViewById(R.id.swDevModelPrewarm),
                         views.swAllowBetaUpdates
                 },
                 views.dialogClose,
@@ -847,7 +846,7 @@ public final class SettingsDialogController {
         TextView rendering=dialog.findViewById(R.id.tvDevStatusBirdseye);
         if(rendering!=null)rendering.setText(com.drivehub.kamera.birdseye.BirdseyeRenderer.timingStatus());
         TextView steering=dialog.findViewById(R.id.tvDevStatusSteering);
-        if(steering!=null)steering.setText(com.drivehub.kamera.steering.SteeringReader.diagnostic());
+        if(steering!=null)steering.setText(com.drivehub.kamera.steering.SteeringReader.diagnostic()+"\n\n"+SignalService.reverseForegroundDiagnostic());
     }
 
     private String readCameraProbeSummary() {

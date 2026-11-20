@@ -37,11 +37,8 @@ public final class RivelaAssets {
         AssetManager assets=context.getApplicationContext().getAssets();
         CompletableFuture<WarmupResult> pending=new CompletableFuture<>();warmup=pending;
         try {
-            Context app=context.getApplicationContext();
             IO.execute(()->{
-                if(!ModelLoadSafety.enter(app,true)){Log.w("RivelaAssets","Automatic warmup skipped: "+ModelLoadSafety.status(app));pending.complete(new WarmupResult(false,false,0));return;}
                 WarmupResult result=warm(assets,()->BirdseyeCalibration.load(Paths.get(BirdseyeCalibration.VEHICLE_PATH)));
-                if(result.modelReady)ModelLoadSafety.loaded(app);
                 pending.complete(result);
             });
         }catch(RuntimeException|OutOfMemoryError error) {
@@ -80,14 +77,10 @@ public final class RivelaAssets {
     public static void prepare(RivelaScene scene,Context context,Callback callback) {
         Context app=context.getApplicationContext();
         IO.execute(()->{
-            ThreeDFailure.Kind stage=ThreeDFailure.Kind.STARTUP_STORAGE;
+            ThreeDFailure.Kind stage=ThreeDFailure.Kind.PROJECTION;
             try {
-                if(!ModelLoadSafety.enter(app,false)) {
-                    ThreeDFailure blocked=ModelLoadSafety.blockedFailure(app);
-                    throw blocked!=null?blocked:ThreeDFailure.at(ThreeDFailure.Kind.STARTUP_BLOCKED,new IllegalStateException("Startup attempt was refused"));
-                }
-                stage=ThreeDFailure.Kind.PROJECTION;scene.prepareBowl();
-                stage=ThreeDFailure.Kind.MODEL;VehicleModel loaded=model(app.getAssets());ModelLoadSafety.loaded(app);
+                scene.prepareBowl();
+                stage=ThreeDFailure.Kind.MODEL;VehicleModel loaded=model(app.getAssets());
                 MAIN.post(()->callback.ready(loaded,null));
             } catch(Exception|OutOfMemoryError error) {
                 ThreeDFailure failure=ThreeDFailure.at(stage,error);

@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="surround_3d_failed_detail">3D unavailable [%1$s]: %2$s Using 2D. Details: Dev → 3D startup protection.</string>
-    <string name="surround_3d_error_guard">Startup protection is active after five unconfirmed process starts.</string>
-    <string name="surround_3d_error_storage">The 3D startup protection record could not be read or saved.</string>
+    <string name="settings_dev_3d_diagnostics">3D diagnostics</string>
+    <string name="surround_3d_no_errors">No 3D error recorded.</string>
+    <string name="surround_3d_failed_detail">3D unavailable [%1$s]: %2$s Using 2D. Details: Dev → 3D diagnostics.</string>
     <string name="surround_3d_error_projection">The 3D camera projection could not be prepared from the vehicle calibration.</string>
     <string name="surround_3d_error_model">The vehicle model or its textures could not be loaded or validated.</string>
     <string name="surround_3d_error_memory">Not enough memory to prepare or display 3D.</string>

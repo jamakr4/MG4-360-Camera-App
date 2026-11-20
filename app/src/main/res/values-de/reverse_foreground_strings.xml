@@ -1,0 +1,4 @@
+<resources>
+    <string name="parking_reverse_foreground">Kamera in R im Vordergrund halten</string>
+    <string name="parking_reverse_foreground_hint">Holt die Kamera zurück, wenn Android Auto, CarPlay oder eine andere App in R übernimmt. Home oder Schließen beendet den Vorrang bis zum Wiederöffnen oder erneuten Einlegen von R. Notruf und geschützte OEM-Ansichten haben Vorrang. Nach drei erfolglosen Rückholungen pausiert die automatische Wiederherstellung.</string>
+</resources>

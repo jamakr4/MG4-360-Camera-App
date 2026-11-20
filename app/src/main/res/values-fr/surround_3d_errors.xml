@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="surround_3d_failed_detail">3D indisponible [%1$s] : %2$s La vue 2D reste active. Détails : Dev → Protection au démarrage 3D.</string>
-    <string name="surround_3d_error_guard">La protection est active après cinq démarrages du processus non confirmés.</string>
-    <string name="surround_3d_error_storage">Impossible de lire ou d’enregistrer le suivi de protection au démarrage 3D.</string>
+    <string name="settings_dev_3d_diagnostics">Diagnostic 3D</string>
+    <string name="surround_3d_no_errors">Aucune erreur 3D enregistrée.</string>
+    <string name="surround_3d_failed_detail">3D indisponible [%1$s] : %2$s La vue 2D reste active. Détails : Dev → Diagnostic 3D.</string>
     <string name="surround_3d_error_projection">Impossible de préparer la projection 3D des caméras à partir du calibrage du véhicule.</string>
     <string name="surround_3d_error_model">Impossible de charger ou de valider le modèle du véhicule ou ses textures.</string>
     <string name="surround_3d_error_memory">Mémoire insuffisante pour préparer ou afficher la vue 3D.</string>

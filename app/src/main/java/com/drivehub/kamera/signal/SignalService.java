@@ -136,6 +136,7 @@ public class SignalService extends Service {
     private final ReverseLaunchPolicy reverseLaunch = new ReverseLaunchPolicy();
     private final ParkingAutomationPolicy parkingAutomation = new ParkingAutomationPolicy();
     private final ParkClosePolicy parkClose = new ParkClosePolicy();
+    private volatile ReverseForegroundController reverseForeground;
     private final Runnable parkingSpeedRunnable = this::pollParkingSpeed;
     private final OemOverlayRecovery oemOverlayRecovery = new OemOverlayRecovery();
     private final Runnable oemOverlayRestoreRunnable = new Runnable() {
@@ -513,6 +514,12 @@ public class SignalService extends Service {
     public void onCreate() {
         super.onCreate();
         sInstance = this;
+        reverseForeground=new ReverseForegroundController(this,mainHandler,
+                ()->!UiPrefs.isOemCameraAccessBlocked(UiPrefs.getPrefs(this))&&!CameraProbe.isOemCameraAccessBlocked(),
+                job->{Handler worker=oemLifecycleHandler;return worker!=null&&worker.post(job);},
+                reason->{cancelParkingAutomation(reason);reverseLaunch.dismiss();});
+        MainActivity resumed=MainActivity.resumedCameraActivity();
+        if(resumed!=null)reverseForeground.cameraResumed(resumed,false);
         exclusiveCameraLease=new com.drivehub.kamera.birdseye.ExclusiveCameraLease(message->DevRuntimeLog.add("Camera ownership",message));
         ipkRearview = new IpkCameraOverlay(this);
         systemPerformanceOverlay = new SystemPerformanceOverlay(this);
@@ -677,6 +684,8 @@ public class SignalService extends Service {
             if (UiPrefs.KEY_OEM_TAKEOVER_YIELD.equals(key) || UiPrefs.KEY_OEM_AVM_COEXIST.equals(key)
                     || UiPrefs.KEY_EXTERNAL_CAMERA_PAUSED.equals(key)) {
                 mainHandler.post(this::applyOemCoexistState);
+            } else if (UiPrefs.KEY_PARKING_REVERSE_FOREGROUND.equals(key)) {
+                mainHandler.post(()->{if(reverseForeground!=null)reverseForeground.vehicleSample(guidanceGear);});
             } else if (UiPrefs.KEY_PARKING_AUTO_CLOSE_ON_PARK.equals(key)) {
                 boolean enabled = UiPrefs.isParkingAutoCloseOnParkEnabled(sp);
                 // Invalidate queued requests immediately when a UI toggle is switched off.
@@ -766,6 +775,8 @@ public class SignalService extends Service {
                 if(!oemLifecycleMonitoring||token!=oemMonitorGeneration)return;
                 guidanceGear=com.drivehub.kamera.steering.GearSnapshot.value(rawGear,sampledAt);
                 vehicleMotion=com.drivehub.kamera.steering.VehicleMotionSnapshot.value(speedKmh,rawGear,sampledAt);
+                ReverseForegroundController foregroundController=reverseForeground;
+                if(foregroundController!=null)foregroundController.sampleOnWorker();
                 if (gear != lastOemGear || (sampledAt - lastOemGearSampleMs >= 250
                         && (gear == REVERSE_GEAR_VALUE
                         || UiPrefs.isOemCameraAccessBlocked(UiPrefs.getPrefs(SignalService.this))))) {
@@ -898,6 +909,7 @@ public class SignalService extends Service {
 
     /** Main-thread only. Keep the existing reverse launch and dismissal policy. */
     private void updateReverseLaunch(boolean oemStarting) {
+        if(reverseForeground!=null)reverseForeground.vehicleSample(guidanceGear);
         boolean ready = isParkingAutomationReady();
         configureParkingAutomation();
         if (!ready) cancelParkingAutomation("camera access unavailable");
@@ -992,9 +1004,13 @@ public class SignalService extends Service {
     }
 
     public static void onParkingActivityStopped(String session, boolean recreating) {
+        onParkingActivityStopped(session,recreating,false);
+    }
+
+    public static void onParkingActivityStopped(String session,boolean recreating,boolean temporarilyHidden) {
         SignalService inst = sInstance;
         if (inst == null || !inst.parkingAutomation.matches(session)) return;
-        if (recreating) {
+        if (recreating||temporarilyHidden) {
             inst.parkingAutomation.recreating(session);
             inst.mainHandler.removeCallbacks(inst.parkingSpeedRunnable);
         } else {
@@ -1017,10 +1033,28 @@ public class SignalService extends Service {
     public static void onMainClosedByUser() {
         SignalService inst=sInstance;
         if(inst!=null) {
+            if(inst.reverseForeground!=null)inst.reverseForeground.dismiss("user closed camera");
             inst.parkClose.viewStopped(MainActivity.foregroundCameraViewId());
             inst.cancelParkingAutomation("manual close");
             inst.reverseLaunch.dismiss();
         }
+    }
+
+    public static void onMainCameraResumed(MainActivity activity,boolean userOpen) {
+        SignalService inst=sInstance;
+        if(inst!=null&&inst.reverseForeground!=null)inst.reverseForeground.cameraResumed(activity,userOpen);
+    }
+    public static void onMainCameraPaused(MainActivity activity) {
+        SignalService inst=sInstance;
+        if(inst!=null&&inst.reverseForeground!=null)inst.reverseForeground.cameraPaused(activity);
+    }
+    public static boolean retainReverseSession(MainActivity activity) {
+        SignalService inst=sInstance;
+        return inst!=null&&inst.reverseForeground!=null&&inst.reverseForeground.retainSession(activity);
+    }
+    public static String reverseForegroundDiagnostic() {
+        SignalService inst=sInstance;
+        return inst!=null&&inst.reverseForeground!=null?inst.reverseForeground.diagnostic():"R foreground: service stopped";
     }
 
     public static void onParkCloseViewStarted(String viewId) {
@@ -1443,6 +1477,7 @@ public class SignalService extends Service {
             pollThread = null;
         }
         stopOemLifecycleMonitor();
+        if(reverseForeground!=null){reverseForeground.close();reverseForeground=null;}
         if (takeoverManager != null) { takeoverManager.close(); takeoverManager = null; }
         if(exclusiveCameraLease!=null){exclusiveCameraLease.close();exclusiveCameraLease=null;}
         unregisterOemCoexistListener();

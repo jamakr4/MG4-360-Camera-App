@@ -402,6 +402,19 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
             android:text="@string/parking_auto_close_on_park_hint" />
+
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="12dp" android:gravity="center_vertical"
+            android:minHeight="48dp" android:orientation="horizontal">
+            <TextView style="@style/DrivehubSettingsCardRowLabel"
+                android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+                android:labelFor="@id/switchParkingReverseForeground" android:text="@string/parking_reverse_foreground" />
+            <Switch android:id="@+id/switchParkingReverseForeground" style="@style/DrivehubSettingsSwitch"
+                android:contentDescription="@string/parking_reverse_foreground" />
+        </LinearLayout>
+        <TextView style="@style/DrivehubSettingsCaption"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="6dp" android:text="@string/parking_reverse_foreground_hint" />
     </LinearLayout>
 
 

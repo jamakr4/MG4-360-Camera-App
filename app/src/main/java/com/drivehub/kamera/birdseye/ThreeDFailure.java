@@ -11,8 +11,6 @@ import java.util.Date;
 /** A stable support code plus the original cause; created only when 3D fails. */
 public final class ThreeDFailure extends RuntimeException {
     public enum Kind {
-        STARTUP_BLOCKED("3D-GUARD", R.string.surround_3d_error_guard),
-        STARTUP_STORAGE("3D-STORAGE", R.string.surround_3d_error_storage),
         PROJECTION("3D-PROJECTION", R.string.surround_3d_error_projection),
         MODEL("3D-MODEL", R.string.surround_3d_error_model),
         MEMORY("3D-MEMORY", R.string.surround_3d_error_memory),

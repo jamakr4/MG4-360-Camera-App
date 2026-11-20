@@ -4,14 +4,16 @@ import org.junit.Test;
 import static org.junit.Assert.*;
 
 public class BirdseyeCarGeometryTest {
-    @Test public void bodyIsCenteredInsideMaskAndPixelsKeepSquareGroundScale() {
+    @Test public void frontUsesNominalFootprintAndOnlyRearGetsDisplayExtension() {
         double x0=.10512996465,y0=.04582828283,x1=.89487004280,y1=.95276959240;
         BirdseyeCarGeometry g=new BirdseyeCarGeometry(768,1536,x0,y0,x1,y1);
-        assertEquals(g.widthMm/768,g.heightMm/1536,1e-6);
         assertEquals(0,g.leftMm+(x0+x1)*g.widthMm/2,1e-3);
-        assertEquals(0,g.topMm+(y0+y1)*g.heightMm/2,1e-3);
         assertEquals(BirdseyeMesh.CAR_WIDTH-2*BirdseyeCarGeometry.MASK_INSET_MM,(x1-x0)*g.widthMm,1e-3);
-        assertTrue((y1-y0)*g.heightMm<=BirdseyeMesh.CAR_LENGTH-2*BirdseyeCarGeometry.MASK_INSET_MM);
+        assertEquals(-2143.5,g.topMm+y0*g.heightMm,1e-3);
+        assertEquals(2323.5,g.topMm+y1*g.heightMm,1e-3);
+        assertEquals(4467,(y1-y0)*g.heightMm,1e-3);
+        // The original shadow is not moved rearwards with the larger artwork.
+        assertEquals(4161.819055,1536*(y1-y0)*g.maskReferencePixelMm,1e-3);
     }
     @Test public void extraTransparentPaddingCannotChangeVisibleBodySize() {
         BirdseyeCarGeometry a=new BirdseyeCarGeometry(40,80,.2,.1,.8,.9);

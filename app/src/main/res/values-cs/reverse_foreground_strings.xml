@@ -1,0 +1,4 @@
+<resources>
+    <string name="parking_reverse_foreground">V R ponechat kameru v popředí</string>
+    <string name="parking_reverse_foreground_hint">Vrátí kameru do popředí, pokud ji v R překryje Android Auto, CarPlay nebo jiná aplikace. Tlačítko Domů nebo zavření kamery ukončí prioritu do opětovného otevření nebo nového zařazení R. Tísňové a chráněné obrazovky OEM mají přednost. Po třech neúspěšných pokusech se automatické obnovení pozastaví.</string>
+</resources>

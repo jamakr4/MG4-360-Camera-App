@@ -129,11 +129,13 @@ public final class BirdseyeRenderer implements GLSurfaceView.Renderer {
             "varying vec3 vCam0,vCam1,vCam2,vCam3; varying vec2 vGround;\n" +
             // Reference (u,v) -> top-field (u,v/2). Top-field pixels occupy rows
             // 0,2,...478; interpolate between those actual positions, clamp the last line.
-            PackedUyvyShader.SAMPLING +
+            PackedUyvyShader.SAMPLING + BirdseyeRearMask.GLSL +
             "void main(){vec2 car=vec2(" + BirdseyeMesh.CAR_WIDTH/2 + "," + BirdseyeMesh.CAR_LENGTH/2 + ");" +
             // A valid RGBA car uses its own silhouette; retain the metric mask only if artwork is absent.
             "vec2 g=abs(vGround);vec3 color=vec3(0.0);if(uCarReady>0.5 || g.x>=car.x || g.y>=car.y){" +
             "vec4 w=max(vec4(vCam0.z,vCam1.z,vCam2.z,vCam3.z),vec4(0.0))*uFresh;" +
+            // Only 2D uses this contour; retain the existing fallback when artwork is absent.
+            "if(uCarReady>0.5 && w.w>0.0)w.w*=rearBodyVisibility(vCam3.xy);" +
             "float sum=dot(w,vec4(1.0));if(sum<0.00000001){" +
             "float stripe=step(0.5,fract((vGround.x+vGround.y)/180.0));" +
             "color=mix(vec3(0.18,0.09,0.16),vec3(0.32,0.15,0.26),stripe);" +

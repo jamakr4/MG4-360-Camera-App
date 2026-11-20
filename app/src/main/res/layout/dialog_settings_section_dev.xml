@@ -670,13 +670,7 @@
     <TextView style="@style/DrivehubSettingsBodyMuted" android:layout_width="match_parent" android:layout_height="wrap_content"
         android:text="@string/settings_dev_steering_hint" />
     <TextView style="@style/DrivehubSettingsCardLabel" android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:layout_marginTop="16dp" android:text="@string/settings_model_guard_title" />
-    <TextView style="@style/DrivehubSettingsBodyMuted" android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:text="@string/settings_model_guard_hint" />
-    <Switch android:id="@+id/swDevModelPrewarm" style="@style/DrivehubSettingsSwitch" android:layout_width="match_parent"
-        android:layout_height="48dp" android:textColor="@color/settings_text_primary" android:text="@string/settings_model_guard_auto" />
-    <TextView android:id="@+id/tvDevModelSafety" style="@style/DrivehubSettingsCreditsBody" android:layout_width="match_parent"
+        android:layout_marginTop="16dp" android:text="@string/settings_dev_3d_diagnostics" />
+    <TextView android:id="@+id/tvDevThreeDDiagnostics" style="@style/DrivehubSettingsCreditsBody" android:layout_width="match_parent"
         android:layout_height="wrap_content" android:textIsSelectable="true" />
-    <Button android:id="@+id/btnDevModelSafetyReset" style="@style/DrivehubDialogButtonSecondary" android:layout_width="wrap_content"
-        android:layout_height="48dp" android:text="@string/settings_model_guard_reset" />
 </LinearLayout>

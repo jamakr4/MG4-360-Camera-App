@@ -50,12 +50,18 @@ final class BirdseyeCarArtwork {
                     bounds.getDouble("x0"), bounds.getDouble("y0"), bounds.getDouble("x1"), bounds.getDouble("y1"));
             options.inJustDecodeBounds = false; options.inScaled = false;
             options.inPreferredConfig = Bitmap.Config.ARGB_8888;
+            options.inMutable = true;
             options.inPremultiplied = false; // Shader explicitly composites straight alpha over its background.
             try (InputStream in = assets.open(imagePath)) { bitmap = BitmapFactory.decodeStream(in,null,options); }
             if (bitmap == null || !bitmap.hasAlpha() || bitmap.getWidth() != options.outWidth || bitmap.getHeight() != options.outHeight)
                 throw new IOException("Cannot decode car artwork");
+            int firstRow=BirdseyeRearMask.firstShadowRow(bitmap.getHeight());
+            int[] rearPixels=new int[bitmap.getWidth()*(bitmap.getHeight()-firstRow)];
+            bitmap.getPixels(rearPixels,0,bitmap.getWidth(),0,firstRow,bitmap.getWidth(),bitmap.getHeight()-firstRow);
+            BirdseyeRearMask.addShadow(rearPixels,bitmap.getWidth(),bitmap.getHeight(),firstRow,geometry);
+            bitmap.setPixels(rearPixels,0,bitmap.getWidth(),0,firstRow,bitmap.getWidth(),bitmap.getHeight()-firstRow);
             return new BirdseyeCarArtwork(bitmap,geometry);
-        } catch (Exception error) {
+        } catch (Exception | OutOfMemoryError error) {
             if (bitmap != null) bitmap.recycle();
             Log.i("Birdseye", "Optional car artwork unavailable ("+color.id+"): "+error.getMessage());
             return null;
