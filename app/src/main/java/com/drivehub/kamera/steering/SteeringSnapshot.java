@@ -3,7 +3,8 @@ package com.drivehub.kamera.steering;
 /** Immutable read result. A held angle may have an old sensor timestamp but a fresh successful read. */
 public final class SteeringSnapshot {
     public static final long MAX_AGE_MS = 500;
-    public static final float MAX_RAW_DEGREES = 516.95f;
+    /** Software plausibility guard (1.5 turns), not a measured vehicle stop or curve endpoint. */
+    public static final float MAX_RAW_DEGREES = 540f;
     public static final SteeringSnapshot EMPTY = unavailable("paused", 0);
     public final float rawDegrees;
     public final boolean available;
@@ -16,9 +17,13 @@ public final class SteeringSnapshot {
     }
 
     public static SteeringSnapshot value(float raw, int status, long readMs, long timestampNs) {
-        boolean valid=status==0 && Float.isFinite(raw) && Math.abs(raw)<=MAX_RAW_DEGREES;
+        boolean valid=status==0 && isPlausible(raw);
         return new SteeringSnapshot(raw, valid, readMs, timestampNs,
                 status!=0 ? "property status="+status : valid ? "available" : "invalid angle");
+    }
+
+    public static boolean isPlausible(float raw) {
+        return Float.isFinite(raw) && Math.abs(raw)<=MAX_RAW_DEGREES;
     }
 
     public static SteeringSnapshot unavailable(String reason, long readMs) {

@@ -14,11 +14,11 @@ public final class SteeringModel {
     }
     public static final Solution INVALID = new Solution(false, Double.NaN, Float.NaN, Float.NaN);
     public final VehicleGeometry geometry = VehicleGeometry.MG4;
-    private final double maxCurvature = curvature(SteeringSnapshot.MAX_RAW_DEGREES);
+    private final double maxCurvature = curvature(OemSteeringCurve.MAX_INPUT_DEGREES);
 
     public Solution solve(float sensorDegrees) {
-        if (!Float.isFinite(sensorDegrees) || Math.abs(sensorDegrees) > SteeringSnapshot.MAX_RAW_DEGREES)
-            return INVALID;
+        sensorDegrees=OemSteeringCurve.clampSensorDegrees(sensorDegrees);
+        if (!Float.isFinite(sensorDegrees)) return INVALID;
         double k = curvature(Math.abs(sensorDegrees));
         // SAIC input positive left; our wheels/curvature positive right.
         return fromCurvature(sensorDegrees == 0 ? 0 : Math.copySign(k, -sensorDegrees));

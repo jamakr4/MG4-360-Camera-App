@@ -43,6 +43,54 @@ public class SteeringGuidanceTest {
         assertTrue(guidance.update(SteeringSnapshot.value(199.3f,0,1610,10),GearSnapshot.value(2,1610),true,1610).guidanceAvailable);
     }
 
+    @Test public void fullLockOvershootKeepsGuidanceAndFinitePathsInBothGearsAndReturnsSmoothly() {
+        SteeringModel model=new SteeringModel();WheelGuides guides=new WheelGuides();
+        for(int gear:new int[]{2,4})for(float sign:new float[]{-1,1}) {
+            SteeringGuidance guidance=new SteeringGuidance();long now=1000;
+            SteeringModel.Solution limit=model.solve(sign*516.95f);
+            for(float magnitude:new float[]{516.95f,Math.nextUp(516.95f),517,520,540,517,516.95f,516.9f,500}) {
+                float raw=sign*magnitude;
+                SteeringSnapshot sample=SteeringSnapshot.value(raw,0,now,10);
+                SteeringGuidance.Frame frame=guidance.update(sample,GearSnapshot.value(gear,now),true,now);
+                assertTrue("guidance at raw="+raw+" gear="+gear,frame.guidanceAvailable);
+                assertTrue(frame.steeringAvailable);assertTrue(frame.wheels.valid);
+                assertEquals(gear==2?WheelGuides.Direction.REVERSE:WheelGuides.Direction.FORWARD,frame.direction);
+                if(magnitude>=516.95f)assertEquals(limit.curvaturePerMm,frame.wheels.curvaturePerMm,0);
+                for(com.drivehub.kamera.rivela.PdcBars.Bar path:guides.lines(frame.wheels,0,0,frame.direction))
+                    for(double coordinate:path.xy)assertTrue(Double.isFinite(coordinate));
+                WheelGuides.Corridor corridor=guides.corridor(frame.wheels,0,0,frame.direction);
+                assertTrue(corridor.triangles.length>0);
+                for(double coordinate:corridor.triangles)assertTrue(Double.isFinite(coordinate));
+                now+=50;
+            }
+            SteeringGuidance.Frame returned=guidance.update(SteeringSnapshot.value(sign*500,0,now,10),GearSnapshot.value(gear,now),true,now);
+            assertTrue(returned.guidanceAvailable);
+            assertTrue(Math.abs(returned.wheels.curvaturePerMm)<Math.abs(limit.curvaturePerMm));
+            assertTrue(Math.abs(returned.wheels.curvaturePerMm)>Math.abs(model.solve(sign*500).curvaturePerMm));
+        }
+    }
+
+    @Test public void fullLockOvershootDoesNotBypassStatusFreshnessOrPlausibilityChecks() {
+        for(int gear:new int[]{2,4})for(float sign:new float[]{-1,1}) {
+            SteeringGuidance guidance=new SteeringGuidance();
+            SteeringSnapshot valid=SteeringSnapshot.value(sign*520,0,1000,1);
+            SteeringGuidance.Frame first=guidance.update(valid,GearSnapshot.value(gear,1000),true,1000);
+            assertTrue(first.guidanceAvailable);
+            for(SteeringSnapshot invalid:new SteeringSnapshot[]{SteeringSnapshot.value(sign*520,1,1100,1),
+                    SteeringSnapshot.value(sign*Math.nextUp(540f),0,1100,1),SteeringSnapshot.value(Float.NaN,0,1100,1),
+                    SteeringSnapshot.unavailable("disconnected",1100)}) {
+                SteeringGuidance.Frame frame=guidance.update(invalid,GearSnapshot.value(gear,1100),true,1100);
+                assertFalse(frame.guidanceAvailable);assertFalse(frame.steeringAvailable);
+                assertEquals(first.wheels.curvaturePerMm,frame.wheels.curvaturePerMm,0);
+            }
+            assertFalse(guidance.update(valid,GearSnapshot.value(gear,1501),true,1501).guidanceAvailable);
+            SteeringSnapshot fresh=SteeringSnapshot.value(sign*520,0,1501,1);
+            assertFalse(guidance.update(fresh,GearSnapshot.value(gear,1000),true,1501).guidanceAvailable);
+            assertFalse(guidance.update(fresh,GearSnapshot.value(gear,1501),false,1501).guidanceAvailable);
+            assertTrue(guidance.update(fresh,GearSnapshot.value(gear,1501),true,1501).guidanceAvailable);
+        }
+    }
+
     @Test public void staleGearAndInactiveViewHideGuidesAndResetRequiresNewSteering() {
         SteeringGuidance guidance=new SteeringGuidance();
         SteeringSnapshot raw=SteeringSnapshot.value(-199.3f,0,1600,10);

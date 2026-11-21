@@ -30,9 +30,20 @@ public class SteeringTest {
             assertFalse(SteeringSnapshot.decode(bad,true,1000).available);
             assertFalse(SteeringSnapshot.decode(new Property(bad,0),false,1000).available);
         }
-        for(float bad:new float[]{Float.NaN,Float.POSITIVE_INFINITY,-Float.MAX_VALUE,517,-517}) {
+        for(float bad:new float[]{Float.NaN,Float.POSITIVE_INFINITY,Float.NEGATIVE_INFINITY,-Float.MAX_VALUE,541,-541,
+                Math.nextUp(540f),Math.nextDown(-540f)}) {
             assertFalse(SteeringSnapshot.value(bad,0,1000,0).available);
             assertEquals(0,SteeringMapping.degrees(bad,1,false),0);
+        }
+    }
+    @Test public void plausibleOvershootPreservesRawSensorValuesInBothPropertyOverloads() throws Exception {
+        for(float raw:new float[]{516.95f,Math.nextUp(516.95f),517,520,540,-516.95f,Math.nextDown(-516.95f),-517,-520,-540}) {
+            for(SteeringSnapshot sample:new SteeringSnapshot[]{SteeringSnapshot.decode(raw,true,1000),
+                    SteeringSnapshot.decode(new Property(raw,0),true,1000),SteeringSnapshot.decode(new Property(raw,0),false,1000)}) {
+                assertTrue(sample.available);assertTrue(sample.fresh(1500));assertFalse(sample.fresh(1501));
+                assertEquals(raw,sample.rawDegrees,0);assertEquals("available",sample.state);
+            }
+            assertFalse(SteeringSnapshot.decode(new Property(raw,1),false,1000).available);
         }
     }
     @Test public void freshnessUsesReadTimeIncludingHeldAnglesAndRejectsClockReversal() {
@@ -50,6 +61,9 @@ public class SteeringTest {
         assertEquals(35,SteeringMapping.degrees(-516.95f,1,false),0);
         assertEquals(-35,SteeringMapping.degrees(516.95f,SteeringMapping.DEFAULT_SCALE,false),.001f);
         assertEquals(0,SteeringMapping.degrees(0,1,true),0);
+        for(float sign:new float[]{-1,1})for(float scale:new float[]{1,SteeringMapping.DEFAULT_SCALE,30})
+            for(boolean invert:new boolean[]{false,true})
+                assertEquals(SteeringMapping.degrees(sign*516.95f,scale,invert),SteeringMapping.degrees(sign*540,scale,invert),0);
     }
     @Test public void corruptPreferencesCannotDivideByZeroOrReverseDirection() {
         for(float bad:new float[]{0,-1,.99f,30.1f,Float.NaN,Float.POSITIVE_INFINITY})

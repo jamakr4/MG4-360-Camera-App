@@ -48,7 +48,20 @@ public class CarSteeringSourceTest {
     @Test public void wrongSensorEmptyPayloadAndInvalidFloatNeverMoveTheWheels() throws Exception {
         Event e=new Event(20);e.sensorType=123;assertFalse(SteeringSnapshot.decodeSensor(e,100).available);
         e.sensorType=SteeringReader.PROPERTY;e.floatValues=new float[0];assertFalse(SteeringSnapshot.decodeSensor(e,100).available);
-        for(float bad:new float[]{Float.NaN,Float.POSITIVE_INFINITY,517,-517}){e.floatValues=new float[]{bad};assertFalse(SteeringSnapshot.decodeSensor(e,100).available);}
+        for(float bad:new float[]{Float.NaN,Float.POSITIVE_INFINITY,541,-541,Math.nextUp(540f),Math.nextDown(-540f)}){e.floatValues=new float[]{bad};assertFalse(SteeringSnapshot.decodeSensor(e,100).available);}
         assertFalse(SteeringSnapshot.decodeSensor(null,100).available);
+    }
+    @Test public void legacyReadsAndCallbacksPreservePlausibleFullLockOvershoot() {
+        AtomicLong now=new AtomicLong(100);Sensor sensor=new Sensor();Car car=new Car(sensor,null);car.connected=true;
+        CarSteeringSource source=new CarSteeringSource(new CarServiceConnection(()->car,now::get),now::get);
+        try {
+            for(float raw:new float[]{-517,-540,517,540}) {
+                sensor.event=new Event(raw);SteeringSnapshot polled=source.read();
+                assertTrue(polled.available);assertEquals(raw,polled.rawDegrees,0);assertEquals(123,polled.sensorTimestampNs);
+                sensor.event=null;now.addAndGet(50);sensor.listener.onSensorChanged(new Event(raw));
+                SteeringSnapshot callback=source.read();assertTrue(callback.available);assertEquals(raw,callback.rawDegrees,0);
+                assertTrue(callback.state.startsWith("sensor callback:"));
+            }
+        }finally{source.close();}
     }
 }
