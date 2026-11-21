@@ -39,9 +39,11 @@
             app:layout_constraintTop_toTopOf="@id/surfaceView" app:layout_constraintBottom_toBottomOf="@id/surfaceView" />
 
         <TextView android:id="@+id/pdcStatus" android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:background="#CC10151C" android:textColor="#FFFFFF" android:textSize="18sp"
+            android:background="@drawable/bg_pdc_status" android:textColor="#FFFFFF" android:textSize="18sp"
             android:gravity="center" app:layout_constrainedWidth="true"
-            android:padding="8dp" android:visibility="gone" android:layout_marginBottom="12dp"
+            android:paddingStart="14dp" android:paddingEnd="14dp"
+            android:paddingTop="8dp" android:paddingBottom="8dp"
+            android:singleLine="true" android:visibility="gone" android:layout_marginBottom="12dp"
             android:accessibilityLiveRegion="polite"
             app:layout_constraintBottom_toTopOf="@id/btnTriggerEventSave"
             app:layout_constraintStart_toStartOf="parent" app:layout_constraintEnd_toEndOf="parent" />

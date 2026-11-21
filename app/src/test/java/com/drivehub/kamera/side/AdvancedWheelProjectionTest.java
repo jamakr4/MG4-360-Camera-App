@@ -16,6 +16,18 @@ public class AdvancedWheelProjectionTest {
         public synchronized void session(int token){if(token>0){owner=token;active=null;}else if(owner==-token){owner=0;active=null;}}
         public synchronized boolean maps(int token,String identity,float[][] maps){if(token!=owner||owner==0)return false;if(identity==null){active=null;return false;}if(maps!=null){uploads.incrementAndGet();key=identity;}active=identity.equals(key)?identity:null;return active!=null;}
     }
+    @Test public void missingAndInvalidStartupCalibrationRecoverWithoutReopeningTheView()throws Exception{
+        Access access=new Access();access.ioFailure=true;
+        try(AdvancedWheelProjection loader=new AdvancedWheelProjection(access,c->new float[6][1],()->0,s->{},15)){
+            loader.setActive(true);int owner=access.owner;
+            await(()->access.ioFailures.get()>=2);assertFalse(loader.ready());assertNull(access.active);
+            access.invalid=true;access.ioFailure=false;
+            int reads=access.reads.get();await(()->access.reads.get()>=reads+2);
+            assertFalse(loader.ready());assertEquals(0,access.uploads.get());
+            access.invalid=false;await(loader::ready);
+            assertEquals(owner,access.owner);assertNotNull(access.active);assertEquals(1,access.uploads.get());
+        }
+    }
     @Test public void readsOnlyWhileEnabledReusesCachedMapsAndExpiresIoGrace()throws Exception{
         Access access=new Access();AtomicLong clock=new AtomicLong(1000);
         try(AdvancedWheelProjection loader=new AdvancedWheelProjection(access,c->new float[4][1],clock::get,s->{},15)){

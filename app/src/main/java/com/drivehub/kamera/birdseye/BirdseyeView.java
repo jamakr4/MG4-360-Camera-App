@@ -34,16 +34,19 @@ import com.drivehub.kamera.settings.UiPrefs;
 
 import java.nio.ByteBuffer;
 import java.nio.file.Paths;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 /** Independent live output. Device attachment and calibration IO never run on the UI/GL threads. */
 public final class BirdseyeView extends FrameLayout {
+    interface CalibrationLoader { BirdseyeCalibration load() throws java.io.IOException; }
     private static final ScheduledThreadPoolExecutor IO = new ScheduledThreadPoolExecutor(1);
     static { IO.setRemoveOnCancelPolicy(true); }
     private final Handler main = new Handler(Looper.getMainLooper());
     private final SharedPreferences prefs;
+    private final CalibrationLoader calibrationLoader;
     private final BirdseyeSurface gl;
     private final TextView message, cameraWarning;
     private final Source source = new Source(BirdseyeOwnerIds.next());
@@ -82,6 +85,10 @@ public final class BirdseyeView extends FrameLayout {
     }
     public boolean rearFrameFresh() { return resumed&&!blocked&&source.ready&&(renderer.freshMask&8)!=0
             &&SystemClock.elapsedRealtime()-renderer.lastDrawElapsedMs<=500; }
+    private void applyBlackBox() {
+        renderer.setBlackBoxEnabled(UiPrefs.isBirdseyeBlackBoxEnabled(prefs));
+        gl.requestRender();
+    }
     private void applyMode() {
         boolean mode=prefs.getBoolean(UiPrefs.KEY_PARKING_SURROUND_3D,false);
         renderer.setThreeD(mode);
@@ -171,6 +178,9 @@ public final class BirdseyeView extends FrameLayout {
         if (UiPrefs.KEY_PARKING_BIRDSEYE_CAR_COLOR.equals(key)) {
             renderer.setCarColor(UiPrefs.getBirdseyeCarColor(p));
         }
+        if (UiPrefs.KEY_PARKING_BIRDSEYE_BLACK_BOX.equals(key)) {
+            applyBlackBox();
+        }
         if (UiPrefs.KEY_OEM_CAMERA_ACCESS_BLOCKED.equals(key) || UiPrefs.KEY_OEM_AVM_ACTIVE.equals(key)
                 || UiPrefs.KEY_OEM_AVM_COEXIST.equals(key) || UiPrefs.KEY_EXTERNAL_CAMERA_PAUSED.equals(key)) updateOemState();
     };
@@ -199,6 +209,8 @@ public final class BirdseyeView extends FrameLayout {
                 Log.e("Birdseye", "Renderer failed: " + renderer.error);
                 stopSource(); showMessage(R.string.birdseye_render_failed);
             }
+            // Scheduled executors suppress all later polls after an uncaught worker failure.
+            if (surfaceReady && !blocked && !renderFailed) startSource();
             gl.setContinuousRendering(!blocked && source.ready && !renderFailed);
             long drawAgeMs = SystemClock.elapsedRealtime()-renderer.lastDrawElapsedMs;
             int fresh = drawAgeMs > 500 ? 0 : renderer.freshMask;
@@ -231,9 +243,14 @@ public final class BirdseyeView extends FrameLayout {
         }
     };
 
-    @android.annotation.SuppressLint("ClickableViewAccessibility")
     public BirdseyeView(Context context, AttributeSet attrs) {
+        this(context,attrs,()->BirdseyeCalibration.load(Paths.get(BirdseyeCalibration.VEHICLE_PATH)));
+    }
+
+    @android.annotation.SuppressLint("ClickableViewAccessibility")
+    BirdseyeView(Context context, AttributeSet attrs, CalibrationLoader calibrationLoader) {
         super(context, attrs);
+        this.calibrationLoader=calibrationLoader;
         setBackgroundColor(Color.BLACK);
         prefs = UiPrefs.getPrefs(context);
         renderer.setPdcGeometry(pdc);
@@ -318,7 +335,8 @@ public final class BirdseyeView extends FrameLayout {
         resumed = true; renderFailed = false; renderer.error = null;
         CameraHandoffController.demand("birdseye", true);
         prefs.registerOnSharedPreferenceChangeListener(preferences);
-        renderer.setCarColor(UiPrefs.getBirdseyeCarColor(prefs));applyMode();
+        renderer.setCarColor(UiPrefs.getBirdseyeCarColor(prefs));
+        applyBlackBox();applyMode();
         gl.onResume(); updateOemState();
         main.removeCallbacks(tick); main.post(tick);
     }
@@ -341,18 +359,27 @@ public final class BirdseyeView extends FrameLayout {
     }
 
     private void startSource() {
-        if (task != null && !task.isCancelled()) return;
+        if (task != null && !task.isDone()) return;
+        boolean restarting=task!=null;
+        if(restarting&&!task.isCancelled()) {
+            try {task.get();} // Already done: this never waits on the UI thread.
+            catch(ExecutionException error) {
+                Log.e("Birdseye","Calibration worker stopped; restarting in 2 seconds",error.getCause());
+            }catch(InterruptedException error) {
+                Thread.currentThread().interrupt();return;
+            }
+        }
         handoffGeneration=CameraHandoffController.generation();
         final int token = ++generation;
         source.active = true; source.ready = false; lastMask = -1;
         final String[] calibrationHash = {null};
         final CalibrationReadState reads=new CalibrationReadState();
         calibrationRetrying=false;
-        renderer.invalidateFrames(); showMessage(R.string.birdseye_loading);
+        renderer.invalidateFrames(); showMessage(restarting?R.string.birdseye_calibration_rechecking:R.string.birdseye_loading);
         task = IO.scheduleWithFixedDelay(() -> {
             if (generation != token || !source.active) return;
             try {
-                reads.success(BirdseyeCalibration.load(Paths.get(BirdseyeCalibration.VEHICLE_PATH)));
+                reads.success(calibrationLoader.load());
             }catch(java.io.IOException error) {
                 reads.ioFailure(SystemClock.elapsedRealtime());
                 Log.w("Birdseye","Calibration read IO failure; retrying="+reads.retrying()+": "+error.getMessage());
@@ -393,7 +420,7 @@ public final class BirdseyeView extends FrameLayout {
                 try {BirdseyeNative.attach(source.owner,i);}
                 catch(RuntimeException error){Log.w("Birdseye","Camera "+i+" attach failed",error);}
             }
-        }, 0, 2, TimeUnit.SECONDS);
+        }, restarting?2:0, 2, TimeUnit.SECONDS);
     }
 
     private void stopSource() {

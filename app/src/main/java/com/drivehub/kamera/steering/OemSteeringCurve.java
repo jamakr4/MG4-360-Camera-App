@@ -2,6 +2,8 @@ package com.drivehub.kamera.steering;
 
 /** Independently recovered ArcSoft 0x226858 coefficients; magnitude in degrees, not a road-wheel angle. */
 public final class OemSteeringCurve {
+    /** Recovered OEM curve endpoint, independent of the accepted sensor tolerance. */
+    public static final float MAX_INPUT_DEGREES = 516.95f;
     // upper bound, input offset, numerator, denominator, output offset.
     // Preserve the recovered operations/constants instead of interpolating rounded output samples.
     private static final double[][] SEGMENTS = {
@@ -16,9 +18,15 @@ public final class OemSteeringCurve {
         {517, -485.81, 3.1000000000000014, 31.140000000000043, 37.94}
     };
     private OemSteeringCurve() {}
+    /** Saturate plausible end-stop overshoot before evaluating the calibrated curve. */
+    public static float clampSensorDegrees(float input) {
+        return SteeringSnapshot.isPlausible(input)
+                ? Math.max(-MAX_INPUT_DEGREES,Math.min(MAX_INPUT_DEGREES,input)) : Float.NaN;
+    }
     public static float magnitudeDegrees(float input) {
-        if (!Float.isFinite(input) || input < 0 || input > SteeringSnapshot.MAX_RAW_DEGREES)
-            return Float.NaN;
+        if (input < 0) return Float.NaN;
+        input=clampSensorDegrees(input);
+        if (!Float.isFinite(input)) return Float.NaN;
         for (double[] s : SEGMENTS) if (input <= s[0])
             return (float) (((input + s[1]) * s[2]) / s[3] + s[4]);
         return Float.NaN;

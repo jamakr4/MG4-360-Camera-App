@@ -59,12 +59,27 @@ public class SteeringModelTest {
         assertTrue(zero.valid);assertEquals(0,zero.curvaturePerMm,0);assertEquals(0,zero.leftDegrees,0);
         assertTrue(model.solve(-.000001f).curvaturePerMm>0);
         assertTrue(model.solve(.000001f).curvaturePerMm<0);
-        for(float bad:new float[]{Float.NaN,Float.POSITIVE_INFINITY,Float.NEGATIVE_INFINITY,517,-517,
+        for(float bad:new float[]{Float.NaN,Float.POSITIVE_INFINITY,Float.NEGATIVE_INFINITY,541,-541,Float.MAX_VALUE,-Float.MAX_VALUE,
                 Math.nextUp(SteeringSnapshot.MAX_RAW_DEGREES),Math.nextDown(-SteeringSnapshot.MAX_RAW_DEGREES)}) {
             assertFalse(model.solve(bad).valid);assertTrue(Double.isNaN(model.solve(bad).curvaturePerMm));
         }
         assertTrue(Float.isNaN(OemSteeringCurve.magnitudeDegrees(-1)));
+        assertTrue(Float.isNaN(OemSteeringCurve.magnitudeDegrees(Math.nextUp(540f))));
         assertFalse(model.fromCurvature(Double.NaN).valid);assertFalse(model.fromCurvature(1).valid);
+    }
+
+    @Test public void plausibleEndStopOvershootSaturatesWithoutExtrapolatingTheOemCurve() {
+        for(float sign:new float[]{-1,1}) {
+            SteeringModel.Solution limit=model.solve(sign*516.95f);
+            for(float magnitude:new float[]{Math.nextUp(516.95f),517,520,540}) {
+                SteeringModel.Solution saturated=model.solve(sign*magnitude);
+                assertTrue(saturated.valid);
+                assertEquals(limit.curvaturePerMm,saturated.curvaturePerMm,0);
+                assertEquals(limit.leftDegrees,saturated.leftDegrees,0);
+                assertEquals(limit.rightDegrees,saturated.rightDegrees,0);
+                assertEquals(OemSteeringCurve.magnitudeDegrees(516.95f),OemSteeringCurve.magnitudeDegrees(magnitude),0);
+            }
+        }
     }
 
     @Test public void staleAndUnavailableSamplesHoldLastValidPoseAndRecoverWithoutIndependentWheelFilters() {

@@ -98,7 +98,7 @@ public class MainCameraLayoutInstrumentedTest {
                 for(boolean enabled:new boolean[]{true,false,true,false}) {
                     prefs.edit().putBoolean("testRecordEnabled",enabled).commit();a.refreshTestRecordButtonState();
                     // The live status must stay above both action buttons.
-                    pdc.setText("PDC  ●   ●   ●   ●   80 cm");
+                    pdc.setText("○   ●   ●   ○   77 cm");
                     pdc.setVisibility(View.VISIBLE);
                     for(int[] size:new int[][]{{1920,640},{1280,480},{960,640}}) {
                         root.measure(View.MeasureSpec.makeMeasureSpec(size[0],View.MeasureSpec.EXACTLY),
@@ -118,6 +118,11 @@ public class MainCameraLayoutInstrumentedTest {
                         assertTrue(dashcam.getWidth()>0);assertTrue(dashcam.getLeft()>=0);
                         assertTrue(dashcam.getRight()<=center.getWidth());
                         assertTrue(pdc.getTop()>=0);assertTrue(pdc.getBottom()<dashcam.getTop());
+                        assertTrue(pdc.getLeft()>=0);assertTrue(pdc.getRight()<=center.getWidth());
+                        assertEquals(center.getWidth()/2.0,(pdc.getLeft()+pdc.getRight())/2.0,1);
+                        assertEquals(1,pdc.getLineCount());
+                        assertTrue(pdc.getPaint().measureText(pdc.getText().toString())
+                                <=pdc.getWidth()-pdc.getPaddingLeft()-pdc.getPaddingRight());
                         if(enabled) {
                             assertEquals(View.VISIBLE,test.getVisibility());assertTrue(test.getWidth()>0);
                             assertEquals(dashcam.getTop(),test.getTop());assertEquals(dashcam.getBottom(),test.getBottom());

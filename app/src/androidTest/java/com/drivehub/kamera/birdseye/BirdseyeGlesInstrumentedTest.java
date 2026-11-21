@@ -243,6 +243,7 @@ public class BirdseyeGlesInstrumentedTest {
         BirdseyeSynthetic frames=new BirdseyeSynthetic();frames.fixedClockUs=1_000_000;
         java.util.concurrent.atomic.AtomicInteger loads=new java.util.concurrent.atomic.AtomicInteger();
         BirdseyeRenderer renderer=new BirdseyeRenderer(frames,color->{loads.incrementAndGet();return syntheticArtwork();});
+        renderer.setBlackBoxEnabled(false);
         for(int context=0;context<2;context++)try(Pbuffer egl=new Pbuffer()) {
             renderer.setMesh(new BirdseyeMesh(frames.calibration));
             renderer.onSurfaceCreated(null,null);renderer.onSurfaceChanged(null,W,H);renderer.onDrawFrame(null);
@@ -262,6 +263,35 @@ public class BirdseyeGlesInstrumentedTest {
             int ground=groundPixel(pixels,1600,0),expected=BirdseyeSynthetic.groundColor(1600,0);
             for(int shift=0;shift<24;shift+=8)assertEquals((expected>>shift)&255,(ground>>shift)&255,3);
             assertEquals(context+1,loads.get());
+        }
+    }
+    @Test public void blackBoxDefaultsOnAndTogglesInNormalAndWideAfterContextLoss() throws Exception {
+        BirdseyeSynthetic frames=new BirdseyeSynthetic();frames.fixedClockUs=1_000_000;
+        java.util.concurrent.atomic.AtomicInteger loads=new java.util.concurrent.atomic.AtomicInteger();
+        BirdseyeRenderer renderer=new BirdseyeRenderer(frames,color->{loads.incrementAndGet();return syntheticArtwork();});
+        ProjectionAssets projection=ProjectionAssets.get(frames.calibration);
+        renderer.setMesh(projection.mesh);renderer.setWideMesh(projection.wideMesh,null);
+        for(int context=0;context<2;context++)try(Pbuffer egl=new Pbuffer()) {
+            renderer.onSurfaceCreated(null,null);renderer.onSurfaceChanged(null,W,H);
+            for(boolean wide:new boolean[]{false,true}) {
+                renderer.setWide(wide);renderer.onDrawFrame(null);
+                assertNull(renderer.error);assertEquals(wide,renderer.wideActive);
+                assertEquals("The default black box must cover transparent car pixels",0,groundPixel(read(),0,0));
+                int outside=groundPixel(read(),1600,0);
+                renderer.setBlackBoxEnabled(false);renderer.onDrawFrame(null);
+                int shown=groundPixel(read(),0,0),expected=BirdseyeSynthetic.groundColor(0,0);
+                for(int shift=0;shift<24;shift+=8)assertEquals((expected>>shift)&255,(shown>>shift)&255,5);
+                assertEquals(outside,groundPixel(read(),1600,0));
+                renderer.setBlackBoxEnabled(true);renderer.onDrawFrame(null);
+                assertEquals(0,groundPixel(read(),0,0));
+                assertEquals("Car artwork must remain above the box",0x0000FF,groundPixel(read(),0,1000));
+                if(!wide) {
+                    int alpha=groundPixel(read(),0,-900);
+                    assertEquals(0,(alpha>>16)&255);assertEquals(128,(alpha>>8)&255,1);assertEquals(0,alpha&255);
+                }
+                assertEquals(outside,groundPixel(read(),1600,0));
+            }
+            assertEquals("Toggling must not reload the car texture",context+1,loads.get());
         }
     }
     private static BirdseyeRenderer stillRenderer(BirdseyeRenderer.Frames frames,BirdseyeCarArtwork.Source artwork) {
@@ -286,7 +316,9 @@ public class BirdseyeGlesInstrumentedTest {
                 double y=direction==com.drivehub.kamera.steering.WheelGuides.Direction.REVERSE?3000:-3000;
                 for(double x:new double[]{-1030,1030})assertEquals(0x73D9FF,groundPixel(wide,x/2,y/2));
                 // Both halves of the opaque roof remain above the fill at the new image scale.
-                assertEquals(groundPixel(normal,0,0),groundPixel(wide,0,0));
+                int normalRoof=groundPixel(normal,0,0),wideRoof=groundPixel(wide,0,0);
+                // Linear filtering at the two image scales can round a roof channel by one level.
+                for(int shift=0;shift<24;shift+=8)assertEquals((normalRoof>>shift)&255,(wideRoof>>shift)&255,1);
                 save(wide,"birdseye-wide-"+direction+"-synthetic.png");
                 renderer.setWide(false);renderer.onDrawFrame(null);assertEquals(0,differences(normal,read()));
                 renderer.setWide(true);renderer.onDrawFrame(null);savedWide=read();
@@ -338,6 +370,7 @@ public class BirdseyeGlesInstrumentedTest {
             for(int y=24;y<29;y++)for(int x:new int[]{3,4,5,6,33,34,35,36})art.bitmap.setPixel(x,y,0xFFFFFFFF);
             return art;
         });
+        renderer.setBlackBoxEnabled(false);
         renderer.setMesh(new BirdseyeMesh(frames.calibration));renderer.setScene(new RivelaScene(frames.calibration));
         renderer.setBlueGuideCorridor(true);
         renderer.steering.setSolution(new com.drivehub.kamera.steering.SteeringModel().solve(0),true,
@@ -473,6 +506,7 @@ public class BirdseyeGlesInstrumentedTest {
         org.junit.Assume.assumeTrue("Optional local paint artwork is absent",bundled != null && bundled.length > 0);
         BirdseyeSynthetic frames = new BirdseyeSynthetic(); frames.fixedClockUs = 1_000_000;
         BirdseyeRenderer renderer = new BirdseyeRenderer(frames,assets);
+        renderer.setBlackBoxEnabled(false);
         renderer.setMesh(new BirdseyeMesh(frames.calibration));
         java.util.Set<Integer> hoodColors = new java.util.HashSet<>();
         try (Pbuffer egl = new Pbuffer()) {

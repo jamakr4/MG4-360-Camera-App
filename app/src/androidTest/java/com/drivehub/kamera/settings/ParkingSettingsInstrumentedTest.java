@@ -35,6 +35,20 @@ import static org.junit.Assert.*;
 
 @RunWith(AndroidJUnit4.class)
 public class ParkingSettingsInstrumentedTest {
+    @Test public void blackBoxDefaultsOnAndPersistsAcrossActivityRecreation() {
+        SharedPreferences prefs=UiPrefs.getPrefs(InstrumentationRegistry.getInstrumentation().getTargetContext());
+        String key=UiPrefs.KEY_PARKING_BIRDSEYE_BLACK_BOX;boolean had=prefs.contains(key),saved=prefs.getBoolean(key,true);
+        prefs.edit().remove(key).commit();
+        try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)) {
+            openParking(scenario);
+            dialogView(R.id.switchParkingBirdseyeBlackBox).perform(scrollTo()).check(matches(isChecked())).perform(click());
+            assertFalse(UiPrefs.isBirdseyeBlackBoxEnabled(prefs));
+            dialogView(R.id.btnClose).perform(click());scenario.recreate();openParking(scenario);
+            dialogView(R.id.switchParkingBirdseyeBlackBox).perform(scrollTo()).check(matches(not(isChecked()))).perform(click());
+            assertTrue(UiPrefs.isBirdseyeBlackBoxEnabled(prefs));
+            dialogView(R.id.btnClose).perform(click());
+        } finally {SharedPreferences.Editor edit=prefs.edit();if(had)edit.putBoolean(key,saved);else edit.remove(key);edit.commit();}
+    }
     @Test public void reverseForegroundDefaultsOnAndPersistsWhenParkingReopens() {
         SharedPreferences prefs=UiPrefs.getPrefs(InstrumentationRegistry.getInstrumentation().getTargetContext());
         String key=UiPrefs.KEY_PARKING_REVERSE_FOREGROUND;boolean had=prefs.contains(key),saved=prefs.getBoolean(key,true);

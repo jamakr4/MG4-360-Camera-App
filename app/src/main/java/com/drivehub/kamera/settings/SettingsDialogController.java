@@ -442,6 +442,9 @@ public final class SettingsDialogController {
     private void wireParkingSettings(SharedPreferences prefs) {
         ParkingAutomationSettings.bind(dialog, prefs);
         GuidelineSettings.bind(dialog,prefs);
+        Switch blackBox = dialog.findViewById(R.id.switchParkingBirdseyeBlackBox);
+        blackBox.setChecked(UiPrefs.isBirdseyeBlackBoxEnabled(prefs));
+        blackBox.setOnCheckedChangeListener((button, enabled) -> UiPrefs.setBirdseyeBlackBoxEnabled(prefs, enabled));
         SegmentedControl sideCorrection=dialog.findViewById(R.id.segParkingSideCorrection);
         sideCorrection.check(UiPrefs.isParkingSideCorrectionEnabled(prefs)?R.id.segParkingSideStraight:R.id.segParkingSideNone);
         sideCorrection.getChildAt(0).setContentDescription(activity.getString(R.string.settings_parking_side_correction)+": "+activity.getString(R.string.settings_parking_alignment_none));
@@ -621,6 +624,7 @@ public final class SettingsDialogController {
                         views.swBannerErrorRecovered,
                         views.swSafetyWarning,
                         views.swParkingHighlightMissingAreas,
+                        dialog.findViewById(R.id.switchParkingBirdseyeBlackBox),
                         dialog.findViewById(R.id.switchParkingAutoClose),
                         dialog.findViewById(R.id.switchParkingAutoOpenDrive),
                         dialog.findViewById(R.id.switchParkingAutoCloseOnPark),

@@ -57,8 +57,10 @@ A community camera mod for the MG4 EV (AAOS 9, pre-2026 facelift), featuring liv
 </p>
 
 <p align="center">
-  <img src="images/blinker_cam_v2.gif" alt="Automatic turn signal camera overlay" width="100%"">
+  <img src="images/blinker_cam_v2.gif" alt="Automatic turn signal camera overlay" width="46%"">
+  <img src="images/reviewmode.jpg" alt="reviewmode of dashcam" width="48%"">  
 </p>
+
 
 
 
@@ -220,7 +222,7 @@ Under **Parking → MG4 vehicle color**, eight color circles select the pre-rend
 
 Color previews are screen approximations. Artwork: **MattDoesBlender**, adapted and rendered under **CC BY-NC-SA 4.0**; see [image attribution](images/ATTRIBUTION.md).
 
-With valid vehicle artwork, the 2D view follows its transparent silhouette without a black rectangle behind the rounded corners. Missing artwork retains a black placeholder. The vehicle artwork covers the invisible ground underneath; that ground is not reconstructed.
+The 2D view places a black rectangle beneath the vehicle artwork by default to hide camera artifacts in the vehicle footprint. **Parking → Black background under car (2D)** turns it off immediately for both Normal and Wide, revealing the camera image through transparent areas around the artwork. The choice is saved across app restarts and leaves 3D rendering unchanged. The Birdseye Debug Activity exposes the same toggle beside its view controls for direct comparisons. The ground beneath the actual vehicle is not reconstructed.
 
 The 2D ground view requires the vehicle calibration at `/configure/camera_calibdata.bin` and current images from the four existing camera sessions. Missing calibration or camera images are shown explicitly. Its physical calibration, seams and recording performance still require vehicle testing; see [implementation and verification](docs/BIRDSEYE_2D_TEST.md) and the separate [offline preview](tools/birdseye/README.md).
 
@@ -231,6 +233,8 @@ The 3D wheels steer with the vehicle; speed-dependent rolling is disabled. The 3
 **Parking → Guidelines 2D/3D** provides a speed threshold, enabled by default at **25 km/h**. With the filter on, guides remain visible at the threshold, hide above it and return automatically below it; missing or stale speed also hides them. The main path button remains the independent on/off choice. **Lines** draws four light-blue clearance curves at **2060 mm mirror width**; **Simple** retains the mirror-width outer edges and translucent fill and is the default. These choices persist and apply to R/D in Normal, Wide and 3D. Guides build over **350 ms** in driving direction (D: rear to front; R: front to rear) and retract along the same sweep when the speed filter or path button hides them. Quick toggles reverse from the current position. When a path is already visible, direct D↔R changes blend the complete outgoing and incoming paths simultaneously on one 350 ms clock instead of replaying the build sweep; quick gear reversals continue from both current opacities. Invalid steering/gear or camera freshness still removes the prediction immediately. Both styles retain the **700 mm end fade**, including each of the four individual lines. The Debug Activity starts with the saved style (Simple by default), uses the same light-blue mirror-width curves and reveal, and offers P/R/D selection, a local speed-threshold test checkbox plus simulated speed in 2D and 3D. In Debug, P retracts the visible guidance over 350 ms; switching back during retraction continues from the current position. The selection survives recreation.
 
 Short camera gaps in **Normal, Wide and 3D** retain each camera's last uploaded image for up to **2 seconds**, independently of other cameras. The first returning image is uploaded immediately. Guidance, PDC and handoff readiness still require frames no older than **500 ms** and no more than **150 ms** behind the newest camera. Ownership loss and renderer errors invalidate the output immediately.
+
+The OEM steering curve ends at **±516.95°**. Successful, fresh sensor readings up to **±540°** are accepted and saturated at that curve endpoint, so a small full-lock overshoot does not hide the R/D guidelines or extrapolate the steering geometry. The ±540° bound is a software plausibility tolerance, not a measured Extended Range steering limit. Dev Status retains the original raw reading. Non-finite values, larger readings, property errors and expired reads still hide guidance.
 
 The **Birdseye debug activity** uses the same model and offers a manual slider over ±516.95°, presets, radius diagnostics, opt-in live readings, an interruption test and blue-area versus individual-line comparison in both 2D and 3D. The test-speed slider exercises the guideline speed threshold in 2D and 3D; live mode uses the shared vehicle-motion snapshot. The live 3D floor extends 4 m from the vehicle so guide endpoints remain on flat projected ground. **The D rear curves are visual guides joining the front endpoints, not physical rear-wheel trajectories.** The assumed 1450 mm effective track and existing mesh registration still need vehicle validation.
 
