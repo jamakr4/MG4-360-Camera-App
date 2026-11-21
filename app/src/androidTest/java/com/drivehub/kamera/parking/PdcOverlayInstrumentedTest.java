@@ -133,29 +133,39 @@ public class PdcOverlayInstrumentedTest {
     @Test public void statusShowsOnlySectorDotsAndReportedCentimetres() {
         ui(() -> {
             try (Fixture fixture = new Fixture()) {
+                fixture.geometry.set(new PdcSnapshot(new int[]{0, 3, 3, 0}, 77, 0, SystemClock.elapsedRealtime()));
+                fixture.overlay.updateStatus();
+                assertEquals("○   ●   ●   ○   77 cm", fixture.status.getText().toString());
+                assertEquals("PDC 0, 3, 3, 0; 77 cm", fixture.status.getContentDescription().toString());
+
                 fixture.geometry.set(new PdcSnapshot(new int[]{1, 3, 6, 9}, 80, 0, SystemClock.elapsedRealtime()));
                 fixture.overlay.updateStatus();
                 assertEquals(4, fixture.geometry.bars(fixture.scene.car, SystemClock.elapsedRealtime()).size());
                 assertTrue(fixture.drawnPixels() > 0);
-                assertEquals("PDC  ●   ●   ●   ●   80 cm", fixture.status.getText().toString());
+                assertEquals("●   ●   ●   ●   80 cm", fixture.status.getText().toString());
                 assertEquals("PDC 1, 3, 6, 9; 80 cm", fixture.status.getContentDescription().toString());
 
                 fixture.geometry.set(new PdcSnapshot(new int[]{1, -1, 255, 9}, 80, 0, SystemClock.elapsedRealtime()));
                 fixture.overlay.updateStatus();
                 assertEquals(2, fixture.geometry.bars(fixture.scene.car, SystemClock.elapsedRealtime()).size());
                 assertTrue(fixture.drawnPixels() > 0);
-                assertEquals("PDC  ●   –   –   ●   80 cm", fixture.status.getText().toString());
+                assertEquals("●   –   –   ●   80 cm", fixture.status.getText().toString());
                 assertEquals("PDC 1, –, –, 9; 80 cm", fixture.status.getContentDescription().toString());
 
                 fixture.geometry.set(new PdcSnapshot(new int[]{2, 2, 0, 0}, 90, 0, SystemClock.elapsedRealtime()));
                 fixture.overlay.updateStatus();
-                assertEquals("PDC  ●   ●   ○   ○   90 cm", fixture.status.getText().toString());
+                assertEquals("●   ●   ○   ○   90 cm", fixture.status.getText().toString());
+
+                fixture.geometry.set(new PdcSnapshot(new int[]{0, 0, 0, 0}, 90, 0, SystemClock.elapsedRealtime()));
+                fixture.overlay.updateStatus();
+                assertEquals("○   ○   ○   ○", fixture.status.getText().toString());
+                assertEquals("PDC 0, 0, 0, 0", fixture.status.getContentDescription().toString());
 
                 fixture.geometry.set(new PdcSnapshot(new int[]{1,3,6,9},255,0,SystemClock.elapsedRealtime()));
                 fixture.overlay.updateStatus();
                 assertEquals(4,fixture.geometry.bars(fixture.scene.car,SystemClock.elapsedRealtime()).size());
                 assertTrue(fixture.drawnPixels()>0);
-                assertEquals("PDC  ●   ●   ●   ●", fixture.status.getText().toString());
+                assertEquals("●   ●   ●   ●", fixture.status.getText().toString());
                 assertEquals("PDC 1, 3, 6, 9", fixture.status.getContentDescription().toString());
 
                 fixture.geometry.set(PdcSnapshot.EMPTY);

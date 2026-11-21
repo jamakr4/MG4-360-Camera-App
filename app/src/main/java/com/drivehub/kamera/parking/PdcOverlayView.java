@@ -54,7 +54,7 @@ public final class PdcOverlayView extends View {
         boolean show=active&&rearShown.getAsBoolean()&&snapshot.fresh(SystemClock.elapsedRealtime())&&snapshot.hasSectors();
         status.setVisibility(show?VISIBLE:GONE);
         if(!show)return;
-        android.text.SpannableStringBuilder text=new android.text.SpannableStringBuilder("PDC  ");
+        android.text.SpannableStringBuilder text=new android.text.SpannableStringBuilder();
         StringBuilder key=new StringBuilder();
         for(int i=0;i<4;i++) {
             int level=snapshot.level(i),start=text.length(),band=PdcBars.band(level);
