@@ -49,7 +49,7 @@ public final class BirdseyeDebugActivity extends Activity {
     private TextView speedValue;
     private Button steeringReset;
     private TextView steeringValue;
-    private CheckBox liveSteering, unavailableSteering, reverseGuides, blueCorridor,guideSpeedLimit;
+    private CheckBox liveSteering, unavailableSteering, reverseGuides, blueCorridor,guideSpeedLimit,blackBox;
     private RadioGroup guideDirection;
     private TextView guideHorizon;
     private final java.util.List<Button> steeringPresets=new java.util.ArrayList<>();
@@ -124,8 +124,15 @@ public final class BirdseyeDebugActivity extends Activity {
     private final SharedPreferences.OnSharedPreferenceChangeListener preferences = (p, key) -> {
         if(UiPrefs.KEY_PARKING_SURROUND_3D.equals(key)||UiPrefs.KEY_PARKING_SURROUND_WIDE.equals(key))applyMode();
         if (UiPrefs.KEY_PARKING_BIRDSEYE_CAR_COLOR.equals(key)) renderer.setCarColor(UiPrefs.getBirdseyeCarColor(p));
+        if (UiPrefs.KEY_PARKING_BIRDSEYE_BLACK_BOX.equals(key)) applyBlackBox();
         if(UiPrefs.KEY_PARKING_GUIDE_SPEED_KMH.equals(key))updateSpeedLimit();
     };
+    private void applyBlackBox() {
+        boolean enabled=UiPrefs.isBirdseyeBlackBoxEnabled(prefs);
+        renderer.setBlackBoxEnabled(enabled);
+        if(blackBox!=null&&blackBox.isChecked()!=enabled)blackBox.setChecked(enabled);
+        gl.requestRender();
+    }
     private void updateSpeedLimit() {
         int limit=UiPrefs.getParkingGuideSpeedKmh(prefs);
         guideSpeedLimit.setText(getString(R.string.birdseye_debug_guide_speed_limit,limit));
@@ -217,6 +224,11 @@ public final class BirdseyeDebugActivity extends Activity {
         wideToggle=new Button(this);wideToggle.setId(R.id.surroundWideToggle);wideToggle.setAllCaps(false);
         wideToggle.setOnClickListener(v->prefs.edit().putBoolean(UiPrefs.KEY_PARKING_SURROUND_WIDE,!prefs.getBoolean(UiPrefs.KEY_PARKING_SURROUND_WIDE,false)).apply());
         modes.addView(wideToggle);controls.addView(modes);
+        blackBox=new CheckBox(this);blackBox.setId(R.id.surroundDebugBlackBox);
+        blackBox.setText(R.string.birdseye_black_box_title);blackBox.setTextColor(Color.WHITE);
+        blackBox.setChecked(UiPrefs.isBirdseyeBlackBoxEnabled(prefs));
+        blackBox.setOnCheckedChangeListener((button,enabled)->UiPrefs.setBirdseyeBlackBoxEnabled(prefs,enabled));
+        controls.addView(blackBox);
         zoomOut=new Button(this);zoomIn=new Button(this);
         zoomOut.setId(R.id.surroundDebugZoomOut);zoomIn.setId(R.id.surroundDebugZoomIn);
         zoomOut.setText(R.string.birdseye_debug_zoom_minus);zoomIn.setText(R.string.birdseye_debug_zoom_plus);
@@ -384,7 +396,8 @@ public final class BirdseyeDebugActivity extends Activity {
     @Override protected void onResume() {
         super.onResume();
         prefs.registerOnSharedPreferenceChangeListener(preferences);
-        renderer.setCarColor(UiPrefs.getBirdseyeCarColor(prefs));applyMode();
+        renderer.setCarColor(UiPrefs.getBirdseyeCarColor(prefs));
+        applyBlackBox();applyMode();
         resumed=true;if(liveSteering.isChecked())steeringReader.start();gl.onResume();handler.post(draw);
     }
     @Override protected void onPause() { resumed=false;steeringReader.stop();steeringPose.pause();handler.removeCallbacks(draw); prefs.unregisterOnSharedPreferenceChangeListener(preferences); gl.onPause(); super.onPause(); }

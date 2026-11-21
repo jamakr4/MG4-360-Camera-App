@@ -69,6 +69,19 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp" />
+
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="12dp" android:gravity="center_vertical"
+            android:minHeight="48dp" android:orientation="horizontal">
+            <TextView style="@style/DrivehubSettingsCardRowLabel"
+                android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+                android:labelFor="@id/switchParkingBirdseyeBlackBox" android:text="@string/birdseye_black_box_title" />
+            <Switch android:id="@+id/switchParkingBirdseyeBlackBox" style="@style/DrivehubSettingsSwitch"
+                android:contentDescription="@string/birdseye_black_box_title" />
+        </LinearLayout>
+        <TextView style="@style/DrivehubSettingsCaption"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="4dp" android:text="@string/birdseye_black_box_hint" />
     </LinearLayout>
 
     <LinearLayout

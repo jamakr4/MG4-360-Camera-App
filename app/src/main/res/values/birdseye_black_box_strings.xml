@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="birdseye_black_box_title">Black background under car (2D)</string>
+    <string name="birdseye_black_box_hint">Hide camera artifacts beneath the car in Normal and Wide view.</string>
+</resources>
