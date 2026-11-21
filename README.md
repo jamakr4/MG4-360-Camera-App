@@ -67,7 +67,7 @@ A community camera mod for the MG4 EV (AAOS 9, pre-2026 facelift), featuring liv
 <h2 align="center">Native four-camera dashcam? Sure!</h2>
 
 <p align="center">
-  Record all four factory cameras in one combined clip, with time, speed and your own footer signature. Save to a USB drive or internal storage, keep a rolling buffer, capture a single test clip or save an event when it matters. A movable, color-coded status indicator shows recording activity, pauses and errors.
+  Record all four factory cameras in one combined clip, with time, speed and your own footer signature. Save to a USB drive or internal storage, keep a rolling buffer, capture a single test clip or save an event when it matters. A movable, color-coded status indicator shows recording activity, pauses and errors. Review footage on scene with the integrated player!
 </p>
 
 <p align="center">
