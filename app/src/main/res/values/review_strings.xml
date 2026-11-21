@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="review_title">Dashcam review</string>
+    <string name="review_internal_storage">Internal storage</string>
+    <string name="review_back">Back</string>
+    <string name="review_recording_folder">Recording folder</string>
+    <string name="review_choose_folder">Open folder</string>
+    <string name="review_refresh">Refresh</string>
+    <string name="review_events">Events</string>
+    <string name="review_test">Test Clips</string>
+    <string name="review_buffer">Buffer</string>
+    <string name="review_other">Other</string>
+    <string name="review_select_clip">Select an event or video to start playback.</string>
+    <string name="review_seek">Video position</string>
+    <string name="review_previous">Previous clip</string>
+    <string name="review_rewind">Back 10 seconds</string>
+    <string name="review_play">Play</string>
+    <string name="review_pause">Pause</string>
+    <string name="review_forward">Forward 10 seconds</string>
+    <string name="review_next">Next clip</string>
+    <string name="review_fullscreen">Fullscreen</string>
+    <string name="review_exit_fullscreen">Exit fullscreen</string>
+    <string name="review_empty_category">No entries in this category.</string>
+    <string name="review_no_recordings">No recordings found.\nThe folder is empty or unavailable. Open a folder manually.</string>
+    <string name="review_retry">Try again</string>
+    <string name="review_playback_error">This video cannot be played. The file may be unavailable, incomplete or unsupported.</string>
+    <string name="review_folder_error">This folder cannot be opened. Check the storage device or open another folder.</string>
+    <string name="review_storage_closed">Storage is disconnected or being ejected. Reconnect it and try again, or open another folder.</string>
+    <string name="review_picker_unavailable">No folder picker is available.</string>
+    <string name="review_date_unknown">Date unknown</string>
+    <string name="review_clip_count">Clips: %1$d</string>
+    <string name="review_clip_position">%1$s · Clip %2$d/%3$d</string>
+    <string name="review_folder">Folder</string>
+    <string name="review_video">Video</string>
+    <string name="review_file_only">File · view only</string>
+    <string name="review_zero_time" translatable="false">00:00</string>
+    <string name="review_rewind_label" translatable="false">−10 s</string>
+    <string name="review_forward_label" translatable="false">+10 s</string>
+    <string name="review_empty_code" translatable="false">404</string>
+</resources>

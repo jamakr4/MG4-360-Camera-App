@@ -48,6 +48,9 @@
             </intent-filter>
         </activity>
 
+        <activity android:name=".dashcam.review.DashcamReviewActivity"
+            android:theme="@style/Theme.DrivehubKamera.Review" android:exported="false" />
+
         <activity
             android:name=".camera.TileViewActivity"
             android:exported="false"

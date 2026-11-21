@@ -142,6 +142,17 @@ public class RecordingService extends Service {
     private volatile long oemSeenAt;
     private volatile boolean watchdogFailed;
     private volatile File recordingFile;
+    private void setRecordingFile(File file) {
+        synchronized (ReviewFileAccess.LOCK) {
+            if (recordingFile != null) ReviewFileAccess.endWrite(recordingFile);
+            recordingFile = file;
+            if (file != null) ReviewFileAccess.beginWrite(file);
+        }
+    }
+    public static File activeReviewDirectory() {
+        RecordingService live = instance;
+        return live != null && !live.surveillanceOwnsRecorder ? live.activeBaseDir : null;
+    }
     private final ExecutorService supervisor = Executors.newSingleThreadExecutor();
     private final AtomicBoolean supervising = new AtomicBoolean();
     private BroadcastReceiver shutdownReceiver;
@@ -229,7 +240,7 @@ public class RecordingService extends Service {
         catch (Throwable error) { DevRuntimeLog.add(TAG, "release failed: " + error); }
         File unfinished = recordingFile;
         if (unfinished != null && !isReadableClip(unfinished)) discardClip(unfinished);
-        recordingFile = null;
+        setRecordingFile(null);
     }
 
     public static boolean isSurveillanceActive(Context context) {
@@ -1135,7 +1146,7 @@ public class RecordingService extends Service {
         }
         boolean surveillance = surveillanceOwnsRecorder;
         File outputFile = new File(baseDir, baseName + (surveillance ? ".mp4.part" : ".mp4"));
-        recordingFile = outputFile;
+        setRecordingFile(outputFile);
         publishStatus(STATUS_STARTING, 0, TOTAL_CAMERAS, "");
         boolean started = CameraProbe.startCombinedMp4Record(
                 outputFile.getAbsolutePath(),
@@ -1149,7 +1160,7 @@ public class RecordingService extends Service {
 
         if (!started) {
             discardClip(outputFile);
-            recordingFile = null;
+            setRecordingFile(null);
             // The external gate closes before preference notifications and the pause intent.
             // Losing an in-flight start to that handoff is a pause, not a camera-open error.
             if (oemPauseRequested || CameraProbe.isOemCameraAccessBlocked()) {
@@ -1207,7 +1218,7 @@ public class RecordingService extends Service {
                 + " oem=" + urgent + "; device release time: " + CameraProbe.describeCameraFormats());
         if (!stopped || watchdogFailed || !isReadableClip(outputFile)) {
             discardClip(outputFile);
-            recordingFile = null;
+            setRecordingFile(null);
             if (urgent && stopped && !watchdogFailed) {
                 publishStatus(STATUS_PAUSED_OEM, 0, TOTAL_CAMERAS, "");
                 return true; // An OEM interruption before the first frame is not a recorder failure.
@@ -1216,7 +1227,7 @@ public class RecordingService extends Service {
             return false;
         }
 
-        recordingFile = null;
+        setRecordingFile(null);
         if (surveillance) {
             File completed = new File(baseDir, baseName + ".mp4");
             if (completed.exists() || !outputFile.renameTo(completed)
@@ -1517,46 +1528,50 @@ public class RecordingService extends Service {
     }
 
     private void cleanupOldSegments(File baseDir, int keepSegments, Set<String> protectedBases) {
-        boolean changed = false;
-        for (File file : RecordingFiles.deletionCandidates(baseDir.listFiles(), keepSegments,
-                protectedBases == null ? java.util.Collections.emptySet() : protectedBases)) {
-            if (DashcamStorageManager.deleteFreeingSpace(file)) changed = true;
-            else publishStatus(STATUS_ERROR, 0, TOTAL_CAMERAS, "Could not delete " + file);
-        }
-        if (changed && !DashcamStorageManager.syncDirectory(baseDir)) {
-            publishStatus(STATUS_ERROR, 0, TOTAL_CAMERAS, "Deletion sync failed: " + baseDir);
+        synchronized (ReviewFileAccess.LOCK) {
+            boolean changed = false;
+            for (File file : RecordingFiles.deletionCandidates(baseDir.listFiles(), keepSegments,
+                    protectedBases == null ? java.util.Collections.emptySet() : protectedBases)) {
+                if (DashcamStorageManager.deleteFreeingSpace(file)) changed = true;
+                else publishStatus(STATUS_ERROR, 0, TOTAL_CAMERAS, "Could not delete " + file);
+            }
+            if (changed && !DashcamStorageManager.syncDirectory(baseDir)) {
+                publishStatus(STATUS_ERROR, 0, TOTAL_CAMERAS, "Deletion sync failed: " + baseDir);
+            }
         }
     }
 
     private void trimOldEventDirsLocked(File eventsBaseDir) {
-        if (eventsBaseDir == null) return;
-        File[] files = eventsBaseDir.listFiles();
-        if (files == null) return;
-        List<File> eventDirs = new ArrayList<>();
-        for (File f : files) {
-            if (f.isDirectory() && f.getName().startsWith("event_")) {
-                eventDirs.add(f);
+        synchronized (ReviewFileAccess.LOCK) {
+            if (eventsBaseDir == null) return;
+            File[] files = eventsBaseDir.listFiles();
+            if (files == null) return;
+            List<File> eventDirs = new ArrayList<>();
+            for (File f : files) {
+                if (f.isDirectory() && f.getName().startsWith("event_")) {
+                    eventDirs.add(f);
+                }
             }
-        }
-        int maxRetained = DashcamStorageManager.getActiveMaxRetainedEventDirs(prefs(), activeBaseIsUsb);
-        if (eventDirs.size() <= maxRetained) return;
-        // event_<yyMMddHHmmssSSS> sorts chronologically by name.
-        eventDirs.sort(Comparator.comparing(File::getName));
-        Set<String> pendingNames = new HashSet<>();
-        for (EventCaptureRequest req : pendingEventRequests) {
-            pendingNames.add(req.eventBaseName);
-        }
-        int toDelete = eventDirs.size() - maxRetained;
-        int deleted = 0;
-        for (File dir : eventDirs) {
-            if (deleted >= toDelete) break;
-            // Never delete a dir whose copy jobs may still write into it.
-            if (pendingNames.contains(dir.getName())) continue;
-            if (deleteDirRecursive(dir)) {
-                DevRuntimeLog.add("RecordingService", "Event cap: deleted " + dir.getName());
-                deleted++;
-            } else {
-                Log.w(TAG, "Failed to delete old event dir " + dir.getAbsolutePath());
+            int maxRetained = DashcamStorageManager.getActiveMaxRetainedEventDirs(prefs(), activeBaseIsUsb);
+            if (eventDirs.size() <= maxRetained) return;
+            // event_<yyMMddHHmmssSSS> sorts chronologically by name.
+            eventDirs.sort(Comparator.comparing(File::getName));
+            Set<String> pendingNames = new HashSet<>();
+            for (EventCaptureRequest req : pendingEventRequests) {
+                pendingNames.add(req.eventBaseName);
+            }
+            int toDelete = eventDirs.size() - maxRetained;
+            int deleted = 0;
+            for (File dir : eventDirs) {
+                if (deleted >= toDelete) break;
+                // Never delete a dir whose copy jobs may still write into it.
+                if (pendingNames.contains(dir.getName()) || ReviewFileAccess.isProtected(dir)) continue;
+                if (deleteDirRecursive(dir)) {
+                    DevRuntimeLog.add("RecordingService", "Event cap: deleted " + dir.getName());
+                    deleted++;
+                } else {
+                    Log.w(TAG, "Failed to delete old event dir " + dir.getAbsolutePath());
+                }
             }
         }
     }

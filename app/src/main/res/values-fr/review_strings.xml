@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="review_title">Lecture dashcam</string>
+    <string name="review_internal_storage">Stockage interne</string>
+    <string name="review_back">Retour</string>
+    <string name="review_recording_folder">Dossier des enregistrements</string>
+    <string name="review_choose_folder">Ouvrir un dossier</string>
+    <string name="review_refresh">Actualiser</string>
+    <string name="review_events">Événements</string>
+    <string name="review_test">Clips de test</string>
+    <string name="review_buffer">Tampon</string>
+    <string name="review_other">Autres</string>
+    <string name="review_select_clip">Sélectionnez un événement ou une vidéo à lire.</string>
+    <string name="review_seek">Position de lecture</string>
+    <string name="review_previous">Clip précédent</string>
+    <string name="review_rewind">Reculer de 10 secondes</string>
+    <string name="review_play">Lire</string>
+    <string name="review_pause">Pause</string>
+    <string name="review_forward">Avancer de 10 secondes</string>
+    <string name="review_next">Clip suivant</string>
+    <string name="review_fullscreen">Plein écran</string>
+    <string name="review_exit_fullscreen">Quitter le plein écran</string>
+    <string name="review_empty_category">Aucun élément dans cette catégorie.</string>
+    <string name="review_no_recordings">Aucun enregistrement trouvé.\nLe dossier est vide ou indisponible. Ouvrez un dossier manuellement.</string>
+    <string name="review_retry">Réessayer</string>
+    <string name="review_playback_error">Cette vidéo ne peut pas être lue. Le fichier est peut-être indisponible, incomplet ou non pris en charge.</string>
+    <string name="review_folder_error">Impossible d’ouvrir ce dossier. Vérifiez le support de stockage ou ouvrez un autre dossier.</string>
+    <string name="review_storage_closed">Le support est déconnecté ou en cours d’éjection. Reconnectez-le et réessayez, ou ouvrez un autre dossier.</string>
+    <string name="review_picker_unavailable">Aucun sélecteur de dossier disponible.</string>
+    <string name="review_date_unknown">Date inconnue</string>
+    <string name="review_clip_count">Clips : %1$d</string>
+    <string name="review_clip_position">%1$s · Clip %2$d/%3$d</string>
+    <string name="review_folder">Dossier</string>
+    <string name="review_video">Vidéo</string>
+    <string name="review_file_only">Fichier · affichage uniquement</string>
+</resources>

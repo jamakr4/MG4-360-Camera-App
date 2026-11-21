@@ -169,6 +169,54 @@ public final class DashcamStorageManager {
 
     // ---------- Resolution ----------
 
+    /** Existing recording location only: never creates directories or probes write access. */
+    public static File readableRecordsDirectory(Context context) {
+        File live = RecordingService.activeReviewDirectory();
+        if (live != null) return live;
+        SharedPreferences prefs = UiPrefs.getPrefs(context);
+        int target = getStorageTarget(prefs);
+        String actual = prefs.getString("dashcamActualPath", "");
+        if (target != TARGET_INTERNAL_ONLY) {
+            SelectedUsbLocation selected = getSelectedUsbLocation(prefs);
+            List<UsbCandidate> candidates = findReadableUsbCandidates(context);
+            if (candidates.isEmpty()) candidates = findLegacyStorageCandidates(context);
+            candidates = selected == null ? prioritizeUsbCandidates(candidates)
+                    : filterSelectedVolume(candidates, selected.volumeId);
+            if (candidates.size() == 1) {
+                List<File> dirs = recordsDirCandidates(candidates.get(0), selected);
+                for (File dir : dirs) if (!actual.isEmpty()
+                        && ReviewFileAccess.key(dir).equals(ReviewFileAccess.key(new File(actual)))
+                        && new File(actual).isDirectory() && new File(actual).canRead()) return new File(actual);
+                for (File dir : dirs) if (dir.isDirectory() && dir.canRead()) return dir;
+            }
+            if (target == TARGET_USB_ONLY) return null;
+        }
+        String custom = DashcamSettingsController.getConfiguredRecordsPath(prefs);
+        File preferred = custom.isEmpty() ? new File(android.os.Environment.getExternalStoragePublicDirectory(
+                android.os.Environment.DIRECTORY_DOWNLOADS), "dashcam") : new File(custom);
+        if (preferred.isDirectory() && preferred.canRead()) return preferred;
+        File fallback = new File(context.getFilesDir(), "dashcam");
+        return fallback.isDirectory() && fallback.canRead() ? fallback : preferred;
+    }
+
+    private static List<UsbCandidate> findReadableUsbCandidates(Context context) {
+        List<UsbCandidate> result = new ArrayList<>();
+        StorageManager manager = context.getSystemService(StorageManager.class);
+        if (manager == null) return result;
+        // getExternalFilesDirs() would create application directories, so enumerate volumes directly.
+        for (StorageVolume volume : manager.getStorageVolumes()) {
+            if (volume.isPrimary() || !volume.isRemovable()) continue;
+            String id = volume.getUuid();
+            if (id == null || id.isEmpty()) continue;
+            File root = Build.VERSION.SDK_INT >= 30 ? volume.getDirectory() : new File(LEGACY_STORAGE_ROOT, id);
+            if (root == null || (!root.isDirectory() && !new File(MEDIA_RW_ROOT, id).isDirectory())) continue;
+            String description = safeDescription(volume, context);
+            result.add(new UsbCandidate(root, description, looksLikeUsb(root, description), id,
+                    new File(root, "Android/data/" + context.getPackageName() + "/files")));
+        }
+        return result;
+    }
+
     /**
      * Resolves the storage target for the configured mode. Performs real IO (USB write test)
      * unless the mode is INTERNAL_ONLY — do not call on the main thread.

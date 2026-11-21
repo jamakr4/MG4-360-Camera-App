@@ -342,6 +342,14 @@ You do not need to run the dashcam in continuous loop mode to capture video. Two
 - **Test clip** — a button on the home screen starts a single recording for a configurable duration (default 30 s, adjustable in Settings up to 120 s). Useful for quickly capturing something without enabling the full ring buffer. Test clips are saved to a separate `test/` subfolder and do not participate in the ring-buffer cleanup cycle.
 - **Future-only event recording** — if continuous recording is off but you still trigger an event save (via the home screen button or the companion app broadcast `com.drivehub.kamera.action.TRIGGER_DASHCAM_EVENT`), the app automatically starts a short recording from that moment forward and saves it as an event. The pre-trigger window is lost since no loop was running, but at least the next few clips are captured.
 
+<h4>Review recordings</h4>
+
+<p>The playback button next to Close on the main screen opens <strong>Dashcam Review</strong>. The current recording folder is split into <strong>Events</strong>, <strong>Test Clips</strong>, <strong>Buffer</strong> and <strong>Other</strong>, with the newest entries first. Existing rolling clips in the main folder and clips in a <code>buffer/</code> subfolder both appear under Buffer. Select an event folder to play its completed clips from oldest to newest; the seek bar applies to the current clip. Playback also provides pause, ±10 seconds, previous/next event clip and fullscreen.</p>
+
+<p>If the recording folder is empty or unavailable, use <strong>Open folder</strong> to select one with the Android folder picker. This choice affects only the current review session; <strong>Recording folder</strong> returns to the configured recording location. Other folders can be browsed, while non-video files are listed without opening them. Use Refresh to pick up newly completed clips. An event already selected for playback keeps its original clip list until selected again.</p>
+
+<p>Review uses Android MediaPlayer directly and does not require the SAIC player or a USB media rescan. Recording continues, active recording files are excluded, and the selected clip/event is protected from automatic retention while playing or paused in Review. Leaving the screen releases that protection and pauses playback; returning requires Play. Existing camera automation keeps priority. Playback has no gear restriction. Concurrent decoding and recording, camera handoffs and physical USB removal still require acceptance testing on the head unit.</p>
+
 <h4>MG4Control surveillance recording</h4>
 
 <p>External START/STOP commands can record into a separate surveillance folder for up to two hours, then restore the previous dashcam setting. Choose how low storage is handled; read-only state queries and a USB write-test callback are also available. See the <a href="docs/surveillance-integration.md">integration guide</a> for actions, extras and storage behavior. Vehicle acceptance of this recording mode is pending.</p>
@@ -641,6 +649,7 @@ This is an independent community project and is **not affiliated with SAIC, MG M
 - Thanks to **[MattDoesBlender](https://sketchfab.com/MattDoesBlender)** for creating the [MG4 model](https://sketchfab.com/3d-models/2025-mg-mg4-glbmgmotorcommx-ee2e3b0e1a7b481cb2c08e6fc6d2ed9e) used for our 2D vehicle artwork and 3D model, available under [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/)
 - Thanks to **HenryCena82595** for creating [notification-sound-7062 on Freesound](https://freesound.org/s/731783/), used for the app's notification sound and available under [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/)
 - OpenCV 4.9.0 - Apache License 2.0
+- [Android MediaPlayer](https://developer.android.com/reference/android/media/MediaPlayer) — Android Open Source Project (AOSP), Apache License 2.0; Android platform API used for dashcam review playback
 - AndroidX AppCompat 1.7.1 - Apache License 2.0
 - AndroidX Activity 1.12.4 - Apache License 2.0
 - AndroidX ConstraintLayout 2.2.1 - Apache License 2.0

@@ -1,0 +1,59 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto" android:id="@+id/reviewRoot"
+    android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical"
+    android:padding="12dp">
+    <LinearLayout android:id="@+id/reviewHeader" android:layout_width="match_parent" android:layout_height="64dp" android:gravity="center_vertical">
+        <ImageButton android:id="@+id/reviewBack" style="@style/ReviewIcon" android:src="@drawable/ic_arrow_back_material" android:contentDescription="@string/review_back" />
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:paddingHorizontal="16dp">
+            <TextView style="@style/ReviewText" android:text="@string/review_title" android:textSize="24sp" android:textStyle="bold" />
+            <TextView android:id="@+id/reviewPath" style="@style/ReviewText" android:textSize="12sp" android:textColor="@color/settings_text_secondary" android:maxLines="1" android:ellipsize="middle" />
+        </LinearLayout>
+        <Button android:id="@+id/reviewRecordingFolder" style="@style/ReviewButton" android:text="@string/review_recording_folder" />
+        <Button android:id="@+id/reviewChooseFolder" style="@style/ReviewButton" android:text="@string/review_choose_folder" />
+        <ImageButton android:id="@+id/reviewRefresh" style="@style/ReviewIcon" android:src="@android:drawable/ic_popup_sync" android:contentDescription="@string/review_refresh" />
+    </LinearLayout>
+    <LinearLayout android:id="@+id/reviewTabs" android:layout_width="match_parent" android:layout_height="60dp" android:gravity="center">
+        <TextView android:id="@+id/reviewEvents" style="@style/ReviewCategoryTab" android:text="@string/review_events" />
+        <TextView android:id="@+id/reviewTest" style="@style/ReviewCategoryTab" android:text="@string/review_test" />
+        <TextView android:id="@+id/reviewBuffer" style="@style/ReviewCategoryTab" android:text="@string/review_buffer" />
+        <TextView android:id="@+id/reviewOther" style="@style/ReviewCategoryTab" android:text="@string/review_other" />
+    </LinearLayout>
+    <FrameLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1">
+        <androidx.constraintlayout.widget.ConstraintLayout android:id="@+id/reviewContent" android:layout_width="match_parent" android:layout_height="match_parent">
+            <LinearLayout android:id="@+id/reviewPlayerPanel" android:layout_width="0dp" android:layout_height="0dp" app:layout_constraintHorizontal_weight="2" app:layout_constraintStart_toStartOf="parent" app:layout_constraintEnd_toStartOf="@id/reviewListPanel" app:layout_constraintTop_toTopOf="parent" app:layout_constraintBottom_toBottomOf="parent" android:orientation="vertical" android:background="@android:color/black">
+                <FrameLayout android:id="@+id/reviewVideoFrame" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1">
+                    <TextureView android:id="@+id/reviewVideo" android:layout_width="match_parent" android:layout_height="match_parent" />
+                    <TextView android:id="@+id/reviewPlayerMessage" style="@style/ReviewText" android:layout_height="match_parent" android:gravity="center" android:padding="32dp" android:text="@string/review_select_clip" android:accessibilityLiveRegion="polite" />
+                    <ProgressBar android:id="@+id/reviewPlayerLoading" android:layout_width="48dp" android:layout_height="48dp" android:layout_gravity="center" android:visibility="gone" />
+                </FrameLayout>
+                <TextView android:id="@+id/reviewPlayingTitle" style="@style/ReviewText" android:paddingHorizontal="16dp" android:maxLines="1" android:ellipsize="middle" android:textSize="16sp" />
+                <LinearLayout android:layout_width="match_parent" android:layout_height="32dp" android:gravity="center_vertical" android:paddingHorizontal="12dp">
+                    <TextView android:id="@+id/reviewElapsed" style="@style/ReviewText" android:layout_width="wrap_content" android:textSize="14sp" android:text="@string/review_zero_time" />
+                    <SeekBar android:id="@+id/reviewSeek" android:layout_width="0dp" android:layout_height="32dp" android:layout_weight="1" android:contentDescription="@string/review_seek" />
+                    <TextView android:id="@+id/reviewDuration" style="@style/ReviewText" android:layout_width="wrap_content" android:textSize="14sp" android:text="@string/review_zero_time" />
+                </LinearLayout>
+                <LinearLayout android:id="@+id/reviewControls" android:layout_width="match_parent" android:layout_height="60dp" android:gravity="center">
+                    <ImageButton android:id="@+id/reviewPrevious" style="@style/ReviewIcon" android:src="@android:drawable/ic_media_previous" android:contentDescription="@string/review_previous" />
+                    <Button android:id="@+id/reviewRewind" style="@style/ReviewButton" android:text="@string/review_rewind_label" android:contentDescription="@string/review_rewind" />
+                    <ImageButton android:id="@+id/reviewPlay" style="@style/ReviewIcon" android:src="@android:drawable/ic_media_play" android:contentDescription="@string/review_play" />
+                    <Button android:id="@+id/reviewForward" style="@style/ReviewButton" android:text="@string/review_forward_label" android:contentDescription="@string/review_forward" />
+                    <ImageButton android:id="@+id/reviewNext" style="@style/ReviewIcon" android:src="@android:drawable/ic_media_next" android:contentDescription="@string/review_next" />
+                    <ImageButton android:id="@+id/reviewFullscreen" style="@style/ReviewIcon" android:src="@drawable/ic_review_fullscreen" android:contentDescription="@string/review_fullscreen" />
+                </LinearLayout>
+            </LinearLayout>
+            <LinearLayout android:id="@+id/reviewListPanel" android:layout_width="0dp" android:layout_height="0dp" app:layout_constraintHorizontal_weight="1" app:layout_constraintStart_toEndOf="@id/reviewPlayerPanel" app:layout_constraintEnd_toEndOf="parent" app:layout_constraintTop_toTopOf="parent" app:layout_constraintBottom_toBottomOf="parent" android:layout_marginStart="12dp" android:orientation="vertical">
+                <TextView android:id="@+id/reviewBreadcrumb" style="@style/ReviewText" android:padding="8dp" android:textSize="14sp" android:maxLines="1" android:ellipsize="middle" />
+                <FrameLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1">
+                    <ListView android:id="@+id/reviewList" android:layout_width="match_parent" android:layout_height="match_parent" android:divider="@color/settings_divider" android:dividerHeight="1dp" />
+                    <TextView android:id="@+id/reviewListEmpty" style="@style/ReviewText" android:layout_height="match_parent" android:gravity="center" android:padding="20dp" android:text="@string/review_empty_category" />
+                </FrameLayout>
+            </LinearLayout>
+        </androidx.constraintlayout.widget.ConstraintLayout>
+        <LinearLayout android:id="@+id/reviewEmpty" android:layout_width="match_parent" android:layout_height="match_parent" android:gravity="center" android:orientation="vertical" android:visibility="gone">
+            <TextView style="@style/ReviewText" android:text="@string/review_empty_code" android:textSize="64sp" android:gravity="center" android:textColor="@color/settings_text_muted" android:importantForAccessibility="no" />
+            <TextView android:id="@+id/reviewEmptyMessage" style="@style/ReviewText" android:gravity="center" android:padding="16dp" android:text="@string/review_no_recordings" android:accessibilityLiveRegion="polite" />
+            <Button android:id="@+id/reviewEmptyChoose" style="@style/ReviewButton" android:text="@string/review_choose_folder" />
+            <Button android:id="@+id/reviewRetry" style="@style/ReviewButton" android:text="@string/review_retry" android:layout_marginTop="12dp" />
+        </LinearLayout>
+        <ProgressBar android:id="@+id/reviewLoading" android:layout_width="48dp" android:layout_height="48dp" android:layout_gravity="center" android:visibility="gone" />
+    </FrameLayout>
+</LinearLayout>

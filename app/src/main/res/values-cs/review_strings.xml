@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="review_title">Přehrávání záznamů</string>
+    <string name="review_internal_storage">Interní úložiště</string>
+    <string name="review_back">Zpět</string>
+    <string name="review_recording_folder">Složka záznamů</string>
+    <string name="review_choose_folder">Otevřít složku</string>
+    <string name="review_refresh">Obnovit</string>
+    <string name="review_events">Události</string>
+    <string name="review_test">Testovací klipy</string>
+    <string name="review_buffer">Průběžné záznamy</string>
+    <string name="review_other">Ostatní</string>
+    <string name="review_select_clip">Vyberte událost nebo video k přehrání.</string>
+    <string name="review_seek">Pozice videa</string>
+    <string name="review_previous">Předchozí klip</string>
+    <string name="review_rewind">Zpět o 10 sekund</string>
+    <string name="review_play">Přehrát</string>
+    <string name="review_pause">Pozastavit</string>
+    <string name="review_forward">Vpřed o 10 sekund</string>
+    <string name="review_next">Další klip</string>
+    <string name="review_fullscreen">Celá obrazovka</string>
+    <string name="review_exit_fullscreen">Ukončit celou obrazovku</string>
+    <string name="review_empty_category">V této kategorii nejsou žádné položky.</string>
+    <string name="review_no_recordings">Nebyly nalezeny žádné záznamy.\nSložka je prázdná nebo nedostupná. Otevřete složku ručně.</string>
+    <string name="review_retry">Zkusit znovu</string>
+    <string name="review_playback_error">Toto video nelze přehrát. Soubor může být nedostupný, neúplný nebo nepodporovaný.</string>
+    <string name="review_folder_error">Tuto složku nelze otevřít. Zkontrolujte úložiště nebo otevřete jinou složku.</string>
+    <string name="review_storage_closed">Úložiště je odpojeno nebo se vysouvá. Připojte je a zkuste to znovu, nebo otevřete jinou složku.</string>
+    <string name="review_picker_unavailable">Výběr složky není dostupný.</string>
+    <string name="review_date_unknown">Neznámé datum</string>
+    <string name="review_clip_count">Klipy: %1$d</string>
+    <string name="review_clip_position">%1$s · Klip %2$d/%3$d</string>
+    <string name="review_folder">Složka</string>
+    <string name="review_video">Video</string>
+    <string name="review_file_only">Soubor · pouze zobrazení</string>
+</resources>

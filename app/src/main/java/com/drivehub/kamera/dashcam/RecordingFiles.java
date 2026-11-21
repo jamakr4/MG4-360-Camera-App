@@ -16,7 +16,7 @@ final class RecordingFiles {
         java.util.Map<String, java.util.List<File>> groups = new java.util.TreeMap<>();
         if (files == null) return new java.util.ArrayList<>();
         for (File file : files) {
-            if (!file.isFile() || !isLoopClip(file.getName())) continue;
+            if (!file.isFile() || !isLoopClip(file.getName()) || ReviewFileAccess.isProtected(file)) continue;
             String base = file.getName().replaceFirst("(_[FRXY])?\\.mp4$", "");
             groups.computeIfAbsent(base, ignored -> new java.util.ArrayList<>()).add(file);
         }
@@ -34,12 +34,15 @@ final class RecordingFiles {
     // Adapted from Tommasov/MG4_Dashcam 1.4.3: release FAT chains before unlink.
     // If truncate/fsync fails, retain the directory entry for diagnosis/retry.
     static boolean deleteFreeingSpace(File file) throws IOException {
-        if (!file.isFile()) return false;
-        if (file.length() > 0) {
-            try (FileOutputStream out = new FileOutputStream(file)) {
-                out.getFD().sync();
+        synchronized (ReviewFileAccess.LOCK) {
+            if (ReviewFileAccess.isProtected(file)) return false;
+            if (!file.isFile()) return false;
+            if (file.length() > 0) {
+                try (FileOutputStream out = new FileOutputStream(file)) {
+                    out.getFD().sync();
+                }
             }
+            return file.delete();
         }
-        return file.delete();
     }
 }

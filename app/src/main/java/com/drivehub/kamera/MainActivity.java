@@ -329,6 +329,8 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
         ImageButton btnClose = sideCameraPanel.findViewById(R.id.btnClose);
         btnClose.setOnClickListener(v -> closeFromUser());
+        sideCameraPanel.findViewById(R.id.btnDashcamReview).setOnClickListener(v -> startActivity(
+                new Intent(this, com.drivehub.kamera.dashcam.review.DashcamReviewActivity.class)));
 
         btnRecordTestClip = findViewById(R.id.btnRecordTestClip);
         btnRecordTestClip.setOnClickListener(v -> {

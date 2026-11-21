@@ -78,3 +78,5 @@ app/src/main/res/raw/*
 /app/src/androidTest/assets/oem/
 # Private user camera screenshots used only for local projection previews/tests.
 /app/src/androidTest/assets/reference/
+# Local synthetic video fixture for dashcam review tests.
+/app/src/androidTest/assets/review/clip.mp4
