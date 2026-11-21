@@ -57,8 +57,8 @@ A community camera mod for the MG4 EV (AAOS 9, pre-2026 facelift), featuring liv
 </p>
 
 <p align="center">
-  <img src="images/blinker_cam_v2.gif" alt="Automatic turn signal camera overlay" width="46%"">
-  <img src="images/reviewmode.jpg" alt="reviewmode of dashcam" width="48%"">  
+  <img src="images/blinker_cam_v2.gif" alt="Automatic turn signal camera overlay" width="100%"">
+  
 </p>
 
 
@@ -71,7 +71,8 @@ A community camera mod for the MG4 EV (AAOS 9, pre-2026 facelift), featuring liv
 </p>
 
 <p align="center">
-  <img src="images/dashcam_demo_v3.gif" alt="Native four-camera dashcam recording" width="96%">
+  <img src="images/dashcam_demo_v3.gif" alt="Native four-camera dashcam recording" width=57%">
+  <img src="images/reviewmode.jpg" alt="reviewmode of dashcam" width="43%"">  
 </p>
 
 <p align="center">
