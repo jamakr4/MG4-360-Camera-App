@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="birdseye_black_box_title">Fond noir sous le véhicule (2D)</string>
+    <string name="birdseye_black_box_hint">Masque les artefacts de caméra sous le véhicule dans les vues Normal et Wide.</string>
+</resources>

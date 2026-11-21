@@ -82,6 +82,10 @@ public final class BirdseyeView extends FrameLayout {
     }
     public boolean rearFrameFresh() { return resumed&&!blocked&&source.ready&&(renderer.freshMask&8)!=0
             &&SystemClock.elapsedRealtime()-renderer.lastDrawElapsedMs<=500; }
+    private void applyBlackBox() {
+        renderer.setBlackBoxEnabled(UiPrefs.isBirdseyeBlackBoxEnabled(prefs));
+        gl.requestRender();
+    }
     private void applyMode() {
         boolean mode=prefs.getBoolean(UiPrefs.KEY_PARKING_SURROUND_3D,false);
         renderer.setThreeD(mode);
@@ -170,6 +174,9 @@ public final class BirdseyeView extends FrameLayout {
         if (UiPrefs.KEY_ACCENT_COLOR.equals(key)) styleModeToggle();
         if (UiPrefs.KEY_PARKING_BIRDSEYE_CAR_COLOR.equals(key)) {
             renderer.setCarColor(UiPrefs.getBirdseyeCarColor(p));
+        }
+        if (UiPrefs.KEY_PARKING_BIRDSEYE_BLACK_BOX.equals(key)) {
+            applyBlackBox();
         }
         if (UiPrefs.KEY_OEM_CAMERA_ACCESS_BLOCKED.equals(key) || UiPrefs.KEY_OEM_AVM_ACTIVE.equals(key)
                 || UiPrefs.KEY_OEM_AVM_COEXIST.equals(key) || UiPrefs.KEY_EXTERNAL_CAMERA_PAUSED.equals(key)) updateOemState();
@@ -318,7 +325,8 @@ public final class BirdseyeView extends FrameLayout {
         resumed = true; renderFailed = false; renderer.error = null;
         CameraHandoffController.demand("birdseye", true);
         prefs.registerOnSharedPreferenceChangeListener(preferences);
-        renderer.setCarColor(UiPrefs.getBirdseyeCarColor(prefs));applyMode();
+        renderer.setCarColor(UiPrefs.getBirdseyeCarColor(prefs));
+        applyBlackBox();applyMode();
         gl.onResume(); updateOemState();
         main.removeCallbacks(tick); main.post(tick);
     }

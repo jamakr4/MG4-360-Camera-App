@@ -5,4 +5,5 @@
     <item name="surroundGuidesToggle" type="id"/>
     <item name="surroundDebugSurface" type="id"/>
     <item name="surroundDebugPdc" type="id"/>
+    <item name="surroundDebugBlackBox" type="id"/>
 </resources>

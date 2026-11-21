@@ -16,6 +16,33 @@ import static androidx.test.espresso.matcher.ViewMatchers.*;
 import static org.junit.Assert.*;
 @RunWith(AndroidJUnit4.class)
 public class RivelaUiInstrumentedTest {
+    @Test public void debugBlackBoxToggleUpdatesPixelsAndPersistsAcrossRecreation() throws Exception {
+        SharedPreferences prefs=UiPrefs.getPrefs(InstrumentationRegistry.getInstrumentation().getTargetContext());
+        java.util.Map<String,?> saved=prefs.getAll();
+        String[] keys={UiPrefs.KEY_PARKING_BIRDSEYE_BLACK_BOX,UiPrefs.KEY_PARKING_SURROUND_3D,UiPrefs.KEY_PARKING_SURROUND_WIDE};
+        prefs.edit().remove(keys[0]).putBoolean(keys[1],false).putBoolean(keys[2],false).commit();
+        java.util.List<android.graphics.Bitmap> pictures=new java.util.ArrayList<>();
+        try(ActivityScenario<BirdseyeDebugActivity> scenario=ActivityScenario.launch(BirdseyeDebugActivity.class)) {
+            scenario.onActivity(a->((android.widget.CheckBox)a.findViewById(R.id.surroundDebugReverseGuides)).setChecked(false));
+            awaitDraws(scenario);android.graphics.Bitmap masked=capture(scenario,0);pictures.add(masked);
+            onView(withId(R.id.surroundDebugBlackBox)).perform(scrollTo()).check(matches(isChecked())).perform(click());
+            assertFalse(UiPrefs.isBirdseyeBlackBoxEnabled(prefs));
+            awaitDraws(scenario);android.graphics.Bitmap unmasked=capture(scenario,0);pictures.add(unmasked);
+            saveBlackBoxPreview(masked,"black-box-on");saveBlackBoxPreview(unmasked,"black-box-off");
+            assertTrue("The debug toggle must change the rendered car background",pixelDifferences(masked,unmasked)>20);
+            prefs.edit().putBoolean(keys[0],true).commit();awaitDraws(scenario);
+            onView(withId(R.id.surroundDebugBlackBox)).check(matches(isChecked()));
+            android.graphics.Bitmap restored=capture(scenario,0);pictures.add(restored);
+            assertEquals(0,pixelDifferences(masked,restored));
+            scenario.recreate();awaitDraws(scenario);
+            onView(withId(R.id.surroundDebugBlackBox)).perform(scrollTo()).check(matches(isChecked()));
+        } finally {
+            for(android.graphics.Bitmap picture:pictures)picture.recycle();
+            SharedPreferences.Editor edit=prefs.edit();
+            for(String key:keys){Object value=saved.get(key);if(value instanceof Boolean)edit.putBoolean(key,(Boolean)value);else edit.remove(key);}
+            edit.commit();
+        }
+    }
     @Test public void parkingSwatchChangesBothViewsAndPersistsAcrossRecreation() throws Exception {
         SharedPreferences prefs=UiPrefs.getPrefs(InstrumentationRegistry.getInstrumentation().getTargetContext());
         java.util.Map<String,?> saved=prefs.getAll();
@@ -156,11 +183,24 @@ public class RivelaUiInstrumentedTest {
         fail("Guideline animation did not reach "+target);
     }
     private static android.graphics.Bitmap capture(ActivityScenario<BirdseyeDebugActivity> scenario) throws Exception {
-        awaitGuideLevel(scenario,1); // Compare settled styles/paint rather than different reveal frames.
+        return capture(scenario,1);
+    }
+    private static android.graphics.Bitmap capture(ActivityScenario<BirdseyeDebugActivity> scenario,float guideLevel) throws Exception {
+        awaitGuideLevel(scenario,guideLevel); // Compare settled styles/paint rather than different reveal frames.
         java.util.concurrent.atomic.AtomicReference<android.graphics.Bitmap> bitmap=new java.util.concurrent.atomic.AtomicReference<>();
         scenario.onActivity(a->bitmap.set(a.gl.getBitmap()));
         assertNotNull("TextureView did not expose the rendered vehicle",bitmap.get());
         return bitmap.get();
+    }
+    private static void saveBlackBoxPreview(android.graphics.Bitmap bitmap,String name) throws Exception {
+        String directory=InstrumentationRegistry.getArguments().getString("additionalTestOutputDir");
+        if(directory==null)return;
+        java.io.File folder=new java.io.File(directory);folder.mkdirs();
+        java.io.ByteArrayOutputStream png=new java.io.ByteArrayOutputStream();
+        bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,png);
+        try(java.io.FileOutputStream output=new java.io.FileOutputStream(new java.io.File(folder,name+".png.b64"))) {
+            output.write(android.util.Base64.encode(png.toByteArray(),android.util.Base64.NO_WRAP));
+        }
     }
     private static void assertDifferent(android.graphics.Bitmap a,android.graphics.Bitmap b) {assertTrue("Selected paint did not change the rendered vehicle",pixelDifferences(a,b)>200);}
     private static int pixelDifferences(android.graphics.Bitmap a,android.graphics.Bitmap b) {

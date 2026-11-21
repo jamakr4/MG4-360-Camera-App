@@ -220,7 +220,7 @@ Under **Parking → MG4 vehicle color**, eight color circles select the pre-rend
 
 Color previews are screen approximations. Artwork: **MattDoesBlender**, adapted and rendered under **CC BY-NC-SA 4.0**; see [image attribution](images/ATTRIBUTION.md).
 
-With valid vehicle artwork, the 2D view follows its transparent silhouette without a black rectangle behind the rounded corners. Missing artwork retains a black placeholder. The vehicle artwork covers the invisible ground underneath; that ground is not reconstructed.
+The 2D view places a black rectangle beneath the vehicle artwork by default to hide camera artifacts in the vehicle footprint. **Parking → Black background under car (2D)** turns it off immediately for both Normal and Wide, revealing the camera image through transparent areas around the artwork. The choice is saved across app restarts and leaves 3D rendering unchanged. The Birdseye Debug Activity exposes the same toggle beside its view controls for direct comparisons. The ground beneath the actual vehicle is not reconstructed.
 
 The 2D ground view requires the vehicle calibration at `/configure/camera_calibdata.bin` and current images from the four existing camera sessions. Missing calibration or camera images are shown explicitly. Its physical calibration, seams and recording performance still require vehicle testing; see [implementation and verification](docs/BIRDSEYE_2D_TEST.md) and the separate [offline preview](tools/birdseye/README.md).
 

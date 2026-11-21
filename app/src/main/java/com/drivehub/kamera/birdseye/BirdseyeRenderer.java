@@ -37,7 +37,9 @@ public final class BirdseyeRenderer implements GLSurfaceView.Renderer {
     private BirdseyeMesh uploadedMesh;
     private volatile BirdseyeCarColor requestedCarColor = BirdseyeCarColor.PICCADILLY_BLUE;
     private BirdseyeCarColor uploadedCarColor;
-    private int program, freshUniform, width=450, height=640;
+    private int program, freshUniform, blackBoxUniform, width=450, height=640;
+    private volatile boolean blackBoxEnabled = true;
+    public void setBlackBoxEnabled(boolean enabled) { blackBoxEnabled = enabled; }
     public volatile boolean threeDRequested, threeDActive, depthAvailable;
     public volatile String threeDError;
     public volatile ThreeDFailure threeDFailure;
@@ -125,14 +127,14 @@ public final class BirdseyeRenderer implements GLSurfaceView.Renderer {
             "vCam0=aCam0;vCam1=aCam1;vCam2=aCam2;vCam3=aCam3;}";
     private static final String FRAGMENT =
             "#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n" +
-            "uniform sampler2D uCam0,uCam1,uCam2,uCam3; uniform vec4 uFresh; uniform float uCarReady;\n" +
+            "uniform sampler2D uCam0,uCam1,uCam2,uCam3; uniform vec4 uFresh; uniform float uCarReady,uBlackBox;\n" +
             "varying vec3 vCam0,vCam1,vCam2,vCam3; varying vec2 vGround;\n" +
             // Reference (u,v) -> top-field (u,v/2). Top-field pixels occupy rows
             // 0,2,...478; interpolate between those actual positions, clamp the last line.
             PackedUyvyShader.SAMPLING + BirdseyeRearMask.GLSL +
             "void main(){vec2 car=vec2(" + BirdseyeMesh.CAR_WIDTH/2 + "," + BirdseyeMesh.CAR_LENGTH/2 + ");" +
-            // A valid RGBA car uses its own silhouette; retain the metric mask only if artwork is absent.
-            "vec2 g=abs(vGround);vec3 color=vec3(0.0);if(uCarReady>0.5 || g.x>=car.x || g.y>=car.y){" +
+            // Cover the calibrated vehicle footprint before composing the transparent car artwork.
+            "vec2 g=abs(vGround);vec3 color=vec3(0.0);if(uBlackBox<0.5 || g.x>=car.x || g.y>=car.y){" +
             "vec4 w=max(vec4(vCam0.z,vCam1.z,vCam2.z,vCam3.z),vec4(0.0))*uFresh;" +
             // Only 2D uses this contour; retain the existing fallback when artwork is absent.
             "if(uCarReady>0.5 && w.w>0.0)w.w*=rearBodyVisibility(vCam3.xy);" +
@@ -162,6 +164,7 @@ public final class BirdseyeRenderer implements GLSurfaceView.Renderer {
             attributes[0] = GLES20.glGetAttribLocation(program, "aPosition");
             for (int i = 0; i < 4; i++) attributes[i+1] = GLES20.glGetAttribLocation(program, "aCam"+i);
             freshUniform = GLES20.glGetUniformLocation(program, "uFresh");
+            blackBoxUniform = GLES20.glGetUniformLocation(program, "uBlackBox");
             GLES20.glUseProgram(program);
             GLES20.glGenTextures(5, textures, 0);
             int cameraFilter=PackedUyvyShader.textureFilter();
@@ -268,6 +271,7 @@ public final class BirdseyeRenderer implements GLSurfaceView.Renderer {
             }
             if(!drewThreeD) {
             GLES20.glUseProgram(program);GLES20.glDisable(GLES20.GL_DEPTH_TEST);GLES20.glDisable(GLES20.GL_BLEND);
+            GLES20.glUniform1f(blackBoxUniform, blackBoxEnabled ? 1 : 0);
             GLES20.glActiveTexture(GLES20.GL_TEXTURE4);GLES20.glBindTexture(GLES20.GL_TEXTURE_2D,textures[4]);
             GLES20.glUniform4f(freshUniform, visibleMask&1, (visibleMask>>1)&1, (visibleMask>>2)&1, (visibleMask>>3)&1);
             GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, buffers[0]);

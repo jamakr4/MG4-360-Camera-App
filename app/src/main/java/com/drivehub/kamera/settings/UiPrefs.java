@@ -71,6 +71,7 @@ public final class UiPrefs {
         return prefs.getBoolean(KEY_DEV_STEERING_INVERT,false);
     }
     public static final String KEY_PARKING_BIRDSEYE_CAR_COLOR = "parkingBirdseyeCarColor";
+    public static final String KEY_PARKING_BIRDSEYE_BLACK_BOX = "parkingBirdseyeBlackBox";
     public static final String KEY_PARKING_FRONT_WHEEL_ALIGNMENT = "parkingFrontWheelAlignment";
     public static final String KEY_PARKING_REAR_WHEEL_ALIGNMENT = "parkingRearWheelAlignment";
     public static final String KEY_PARKING_FRONT_WHEEL_MODE = "parkingFrontWheelAlignmentMode";
@@ -284,6 +285,14 @@ public final class UiPrefs {
 
     public static void setBirdseyeCarColor(SharedPreferences prefs, BirdseyeCarColor color) {
         prefs.edit().putString(KEY_PARKING_BIRDSEYE_CAR_COLOR, color.id).apply();
+    }
+
+    public static boolean isBirdseyeBlackBoxEnabled(SharedPreferences prefs) {
+        return prefs.getBoolean(KEY_PARKING_BIRDSEYE_BLACK_BOX, true);
+    }
+
+    public static void setBirdseyeBlackBoxEnabled(SharedPreferences prefs, boolean enabled) {
+        prefs.edit().putBoolean(KEY_PARKING_BIRDSEYE_BLACK_BOX, enabled).apply();
     }
 
     public static boolean isParkingFrontWheelAlignmentEnabled(SharedPreferences prefs) {
