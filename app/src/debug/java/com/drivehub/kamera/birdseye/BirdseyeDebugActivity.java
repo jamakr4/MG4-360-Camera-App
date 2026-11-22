@@ -52,6 +52,7 @@ public final class BirdseyeDebugActivity extends Activity {
     private Button steeringReset;
     private TextView steeringValue;
     private CheckBox liveSteering, unavailableSteering, reverseGuides, blueCorridor,guideSpeedLimit,blackBox;
+    private CheckBox rearArtifactFix;
     private RadioGroup guideDirection;
     private TextView guideHorizon;
     private GuidelineWidthControl guideWidth;
@@ -232,6 +233,11 @@ public final class BirdseyeDebugActivity extends Activity {
         blackBox.setChecked(UiPrefs.isBirdseyeBlackBoxEnabled(prefs));
         blackBox.setOnCheckedChangeListener((button,enabled)->UiPrefs.setBirdseyeBlackBoxEnabled(prefs,enabled));
         controls.addView(blackBox);
+        rearArtifactFix=new CheckBox(this);rearArtifactFix.setId(R.id.surroundDebugRearArtifactFix);
+        rearArtifactFix.setText(R.string.birdseye_debug_rear_artifact_fix);rearArtifactFix.setTextColor(Color.WHITE);
+        rearArtifactFix.setChecked(state==null||state.getBoolean("rearArtifactFix3d",true));controls.addView(rearArtifactFix);
+        renderer.setRearArtifactFix3d(rearArtifactFix.isChecked());
+        rearArtifactFix.setOnCheckedChangeListener((button,checked)->{renderer.setRearArtifactFix3d(checked);gl.requestRender();});
         zoomOut=new Button(this);zoomIn=new Button(this);
         zoomOut.setId(R.id.surroundDebugZoomOut);zoomIn.setId(R.id.surroundDebugZoomIn);
         zoomOut.setText(R.string.birdseye_debug_zoom_minus);zoomIn.setText(R.string.birdseye_debug_zoom_plus);
@@ -400,6 +406,7 @@ public final class BirdseyeDebugActivity extends Activity {
         out.putBoolean("reverseGuidePreview",reverseGuides.isChecked());
         out.putBoolean("guideSpeedLimitTest",guideSpeedLimit.isChecked());
         out.putBoolean("blueGuideCorridor",blueCorridor.isChecked());
+        out.putBoolean("rearArtifactFix3d",rearArtifactFix.isChecked());
         out.putString("guideWidthMode",guideWidth.mode().id);
         out.putInt("guideCustomWidthMm",guideWidth.customMm());
         out.putBoolean("guideForward",guideDirection.getCheckedRadioButtonId()==R.id.surroundDebugGuideForward);

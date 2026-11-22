@@ -1,6 +1,6 @@
 package com.drivehub.kamera.birdseye;
 
-/** Display-only self-body contour from the MG4 rear-camera snapshot (unmirrored 720x480).
+/** Display-only 2D/3D self-body contour from the MG4 rear-camera snapshot (unmirrored 720x480).
  * This is a provisional visibility mask, not a change to calibration or vehicle dimensions. */
 final class BirdseyeRearMask {
     private BirdseyeRearMask() {}

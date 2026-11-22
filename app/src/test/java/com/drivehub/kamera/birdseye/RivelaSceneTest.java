@@ -36,6 +36,31 @@ public class RivelaSceneTest {
         double[] p=new double[3];c.projectRay(1,0,1,p);
         assertEquals(360+180*Math.PI/4,p[0],1e-9);assertEquals(240,p[1],0);assertEquals(45,p[2],1e-9);
     }
+    @Test public void rearGroundFillsOnlyTheInnerRearOpeningAndSharesItsCalibratedBoundary() {
+        RivelaScene scene=new RivelaScene(BirdseyeCalibration.parse(BirdseyeSynthetic.calibrationBytes()));
+        scene.prepareBowl();Bowl bowl=scene.bowl();float[] ground=scene.rearGround();
+        assertTrue(ground.length>0);assertEquals(0,ground.length%(3*Bowl.STRIDE));
+        for(int v=0;v<ground.length;v+=Bowl.STRIDE) {
+            double x=Math.abs(ground[v]-scene.car.centerX)/(scene.car.width/2+40);
+            double y=(ground[v+1]-scene.car.centerY)/(scene.car.length/2+40);
+            assertTrue(y>=-1e-6);assertTrue(Math.pow(x,6)+Math.pow(y,6)<=1.000001);
+            assertEquals(0,ground[v+2],0);
+            double weight=0;
+            for(int i=0;i<Bowl.STRIDE;i++)assertTrue(Float.isFinite(ground[v+i]));
+            for(int c=0;c<4;c++) {assertTrue(ground[v+11+c]>=0);weight+=ground[v+11+c];}
+            assertTrue(weight==0||Math.abs(weight-1)<1e-6);
+        }
+        for(int angle=0;angle<=72;angle++) {
+            int boundary=angle*Bowl.STRIDE;boolean found=false;
+            for(int v=0;v<ground.length;v+=Bowl.STRIDE) {
+                if(ground[v]!=bowl.vertices[boundary]||ground[v+1]!=bowl.vertices[boundary+1])continue;
+                for(int i=0;i<Bowl.STRIDE;i++)assertEquals(bowl.vertices[boundary+i],ground[v+i],0);
+                found=true;break;
+            }
+            assertTrue("Missing shared boundary at "+angle,found);
+        }
+        assertEquals(1836,scene.car.width,0);assertEquals(4287,scene.car.length,0);
+    }
     @Test public void orbitClampsZoomAndPitchAndResets() {
         OrbitCamera c=new OrbitCamera();c.rotate(99999,99999);c.zoom(1e10f);
         assertEquals(80,c.values()[1],0);assertEquals(5000,c.values()[2],0);

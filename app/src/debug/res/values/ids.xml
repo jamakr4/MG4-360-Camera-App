@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <item name="surroundDebugRearArtifactFix" type="id" />
     <item name="debug_axle_left_rotation" type="id" />
     <item name="debug_axle_right_rotation" type="id" />
     <item name="debug_axle_left_value" type="id" />

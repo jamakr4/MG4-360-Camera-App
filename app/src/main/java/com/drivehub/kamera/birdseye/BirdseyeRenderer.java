@@ -49,6 +49,8 @@ public final class BirdseyeRenderer implements GLSurfaceView.Renderer {
     public final OrbitCamera orbit=new OrbitCamera();
     public final WheelSteering steering=new WheelSteering();
     private volatile boolean wheelGuidePreview;
+    private volatile boolean rearArtifactFix3d=true;
+    public void setRearArtifactFix3d(boolean enabled){rearArtifactFix3d=enabled;}
     volatile float guideProgress,outgoingGuideProgress;
     private volatile com.drivehub.kamera.steering.WheelGuides.Style guideStyle=com.drivehub.kamera.steering.WheelGuides.Style.SIMPLE;
     private volatile int guideWidthMm=com.drivehub.kamera.steering.GuidelineWidth.DEFAULT_MM;
@@ -261,7 +263,7 @@ public final class BirdseyeRenderer implements GLSurfaceView.Renderer {
                     stage=ThreeDFailure.Kind.GPU_SETUP;
                     if(bowlPass==null)bowlPass=new RivelaBowlPass();
                     stage=ThreeDFailure.Kind.GPU_DRAW;
-                    bowlPass.draw(width,height,currentScene,currentModel,color,textures,visibleMask,mask,orbit,angles,pdcGeometry,SystemClock.elapsedRealtime(),guideFrame);
+                    bowlPass.draw(width,height,currentScene,currentModel,color,textures,visibleMask,mask,orbit,angles,pdcGeometry,SystemClock.elapsedRealtime(),guideFrame,rearArtifactFix3d);
                     drewThreeD=true;
                 } catch(RuntimeException|OutOfMemoryError failure) {
                     failThreeD(ThreeDFailure.at(stage,failure));

@@ -321,6 +321,114 @@ public class RivelaGlesInstrumentedTest {
             assertNull(r.error);assertNull(r.threeDError);
         }
     }
+    @Test public void rearDisplayShaderAddsExactly180MillimetresWithoutMovingTheFront() {
+        try(Egl egl=new Egl()) {
+            int program=GlPrograms.link(RivelaBowlPass.MODEL_VERTEX,
+                    com.drivehub.kamera.rivela.BowlShaders.PRECISION+"void main(){gl_FragColor=vec4(1.0,0.0,0.0,1.0);}");
+            try {
+                GLES20.glUseProgram(program);GLES20.glViewport(0,0,W,H);GLES20.glDisable(GLES20.GL_DEPTH_TEST);
+                float[] ortho=new float[16];Matrix.orthoM(ortho,0,-100,100,-50,450,-100,100);
+                GLES20.glUniformMatrix4fv(GLES20.glGetUniformLocation(program,"uMvp"),1,false,ortho,0);
+                GLES20.glUniform3f(GLES20.glGetUniformLocation(program,"uCenter"),0,0,0);
+                GLES20.glUniform3f(GLES20.glGetUniformLocation(program,"uPivot"),0,0,0);
+                GLES20.glUniform2f(GLES20.glGetUniformLocation(program,"uSteer"),1,0);
+                FloatBuffer vertices=ByteBuffer.allocateDirect(9*4).order(ByteOrder.nativeOrder()).asFloatBuffer();
+                vertices.put(new float[]{-50,0,0,50,0,0,0,200,0}).flip();
+                int pos=GLES20.glGetAttribLocation(program,"aPos");GLES20.glEnableVertexAttribArray(pos);
+                GLES20.glVertexAttribPointer(pos,3,GLES20.GL_FLOAT,false,0,vertices);
+                int[][] rows=new int[2][2];
+                for(int enabled=0;enabled<2;enabled++) {
+                    GLES20.glUniform3f(GLES20.glGetUniformLocation(program,"uRearDisplay"),100,100,enabled*180);
+                    GLES20.glClearColor(0,0,0,1);GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);
+                    GLES20.glDrawArrays(GLES20.GL_TRIANGLES,0,3);ByteBuffer picture=pixels();
+                    rows[enabled][0]=H;rows[enabled][1]=-1;
+                    for(int y=0;y<H;y++)for(int x=0;x<W;x++)if(color(picture,x,y)==0xff0000) {
+                        rows[enabled][0]=Math.min(rows[enabled][0],y);rows[enabled][1]=Math.max(rows[enabled][1],y);
+                    }
+                }
+                assertEquals(180*H/500f,rows[0][0]-rows[1][0],2);
+                assertEquals(rows[0][1],rows[1][1]);GLES20.glDisableVertexAttribArray(pos);
+            }finally{GLES20.glDeleteProgram(program);}
+        }
+    }
+    @Test public void rearCameraBodyMaskRemovesOnlySelfBodyAndRenormalizesRemainingCameras() {
+        try(Egl egl=new Egl()) {
+            int program=GlPrograms.link("attribute vec2 aPos;uniform vec2 uRearUv,uWorld;uniform vec4 uWeights;"
+                    +"varying vec2 t0,t1,t2,t3,vGround;varying vec4 w;"
+                    +"void main(){gl_Position=vec4(aPos,0.0,1.0);vGround=uWorld;t0=t1=t2=vec2(0.5);t3=uRearUv;w=uWeights;}",
+                    RivelaBowlPass.packedFragment());
+            int[] textures=new int[2];GLES20.glGenTextures(2,textures,0);
+            try {
+                GLES20.glUseProgram(program);GLES20.glViewport(0,0,W,H);GLES20.glDisable(GLES20.GL_DEPTH_TEST);
+                for(int i=0;i<2;i++) {
+                    GLES20.glActiveTexture(GLES20.GL_TEXTURE0+i);GLES20.glBindTexture(GLES20.GL_TEXTURE_2D,textures[i]);
+                    GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D,GLES20.GL_TEXTURE_MIN_FILTER,GLES20.GL_NEAREST);
+                    GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D,GLES20.GL_TEXTURE_MAG_FILTER,GLES20.GL_NEAREST);
+                    GLES20.glTexImage2D(GLES20.GL_TEXTURE_2D,0,GLES20.GL_RGBA,1,1,0,GLES20.GL_RGBA,GLES20.GL_UNSIGNED_BYTE,
+                            ByteBuffer.wrap(new byte[]{(byte)128,(byte)(i==0?64:200),(byte)128,(byte)(i==0?64:200)}));
+                }
+                GLES20.glUniform1i(GLES20.glGetUniformLocation(program,"tex0"),0);
+                GLES20.glUniform1i(GLES20.glGetUniformLocation(program,"tex3"),1);
+                GLES20.glUniform4f(GLES20.glGetUniformLocation(program,"uFresh"),1,1,1,1);
+                GLES20.glUniform2f(GLES20.glGetUniformLocation(program,"uRearUv"),350f/720,470f/480);
+                FloatBuffer quad=ByteBuffer.allocateDirect(8*4).order(ByteOrder.nativeOrder()).asFloatBuffer();
+                quad.put(new float[]{-1,-1,1,-1,-1,1,1,1}).flip();
+                int pos=GLES20.glGetAttribLocation(program,"aPos");GLES20.glEnableVertexAttribArray(pos);
+                GLES20.glVertexAttribPointer(pos,2,GLES20.GL_FLOAT,false,0,quad);
+                GLES20.glUniform4f(GLES20.glGetUniformLocation(program,"uWeights"),0,0,0,1);
+                GLES20.glUniform1f(GLES20.glGetUniformLocation(program,"uRearArtifactFix"),0);
+                GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP,0,4);
+                int original=color(pixels(),W/2,H/2);assertTrue((original&255)>200);
+                GLES20.glUniform1f(GLES20.glGetUniformLocation(program,"uRearArtifactFix"),1);
+                GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP,0,4);assertEquals(0,color(pixels(),W/2,H/2));
+                GLES20.glUniform4f(GLES20.glGetUniformLocation(program,"uWeights"),1,0,0,1);
+                GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP,0,4);int mixed=color(pixels(),W/2,H/2);
+                GLES20.glUniform4f(GLES20.glGetUniformLocation(program,"uWeights"),1,0,0,0);
+                GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP,0,4);assertEquals(mixed,color(pixels(),W/2,H/2));
+                assertTrue((mixed&255)>40&&(mixed&255)<70);
+                // A tiny, but valid side contribution must survive when the dominant rear view is masked.
+                GLES20.glUniform4f(GLES20.glGetUniformLocation(program,"uWeights"),.002f,0,0,1);
+                GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP,0,4);assertEquals(mixed,color(pixels(),W/2,H/2));
+                GLES20.glUniform4f(GLES20.glGetUniformLocation(program,"uWeights"),0,0,0,1);
+                GLES20.glUniform2f(GLES20.glGetUniformLocation(program,"uRearUv"),350f/720,200f/480);
+                GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP,0,4);assertEquals(original,color(pixels(),W/2,H/2));
+                // Real shader: pavement remains intact outside the rounded footprint, with a soft shadow edge.
+                int world=GLES20.glGetUniformLocation(program,"uWorld");
+                GLES20.glUniform4f(GLES20.glGetUniformLocation(program,"uRearShadow"),0,1160,878,1160);
+                GLES20.glUniform2f(world,1100,2320);
+                GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP,0,4);assertEquals(original,color(pixels(),W/2,H/2));
+                GLES20.glUniform2f(world,0,2200);
+                GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP,0,4);int dark=color(pixels(),W/2,H/2)&255;
+                assertTrue(dark<60);
+                GLES20.glUniform2f(world,878,2200);
+                GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP,0,4);int edge=color(pixels(),W/2,H/2)&255;
+                assertTrue(edge>dark&&edge<(original&255));
+                GLES20.glDisableVertexAttribArray(pos);
+            }finally{GLES20.glDeleteTextures(2,textures,0);GLES20.glDeleteProgram(program);}
+        }
+    }
+    @Test public void rearFixChangesOnlyThreeDDisplayAndNeverMutatesPhysicalGeometry() throws Exception {
+        BirdseyeSynthetic frames=new BirdseyeSynthetic();frames.fixedClockUs=1_000_000;
+        ProjectionAssets projection=ProjectionAssets.get(frames.calibration);projection.scene.prepareBowl();
+        BirdseyeRenderer r=new BirdseyeRenderer(frames,null,()->0L,0);
+        r.setMesh(projection.mesh);r.setWideMesh(projection.wideMesh,null);r.setScene(projection.scene);r.setModel(model);
+        r.orbit.rotate(0,(75-55)/.25f);float[] vertices=new float[model.vertices.limit()];model.vertices.duplicate().get(vertices);
+        try(Egl egl=new Egl()) {
+            r.onSurfaceCreated(null,null);r.onSurfaceChanged(null,W,H);
+            for(boolean wide:new boolean[]{false,true}) {
+                r.setWide(wide);r.setRearArtifactFix3d(false);r.onDrawFrame(null);ByteBuffer before=pixels();
+                r.setRearArtifactFix3d(true);r.onDrawFrame(null);assertEquals(0,differences(before,pixels(),new int[]{0,0,W,H}));
+            }
+            r.setThreeD(true);r.setRearArtifactFix3d(false);r.onDrawFrame(null);ByteBuffer before=pixels();
+            r.setRearArtifactFix3d(true);r.onDrawFrame(null);ByteBuffer after=pixels();
+            assertTrue(differences(before,after,new int[]{0,0,W,H})>20);
+            int[] roof=projectPoint(r,projection.scene,0,-600,-1540);
+            assertEquals(color(before,roof[0],roof[1]),color(after,roof[0],roof[1]));
+            float[] retained=new float[vertices.length];model.vertices.duplicate().get(retained);assertArrayEquals(vertices,retained,0);
+            assertEquals(1836,projection.scene.car.width,0);assertEquals(4287,projection.scene.car.length,0);
+            assertNull(r.error);assertNull(r.threeDError);
+        }
+    }
     private static double changedMeanY(ByteBuffer picture,ByteBuffer background) {
         long sum=0,count=0;
         for(int y=0;y<H;y++)for(int x=0;x<W;x++)if(color(picture,x,y)!=color(background,x,y)){sum+=y;count++;}

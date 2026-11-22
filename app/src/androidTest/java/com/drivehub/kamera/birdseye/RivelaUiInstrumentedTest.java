@@ -85,6 +85,27 @@ public class RivelaUiInstrumentedTest {
         }while(SystemClock.elapsedRealtime()<deadline);
         fail("Color update did not reach a new rendered frame");
     }
+    @Test public void rearArtifactTestSwitchChangesOnlyThreeDAndSurvivesRecreation() throws Exception {
+        SharedPreferences prefs=UiPrefs.getPrefs(InstrumentationRegistry.getInstrumentation().getTargetContext());
+        Object saved=prefs.getAll().get(UiPrefs.KEY_PARKING_SURROUND_3D);
+        prefs.edit().putBoolean(UiPrefs.KEY_PARKING_SURROUND_3D,true).commit();
+        java.util.List<android.graphics.Bitmap> images=new java.util.ArrayList<>();
+        try(ActivityScenario<BirdseyeDebugActivity> scenario=ActivityScenario.launch(BirdseyeDebugActivity.class)) {
+            await3d(scenario);awaitDraws(scenario);android.graphics.Bitmap on=capture(scenario);images.add(on);
+            onView(withId(R.id.surroundDebugRearArtifactFix)).perform(scrollTo()).check(matches(isChecked())).perform(click());
+            awaitDraws(scenario);android.graphics.Bitmap off=capture(scenario);images.add(off);assertDifferent(on,off);
+            scenario.recreate();await3d(scenario);awaitDraws(scenario);
+            onView(withId(R.id.surroundDebugRearArtifactFix)).perform(scrollTo()).check(matches(org.hamcrest.Matchers.not(isChecked())));
+            android.graphics.Bitmap restored=capture(scenario);images.add(restored);assertEquals(0,pixelDifferences(off,restored));
+            onView(withId(R.id.surroundMode2d)).perform(scrollTo(),click());awaitDraws(scenario);
+            android.graphics.Bitmap twoD=capture(scenario);images.add(twoD);
+            onView(withId(R.id.surroundDebugRearArtifactFix)).perform(scrollTo(),click());awaitDraws(scenario);
+            android.graphics.Bitmap unchanged=capture(scenario);images.add(unchanged);assertEquals(0,pixelDifferences(twoD,unchanged));
+        }finally {
+            for(android.graphics.Bitmap image:images)image.recycle();SharedPreferences.Editor edit=prefs.edit();
+            if(saved instanceof Boolean)edit.putBoolean(UiPrefs.KEY_PARKING_SURROUND_3D,(Boolean)saved);else edit.remove(UiPrefs.KEY_PARKING_SURROUND_3D);edit.commit();
+        }
+    }
     @Test public void debugSpeedChangesDoNotAnimateVehicleAndPersistAcrossRecreation() throws Exception {
         SharedPreferences prefs=UiPrefs.getPrefs(InstrumentationRegistry.getInstrumentation().getTargetContext());
         boolean had=prefs.contains(UiPrefs.KEY_PARKING_SURROUND_3D),saved=prefs.getBoolean(UiPrefs.KEY_PARKING_SURROUND_3D,false);
