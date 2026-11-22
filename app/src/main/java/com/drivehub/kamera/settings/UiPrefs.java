@@ -125,6 +125,7 @@ public final class UiPrefs {
     public static final String KEY_DIGITAL_REARVIEW_ENABLED = "digitalRearviewEnabled";
     public static final String KEY_DIGITAL_REARVIEW_DISPLAY_TARGET = "digitalRearviewDisplayTarget";
     public static final String KEY_DIGITAL_REARVIEW_IPK_SCREEN = "digitalRearviewIpkScreen";
+    public static final String KEY_DIGITAL_REARVIEW_IPK_NORMAL = "digitalRearviewIpkNormal";
     public static final String KEY_DIGITAL_REARVIEW_TAP_TO_HIDE_ENABLED = "digitalRearviewTapToHideEnabled";
     public static final String KEY_DIGITAL_REARVIEW_TAP_TO_HIDE_DURATION_SEC = "digitalRearviewTapToHideDurationSec";
     public static final int DEFAULT_DIGITAL_REARVIEW_TAP_TO_HIDE_DURATION_SEC = 5;
@@ -255,6 +256,13 @@ public final class UiPrefs {
 
     public static boolean isDigitalRearviewTapToHideEnabled(SharedPreferences prefs) {
         return prefs.getBoolean(KEY_DIGITAL_REARVIEW_TAP_TO_HIDE_ENABLED, true);
+    }
+
+    public static boolean isDigitalRearviewIpkNormal(SharedPreferences prefs) {
+        return prefs.getBoolean(KEY_DIGITAL_REARVIEW_IPK_NORMAL,false);
+    }
+    public static void setDigitalRearviewIpkNormal(SharedPreferences prefs,boolean normal) {
+        prefs.edit().putBoolean(KEY_DIGITAL_REARVIEW_IPK_NORMAL,normal).apply();
     }
 
     public static int getDigitalRearviewTapToHideDurationSec(SharedPreferences prefs) {

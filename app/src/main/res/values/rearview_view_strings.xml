@@ -1,0 +1,7 @@
+<resources>
+    <string name="shortcut_toggle_digital_rearview_view">Toggle IPK rearview Wide/Normal</string>
+    <string name="settings_rearview_ipk_view">IPK view</string>
+    <string name="settings_rearview_view_wide">Wide</string>
+    <string name="settings_rearview_view_normal">Normal</string>
+    <string name="settings_rearview_view_hint">Wide shows the full camera image. Normal corrects the fisheye distortion with a narrower 100° view and less visibility to the sides. If Normal is unavailable, Wide is shown.</string>
+</resources>

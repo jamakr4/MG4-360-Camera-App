@@ -1,0 +1,7 @@
+<resources>
+    <string name="shortcut_toggle_digital_rearview_view">Basculer le rétroviseur IPK entre Large et Normale</string>
+    <string name="settings_rearview_ipk_view">Vue IPK</string>
+    <string name="settings_rearview_view_wide">Large</string>
+    <string name="settings_rearview_view_normal">Normale</string>
+    <string name="settings_rearview_view_hint">Large affiche toute l’image de la caméra. Normale corrige la distorsion avec un champ plus étroit de 100° et moins de visibilité sur les côtés. Si Normale est indisponible, la vue Large est affichée.</string>
+</resources>

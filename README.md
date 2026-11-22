@@ -125,7 +125,7 @@ A community camera mod for the MG4 EV (AAOS 9, pre-2026 facelift), featuring liv
 
 - **OEM 360 AVM coexistence**: can briefly yield camera access so the stock reverse/360 view still opens when needed.
 - **Full Screen**: the app hides the (side) navigationbar and also the top bar on demand to get extra space.
-- **External trigger support**: send `com.drivehub.kamera.action.TRIGGER_DASHCAM_EVENT` from ADB or another app to save an event clip. Compatible [MG4Control](https://github.com/SliDeeN/MG4Control) versions also support direct `App function` shortcuts for **Save dashcam event** and **Toggle digital rearview**.
+- **External trigger support**: send `com.drivehub.kamera.action.TRIGGER_DASHCAM_EVENT` from ADB or another app to save an event clip. Compatible [MG4Control](https://github.com/SliDeeN/MG4Control) versions also support direct `App function` shortcuts for **Save dashcam event**, **Toggle digital rearview**, and **Toggle IPK rearview Wide/Normal**.
 - **Experimental surveillance recording**: compatible MG4Control versions can start a separate recording session for up to two hours, then restore the previous dashcam setting.
 - **Auto language selection**: English, German, French and Czech (cs-CZ) are selected automatically from the vehicle language.
 
@@ -392,7 +392,8 @@ To use it:
 2. Turn on `Enable Digital Rearview Mirror`.
 3. Under `Show mirror on`, select `Infotainment`, `IPK`, or `Both`. The default is `Infotainment`.
 4. If using the IPK, choose `Navigation` (default) or `Media` under `IPK screen`. Open that page manually in the instrument cluster; the mirror appears only on the selected page.
-5. On the infotainment display, you can drag and resize the mirror. The app restores the saved layout automatically. The IPK mirror uses a fixed position and shares the configured corner rounding.
+5. Under **IPK view**, choose **Wide** (default) for the full original image or **Normal** for a fisheye-corrected **100° horizontal view**. Normal keeps the same viewing direction and shows less to the sides, with larger objects in the centre. The choice is saved and changes the IPK output immediately. Both modes remain mirrored in the same 260 × 173 pixel area, with the configured corner rounding and fixed position.
+6. On the infotainment display, you can drag and resize the mirror. The app restores the saved layout automatically. IPK view selection does not affect the infotainment mirror, recordings or other camera views.
 
 Behavior:
 
@@ -400,6 +401,7 @@ Behavior:
 - `Tap to temporarily hide` is enabled by default (5 seconds). It hides only the infotainment mirror for the configured duration; the IPK mirror stays visible.
 - The "X" in the infotainment preview or switching Digital Rearview off via an external trigger stops the mirror on both displays, including during a temporary hide.
 - The companion trigger app and MG4Control shortcuts toggle the same mirror setting and use the selected display targets.
+- Normal uses the vehicle calibration at `/configure/camera_calibdata.bin`. Missing, invalid or unsuitable calibration falls back to Wide; Dev Status reports the fallback. Calibration is checked again when selecting Normal or reopening the IPK output. No bundled or reference calibration is used for this view. The lower source/output resolution still limits detail; lens correction does not reconstruct it.
 - Opening the app or its settings hides the infotainment mirror while the IPK mirror stays active on its selected page.
 - **Smooth Entry** under `Settings` -> `Display` also controls the IPK mirror and is enabled by default. The entire IPK panel fades in over 110 ms after its first fresh camera frame is displayed, and fades out over 90 ms when the mirror is switched off or its IPK output is deselected. Camera access is released at the start of fade-out. Leaving the selected IPK page, unavailable page status, reverse gear, OEM takeover, camera failure, screen-off and display/service shutdown remove the panel immediately.
 - Reverse gear, OEM 360 and the four-camera tile view retain priority and pause the IPK mirror. It returns afterwards if still enabled and its selected IPK page is visible.
@@ -412,11 +414,26 @@ Behavior:
 With a version of [MG4Control](https://github.com/SliDeeN/MG4Control) that supports `App function` shortcuts, you can assign these functions from **360 Cam** directly to a custom shortcut:
 
 - **Toggle digital rearview** — switches the digital rearview on or off each time the shortcut is triggered.
+- **Toggle IPK rearview Wide/Normal** — switches the saved IPK view between the full Wide image and the corrected Normal view. It only changes the view selection, leaving the mirror enable state and display target intact.
 - **Save dashcam event** — saves an event recording. If continuous recording is off, it starts a future-only event recording.
 
 The function names follow the system language. No extras are needed. The companion trigger apps and existing broadcast actions remain supported; use MG4Control's `Broadcast` option if you want to set rearview explicitly with the Boolean `enabled` extra.
 
 Integration reference: [MG4Control receiver discovery and invocation](https://github.com/SliDeeN/MG4Control/issues/172#issuecomment-6522784068).
+
+The IPK view is also exposed through `com.drivehub.kamera.action.SET_DIGITAL_REARVIEW_IPK_VIEW`:
+
+```sh
+# Toggle Wide / Normal; also works while the mirror is off, saving the next view.
+adb shell am broadcast -n com.drivehub.kamera/.signal.DigitalRearviewViewTriggerReceiver \
+  -a com.drivehub.kamera.action.SET_DIGITAL_REARVIEW_IPK_VIEW
+
+# Select Normal explicitly; use --ez normal false for Wide.
+adb shell am broadcast -n com.drivehub.kamera/.signal.DigitalRearviewViewTriggerReceiver \
+  -a com.drivehub.kamera.action.SET_DIGITAL_REARVIEW_IPK_VIEW --ez normal true
+```
+
+The optional `normal` extra is Boolean. The receiver uses the same saved setting as **Digital Rearview → IPK view**, and an active IPK mirror applies it immediately without restarting its camera output. The MG4Control discovery action only lists the function and does not toggle it.
 
 </details>
 

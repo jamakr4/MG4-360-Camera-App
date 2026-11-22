@@ -1,0 +1,7 @@
+<resources>
+    <string name="shortcut_toggle_digital_rearview_view">Přepnout zrcátko IPK mezi Široké a Normální</string>
+    <string name="settings_rearview_ipk_view">Zobrazení IPK</string>
+    <string name="settings_rearview_view_wide">Široké</string>
+    <string name="settings_rearview_view_normal">Normální</string>
+    <string name="settings_rearview_view_hint">Široké zobrazuje celý obraz kamery. Normální koriguje zkreslení s užším zorným polem 100° a menším výhledem do stran. Pokud Normální není dostupné, zobrazí se Široké.</string>
+</resources>

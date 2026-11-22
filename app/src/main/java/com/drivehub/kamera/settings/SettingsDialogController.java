@@ -483,6 +483,11 @@ public final class SettingsDialogController {
     private void wireRearviewDisplaySettings(SharedPreferences prefs) {
         SegmentedControl target = dialog.findViewById(R.id.segRearviewDisplayTarget);
         SegmentedControl screen = dialog.findViewById(R.id.segRearviewIpkScreen);
+        SegmentedControl view = dialog.findViewById(R.id.segRearviewIpkView);
+        view.check(UiPrefs.isDigitalRearviewIpkNormal(prefs)?R.id.segRearviewIpkNormal:R.id.segRearviewIpkWide);
+        view.addOnButtonCheckedListener((group,id,checked)->{
+            if(checked)UiPrefs.setDigitalRearviewIpkNormal(prefs,id==R.id.segRearviewIpkNormal);
+        });
         View ipkOptions = dialog.findViewById(R.id.rearviewIpkOptions);
         View tapOptions = dialog.findViewById(R.id.rearviewTapToHideOptions);
         int initialTarget = UiPrefs.getDigitalRearviewDisplayTarget(prefs);

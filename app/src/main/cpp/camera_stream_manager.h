@@ -3,6 +3,7 @@
 #include <jni.h>
 #include "side_camera_preview.h"
 #include "camera_access_gate.h"
+#include "ipk_rearview.h"
 
 #include <string>
 #include <cstdint>
@@ -49,7 +50,9 @@ void detachPreview(int videoIndex);
 int64_t mainPreviewFrameAgeMs(int videoIndex);
 void detachAllPreviews();
 // Independent preview outputs. Sink IDs do not address the main preview's own output worker.
-bool attachPreviewSink(JNIEnv* env, int videoIndex, int sinkId, jobject surface);
+bool attachPreviewSink(JNIEnv* env, int videoIndex, int sinkId, jobject surface,bool ipkRearview=false);
+void setIpkRearviewSession(int token);
+bool setIpkRearviewMap(int token,const std::vector<float>* uv);
 void detachPreviewSink(int videoIndex, int sinkId);
 int64_t previewSinkFrameAgeMs(int videoIndex, int sinkId);
 // age ms (-1 until first post), posted frames, last capture-to-post ms, last post cost ms.

@@ -10,6 +10,7 @@ add_library(cameraprobe SHARED
         cameraprobe_record.cpp
         camera_stream_manager.cpp
         side_camera_preview.cpp
+        ipk_rearview.cpp
 )
 
 find_library(log-lib log)

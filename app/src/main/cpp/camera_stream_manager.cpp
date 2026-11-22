@@ -1155,6 +1155,7 @@ namespace camera_stream_manager
         std::shared_ptr<const SideWheelStyle> gSideWheelStyle=std::make_shared<const SideWheelStyle>();
         side_camera_advanced::Registry gSideAdvanced;
         std::atomic<bool> gSideCameraHighlightMissingAreas{false};
+        ipk_rearview::Registry gIpkRearview;
 
         class ParallelPreviewConsumer final : public FrameConsumer,
                                               public std::enable_shared_from_this<ParallelPreviewConsumer>
@@ -1162,8 +1163,8 @@ namespace camera_stream_manager
             struct Frame { cv::Mat rgba; int64_t capturedUs = 0; };
         public:
             explicit ParallelPreviewConsumer(ANativeWindow *window, bool mirror, int side = -1,
-                    const side_camera_preview::Crops& crops = {})
-                : window_(window), mirror_(mirror), side_(side), crops_(crops), frames_(0) {}
+                    const side_camera_preview::Crops& crops = {},bool ipkRearview=false)
+                : window_(window), mirror_(mirror), side_(side), crops_(crops), ipkRearview_(ipkRearview), frames_(0) {}
             ~ParallelPreviewConsumer() override { ANativeWindow_release(window_); }
 
             void start() {
@@ -1221,6 +1222,9 @@ namespace camera_stream_manager
                                     wheelTransforms, alignment, frontDegrees, rearDegrees,
                                     gSideCameraHighlightMissingAreas.load(),advanced.get(),advancedAxes,gSideCameraCorrection.load());
                             display = composed;
+                        } else if(ipkRearview_) {
+                            auto map=gIpkRearview.current();
+                            display=ipk_rearview::render(frame.rgba,map.get(),composed);
                         }
                         if (display.cols != width || display.rows != height) {
                             width = display.cols;
@@ -1228,7 +1232,7 @@ namespace camera_stream_manager
                             if (ANativeWindow_setBuffersGeometry(window_, width, height,
                                     AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM) != 0) break;
                         }
-                        if (mirror_) cv::flip(display, display, 1);
+                        if (mirror_&&!ipkRearview_) cv::flip(display, display, 1);
                         ANativeWindow_Buffer out{};
                         const int64_t postStart = nowUs();
                         // This can block on a suspended display. Only this output's worker
@@ -1269,6 +1273,7 @@ namespace camera_stream_manager
             const bool mirror_;
             const int side_;
             const side_camera_preview::Crops crops_;
+            const bool ipkRearview_;
             LatestPreviewFrame<Frame> frames_;
             std::atomic<bool> stopping_{false}, finished_{false};
             std::atomic<int64_t> lastPostUs_{0};
@@ -4078,12 +4083,20 @@ namespace camera_stream_manager
         eraseSessionIfIdle(videoIndex, session);
     }
 
-    bool attachPreviewSink(JNIEnv *env, int videoIndex, int sinkId, jobject surface) {
+    void setIpkRearviewSession(int token){gIpkRearview.session(token);}
+    bool setIpkRearviewMap(int token,const std::vector<float>* uv) {
+        try{return gIpkRearview.set(token,uv?std::make_shared<const ipk_rearview::LensMap>(*uv):nullptr);}
+        catch(const std::exception& error){logw("IPK rearview map unavailable: %s",error.what());return false;}
+    }
+
+    bool attachPreviewSink(JNIEnv *env, int videoIndex, int sinkId, jobject surface,bool ipkRearview) {
         if (gCameraAccess.blocked()) return false;
+        if(ipkRearview&&videoIndex!=CAMERA_INDEX_REAR)return false;
         if (sinkId < 0 || sinkId > 31 || surface == nullptr) return false;
         ANativeWindow *window = ANativeWindow_fromSurface(env, surface);
         if (window == nullptr) return false;
-        auto consumer = std::make_shared<ParallelPreviewConsumer>(window, videoIndex == CAMERA_INDEX_REAR);
+        auto consumer = std::make_shared<ParallelPreviewConsumer>(window, videoIndex == CAMERA_INDEX_REAR,
+                -1,side_camera_preview::Crops{},ipkRearview);
         auto session = getOrCreateSession(videoIndex);
         try {
             consumer->start();
