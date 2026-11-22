@@ -15,12 +15,19 @@ public final class BirdseyeFrameHealth {
         }
         return mask;
     }
+    /** Guidance needs a recent image in its own direction, independently of other camera receipts. */
+    public static int guidanceMask(long[] capturedUs,long nowUs) {
+        return ageMask(capturedUs,nowUs,MAX_AGE_US);
+    }
     /** Keep each uploaded image visible through brief gaps, independently of other cameras. */
     public static int displayMask(long[] capturedUs, long nowUs) {
+        return ageMask(capturedUs,nowUs,DISPLAY_HOLD_US);
+    }
+    private static int ageMask(long[] capturedUs,long nowUs,long maxAgeUs) {
         int mask = 0;
         for (int i = 0; i < 4; i++) {
             long t = capturedUs[i];
-            if (t > 0 && t <= nowUs && nowUs-t <= DISPLAY_HOLD_US) mask |= 1 << i;
+            if (t > 0 && t <= nowUs && nowUs-t <= maxAgeUs) mask |= 1 << i;
         }
         return mask;
     }

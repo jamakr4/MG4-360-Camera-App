@@ -67,6 +67,7 @@ public final class BirdseyeRenderer implements GLSurfaceView.Renderer {
     private BirdseyeCarGeometry carArtworkGeometry;
     private boolean pdcUnavailable;
     private boolean guidesUnavailable;
+    private int lastGuideAvailability=-1;
     private final float[] topMvp=new float[16];
     public void setScene(RivelaScene scene) { this.scene=scene; }
     public void setModel(VehicleModel model) { this.model=model; }
@@ -156,6 +157,7 @@ public final class BirdseyeRenderer implements GLSurfaceView.Renderer {
     @Override public void onSurfaceCreated(GL10 gl, EGLConfig config) {
         guideAnimation.reset();
         guideFrame.reset();guideProgress=outgoingGuideProgress=0;
+        lastGuideAvailability=-1;
         program = 0; uploadedMesh = null; error = null; hasCarArtwork = false; uploadedCarColor = null;
         bowlPass=null;pdcPass=null;guidePass=null;carPass=null;carArtworkGeometry=null;
         pdcUnavailable=false;guidesUnavailable=false;threeDActive=false;
@@ -238,11 +240,12 @@ public final class BirdseyeRenderer implements GLSurfaceView.Renderer {
             GLES20.glActiveTexture(GLES20.GL_TEXTURE4);
             GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textures[4]);
             // Check permission/generation again after the copies to invalidate a concurrent handoff.
-            int mask = 0,visibleMask = 0;
+            int mask = 0,visibleMask = 0,guideMask = 0;
             if (allowed && frames.allowed() && generation == resetGeneration) {
                 long nowUs = frames.clockUs();
                 mask = BirdseyeFrameHealth.freshMask(capturedUs, nowUs);
                 visibleMask = BirdseyeFrameHealth.displayMask(capturedUs, nowUs);
+                guideMask = BirdseyeFrameHealth.guidanceMask(capturedUs, nowUs);
             }
             boolean drewThreeD=false;
             RivelaScene currentScene=scene;VehicleModel currentModel=model;
@@ -250,10 +253,17 @@ public final class BirdseyeRenderer implements GLSurfaceView.Renderer {
             com.drivehub.kamera.steering.WheelGuides.Style style=guideStyle;
             com.drivehub.kamera.steering.WheelGuides.Direction direction=angles.guidanceDirection!=null?angles.guidanceDirection:guideDirection;
             int guideCameraMask=direction==com.drivehub.kamera.steering.WheelGuides.Direction.FORWARD?4:8;
+            int guideAvailability=currentScene==null?1:!angles.guidanceAvailable?2:(guideMask&guideCameraMask)==0?3:0;
+            if(wheelGuidePreview&&guideAvailability!=lastGuideAvailability) {
+                String state=guideAvailability==0?"available":guideAvailability==1?"hidden: scene missing":
+                        guideAvailability==2?"hidden: steering/gear unavailable":"hidden: direction camera missing/stale";
+                com.drivehub.kamera.dev.DevRuntimeLog.add("Guidelines",state+" ("+direction+")");
+            }
+            lastGuideAvailability=wheelGuidePreview?guideAvailability:-1;
             guideProgress=guideAnimation.update(wheelGuidePreview,
-                    currentScene!=null&&angles.guidanceAvailable&&(mask&guideCameraMask)!=0,direction,guideClock.getAsLong());
-            if((mask&4)==0)guideAnimation.invalidate(com.drivehub.kamera.steering.WheelGuides.Direction.FORWARD);
-            if((mask&8)==0)guideAnimation.invalidate(com.drivehub.kamera.steering.WheelGuides.Direction.REVERSE);
+                    guideAvailability==0,direction,guideClock.getAsLong());
+            if((guideMask&4)==0)guideAnimation.invalidateOutgoing(com.drivehub.kamera.steering.WheelGuides.Direction.FORWARD);
+            if((guideMask&8)==0)guideAnimation.invalidateOutgoing(com.drivehub.kamera.steering.WheelGuides.Direction.REVERSE);
             guideFrame.update(angles,style,guideWidthMm,direction,guideAnimation);
             outgoingGuideProgress=guideFrame.outgoing().level;
             if(threeDRequested&&currentScene!=null&&currentScene.bowl()!=null&&currentModel!=null) {

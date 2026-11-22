@@ -224,6 +224,82 @@ public class RivelaGlesInstrumentedTest {
                 }
         }
     }
+    @Test public void briefSteeringAndGearGapsRestoreCurrentGuidesWithoutReplayingInEveryView() throws Exception {
+        BirdseyeSynthetic frames=new BirdseyeSynthetic();frames.fixedClockUs=1_000_000;
+        ProjectionAssets projection=ProjectionAssets.get(frames.calibration);projection.scene.prepareBowl();
+        long[] clock={1000};long duration=GuidelineAnimation.DURATION_MS;
+        BirdseyeRenderer r=new BirdseyeRenderer(frames,null,()->clock[0],duration);
+        r.setMesh(projection.mesh);r.setWideMesh(projection.wideMesh,null);r.setScene(projection.scene);r.setModel(model);
+        r.orbit.rotate(-35/.35f,(75-55)/.25f);r.orbit.zoom(11000f/16000);
+        SteeringModel solver=new SteeringModel();
+        try(Egl egl=new Egl()) {
+            r.onSurfaceCreated(null,null);r.onSurfaceChanged(null,W,H);
+            for(int view=0;view<3;view++)for(WheelGuides.Style style:new WheelGuides.Style[]{WheelGuides.Style.LINES,WheelGuides.Style.SIMPLE})
+                for(WheelGuides.Direction direction:WheelGuides.Direction.values()) {
+                    String label=view+"-"+style+"-"+direction;
+                    r.setThreeD(view==2);r.setWide(view==1);r.setGuideStyle(style);
+                    r.steering.setSolution(solver.solve(0),true,direction);
+                    r.setWheelGuidePreview(false);clock[0]+=duration*2;r.onDrawFrame(null);ByteBuffer background=pixels();
+                    r.setWheelGuidePreview(true);r.onDrawFrame(null);clock[0]+=duration;r.onDrawFrame(null);
+                    ByteBuffer straight=pixels();assertEquals(label,1,r.guideProgress,0);
+                    assertTrue(label,differences(background,straight,new int[]{0,0,W,H})>100);
+                    r.steering.setSolution(solver.solve(199.3f),true,direction);r.onDrawFrame(null);ByteBuffer expectedCurve=pixels();
+                    r.steering.setSolution(solver.solve(0),true,direction);r.onDrawFrame(null);
+                    // A failed steering read hides the overlay while retaining the wheel pose.
+                    r.steering.setSolution(solver.solve(0),false,direction);clock[0]+=16;r.onDrawFrame(null);
+                    assertEquals(label,0,r.guideProgress,0);assertEquals(label,0,r.outgoingGuideProgress,0);
+                    assertEquals(label,0,differences(background,pixels(),new int[]{0,0,W,H}));
+                    // Recovery must use today's curve, never a cached straight path or another intro.
+                    r.steering.setSolution(solver.solve(199.3f),true,direction);clock[0]+=50;r.onDrawFrame(null);
+                    ByteBuffer recovered=pixels();assertEquals(label,1,r.guideProgress,0);
+                    assertEquals(label,0,differences(expectedCurve,recovered,new int[]{0,0,W,H}));
+                    assertTrue(label,differences(straight,recovered,new int[]{0,0,W,H})>100);
+                    clock[0]+=duration;r.onDrawFrame(null);
+                    assertEquals(label,0,differences(recovered,pixels(),new int[]{0,0,W,H}));
+                    // Missing gear publishes a null direction; the debug fallback must not discard D's state.
+                    r.steering.setSolution(solver.solve(199.3f),false,null);clock[0]+=16;r.onDrawFrame(null);
+                    assertEquals(label,0,r.guideProgress,0);assertEquals(label,0,r.outgoingGuideProgress,0);
+                    r.steering.setSolution(solver.solve(199.3f),true,direction);clock[0]+=50;r.onDrawFrame(null);
+                    assertEquals(label,1,r.guideProgress,0);
+                    assertEquals(label,0,differences(recovered,pixels(),new int[]{0,0,W,H}));
+                    assertNull(r.error);assertNull(r.threeDError);
+                }
+        }
+    }
+    @Test public void guidanceIgnoresCameraSkewButStillHidesExpiredFramesAndResumesWithoutAnIntro() throws Exception {
+        BirdseyeSynthetic frames=new BirdseyeSynthetic();frames.fixedClockUs=1_000_000;
+        ProjectionAssets projection=ProjectionAssets.get(frames.calibration);projection.scene.prepareBowl();
+        long[] clock={1000};long duration=GuidelineAnimation.DURATION_MS;
+        BirdseyeRenderer r=new BirdseyeRenderer(frames,null,()->clock[0],duration);
+        r.setMesh(projection.mesh);r.setWideMesh(projection.wideMesh,null);r.setScene(projection.scene);r.setModel(model);
+        r.orbit.rotate(-35/.35f,(75-55)/.25f);r.orbit.zoom(11000f/16000);
+        try(Egl egl=new Egl()) {
+            r.onSurfaceCreated(null,null);r.onSurfaceChanged(null,W,H);
+            for(int view=0;view<3;view++)for(WheelGuides.Style style:new WheelGuides.Style[]{WheelGuides.Style.LINES,WheelGuides.Style.SIMPLE})
+                for(WheelGuides.Direction direction:WheelGuides.Direction.values()) {
+                    String label=view+"-"+style+"-"+direction;
+                    r.setThreeD(view==2);r.setWide(view==1);r.setGuideStyle(style);
+                    int needed=direction==WheelGuides.Direction.FORWARD?4:8;
+                    r.steering.setSolution(new SteeringModel().solve(0),true,direction);
+                    frames.missingMask=0;frames.fixedClockUs+=1_000_000;
+                    r.setWheelGuidePreview(false);clock[0]+=duration*2;r.onDrawFrame(null);ByteBuffer background=pixels();
+                    r.setWheelGuidePreview(true);r.onDrawFrame(null);clock[0]+=duration;r.onDrawFrame(null);ByteBuffer full=pixels();
+                    assertTrue(label,differences(background,full,new int[]{0,0,W,H})>100);
+                    frames.missingMask=needed;frames.fixedClockUs+=200_000;clock[0]+=200;r.onDrawFrame(null);
+                    assertEquals(label,0,r.freshMask&needed);assertEquals(label,1,r.guideProgress,0);
+                    assertEquals(label,0,differences(full,pixels(),new int[]{0,0,W,H}));
+                    frames.fixedClockUs+=300_000;clock[0]+=300;r.onDrawFrame(null);
+                    assertEquals(label,1,r.guideProgress,0); // Exactly 500 ms is still recent.
+                    frames.fixedClockUs++;clock[0]++;r.onDrawFrame(null);
+                    assertEquals(label,0,r.guideProgress,0);assertEquals(label,needed,r.displayMask&needed);
+                    assertEquals(label,0,differences(background,pixels(),new int[]{0,0,W,H}));
+                    frames.missingMask=0;frames.fixedClockUs+=50_000;clock[0]+=50;r.onDrawFrame(null);
+                    assertEquals(label,1,r.guideProgress,0);
+                    assertEquals(label,0,differences(full,pixels(),new int[]{0,0,W,H}));
+                    assertNull(r.error);assertNull(r.threeDError);
+                }
+        }
+    }
     @Test public void gearChangesDrawBothDirectionsTogetherAndNeverWaitForTheOutgoingPath() throws Exception {
         BirdseyeSynthetic frames=new BirdseyeSynthetic();frames.fixedClockUs=1_000_000;
         ProjectionAssets projection=ProjectionAssets.get(frames.calibration);projection.scene.prepareBowl();
