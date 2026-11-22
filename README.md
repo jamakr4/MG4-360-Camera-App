@@ -613,7 +613,7 @@ A hidden Dev tab exposes lower-level tuning knobs. To unlock it, open Settings a
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=jamakr4/MG4-360-Camera-App&type=Date&theme=dark">
     <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=jamakr4/MG4-360-Camera-App&type=Date">
-    <img src="https://api.star-history.com/svg?repos=jamakr4/MG4-360-Camera-App&type=Date" alt="Star History Chart" width="65%">
+    <img src="https://api.star-history.com/svg?repos=jamakr4/MG4-360-Camera-App&type=Date" alt="Star History Chart" width="100%">
   </picture>
 </a>
 
