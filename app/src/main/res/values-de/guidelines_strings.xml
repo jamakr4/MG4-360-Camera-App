@@ -6,5 +6,13 @@
     <string name="guidelines_style">Stil</string>
     <string name="guidelines_style_lines">Linien</string>
     <string name="guidelines_style_simple">Einfach</string>
-    <string name="guidelines_style_hint">Beide Stile nutzen 2060 mm inklusive Spiegel. Linien: vier hellblaue Kurven. Einfach: zwei äußere Linien mit transparenter blauer Fläche.</string>
+    <string name="guidelines_style_hint">Beide Stile nutzen die gewählte Breite. Linien: vier hellblaue Kurven. Einfach: zwei äußere Linien mit transparenter blauer Fläche.</string>
+    <string name="guidelines_width">Breite</string>
+    <string name="guidelines_width_mirrors">Inklusive Spiegel (%1$d mm)</string>
+    <string name="guidelines_width_body">Ohne Spiegel (%1$d mm)</string>
+    <string name="guidelines_width_custom">Benutzerdefiniert</string>
+    <string name="guidelines_width_custom_description">Benutzerdefinierte Gesamtbreite in Millimetern</string>
+    <string name="guidelines_width_unit">mm</string>
+    <string name="guidelines_width_hint">Gesamtbreite der Fahrspuren, mittig zum Fahrzeug. Benutzerdefiniert: 1–3000 mm. Gilt nur für Fahrspuren in 2D/3D.</string>
+    <string name="guidelines_width_error">Ganze Zahl von %1$d bis %2$d mm eingeben.</string>
 </resources>

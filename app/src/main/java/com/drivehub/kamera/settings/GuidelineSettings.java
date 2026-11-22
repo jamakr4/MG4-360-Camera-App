@@ -13,6 +13,10 @@ import com.drivehub.kamera.steering.WheelGuides;
 final class GuidelineSettings {
     private GuidelineSettings() {}
     static void bind(Dialog dialog,SharedPreferences prefs) {
+        new GuidelineWidthControl(dialog.findViewById(R.id.guidelineWidthControl),
+                UiPrefs.getParkingGuideWidthMode(prefs),UiPrefs.getParkingGuideCustomWidthMm(prefs),
+                (mode,customMm)->prefs.edit().putString(UiPrefs.KEY_PARKING_GUIDE_WIDTH_MODE,mode.id)
+                        .putInt(UiPrefs.KEY_PARKING_GUIDE_CUSTOM_WIDTH_MM,customMm).apply());
         Switch limit=dialog.findViewById(R.id.switchGuidelineSpeedLimit);
         EditText speed=dialog.findViewById(R.id.etGuidelineSpeed);
         SegmentedControl style=dialog.findViewById(R.id.segGuidelineStyle);

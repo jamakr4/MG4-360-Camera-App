@@ -6,8 +6,8 @@
     <string name="birdseye_debug_speed_unavailable">Speed unavailable</string>
     <item name="surroundDebugGuideSpeed" type="id"/>
     <string name="birdseye_debug_blue_corridor">Blue track area (transparent)</string>
-    <string name="birdseye_debug_blue_forward_horizon">Blue clearance area: 2060 mm including mirrors.\nRear display curves join the front endpoints; steering model unchanged.</string>
-    <string name="birdseye_debug_blue_reverse_horizon">Blue clearance area: 2060 mm including mirrors.\nOEM endpoint depths; steering model unchanged.</string>
+    <string name="birdseye_debug_blue_forward_horizon">Blue clearance area: %1$d mm overall width.\nRear display curves join the front endpoints; steering model unchanged.</string>
+    <string name="birdseye_debug_blue_reverse_horizon">Blue clearance area: %1$d mm overall width.\nOEM endpoint depths where reachable; steering model unchanged.</string>
     <item name="surroundDebugBlueCorridor" type="id"/>
     <string name="birdseye_debug_reverse_guides">Guidelines (2D / 3D test)</string>
     <string name="birdseye_debug_guide_reverse">Reverse (R)</string>
@@ -15,8 +15,8 @@
     <string name="birdseye_debug_park_horizon">Park: guidelines animate out.</string>
     <item name="surroundDebugGuidePark" type="id"/>
     <string name="birdseye_debug_guide_forward">Forward (D)</string>
-    <string name="birdseye_debug_forward_horizon">Four light-blue curves: 2060 mm including mirrors.\nRear display curves share the front endpoints; steering model unchanged.</string>
-    <string name="birdseye_debug_reverse_horizon">Four light-blue curves: 2060 mm including mirrors.\nOEM endpoint depths; endpoints do not represent a single vehicle pose.</string>
+    <string name="birdseye_debug_forward_horizon">Four light-blue curves: %1$d mm overall width.\nRear display curves share the front endpoints; steering model unchanged.</string>
+    <string name="birdseye_debug_reverse_horizon">Four light-blue curves: %1$d mm overall width.\nOEM endpoint depths where reachable; endpoints do not represent a single vehicle pose.</string>
     <item name="surroundDebugGuideReverse" type="id"/>
     <item name="surroundDebugGuideForward" type="id"/>
     <item name="surroundDebugReverseGuides" type="id"/>

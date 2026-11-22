@@ -29,9 +29,13 @@ public final class WheelGuides {
     private static final Corridor EMPTY_CORRIDOR=new Corridor(Collections.emptyList(),new double[0]);
 
     public Corridor corridor(SteeringModel.Solution pose,double centerX,double centerY,Direction direction) {
-        // Apply the same vehicle motion at wider virtual side points. Do not widen the wheel
+        return corridor(pose,centerX,centerY,direction,GuidelineWidth.DEFAULT_MM);
+    }
+    public Corridor corridor(SteeringModel.Solution pose,double centerX,double centerY,Direction direction,int widthMm) {
+        // Apply the same vehicle motion at virtual side points. Do not widen the wheel
         // track used for Ackermann angles or change the body width used by the OEM radius model.
-        return outerCorridor(lines(pose,centerX,centerY,direction,car.widthWithMirrorsMm,car.widthWithMirrorsMm),
+        double width=GuidelineWidth.validOrDefault(widthMm);
+        return outerCorridor(lines(pose,centerX,centerY,direction,width,width),
                 pose.curvaturePerMm,direction);
     }
     /** Select the outer pair; retain the starting-axle lead-in on the other side. */
@@ -133,10 +137,14 @@ public final class WheelGuides {
     public List<PdcBars.Bar> lines(SteeringModel.Solution pose,double centerX,double centerY,Direction direction) {
         return lines(pose,centerX,centerY,direction,car.effectiveFrontTrackMm,car.effectiveRearTrackMm);
     }
-    /** Four blue clearance curves at mirror width, using the same virtual side points as the filled corridor. */
+    /** Four blue clearance curves, using the same virtual side points as the filled corridor. */
     public List<PdcBars.Bar> clearanceLines(SteeringModel.Solution pose,double centerX,double centerY,Direction direction) {
+        return clearanceLines(pose,centerX,centerY,direction,GuidelineWidth.DEFAULT_MM);
+    }
+    public List<PdcBars.Bar> clearanceLines(SteeringModel.Solution pose,double centerX,double centerY,Direction direction,int widthMm) {
         List<PdcBars.Bar> result=new ArrayList<>(4);
-        for(PdcBars.Bar line:lines(pose,centerX,centerY,direction,car.widthWithMirrorsMm,car.widthWithMirrorsMm))
+        double width=GuidelineWidth.validOrDefault(widthMm);
+        for(PdcBars.Bar line:lines(pose,centerX,centerY,direction,width,width))
             result.add(new PdcBars.Bar(CORRIDOR_EDGE_COLOR,line.widthMm,line.xy));
         return Collections.unmodifiableList(result);
     }
@@ -163,7 +171,9 @@ public final class WheelGuides {
                 double endY=oemEndY(k,side);
                 double transverse=1/Math.abs(k)-Math.signum(k)*x;
                 double wheelRadius=Math.hypot(transverse,y);
-                double angle=Math.asin(endY/wheelRadius)-Math.atan2(y,transverse);
+                // Wide virtual side points can turn too tightly to reach the OEM end depth.
+                // End that trace at its maximum reachable depth instead of producing NaN.
+                double angle=Math.asin(Math.max(-1,Math.min(1,endY/wheelRadius)))-Math.atan2(y,transverse);
                 travel=angle/Math.abs(k);
             }
             // Bound the true wheel arc segment length, not only rear-axle travel.

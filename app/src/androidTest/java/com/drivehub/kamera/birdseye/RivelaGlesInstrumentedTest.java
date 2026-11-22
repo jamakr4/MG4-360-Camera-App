@@ -268,6 +268,59 @@ public class RivelaGlesInstrumentedTest {
                 }
         }
     }
+    @Test public void widthChangesRebuildBothStylesInEveryViewWithoutChangingSteering() throws Exception {
+        BirdseyeSynthetic frames=new BirdseyeSynthetic();frames.fixedClockUs=1_000_000;
+        ProjectionAssets projection=ProjectionAssets.get(frames.calibration);projection.scene.prepareBowl();
+        BirdseyeRenderer r=new BirdseyeRenderer(frames,null,()->0L,0);
+        r.setMesh(projection.mesh);r.setWideMesh(projection.wideMesh,null);r.setScene(projection.scene);r.setModel(model);
+        r.orbit.rotate(-35/.35f,(75-55)/.25f);r.orbit.zoom(11000f/16000);
+        r.setWheelGuidePreview(true);
+        try(Egl egl=new Egl()) {
+            r.onSurfaceCreated(null,null);r.onSurfaceChanged(null,W,H);
+            for(int view=0;view<3;view++)for(WheelGuides.Style style:new WheelGuides.Style[]{WheelGuides.Style.LINES,WheelGuides.Style.SIMPLE})
+                for(WheelGuides.Direction direction:WheelGuides.Direction.values()) {
+                    String label=view+"-"+style+"-"+direction;
+                    r.setThreeD(view==2);r.setWide(view==1);r.setGuideStyle(style);
+                    SteeringModel.Solution pose=new SteeringModel().solve(0);
+                    r.steering.setSolution(pose,true,direction);
+                    r.setGuideWidthMm(2060);r.onDrawFrame(null);ByteBuffer mirrors=pixels();
+                    r.setGuideWidthMm(1836);r.onDrawFrame(null);ByteBuffer body=pixels();
+                    assertTrue(label+" body width must change visible pixels",differences(mirrors,body,new int[]{0,0,W,H})>20);
+                    r.setGuideWidthMm(3000);r.onDrawFrame(null);ByteBuffer custom=pixels();
+                    assertTrue(label+" custom width must change visible pixels",differences(body,custom,new int[]{0,0,W,H})>20);
+                    r.setGuideWidthMm(2060);r.onDrawFrame(null);
+                    assertEquals(label+" returning to mirrors must restore the original picture",0,differences(mirrors,pixels(),new int[]{0,0,W,H}));
+                    assertEquals(pose.leftDegrees,r.steering.angles().left,0);assertEquals(pose.rightDegrees,r.steering.angles().right,0);
+                    r.setGuideWidthMm(3000);
+                    for(float lock:new float[]{-516.95f,516.95f}) {
+                        r.steering.setSolution(new SteeringModel().solve(lock),true,direction);r.onDrawFrame(null);
+                        assertNull(label,r.error);assertNull(label,r.threeDError);
+                        assertEquals(label,view==2,r.threeDActive);
+                    }
+                }
+        }
+    }
+    @Test public void gearTransitionsRetainEachLayersWidthUntilThatDirectionUpdates() throws Exception {
+        BirdseyeSynthetic frames=new BirdseyeSynthetic();frames.fixedClockUs=1_000_000;
+        ProjectionAssets projection=ProjectionAssets.get(frames.calibration);projection.scene.prepareBowl();
+        long[] clock={1000};BirdseyeRenderer r=new BirdseyeRenderer(frames,null,()->clock[0],350);
+        r.setMesh(projection.mesh);r.setScene(projection.scene);r.setModel(model);r.setGuideStyle(WheelGuides.Style.SIMPLE);
+        r.setWheelGuidePreview(true);
+        java.lang.reflect.Field field=BirdseyeRenderer.class.getDeclaredField("guideFrame");field.setAccessible(true);
+        try(Egl egl=new Egl()) {
+            r.onSurfaceCreated(null,null);r.onSurfaceChanged(null,W,H);
+            r.setGuideWidthMm(1836);r.steering.setSolution(new SteeringModel().solve(0),true,WheelGuides.Direction.REVERSE);
+            r.onDrawFrame(null);clock[0]+=350;r.onDrawFrame(null);
+            r.setGuideWidthMm(3000);r.steering.setSolution(new SteeringModel().solve(0),true,WheelGuides.Direction.FORWARD);
+            r.onDrawFrame(null);clock[0]+=175;r.onDrawFrame(null);
+            GuidelineFrame frame=(GuidelineFrame)field.get(r);
+            assertEquals(1836,frame.outgoing().widthMm);assertEquals(3000,frame.incoming().widthMm);
+            assertEquals(.5,frame.outgoing().level,1e-6);assertEquals(.5,frame.incoming().level,1e-6);
+            r.setGuideWidthMm(2500);r.onDrawFrame(null);
+            assertEquals(1836,frame.outgoing().widthMm);assertEquals(2500,frame.incoming().widthMm);
+            assertNull(r.error);assertNull(r.threeDError);
+        }
+    }
     private static double changedMeanY(ByteBuffer picture,ByteBuffer background) {
         long sum=0,count=0;
         for(int y=0;y<H;y++)for(int x=0;x<W;x++)if(color(picture,x,y)!=color(background,x,y)){sum+=y;count++;}

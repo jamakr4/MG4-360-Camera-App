@@ -286,6 +286,50 @@ public class WheelGuidesTest {
                 assertEquals(polygon,sum,.001);assertEquals(Math.abs(polygon),absoluteSum,.001);
             }
     }
+    @Test public void customWidthsKeepBothStylesFiniteAndTriangulateWithoutOverlapAtBothLocks() {
+        for(int width:new int[]{1,1000,1836,2060,2237,2238,2500,3000})
+            for(WheelGuides.Direction direction:WheelGuides.Direction.values())
+                for(float raw:new float[]{0,-.0001f,.0001f,-.45f,.45f,-199.3f,199.3f,-398.61f,398.61f,-516.95f,516.95f}) {
+                    String label=width+" mm, "+direction+", "+raw;
+                    SteeringModel.Solution pose=model.solve(raw);
+                    List<PdcBars.Bar> lines=guides.clearanceLines(pose,125,-300,direction,width);
+                    assertEquals(4,lines.size());
+                    for(int side=0;side<4;side++) {
+                        assertEquals(125+(side%2==0?-width/2.0:width/2.0),lines.get(side).xy[0],1e-8);
+                        for(double value:lines.get(side).xy)assertTrue(label,Double.isFinite(value));
+                    }
+                    WheelGuides.Corridor area=guides.corridor(pose,125,-300,direction,width);
+                    assertEquals(2,area.boundaries.size());
+                    double[] a=area.boundaries.get(0).xy,b=area.boundaries.get(1).xy;
+                    double polygon=0,triangles=0;
+                    for(int i=0;i<a.length-2;i+=2)polygon+=cross(a[i],a[i+1],a[i+2],a[i+3]);
+                    polygon+=cross(a[a.length-2],a[a.length-1],b[b.length-2],b[b.length-1]);
+                    for(int i=b.length-2;i>=2;i-=2)polygon+=cross(b[i],b[i+1],b[i-2],b[i-1]);
+                    polygon+=cross(b[0],b[1],a[0],a[1]);
+                    for(int i=0;i<area.triangles.length;i+=6) {
+                        double[] t=area.triangles;
+                        double triangle=cross(t[i+2]-t[i],t[i+3]-t[i+1],t[i+4]-t[i],t[i+5]-t[i+1]);
+                        assertTrue(label,Double.isFinite(triangle)&&triangle*polygon>0);
+                        triangles+=Math.abs(triangle);
+                    }
+                    assertEquals(label,Math.abs(polygon),triangles,.001);
+                }
+    }
+    @Test public void explicitMirrorWidthMatchesDefaultAndOtherWidthsDoNotChangeWheelTracks() {
+        for(WheelGuides.Direction direction:WheelGuides.Direction.values())for(float raw:new float[]{0,-516.95f,516.95f}) {
+            SteeringModel.Solution pose=model.solve(raw);
+            List<PdcBars.Bar> wheels=guides.lines(pose,0,0,direction);
+            double[][] before=wheels.stream().map(bar->bar.xy.clone()).toArray(double[][]::new);
+            assertArrayEquals(guides.corridor(pose,0,0,direction).triangles,
+                    guides.corridor(pose,0,0,direction,2060).triangles,0);
+            List<PdcBars.Bar> expected=guides.clearanceLines(pose,0,0,direction);
+            List<PdcBars.Bar> actual=guides.clearanceLines(pose,0,0,direction,2060);
+            for(int i=0;i<4;i++)assertArrayEquals(expected.get(i).xy,actual.get(i).xy,0);
+            for(int width:new int[]{1,1836,3000})guides.corridor(pose,0,0,direction,width);
+            List<PdcBars.Bar> after=guides.lines(pose,0,0,direction);
+            for(int i=0;i<4;i++)assertArrayEquals(before[i],after.get(i).xy,0);
+        }
+    }
     private static double cross(double ax,double ay,double bx,double by){return ax*by-ay*bx;}
     @Test public void blueMirrorWidthFieldEnclosesWheelGuidesBeforeTheUnequalReverseEndCap() {
         for(WheelGuides.Direction direction:WheelGuides.Direction.values())for(float raw:new float[]{0,-.45f,.45f,-199.3f,199.3f,-398.61f,398.61f,-516.95f,516.95f}) {

@@ -4,6 +4,7 @@ import com.drivehub.kamera.birdseye.BirdseyeCarColor;
 import com.drivehub.kamera.dashcam.DashcamSettingsController;
 import com.drivehub.kamera.camera.IpkRoutePolicy;
 import com.drivehub.kamera.signal.DigitalRearviewPolicy;
+import com.drivehub.kamera.steering.GuidelineWidth;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.view.View;
@@ -20,6 +21,17 @@ public final class UiPrefs {
     public static final String KEY_PARKING_GUIDE_SPEED_LIMIT = "parkingGuideSpeedLimit";
     public static final String KEY_PARKING_GUIDE_SPEED_KMH = "parkingGuideSpeedKmh";
     public static final String KEY_PARKING_GUIDE_STYLE = "parkingGuideStyle";
+    public static final String KEY_PARKING_GUIDE_WIDTH_MODE = "parkingGuideWidthMode";
+    public static final String KEY_PARKING_GUIDE_CUSTOM_WIDTH_MM = "parkingGuideCustomWidthMm";
+    public static GuidelineWidth.Mode getParkingGuideWidthMode(SharedPreferences prefs) {
+        return GuidelineWidth.Mode.fromId(prefs.getString(KEY_PARKING_GUIDE_WIDTH_MODE,"mirrors"));
+    }
+    public static int getParkingGuideCustomWidthMm(SharedPreferences prefs) {
+        return GuidelineWidth.validOrDefault(prefs.getInt(KEY_PARKING_GUIDE_CUSTOM_WIDTH_MM,GuidelineWidth.DEFAULT_MM));
+    }
+    public static int getParkingGuideWidthMm(SharedPreferences prefs) {
+        return GuidelineWidth.resolveMm(getParkingGuideWidthMode(prefs),getParkingGuideCustomWidthMm(prefs));
+    }
     public static boolean isParkingGuideSpeedLimitEnabled(SharedPreferences prefs) {
         return prefs.getBoolean(KEY_PARKING_GUIDE_SPEED_LIMIT,true);
     }

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/guidelineWidthControl"
+    android:layout_width="match_parent" android:layout_height="wrap_content"
+    android:layout_marginTop="12dp" android:orientation="vertical">
+    <TextView style="@style/DrivehubSettingsCardRowLabel"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:labelFor="@id/spinnerGuidelineWidth" android:text="@string/guidelines_width" />
+    <Spinner android:id="@+id/spinnerGuidelineWidth"
+        android:layout_width="match_parent" android:layout_height="48dp"
+        android:backgroundTint="@color/settings_text_secondary"
+        android:contentDescription="@string/guidelines_width"
+        android:popupBackground="@drawable/bg_settings_inline_card" android:spinnerMode="dropdown" />
+    <LinearLayout android:id="@+id/rowGuidelineCustomWidth"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:gravity="center_vertical" android:minHeight="48dp"
+        android:orientation="horizontal" android:visibility="gone">
+        <TextView style="@style/DrivehubSettingsCardRowLabel"
+            android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+            android:labelFor="@id/etGuidelineCustomWidth" android:text="@string/guidelines_width_custom" />
+        <EditText android:id="@+id/etGuidelineCustomWidth" style="@style/DrivehubSettingsSliderValue"
+            android:contentDescription="@string/guidelines_width_custom_description"
+            android:imeOptions="actionDone" android:inputType="number" android:singleLine="true" />
+        <TextView style="@style/DrivehubSettingsCaption"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:layout_marginStart="8dp" android:text="@string/guidelines_width_unit" />
+    </LinearLayout>
+    <TextView style="@style/DrivehubSettingsCaption"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="4dp" android:text="@string/guidelines_width_hint" />
+</LinearLayout>

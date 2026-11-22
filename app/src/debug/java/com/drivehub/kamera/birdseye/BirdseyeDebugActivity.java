@@ -22,6 +22,8 @@ import android.view.MotionEvent;
 import com.drivehub.kamera.parking.PdcGeometry;
 import com.drivehub.kamera.parking.PdcSnapshot;
 import com.drivehub.kamera.settings.UiPrefs;
+import com.drivehub.kamera.settings.GuidelineWidthControl;
+import com.drivehub.kamera.steering.GuidelineWidth;
 import com.drivehub.kamera.settings.BirdseyeCarColorPicker;
 import com.drivehub.kamera.R;
 import android.os.Bundle;
@@ -52,6 +54,7 @@ public final class BirdseyeDebugActivity extends Activity {
     private CheckBox liveSteering, unavailableSteering, reverseGuides, blueCorridor,guideSpeedLimit,blackBox;
     private RadioGroup guideDirection;
     private TextView guideHorizon;
+    private GuidelineWidthControl guideWidth;
     private final java.util.List<Button> steeringPresets=new java.util.ArrayList<>();
     private ScrollView controlScroll;
     private TextView steeringStatus;
@@ -82,9 +85,9 @@ public final class BirdseyeDebugActivity extends Activity {
         boolean park=guideDirection.getCheckedRadioButtonId()==R.id.surroundDebugGuidePark;
         boolean forward=guideDirection.getCheckedRadioButtonId()==R.id.surroundDebugGuideForward;
         if(!park)renderer.setGuideDirection(forward?WheelGuides.Direction.FORWARD:WheelGuides.Direction.REVERSE);
-        guideHorizon.setText(park?R.string.birdseye_debug_park_horizon:blueCorridor.isChecked()
+        guideHorizon.setText(park?getString(R.string.birdseye_debug_park_horizon):getString(blueCorridor.isChecked()
                 ?(forward?R.string.birdseye_debug_blue_forward_horizon:R.string.birdseye_debug_blue_reverse_horizon)
-                :(forward?R.string.birdseye_debug_forward_horizon:R.string.birdseye_debug_reverse_horizon));
+                :(forward?R.string.birdseye_debug_forward_horizon:R.string.birdseye_debug_reverse_horizon),guideWidth.widthMm()));
         gl.requestRender();
     }
     private void updateSteeringFrame() {
@@ -254,6 +257,18 @@ public final class BirdseyeDebugActivity extends Activity {
         blueCorridor.setText(R.string.birdseye_debug_blue_corridor);blueCorridor.setTextColor(Color.WHITE);
         blueCorridor.setChecked(state==null?UiPrefs.getParkingGuideStyle(prefs)==WheelGuides.Style.SIMPLE:state.getBoolean("blueGuideCorridor",true));controls.addView(blueCorridor);
         renderer.setBlueGuideCorridor(blueCorridor.isChecked());
+        android.view.View widthView=getLayoutInflater().inflate(R.layout.view_guideline_width,controls,false);
+        controls.addView(widthView);
+        GuidelineWidth.Mode widthMode=state==null?UiPrefs.getParkingGuideWidthMode(prefs)
+                :GuidelineWidth.Mode.fromId(state.getString("guideWidthMode",UiPrefs.getParkingGuideWidthMode(prefs).id));
+        int customWidth=state==null?UiPrefs.getParkingGuideCustomWidthMm(prefs)
+                :state.getInt("guideCustomWidthMm",UiPrefs.getParkingGuideCustomWidthMm(prefs));
+        guideWidth=new GuidelineWidthControl(widthView,widthMode,customWidth,(mode,customMm)->{
+            renderer.setGuideWidthMm(GuidelineWidth.resolveMm(mode,customMm));
+            if(guideHorizon!=null)updateGuideDirection();
+            gl.requestRender();
+        });
+        renderer.setGuideWidthMm(guideWidth.widthMm());
         guideDirection=new RadioGroup(this);guideDirection.setOrientation(RadioGroup.HORIZONTAL);
         RadioButton park=new RadioButton(this),reverse=new RadioButton(this),forward=new RadioButton(this);
         park.setId(R.id.surroundDebugGuidePark);reverse.setId(R.id.surroundDebugGuideReverse);forward.setId(R.id.surroundDebugGuideForward);
@@ -385,6 +400,8 @@ public final class BirdseyeDebugActivity extends Activity {
         out.putBoolean("reverseGuidePreview",reverseGuides.isChecked());
         out.putBoolean("guideSpeedLimitTest",guideSpeedLimit.isChecked());
         out.putBoolean("blueGuideCorridor",blueCorridor.isChecked());
+        out.putString("guideWidthMode",guideWidth.mode().id);
+        out.putInt("guideCustomWidthMm",guideWidth.customMm());
         out.putBoolean("guideForward",guideDirection.getCheckedRadioButtonId()==R.id.surroundDebugGuideForward);
         out.putBoolean("guidePark",guideDirection.getCheckedRadioButtonId()==R.id.surroundDebugGuidePark);
         if(steeringFrame!=null){
