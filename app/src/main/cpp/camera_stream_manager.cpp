@@ -1160,7 +1160,7 @@ namespace camera_stream_manager
         class ParallelPreviewConsumer final : public FrameConsumer,
                                               public std::enable_shared_from_this<ParallelPreviewConsumer>
         {
-            struct Frame { cv::Mat rgba; int64_t capturedUs = 0; };
+            struct Frame { cv::Mat pixels; int64_t capturedUs = 0; };
         public:
             explicit ParallelPreviewConsumer(ANativeWindow *window, bool mirror, int side = -1,
                     const side_camera_preview::Crops& crops = {},bool ipkRearview=false)
@@ -1172,6 +1172,8 @@ namespace camera_stream_manager
                 std::thread([self] { self->run(); }).detach();
             }
             bool isPreview() const override { return true; }
+            bool wantsPackedFrame() const override { return ipkRearview_; }
+            bool isLatestFrameTap() const override { return ipkRearview_; }
             int64_t lastPreviewPostUs() const override { return lastPostUs_.load(); }
             int64_t presentedFrameUs() const {
                 return stopping_.load() ? 0 : lastPresentedFrameUs_.load();
@@ -1185,6 +1187,14 @@ namespace camera_stream_manager
             }
             void processFrameAt(const cv::Mat &rgba, int64_t captured) {
                 frames_.submit(captured, [&] { return Frame{rgba.clone(), captured}; });
+            }
+            void processPackedFrameAt(const cv::Mat& packed,int64_t captured,uint32_t,uint32_t) override {
+                if(!ipkRearview_||!ipk_rearview::validPacked(packed)) {
+                    requestStop();return;
+                }
+                // Same first field as Fast preview, independent of Main/Enhanced consumers.
+                // Copy before V4L2 reuses its buffer; conversion belongs to this output's worker.
+                frames_.submit(captured,[&]{return Frame{ipk_rearview::copyFirstField(packed),captured};});
             }
             void requestStop() override {
                 stopping_.store(true);
@@ -1203,11 +1213,11 @@ namespace camera_stream_manager
                 try {
                     Frame frame;
                     int width = 0, height = 0;
-                    cv::Mat upright, composed;
+                    cv::Mat upright, composed, ipkRgba;
                     side_camera_preview::WheelTransforms wheelTransforms;
                     while (frames_.take(frame)) {
                         if (nowUs() - frame.capturedUs > 250000) continue;
-                        cv::Mat display = frame.rgba;
+                        cv::Mat display = frame.pixels;
                         if (side_ >= 0) {
                             auto settings=std::atomic_load(&gSideWheelStyle);
                             float frontDegrees=settings->frontMode?settings->frontDegrees:0;
@@ -1217,14 +1227,14 @@ namespace camera_stream_manager
                             const unsigned advancedAxes=(settings->frontMode==2?side_camera_preview::ALIGN_FRONT:0)
                                     |(settings->rearMode==2?side_camera_preview::ALIGN_REAR:0);
                             auto advanced=gSideAdvanced.current();
-                            side_camera_preview::compose(frame.rgba, side_ == 0,
+                            side_camera_preview::compose(frame.pixels, side_ == 0,
                                     gSideCameraWheels.load(), crops_, upright, composed,
                                     wheelTransforms, alignment, frontDegrees, rearDegrees,
                                     gSideCameraHighlightMissingAreas.load(),advanced.get(),advancedAxes,gSideCameraCorrection.load());
                             display = composed;
                         } else if(ipkRearview_) {
                             auto map=gIpkRearview.current();
-                            display=ipk_rearview::render(frame.rgba,map.get(),composed);
+                            display=ipk_rearview::renderPacked(frame.pixels,map.get(),ipkRgba,composed);
                         }
                         if (display.cols != width || display.rows != height) {
                             width = display.cols;

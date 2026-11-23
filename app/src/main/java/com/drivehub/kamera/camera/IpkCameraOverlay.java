@@ -76,8 +76,9 @@ public final class IpkCameraOverlay implements AutoCloseable {
         final int camera, sink;
         final Surface surface;
         boolean attached;
-        long sampledAt, sampledFrames, firstFrameMs = -1;
-        double fps = -1;
+        long sampledAt, sampledFrames, textureFrames, sampledTextureFrames, firstFrameMs = -1, lastRateLog;
+        double fps = -1, textureFps = -1;
+        Boolean loggedMainVisible;
         Output(int camera, int sink, Surface surface) {
             this.camera = camera; this.sink = sink; this.surface = surface;
         }
@@ -354,6 +355,7 @@ public final class IpkCameraOverlay implements AutoCloseable {
                 @Override public void onSurfaceTextureSizeChanged(SurfaceTexture st, int w, int h) { }
                 @Override public void onSurfaceTextureUpdated(SurfaceTexture st) {
                     if (texture != preview || token != generation || fade == null || output == null) return;
+                    output.textureFrames++;
                     long now = SystemClock.elapsedRealtime();
                     if (!allowWindow(now)) return;
                     if (now - lastFreshFrame > FRAME_TIMEOUT_MS) {
@@ -458,14 +460,23 @@ public final class IpkCameraOverlay implements AutoCloseable {
                         if (sink.sampledAt == 0) {
                             sink.sampledAt = now;
                             sink.sampledFrames = stats[1];
+                            sink.sampledTextureFrames = sink.textureFrames;
                         } else if (now - sink.sampledAt >= 500) {
                             sink.fps = (stats[1] - sink.sampledFrames) * 1000.0 / (now - sink.sampledAt);
+                            sink.textureFps = (sink.textureFrames - sink.sampledTextureFrames) * 1000.0 / (now - sink.sampledAt);
                             sink.sampledAt = now;
                             sink.sampledFrames = stats[1];
+                            sink.sampledTextureFrames = sink.textureFrames;
                         }
-                        detail = "live · " + viewDetail + " · " + (sink.fps < 0 ? "FPS misst…" : String.format(Locale.ROOT, "%.1f FPS", sink.fps))
+                        detail = "live · " + viewDetail + " · " + (sink.fps < 0 ? "FPS misst…" :
+                                String.format(Locale.ROOT, "%.1f FPS Ausgabe / %.1f FPS Anzeige", sink.fps, sink.textureFps))
                                 + " · Start " + sink.firstFrameMs + " ms · Alter " + age
                                 + " ms · Ausgabe " + stats[2] + "/" + stats[3] + " ms";
+                        boolean mainVisible=com.drivehub.kamera.MainActivity.isMainVisible();
+                        if(sink.fps>=0&&(sink.loggedMainVisible==null||sink.loggedMainVisible!=mainVisible||now-sink.lastRateLog>=5000)) {
+                            event("performance main="+mainVisible+" · "+detail);
+                            sink.loggedMainVisible=mainVisible;sink.lastRateLog=now;
+                        }
                     } else {
                         fade.onFrameHealth(false);
                         if (now - windowCreated > FRAME_TIMEOUT_MS) {
