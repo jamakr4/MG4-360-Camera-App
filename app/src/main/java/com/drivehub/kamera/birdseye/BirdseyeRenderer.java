@@ -49,12 +49,18 @@ public final class BirdseyeRenderer implements GLSurfaceView.Renderer {
     public final OrbitCamera orbit=new OrbitCamera();
     public final WheelSteering steering=new WheelSteering();
     private volatile boolean wheelGuidePreview;
+    private volatile boolean rearArtifactFix3d=true;
+    public void setRearArtifactFix3d(boolean enabled){rearArtifactFix3d=enabled;}
     volatile float guideProgress,outgoingGuideProgress;
-    private volatile com.drivehub.kamera.steering.WheelGuides.Style guideStyle=com.drivehub.kamera.steering.WheelGuides.Style.SIMPLE;
+    private volatile com.drivehub.kamera.steering.WheelGuides.Style guideStyle=com.drivehub.kamera.steering.WheelGuides.Style.DEFAULT;
+    private volatile int guideWidthMm=com.drivehub.kamera.steering.GuidelineWidth.DEFAULT_MM;
+    private volatile com.drivehub.kamera.steering.WheelGuides.Geometry guideGeometry=com.drivehub.kamera.steering.WheelGuides.Geometry.FRONT_BUMPER;
     private volatile com.drivehub.kamera.steering.WheelGuides.Direction guideDirection=com.drivehub.kamera.steering.WheelGuides.Direction.REVERSE;
     public void setWheelGuidePreview(boolean enabled){wheelGuidePreview=enabled;}
     public void setBlueGuideCorridor(boolean enabled){guideStyle=enabled?com.drivehub.kamera.steering.WheelGuides.Style.SIMPLE:com.drivehub.kamera.steering.WheelGuides.Style.LINES;}
     public void setGuideStyle(com.drivehub.kamera.steering.WheelGuides.Style style){guideStyle=java.util.Objects.requireNonNull(style);}
+    public void setGuideWidthMm(int widthMm){guideWidthMm=com.drivehub.kamera.steering.GuidelineWidth.validOrDefault(widthMm);}
+    public void setGuideGeometry(com.drivehub.kamera.steering.WheelGuides.Geometry geometry){guideGeometry=java.util.Objects.requireNonNull(geometry);}
     public void setGuideDirection(com.drivehub.kamera.steering.WheelGuides.Direction direction){guideDirection=java.util.Objects.requireNonNull(direction);}
     private RivelaBowlPass bowlPass;
     private PdcGroundPass pdcPass;
@@ -63,6 +69,7 @@ public final class BirdseyeRenderer implements GLSurfaceView.Renderer {
     private BirdseyeCarGeometry carArtworkGeometry;
     private boolean pdcUnavailable;
     private boolean guidesUnavailable;
+    private int lastGuideAvailability=-1;
     private final float[] topMvp=new float[16];
     public void setScene(RivelaScene scene) { this.scene=scene; }
     public void setModel(VehicleModel model) { this.model=model; }
@@ -152,6 +159,7 @@ public final class BirdseyeRenderer implements GLSurfaceView.Renderer {
     @Override public void onSurfaceCreated(GL10 gl, EGLConfig config) {
         guideAnimation.reset();
         guideFrame.reset();guideProgress=outgoingGuideProgress=0;
+        lastGuideAvailability=-1;
         program = 0; uploadedMesh = null; error = null; hasCarArtwork = false; uploadedCarColor = null;
         bowlPass=null;pdcPass=null;guidePass=null;carPass=null;carArtworkGeometry=null;
         pdcUnavailable=false;guidesUnavailable=false;threeDActive=false;
@@ -234,11 +242,12 @@ public final class BirdseyeRenderer implements GLSurfaceView.Renderer {
             GLES20.glActiveTexture(GLES20.GL_TEXTURE4);
             GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textures[4]);
             // Check permission/generation again after the copies to invalidate a concurrent handoff.
-            int mask = 0,visibleMask = 0;
+            int mask = 0,visibleMask = 0,guideMask = 0;
             if (allowed && frames.allowed() && generation == resetGeneration) {
                 long nowUs = frames.clockUs();
                 mask = BirdseyeFrameHealth.freshMask(capturedUs, nowUs);
                 visibleMask = BirdseyeFrameHealth.displayMask(capturedUs, nowUs);
+                guideMask = BirdseyeFrameHealth.guidanceMask(capturedUs, nowUs);
             }
             boolean drewThreeD=false;
             RivelaScene currentScene=scene;VehicleModel currentModel=model;
@@ -246,11 +255,18 @@ public final class BirdseyeRenderer implements GLSurfaceView.Renderer {
             com.drivehub.kamera.steering.WheelGuides.Style style=guideStyle;
             com.drivehub.kamera.steering.WheelGuides.Direction direction=angles.guidanceDirection!=null?angles.guidanceDirection:guideDirection;
             int guideCameraMask=direction==com.drivehub.kamera.steering.WheelGuides.Direction.FORWARD?4:8;
+            int guideAvailability=currentScene==null?1:!angles.guidanceAvailable?2:(guideMask&guideCameraMask)==0?3:0;
+            if(wheelGuidePreview&&guideAvailability!=lastGuideAvailability) {
+                String state=guideAvailability==0?"available":guideAvailability==1?"hidden: scene missing":
+                        guideAvailability==2?"hidden: steering/gear unavailable":"hidden: direction camera missing/stale";
+                com.drivehub.kamera.dev.DevRuntimeLog.add("Guidelines",state+" ("+direction+")");
+            }
+            lastGuideAvailability=wheelGuidePreview?guideAvailability:-1;
             guideProgress=guideAnimation.update(wheelGuidePreview,
-                    currentScene!=null&&angles.guidanceAvailable&&(mask&guideCameraMask)!=0,direction,guideClock.getAsLong());
-            if((mask&4)==0)guideAnimation.invalidate(com.drivehub.kamera.steering.WheelGuides.Direction.FORWARD);
-            if((mask&8)==0)guideAnimation.invalidate(com.drivehub.kamera.steering.WheelGuides.Direction.REVERSE);
-            guideFrame.update(angles,style,direction,guideAnimation);
+                    guideAvailability==0,direction,guideClock.getAsLong());
+            if((guideMask&4)==0)guideAnimation.invalidateOutgoing(com.drivehub.kamera.steering.WheelGuides.Direction.FORWARD);
+            if((guideMask&8)==0)guideAnimation.invalidateOutgoing(com.drivehub.kamera.steering.WheelGuides.Direction.REVERSE);
+            guideFrame.update(angles,style,guideWidthMm,guideGeometry,direction,guideAnimation);
             outgoingGuideProgress=guideFrame.outgoing().level;
             if(threeDRequested&&currentScene!=null&&currentScene.bowl()!=null&&currentModel!=null) {
                 ThreeDFailure.Kind stage=ThreeDFailure.Kind.DEPTH;
@@ -259,7 +275,7 @@ public final class BirdseyeRenderer implements GLSurfaceView.Renderer {
                     stage=ThreeDFailure.Kind.GPU_SETUP;
                     if(bowlPass==null)bowlPass=new RivelaBowlPass();
                     stage=ThreeDFailure.Kind.GPU_DRAW;
-                    bowlPass.draw(width,height,currentScene,currentModel,color,textures,visibleMask,mask,orbit,angles,pdcGeometry,SystemClock.elapsedRealtime(),guideFrame);
+                    bowlPass.draw(width,height,currentScene,currentModel,color,textures,visibleMask,mask,orbit,angles,pdcGeometry,SystemClock.elapsedRealtime(),guideFrame,rearArtifactFix3d);
                     drewThreeD=true;
                 } catch(RuntimeException|OutOfMemoryError failure) {
                     failThreeD(ThreeDFailure.at(stage,failure));

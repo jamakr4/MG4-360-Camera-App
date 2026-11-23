@@ -10,22 +10,22 @@ final class WheelGuidePass {
     private WheelGuidePath reverse,forward;
     void draw(float[] mvp,RivelaScene scene,WheelSteering.Angles angles,WheelGuides.Direction direction,
               WheelGuides.Style style,boolean maskBody,float progress) {
-        draw(mvp,scene,angles,direction,style,maskBody,progress,1);
+        draw(mvp,scene,angles,direction,style,com.drivehub.kamera.steering.GuidelineWidth.DEFAULT_MM,WheelGuides.Geometry.FRONT_BUMPER,maskBody,progress,1);
     }
     void draw(float[] mvp,RivelaScene scene,GuidelineFrame frame,boolean maskBody) {
         draw(mvp,scene,frame.outgoing(),maskBody);draw(mvp,scene,frame.incoming(),maskBody);
     }
     private void draw(float[] mvp,RivelaScene scene,GuidelineFrame.Layer layer,boolean maskBody) {
         if(layer.progress>0&&layer.angles!=null)
-            draw(mvp,scene,layer.angles,layer.direction,layer.style,maskBody,layer.progress,layer.opacity);
+            draw(mvp,scene,layer.angles,layer.direction,layer.style,layer.widthMm,layer.geometry,maskBody,layer.progress,layer.opacity);
     }
     private void draw(float[] mvp,RivelaScene scene,WheelSteering.Angles angles,WheelGuides.Direction direction,
-                      WheelGuides.Style style,boolean maskBody,float progress,float opacity) {
+                      WheelGuides.Style style,int widthMm,WheelGuides.Geometry geometry,boolean maskBody,float progress,float opacity) {
         if(progress<=0)return;
         WheelGuidePath path;
         if(direction==WheelGuides.Direction.REVERSE){if(reverse==null)reverse=new WheelGuidePath();path=reverse;}
         else {if(forward==null)forward=new WheelGuidePath();path=forward;}
-        path.draw(mvp,scene,angles,direction,style,maskBody,progress,opacity);
+        path.draw(mvp,scene,angles,direction,style,widthMm,geometry,maskBody,progress,opacity);
     }
     void close(){if(reverse!=null)reverse.close();if(forward!=null)forward.close();}
 }
@@ -40,8 +40,10 @@ final class WheelGuidePath {
     private RivelaScene cachedScene;
     private double cachedCurvature=Double.NaN;
     private WheelGuides.Direction cachedDirection;
+    private int cachedWidthMm;
+    private WheelGuides.Geometry cachedGeometry;
     private SteeringModel.Solution pose;
-    private List<PdcBars.Bar> lines,blueLines;
+    private List<PdcBars.Bar> lines,blueLines,outerLines;
     private WheelGuides.Corridor corridor;
     private float[] corridorFade;
     private final float[] revealPlane=new float[4];
@@ -49,16 +51,17 @@ final class WheelGuidePath {
     private double minY,maxY;
 
     void draw(float[] mvp,RivelaScene scene,WheelSteering.Angles angles,WheelGuides.Direction direction,
-              WheelGuides.Style style,boolean maskBody,float progress,float opacity) {
+              WheelGuides.Style style,int widthMm,WheelGuides.Geometry guideGeometry,boolean maskBody,float progress,float opacity) {
         if(progress<=0)return;
         ground.setOpacity(opacity);
-        if(scene!=cachedScene||angles.curvaturePerMm!=cachedCurvature||direction!=cachedDirection) {
-            cachedScene=scene;cachedCurvature=angles.curvaturePerMm;cachedDirection=direction;
-            pose=model.fromCurvature(cachedCurvature);lines=null;blueLines=null;corridor=null;boundsStyle=null;
+        if(scene!=cachedScene||angles.curvaturePerMm!=cachedCurvature||direction!=cachedDirection||widthMm!=cachedWidthMm||guideGeometry!=cachedGeometry) {
+            cachedScene=scene;cachedCurvature=angles.curvaturePerMm;cachedDirection=direction;cachedWidthMm=widthMm;
+            cachedGeometry=guideGeometry;
+            pose=model.fromCurvature(cachedCurvature);lines=null;blueLines=null;outerLines=null;corridor=null;boundsStyle=null;
         }
         if(style==WheelGuides.Style.SIMPLE) {
             if(corridor==null) {
-                corridor=geometry.corridor(pose,scene.car.centerX,scene.car.centerY,direction);
+                corridor=geometry.corridor(pose,scene.car.centerX,scene.car.centerY,direction,widthMm,guideGeometry);
                 corridorFade=endPlane(corridor);
             }
             float[] reveal=reveal(corridor.boundaries,direction,style,progress);
@@ -67,8 +70,11 @@ final class WheelGuidePath {
         }else {
             List<PdcBars.Bar> paths;
             if(style==WheelGuides.Style.LINES) {
-                if(blueLines==null)blueLines=geometry.clearanceLines(pose,scene.car.centerX,scene.car.centerY,direction);
+                if(blueLines==null)blueLines=geometry.clearanceLines(pose,scene.car.centerX,scene.car.centerY,direction,widthMm,guideGeometry);
                 paths=blueLines;
+            }else if(style==WheelGuides.Style.OUTER_LINES) {
+                if(outerLines==null)outerLines=geometry.outerLines(pose,scene.car.centerX,scene.car.centerY,direction,widthMm,guideGeometry);
+                paths=outerLines;
             }else {
                 if(lines==null)lines=geometry.lines(pose,scene.car.centerX,scene.car.centerY,direction);
                 paths=lines;

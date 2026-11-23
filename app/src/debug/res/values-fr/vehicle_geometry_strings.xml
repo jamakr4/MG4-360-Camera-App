@@ -1,0 +1,5 @@
+<resources>
+    <string name="birdseye_debug_corner_radius">Rayon du coin avant extérieur (largeur choisie) : %1$s</string>
+    <string name="birdseye_debug_vehicle_geometry">Manuel MG4 : %1$.0f × %2$.0f × %3$.0f mm\nEmpattement %4$.0f mm · porte-à-faux AV/AR %5$.0f / %6$.0f mm\nVoies AV/AR %7$.0f / %8$.0f mm</string>
+    <string name="birdseye_debug_model_note">Dimensions du manuel MG4 et géométrie Ackermann idéale ; modèle de rayon OEM conservé.\nLe modèle 3D utilise son propre placement des essieux ; validation dans le véhicule à effectuer.</string>
+</resources>

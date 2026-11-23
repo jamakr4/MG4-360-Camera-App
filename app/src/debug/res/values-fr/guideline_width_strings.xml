@@ -1,0 +1,6 @@
+<resources>
+    <string name="birdseye_debug_blue_forward_horizon">Surface balayée : largeur totale %1$d mm.\nCoins avant, côté intérieur arrière et porte-à-faux ; déplacement arrière de 3 m.</string>
+    <string name="birdseye_debug_blue_reverse_horizon">Zone bleue : largeur totale de %1$d mm.\nProfondeurs des extrémités OEM, si accessibles ; modèle de direction inchangé.</string>
+    <string name="birdseye_debug_forward_horizon">Quatre courbes bleues : largeur totale %1$d mm.\nCoins avant et côtés arrière sur leurs arcs réels ; déplacement arrière de 3 m.</string>
+    <string name="birdseye_debug_reverse_horizon">Quatre courbes bleu clair : largeur totale de %1$d mm.\nProfondeurs des extrémités OEM, si accessibles ; les extrémités ne représentent pas une position unique du véhicule.</string>
+</resources>

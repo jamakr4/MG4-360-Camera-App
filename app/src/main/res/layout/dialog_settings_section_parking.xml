@@ -116,25 +116,8 @@
             android:layout_width="match_parent" android:layout_height="wrap_content"
             android:layout_marginTop="4dp" android:text="@string/guidelines_speed_hint" />
 
-        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:layout_marginTop="12dp" android:gravity="center_vertical"
-            android:minHeight="48dp" android:orientation="horizontal">
-            <TextView style="@style/DrivehubSettingsCardRowLabel"
-                android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
-                android:labelFor="@id/segGuidelineStyle" android:text="@string/guidelines_style" />
-            <com.drivehub.kamera.settings.SegmentedControl android:id="@+id/segGuidelineStyle"
-                style="@style/DrivehubSettingsSegmentGroup" android:contentDescription="@string/guidelines_style">
-                <TextView android:id="@+id/segGuidelineLines" style="@style/DrivehubSettingsSegmentItem"
-                    android:layout_width="120dp" android:background="@drawable/bg_settings_segment_start"
-                    android:text="@string/guidelines_style_lines" />
-                <TextView android:id="@+id/segGuidelineSimple" style="@style/DrivehubSettingsSegmentItem"
-                    android:layout_width="120dp" android:background="@drawable/bg_settings_segment_end"
-                    android:text="@string/guidelines_style_simple" />
-            </com.drivehub.kamera.settings.SegmentedControl>
-        </LinearLayout>
-        <TextView style="@style/DrivehubSettingsCaption"
-            android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:layout_marginTop="4dp" android:text="@string/guidelines_style_hint" />
+        <include layout="@layout/view_guideline_width" />
+        <include layout="@layout/view_guideline_appearance" />
     </LinearLayout>
 
     <LinearLayout

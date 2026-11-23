@@ -154,6 +154,16 @@
             </intent-filter>
         </receiver>
         <receiver
+            android:name=".signal.DigitalRearviewViewTriggerReceiver"
+            android:enabled="true"
+            android:exported="true"
+            android:label="@string/shortcut_toggle_digital_rearview_view">
+            <intent-filter>
+                <action android:name="com.drivehub.kamera.action.SET_DIGITAL_REARVIEW_IPK_VIEW" />
+                <action android:name="com.mg4.control.action.SHORTCUT" />
+            </intent-filter>
+        </receiver>
+        <receiver
             android:name=".camera.CameraReleaseTriggerReceiver"
             android:enabled="true"
             android:exported="true"

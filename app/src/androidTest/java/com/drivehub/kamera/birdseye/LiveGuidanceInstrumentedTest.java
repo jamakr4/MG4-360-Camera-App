@@ -102,7 +102,7 @@ public class LiveGuidanceInstrumentedTest {
                 long now=SystemClock.elapsedRealtime();view.setSteeringSnapshot(SteeringSnapshot.value(-516.95f,0,now,1));
                 view.updateSteeringFrame(GearSnapshot.value(2,now),now);
                 assertTrue(renderer.steering.angles().guidanceAvailable);
-                assertEquals(28.8493,renderer.steering.angles().left,.001);assertEquals(38.0802,renderer.steering.angles().right,.001);
+                assertEquals(28.6533,renderer.steering.angles().left,.001);assertEquals(38.5024,renderer.steering.angles().right,.001);
                 assertEquals(WheelGuides.Direction.REVERSE,renderer.steering.angles().guidanceDirection);
                 view.updateSteeringFrame(GearSnapshot.value(4,now),now);
                 assertEquals(WheelGuides.Direction.FORWARD,renderer.steering.angles().guidanceDirection);
@@ -113,7 +113,7 @@ public class LiveGuidanceInstrumentedTest {
                 view.findViewById(R.id.surroundModeToggle).performClick();assertTrue(renderer.threeDRequested);
                 view.updateSteeringFrame(GearSnapshot.value(4,now),now);assertTrue(renderer.steering.angles().guidanceAvailable);
                 view.setSteeringSnapshot(SteeringSnapshot.EMPTY);view.updateSteeringFrame(GearSnapshot.value(4,now),now);
-                assertFalse(renderer.steering.angles().guidanceAvailable);assertEquals(38.0802,renderer.steering.angles().right,.001);
+                assertFalse(renderer.steering.angles().guidanceAvailable);assertEquals(38.5024,renderer.steering.angles().right,.001);
                 view.pauseDisplay();assertFalse(renderer.steering.angles().guidanceAvailable);assertEquals(0,renderer.steering.degrees(),0);
                 view.resumeDisplay();view.updateSteeringFrame(GearSnapshot.value(4,now),now);
                 assertFalse(renderer.steering.angles().guidanceAvailable);

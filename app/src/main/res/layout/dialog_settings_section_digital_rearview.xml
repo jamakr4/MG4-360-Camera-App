@@ -143,6 +143,25 @@
                 android:paddingBottom="4dp"
                 android:text="@string/settings_rearview_ipk_screen_hint" />
 
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:gravity="center_vertical" android:minHeight="56dp" android:orientation="horizontal">
+                <TextView style="@style/DrivehubSettingsCardRowLabel"
+                    android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+                    android:labelFor="@id/segRearviewIpkView" android:text="@string/settings_rearview_ipk_view" />
+                <com.drivehub.kamera.settings.SegmentedControl android:id="@+id/segRearviewIpkView"
+                    style="@style/DrivehubSettingsSegmentGroup" android:contentDescription="@string/settings_rearview_ipk_view">
+                    <TextView android:id="@+id/segRearviewIpkWide" style="@style/DrivehubSettingsSegmentItem"
+                        android:layout_width="120dp" android:background="@drawable/bg_settings_segment_start"
+                        android:text="@string/settings_rearview_view_wide" />
+                    <TextView android:id="@+id/segRearviewIpkNormal" style="@style/DrivehubSettingsSegmentItem"
+                        android:layout_width="120dp" android:background="@drawable/bg_settings_segment_end"
+                        android:text="@string/settings_rearview_view_normal" />
+                </com.drivehub.kamera.settings.SegmentedControl>
+            </LinearLayout>
+            <TextView style="@style/DrivehubSettingsCaption"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:paddingBottom="4dp" android:text="@string/settings_rearview_view_hint" />
+
         </LinearLayout>
 
         <LinearLayout

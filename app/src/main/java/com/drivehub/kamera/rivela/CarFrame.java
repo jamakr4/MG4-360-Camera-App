@@ -9,7 +9,8 @@ package com.drivehub.kamera.rivela;
  */
 public final class CarFrame {
     /** MG4 Electric official body size (without mirrors). */
-    public static final double MG4_LENGTH = 4287, MG4_WIDTH = 1836;
+    public static final double MG4_LENGTH = com.drivehub.kamera.steering.VehicleGeometry.MG4.lengthMm,
+            MG4_WIDTH = com.drivehub.kamera.steering.VehicleGeometry.MG4.widthMm;
 
     public final double centerX, centerY, length, width;
 

@@ -1,0 +1,4 @@
+<resources>
+    <string name="birdseye_debug_corner_radius">Poloměr vnějšího předního rohu (zvolená šířka): %1$s</string>
+    <string name="birdseye_debug_vehicle_geometry">Příručka MG4: %1$.0f × %2$.0f × %3$.0f mm\nRozvor %4$.0f mm · převis P/Z %5$.0f / %6$.0f mm\nRozchod P/Z %7$.0f / %8$.0f mm</string>
+</resources>

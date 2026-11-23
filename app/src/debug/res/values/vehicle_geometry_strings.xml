@@ -1,0 +1,4 @@
+<resources>
+    <string name="birdseye_debug_corner_radius">Outer front corner radius (selected width): %1$s</string>
+    <string name="birdseye_debug_vehicle_geometry">MG4 manual: %1$.0f × %2$.0f × %3$.0f mm\nWheelbase %4$.0f mm · overhang F/R %5$.0f / %6$.0f mm\nTrack F/R %7$.0f / %8$.0f mm</string>
+</resources>

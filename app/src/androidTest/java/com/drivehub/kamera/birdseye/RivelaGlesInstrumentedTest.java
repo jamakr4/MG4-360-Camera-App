@@ -170,9 +170,10 @@ public class RivelaGlesInstrumentedTest {
                 r.setWheelGuidePreview(false);r.onDrawFrame(null);ByteBuffer background=pixels();
                 int changed=differences(lines,background,new int[]{0,0,W,H});assertTrue(changed>100);
                 BirdseyeMesh mesh=view==1?projection.wideMesh:projection.mesh;
+                int pathIndex=0;
                 for(com.drivehub.kamera.rivela.PdcBars.Bar path:guides.clearanceLines(pose,scene.car.centerX,scene.car.centerY,direction)) {
                     boolean found=false;
-                    for(int i=(path.xy.length/4)*2;i<path.xy.length*.85-2&&!found;i+=2) {
+                    for(int i=0;i<path.xy.length*.85-2&&!found;i+=2) {
                         int[] p=view==2?projectPoint(r,scene,(float)path.xy[i],(float)path.xy[i+1],-2):new int[]{
                                 Math.round((float)((path.xy[i]-scene.car.centerX)/mesh.groundWidth+.5)*W),
                                 Math.round((float)((path.xy[i+1]-scene.car.centerY)/mesh.groundHeight+.5)*H)};
@@ -181,8 +182,18 @@ public class RivelaGlesInstrumentedTest {
                             if(c!=color(background,x,y)&&Math.abs(((c>>16)&255)-115)<=3&&Math.abs(((c>>8)&255)-217)<=3&&(c&255)>=252)found=true;
                         }
                     }
-                    assertTrue("Missing blue wheel path in view="+view+" "+direction,found);
+                    // True D rear-axle arcs can stay under the present car footprint.
+                    // Their complete rasterization is checked without a car in the fade test.
+                    if(direction==WheelGuides.Direction.REVERSE||pathIndex<2)
+                        assertTrue("Missing blue clearance path in view="+view+" "+direction+" path="+pathIndex,found);
+                    pathIndex++;
                 }
+                r.setWheelGuidePreview(true);r.setGuideStyle(WheelGuides.Style.OUTER_LINES);r.onDrawFrame(null);
+                ByteBuffer outer=pixels();int outerChanged=differences(outer,background,new int[]{0,0,W,H});
+                assertTrue("Outer lines must retain visible curves",outerChanged>50);
+                // Outer lines also includes the current vehicle-side lead-ins. The standalone
+                // near-straight test checks both full starts and the absence of a filled area.
+                save(outer,"guidelines-outer-lines-"+view+"-"+direction+".png");
                 r.setWheelGuidePreview(true);r.setGuideStyle(com.drivehub.kamera.steering.WheelGuides.Style.SIMPLE);r.onDrawFrame(null);
                 assertTrue("Lines must omit the filled area",differences(pixels(),background,new int[]{0,0,W,H})>changed*2);
                 save(lines,"guidelines-lines-"+view+"-"+direction+".png");
@@ -221,6 +232,82 @@ public class RivelaGlesInstrumentedTest {
                     clock[0]+=duration*3/5;r.onDrawFrame(null);assertEquals(label,0,differences(background,pixels(),new int[]{0,0,W,H}));
                     assertNull(r.error);assertNull(r.threeDError);
                     save(entering,"guideline-animation-"+label+"-partial.png");save(full,"guideline-animation-"+label+"-full.png");
+                }
+        }
+    }
+    @Test public void briefSteeringAndGearGapsRestoreCurrentGuidesWithoutReplayingInEveryView() throws Exception {
+        BirdseyeSynthetic frames=new BirdseyeSynthetic();frames.fixedClockUs=1_000_000;
+        ProjectionAssets projection=ProjectionAssets.get(frames.calibration);projection.scene.prepareBowl();
+        long[] clock={1000};long duration=GuidelineAnimation.DURATION_MS;
+        BirdseyeRenderer r=new BirdseyeRenderer(frames,null,()->clock[0],duration);
+        r.setMesh(projection.mesh);r.setWideMesh(projection.wideMesh,null);r.setScene(projection.scene);r.setModel(model);
+        r.orbit.rotate(-35/.35f,(75-55)/.25f);r.orbit.zoom(11000f/16000);
+        SteeringModel solver=new SteeringModel();
+        try(Egl egl=new Egl()) {
+            r.onSurfaceCreated(null,null);r.onSurfaceChanged(null,W,H);
+            for(int view=0;view<3;view++)for(WheelGuides.Style style:new WheelGuides.Style[]{WheelGuides.Style.LINES,WheelGuides.Style.SIMPLE})
+                for(WheelGuides.Direction direction:WheelGuides.Direction.values()) {
+                    String label=view+"-"+style+"-"+direction;
+                    r.setThreeD(view==2);r.setWide(view==1);r.setGuideStyle(style);
+                    r.steering.setSolution(solver.solve(0),true,direction);
+                    r.setWheelGuidePreview(false);clock[0]+=duration*2;r.onDrawFrame(null);ByteBuffer background=pixels();
+                    r.setWheelGuidePreview(true);r.onDrawFrame(null);clock[0]+=duration;r.onDrawFrame(null);
+                    ByteBuffer straight=pixels();assertEquals(label,1,r.guideProgress,0);
+                    assertTrue(label,differences(background,straight,new int[]{0,0,W,H})>100);
+                    r.steering.setSolution(solver.solve(199.3f),true,direction);r.onDrawFrame(null);ByteBuffer expectedCurve=pixels();
+                    r.steering.setSolution(solver.solve(0),true,direction);r.onDrawFrame(null);
+                    // A failed steering read hides the overlay while retaining the wheel pose.
+                    r.steering.setSolution(solver.solve(0),false,direction);clock[0]+=16;r.onDrawFrame(null);
+                    assertEquals(label,0,r.guideProgress,0);assertEquals(label,0,r.outgoingGuideProgress,0);
+                    assertEquals(label,0,differences(background,pixels(),new int[]{0,0,W,H}));
+                    // Recovery must use today's curve, never a cached straight path or another intro.
+                    r.steering.setSolution(solver.solve(199.3f),true,direction);clock[0]+=50;r.onDrawFrame(null);
+                    ByteBuffer recovered=pixels();assertEquals(label,1,r.guideProgress,0);
+                    assertEquals(label,0,differences(expectedCurve,recovered,new int[]{0,0,W,H}));
+                    assertTrue(label,differences(straight,recovered,new int[]{0,0,W,H})>100);
+                    clock[0]+=duration;r.onDrawFrame(null);
+                    assertEquals(label,0,differences(recovered,pixels(),new int[]{0,0,W,H}));
+                    // Missing gear publishes a null direction; the debug fallback must not discard D's state.
+                    r.steering.setSolution(solver.solve(199.3f),false,null);clock[0]+=16;r.onDrawFrame(null);
+                    assertEquals(label,0,r.guideProgress,0);assertEquals(label,0,r.outgoingGuideProgress,0);
+                    r.steering.setSolution(solver.solve(199.3f),true,direction);clock[0]+=50;r.onDrawFrame(null);
+                    assertEquals(label,1,r.guideProgress,0);
+                    assertEquals(label,0,differences(recovered,pixels(),new int[]{0,0,W,H}));
+                    assertNull(r.error);assertNull(r.threeDError);
+                }
+        }
+    }
+    @Test public void guidanceIgnoresCameraSkewButStillHidesExpiredFramesAndResumesWithoutAnIntro() throws Exception {
+        BirdseyeSynthetic frames=new BirdseyeSynthetic();frames.fixedClockUs=1_000_000;
+        ProjectionAssets projection=ProjectionAssets.get(frames.calibration);projection.scene.prepareBowl();
+        long[] clock={1000};long duration=GuidelineAnimation.DURATION_MS;
+        BirdseyeRenderer r=new BirdseyeRenderer(frames,null,()->clock[0],duration);
+        r.setMesh(projection.mesh);r.setWideMesh(projection.wideMesh,null);r.setScene(projection.scene);r.setModel(model);
+        r.orbit.rotate(-35/.35f,(75-55)/.25f);r.orbit.zoom(11000f/16000);
+        try(Egl egl=new Egl()) {
+            r.onSurfaceCreated(null,null);r.onSurfaceChanged(null,W,H);
+            for(int view=0;view<3;view++)for(WheelGuides.Style style:new WheelGuides.Style[]{WheelGuides.Style.LINES,WheelGuides.Style.SIMPLE})
+                for(WheelGuides.Direction direction:WheelGuides.Direction.values()) {
+                    String label=view+"-"+style+"-"+direction;
+                    r.setThreeD(view==2);r.setWide(view==1);r.setGuideStyle(style);
+                    int needed=direction==WheelGuides.Direction.FORWARD?4:8;
+                    r.steering.setSolution(new SteeringModel().solve(0),true,direction);
+                    frames.missingMask=0;frames.fixedClockUs+=1_000_000;
+                    r.setWheelGuidePreview(false);clock[0]+=duration*2;r.onDrawFrame(null);ByteBuffer background=pixels();
+                    r.setWheelGuidePreview(true);r.onDrawFrame(null);clock[0]+=duration;r.onDrawFrame(null);ByteBuffer full=pixels();
+                    assertTrue(label,differences(background,full,new int[]{0,0,W,H})>100);
+                    frames.missingMask=needed;frames.fixedClockUs+=200_000;clock[0]+=200;r.onDrawFrame(null);
+                    assertEquals(label,0,r.freshMask&needed);assertEquals(label,1,r.guideProgress,0);
+                    assertEquals(label,0,differences(full,pixels(),new int[]{0,0,W,H}));
+                    frames.fixedClockUs+=300_000;clock[0]+=300;r.onDrawFrame(null);
+                    assertEquals(label,1,r.guideProgress,0); // Exactly 500 ms is still recent.
+                    frames.fixedClockUs++;clock[0]++;r.onDrawFrame(null);
+                    assertEquals(label,0,r.guideProgress,0);assertEquals(label,needed,r.displayMask&needed);
+                    assertEquals(label,0,differences(background,pixels(),new int[]{0,0,W,H}));
+                    frames.missingMask=0;frames.fixedClockUs+=50_000;clock[0]+=50;r.onDrawFrame(null);
+                    assertEquals(label,1,r.guideProgress,0);
+                    assertEquals(label,0,differences(full,pixels(),new int[]{0,0,W,H}));
+                    assertNull(r.error);assertNull(r.threeDError);
                 }
         }
     }
@@ -268,6 +355,167 @@ public class RivelaGlesInstrumentedTest {
                 }
         }
     }
+    @Test public void widthChangesRebuildBothStylesInEveryViewWithoutChangingSteering() throws Exception {
+        BirdseyeSynthetic frames=new BirdseyeSynthetic();frames.fixedClockUs=1_000_000;
+        ProjectionAssets projection=ProjectionAssets.get(frames.calibration);projection.scene.prepareBowl();
+        BirdseyeRenderer r=new BirdseyeRenderer(frames,null,()->0L,0);
+        r.setMesh(projection.mesh);r.setWideMesh(projection.wideMesh,null);r.setScene(projection.scene);r.setModel(model);
+        r.orbit.rotate(-35/.35f,(75-55)/.25f);r.orbit.zoom(11000f/16000);
+        r.setWheelGuidePreview(true);
+        try(Egl egl=new Egl()) {
+            r.onSurfaceCreated(null,null);r.onSurfaceChanged(null,W,H);
+            for(int view=0;view<3;view++)for(WheelGuides.Style style:new WheelGuides.Style[]{WheelGuides.Style.LINES,WheelGuides.Style.SIMPLE})
+                for(WheelGuides.Direction direction:WheelGuides.Direction.values()) {
+                    String label=view+"-"+style+"-"+direction;
+                    r.setThreeD(view==2);r.setWide(view==1);r.setGuideStyle(style);
+                    SteeringModel.Solution pose=new SteeringModel().solve(0);
+                    r.steering.setSolution(pose,true,direction);
+                    r.setGuideWidthMm(2060);r.onDrawFrame(null);ByteBuffer mirrors=pixels();
+                    r.setGuideWidthMm(1836);r.onDrawFrame(null);ByteBuffer body=pixels();
+                    assertTrue(label+" body width must change visible pixels",differences(mirrors,body,new int[]{0,0,W,H})>20);
+                    r.setGuideWidthMm(3000);r.onDrawFrame(null);ByteBuffer custom=pixels();
+                    assertTrue(label+" custom width must change visible pixels",differences(body,custom,new int[]{0,0,W,H})>20);
+                    r.setGuideWidthMm(2060);r.onDrawFrame(null);
+                    assertEquals(label+" returning to mirrors must restore the original picture",0,differences(mirrors,pixels(),new int[]{0,0,W,H}));
+                    assertEquals(pose.leftDegrees,r.steering.angles().left,0);assertEquals(pose.rightDegrees,r.steering.angles().right,0);
+                    r.setGuideWidthMm(3000);
+                    for(float lock:new float[]{-516.95f,516.95f}) {
+                        r.steering.setSolution(new SteeringModel().solve(lock),true,direction);r.onDrawFrame(null);
+                        assertNull(label,r.error);assertNull(label,r.threeDError);
+                        assertEquals(label,view==2,r.threeDActive);
+                    }
+                }
+        }
+    }
+    @Test public void gearTransitionsRetainEachLayersWidthUntilThatDirectionUpdates() throws Exception {
+        BirdseyeSynthetic frames=new BirdseyeSynthetic();frames.fixedClockUs=1_000_000;
+        ProjectionAssets projection=ProjectionAssets.get(frames.calibration);projection.scene.prepareBowl();
+        long[] clock={1000};BirdseyeRenderer r=new BirdseyeRenderer(frames,null,()->clock[0],350);
+        r.setMesh(projection.mesh);r.setScene(projection.scene);r.setModel(model);r.setGuideStyle(WheelGuides.Style.SIMPLE);
+        r.setWheelGuidePreview(true);
+        java.lang.reflect.Field field=BirdseyeRenderer.class.getDeclaredField("guideFrame");field.setAccessible(true);
+        try(Egl egl=new Egl()) {
+            r.onSurfaceCreated(null,null);r.onSurfaceChanged(null,W,H);
+            r.setGuideWidthMm(1836);r.steering.setSolution(new SteeringModel().solve(0),true,WheelGuides.Direction.REVERSE);
+            r.onDrawFrame(null);clock[0]+=350;r.onDrawFrame(null);
+            r.setGuideWidthMm(3000);r.steering.setSolution(new SteeringModel().solve(0),true,WheelGuides.Direction.FORWARD);
+            r.onDrawFrame(null);clock[0]+=175;r.onDrawFrame(null);
+            GuidelineFrame frame=(GuidelineFrame)field.get(r);
+            assertEquals(1836,frame.outgoing().widthMm);assertEquals(3000,frame.incoming().widthMm);
+            assertEquals(.5,frame.outgoing().level,1e-6);assertEquals(.5,frame.incoming().level,1e-6);
+            r.setGuideWidthMm(2500);r.onDrawFrame(null);
+            assertEquals(1836,frame.outgoing().widthMm);assertEquals(2500,frame.incoming().widthMm);
+            assertNull(r.error);assertNull(r.threeDError);
+        }
+    }
+    @Test public void rearDisplayShaderAddsExactly180MillimetresWithoutMovingTheFront() {
+        try(Egl egl=new Egl()) {
+            int program=GlPrograms.link(RivelaBowlPass.MODEL_VERTEX,
+                    com.drivehub.kamera.rivela.BowlShaders.PRECISION+"void main(){gl_FragColor=vec4(1.0,0.0,0.0,1.0);}");
+            try {
+                GLES20.glUseProgram(program);GLES20.glViewport(0,0,W,H);GLES20.glDisable(GLES20.GL_DEPTH_TEST);
+                float[] ortho=new float[16];Matrix.orthoM(ortho,0,-100,100,-50,450,-100,100);
+                GLES20.glUniformMatrix4fv(GLES20.glGetUniformLocation(program,"uMvp"),1,false,ortho,0);
+                GLES20.glUniform3f(GLES20.glGetUniformLocation(program,"uCenter"),0,0,0);
+                GLES20.glUniform3f(GLES20.glGetUniformLocation(program,"uPivot"),0,0,0);
+                GLES20.glUniform2f(GLES20.glGetUniformLocation(program,"uSteer"),1,0);
+                FloatBuffer vertices=ByteBuffer.allocateDirect(9*4).order(ByteOrder.nativeOrder()).asFloatBuffer();
+                vertices.put(new float[]{-50,0,0,50,0,0,0,200,0}).flip();
+                int pos=GLES20.glGetAttribLocation(program,"aPos");GLES20.glEnableVertexAttribArray(pos);
+                GLES20.glVertexAttribPointer(pos,3,GLES20.GL_FLOAT,false,0,vertices);
+                int[][] rows=new int[2][2];
+                for(int enabled=0;enabled<2;enabled++) {
+                    GLES20.glUniform3f(GLES20.glGetUniformLocation(program,"uRearDisplay"),100,100,enabled*180);
+                    GLES20.glClearColor(0,0,0,1);GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);
+                    GLES20.glDrawArrays(GLES20.GL_TRIANGLES,0,3);ByteBuffer picture=pixels();
+                    rows[enabled][0]=H;rows[enabled][1]=-1;
+                    for(int y=0;y<H;y++)for(int x=0;x<W;x++)if(color(picture,x,y)==0xff0000) {
+                        rows[enabled][0]=Math.min(rows[enabled][0],y);rows[enabled][1]=Math.max(rows[enabled][1],y);
+                    }
+                }
+                assertEquals(180*H/500f,rows[0][0]-rows[1][0],2);
+                assertEquals(rows[0][1],rows[1][1]);GLES20.glDisableVertexAttribArray(pos);
+            }finally{GLES20.glDeleteProgram(program);}
+        }
+    }
+    @Test public void rearCameraBodyMaskRemovesOnlySelfBodyAndRenormalizesRemainingCameras() {
+        try(Egl egl=new Egl()) {
+            int program=GlPrograms.link("attribute vec2 aPos;uniform vec2 uRearUv,uWorld;uniform vec4 uWeights;"
+                    +"varying vec2 t0,t1,t2,t3,vGround;varying vec4 w;"
+                    +"void main(){gl_Position=vec4(aPos,0.0,1.0);vGround=uWorld;t0=t1=t2=vec2(0.5);t3=uRearUv;w=uWeights;}",
+                    RivelaBowlPass.packedFragment());
+            int[] textures=new int[2];GLES20.glGenTextures(2,textures,0);
+            try {
+                GLES20.glUseProgram(program);GLES20.glViewport(0,0,W,H);GLES20.glDisable(GLES20.GL_DEPTH_TEST);
+                for(int i=0;i<2;i++) {
+                    GLES20.glActiveTexture(GLES20.GL_TEXTURE0+i);GLES20.glBindTexture(GLES20.GL_TEXTURE_2D,textures[i]);
+                    GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D,GLES20.GL_TEXTURE_MIN_FILTER,GLES20.GL_NEAREST);
+                    GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D,GLES20.GL_TEXTURE_MAG_FILTER,GLES20.GL_NEAREST);
+                    GLES20.glTexImage2D(GLES20.GL_TEXTURE_2D,0,GLES20.GL_RGBA,1,1,0,GLES20.GL_RGBA,GLES20.GL_UNSIGNED_BYTE,
+                            ByteBuffer.wrap(new byte[]{(byte)128,(byte)(i==0?64:200),(byte)128,(byte)(i==0?64:200)}));
+                }
+                GLES20.glUniform1i(GLES20.glGetUniformLocation(program,"tex0"),0);
+                GLES20.glUniform1i(GLES20.glGetUniformLocation(program,"tex3"),1);
+                GLES20.glUniform4f(GLES20.glGetUniformLocation(program,"uFresh"),1,1,1,1);
+                GLES20.glUniform2f(GLES20.glGetUniformLocation(program,"uRearUv"),350f/720,470f/480);
+                FloatBuffer quad=ByteBuffer.allocateDirect(8*4).order(ByteOrder.nativeOrder()).asFloatBuffer();
+                quad.put(new float[]{-1,-1,1,-1,-1,1,1,1}).flip();
+                int pos=GLES20.glGetAttribLocation(program,"aPos");GLES20.glEnableVertexAttribArray(pos);
+                GLES20.glVertexAttribPointer(pos,2,GLES20.GL_FLOAT,false,0,quad);
+                GLES20.glUniform4f(GLES20.glGetUniformLocation(program,"uWeights"),0,0,0,1);
+                GLES20.glUniform1f(GLES20.glGetUniformLocation(program,"uRearArtifactFix"),0);
+                GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP,0,4);
+                int original=color(pixels(),W/2,H/2);assertTrue((original&255)>200);
+                GLES20.glUniform1f(GLES20.glGetUniformLocation(program,"uRearArtifactFix"),1);
+                GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP,0,4);assertEquals(0,color(pixels(),W/2,H/2));
+                GLES20.glUniform4f(GLES20.glGetUniformLocation(program,"uWeights"),1,0,0,1);
+                GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP,0,4);int mixed=color(pixels(),W/2,H/2);
+                GLES20.glUniform4f(GLES20.glGetUniformLocation(program,"uWeights"),1,0,0,0);
+                GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP,0,4);assertEquals(mixed,color(pixels(),W/2,H/2));
+                assertTrue((mixed&255)>40&&(mixed&255)<70);
+                // A tiny, but valid side contribution must survive when the dominant rear view is masked.
+                GLES20.glUniform4f(GLES20.glGetUniformLocation(program,"uWeights"),.002f,0,0,1);
+                GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP,0,4);assertEquals(mixed,color(pixels(),W/2,H/2));
+                GLES20.glUniform4f(GLES20.glGetUniformLocation(program,"uWeights"),0,0,0,1);
+                GLES20.glUniform2f(GLES20.glGetUniformLocation(program,"uRearUv"),350f/720,200f/480);
+                GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP,0,4);assertEquals(original,color(pixels(),W/2,H/2));
+                // Real shader: pavement remains intact outside the rounded footprint, with a soft shadow edge.
+                int world=GLES20.glGetUniformLocation(program,"uWorld");
+                GLES20.glUniform4f(GLES20.glGetUniformLocation(program,"uRearShadow"),0,1160,878,1160);
+                GLES20.glUniform2f(world,1100,2320);
+                GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP,0,4);assertEquals(original,color(pixels(),W/2,H/2));
+                GLES20.glUniform2f(world,0,2200);
+                GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP,0,4);int dark=color(pixels(),W/2,H/2)&255;
+                assertTrue(dark<60);
+                GLES20.glUniform2f(world,878,2200);
+                GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP,0,4);int edge=color(pixels(),W/2,H/2)&255;
+                assertTrue(edge>dark&&edge<(original&255));
+                GLES20.glDisableVertexAttribArray(pos);
+            }finally{GLES20.glDeleteTextures(2,textures,0);GLES20.glDeleteProgram(program);}
+        }
+    }
+    @Test public void rearFixChangesOnlyThreeDDisplayAndNeverMutatesPhysicalGeometry() throws Exception {
+        BirdseyeSynthetic frames=new BirdseyeSynthetic();frames.fixedClockUs=1_000_000;
+        ProjectionAssets projection=ProjectionAssets.get(frames.calibration);projection.scene.prepareBowl();
+        BirdseyeRenderer r=new BirdseyeRenderer(frames,null,()->0L,0);
+        r.setMesh(projection.mesh);r.setWideMesh(projection.wideMesh,null);r.setScene(projection.scene);r.setModel(model);
+        r.orbit.rotate(0,(75-55)/.25f);float[] vertices=new float[model.vertices.limit()];model.vertices.duplicate().get(vertices);
+        try(Egl egl=new Egl()) {
+            r.onSurfaceCreated(null,null);r.onSurfaceChanged(null,W,H);
+            for(boolean wide:new boolean[]{false,true}) {
+                r.setWide(wide);r.setRearArtifactFix3d(false);r.onDrawFrame(null);ByteBuffer before=pixels();
+                r.setRearArtifactFix3d(true);r.onDrawFrame(null);assertEquals(0,differences(before,pixels(),new int[]{0,0,W,H}));
+            }
+            r.setThreeD(true);r.setRearArtifactFix3d(false);r.onDrawFrame(null);ByteBuffer before=pixels();
+            r.setRearArtifactFix3d(true);r.onDrawFrame(null);ByteBuffer after=pixels();
+            assertTrue(differences(before,after,new int[]{0,0,W,H})>20);
+            int[] roof=projectPoint(r,projection.scene,0,-600,-1540);
+            assertEquals(color(before,roof[0],roof[1]),color(after,roof[0],roof[1]));
+            float[] retained=new float[vertices.length];model.vertices.duplicate().get(retained);assertArrayEquals(vertices,retained,0);
+            assertEquals(1836,projection.scene.car.width,0);assertEquals(4287,projection.scene.car.length,0);
+            assertNull(r.error);assertNull(r.threeDError);
+        }
+    }
     private static double changedMeanY(ByteBuffer picture,ByteBuffer background) {
         long sum=0,count=0;
         for(int y=0;y<H;y++)for(int x=0;x<W;x++)if(color(picture,x,y)!=color(background,x,y)){sum+=y;count++;}
@@ -277,7 +525,7 @@ public class RivelaGlesInstrumentedTest {
         try(Egl egl=new Egl()) {
             RivelaScene scene=new RivelaScene(new BirdseyeSynthetic().calibration);
             WheelGuidePass pass=new WheelGuidePass();WheelGuides guides=new WheelGuides();
-            float[] mvp=new float[16];Matrix.orthoM(mvp,0,-6500,6500,8000,-8000,-100,100);
+            float[] mvp=new float[16];Matrix.orthoM(mvp,0,-9000,9000,8000,-8000,-100,100);
             try {
                 for(WheelGuides.Direction direction:WheelGuides.Direction.values())for(float raw:new float[]{-441.3f,441.3f}) {
                     GLES20.glViewport(0,0,W,H);GLES20.glClearColor(0,0,0,1);GLES20.glDepthMask(true);
@@ -293,6 +541,68 @@ public class RivelaGlesInstrumentedTest {
             }finally{pass.close();}
         }
     }
+    @Test public void reverseSimpleDrawsTheOutsideFrontArcBeyondTheThreeMetreFrontPose() throws Exception {
+        try(Egl egl=new Egl()) {
+            RivelaScene scene=new RivelaScene(new BirdseyeSynthetic().calibration);
+            WheelGuidePass pass=new WheelGuidePass();WheelGuides guides=new WheelGuides();SteeringModel solver=new SteeringModel();
+            float[] mvp=new float[16];Matrix.orthoM(mvp,0,-9000,9000,8000,-8000,-100,100);
+            try {
+                for(float raw:new float[]{-516.95f,-441.3f,441.3f,516.95f}) {
+                    GLES20.glViewport(0,0,W,H);GLES20.glClearColor(0,0,0,1);GLES20.glDepthMask(true);
+                    GLES20.glDisable(GLES20.GL_DEPTH_TEST);GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT|GLES20.GL_DEPTH_BUFFER_BIT);
+                    SteeringModel.Solution pose=solver.solve(raw);WheelSteering steering=new WheelSteering();
+                    steering.setSolution(pose,true,WheelGuides.Direction.REVERSE);
+                    pass.draw(mvp,scene,steering.angles(),WheelGuides.Direction.REVERSE,WheelGuides.Style.SIMPLE,false,1);
+                    ByteBuffer picture=pixels();
+                    double[] outside=guides.clearanceLines(pose,scene.car.centerX,scene.car.centerY,WheelGuides.Direction.REVERSE)
+                            .get(raw<0?0:1).xy;
+                    for(int remaining:new int[]{1100,2200,3300})assertTrue("Outside curve stops in Simple: "+raw+" at "+remaining,
+                            blueAlongPath(picture,outside,remaining)>240);
+                    assertTrue("The continued arc must still fade at the common far cap",blueAlongPath(picture,outside,150)<200);
+                    save(picture,"reverse-simple-continuous-outside-"+raw+".png");
+                }
+            }finally{pass.close();}
+        }
+    }
+    @Test public void forwardStylesShowTheRearCurveBeyondItsFormerThreeMetreEnd() {
+        try(Egl egl=new Egl()) {
+            RivelaScene scene=new RivelaScene(new BirdseyeSynthetic().calibration);WheelGuidePass pass=new WheelGuidePass();
+            float[] mvp=new float[16];Matrix.orthoM(mvp,0,-9000,9000,8000,-8000,-100,100);
+            try {
+                for(float raw:new float[]{-516.95f,-441.3f,441.3f,516.95f})for(WheelGuides.Style style:new WheelGuides.Style[]{WheelGuides.Style.LINES,WheelGuides.Style.OUTER_LINES,WheelGuides.Style.SIMPLE}) {
+                    GLES20.glViewport(0,0,W,H);GLES20.glClearColor(0,0,0,1);GLES20.glDepthMask(true);
+                    GLES20.glDisable(GLES20.GL_DEPTH_TEST);GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT|GLES20.GL_DEPTH_BUFFER_BIT);
+                    SteeringModel.Solution pose=new SteeringModel().solve(raw);WheelSteering steering=new WheelSteering();
+                    steering.setSolution(pose,true,WheelGuides.Direction.FORWARD);
+                    pass.draw(mvp,scene,steering.angles(),WheelGuides.Direction.FORWARD,style,false,1);
+                    double k=pose.curvaturePerMm,x=k>0?1030:-1030;
+                    // Independently sample 1.5 m of rear-point arc after the old endpoint.
+                    double travel=-3000-1500/Math.abs(1-k*x),angle=k*travel;
+                    double xx=1/k+(x-1/k)*Math.cos(angle),yy=1402.5-(x-1/k)*Math.sin(angle);
+                    assertTrue("Rear guide remains truncated in "+style+" at "+raw,blueAtWorld(pixels(),xx,yy)>240);
+                }
+            }finally{pass.close();}
+        }
+    }
+    @Test public void outerLinesKeepBothLongStartsAcrossStraightWithoutAddingFill() {
+        try(Egl egl=new Egl()) {
+            RivelaScene scene=new RivelaScene(new BirdseyeSynthetic().calibration);WheelGuidePass pass=new WheelGuidePass();
+            float[] mvp=new float[16];Matrix.orthoM(mvp,0,-9000,9000,8000,-8000,-100,100);
+            try {
+                for(WheelGuides.Direction direction:WheelGuides.Direction.values())for(float raw:new float[]{-25.2f,-1,0,1,25.2f}) {
+                    GLES20.glViewport(0,0,W,H);GLES20.glClearColor(0,0,0,1);GLES20.glDepthMask(true);
+                    GLES20.glDisable(GLES20.GL_DEPTH_TEST);GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT|GLES20.GL_DEPTH_BUFFER_BIT);
+                    SteeringModel.Solution pose=new SteeringModel().solve(raw);WheelSteering steering=new WheelSteering();steering.setSolution(pose,true,direction);
+                    pass.draw(mvp,scene,steering.angles(),direction,WheelGuides.Style.OUTER_LINES,false,1);ByteBuffer picture=pixels();
+                    double start=scene.car.centerY+(direction==WheelGuides.Direction.FORWARD?1302.5:-2043.5);
+                    for(int side:new int[]{-1,1})assertTrue("Long side disappears near straight: "+direction+" raw="+raw+" side="+side,
+                            blueAtWorld(picture,scene.car.centerX+side*1030,start)>240);
+                    double middle=scene.car.centerY+(direction==WheelGuides.Direction.FORWARD?-4000:4000);
+                    assertEquals("Outer lines must remain unfilled",0,blueAtWorld(picture,scene.car.centerX,middle));
+                }
+            }finally{pass.close();}
+        }
+    }
     private static int blueAlongPath(ByteBuffer picture,double[] xy,double remaining) {
         double x=xy[0],y=xy[1];
         for(int i=xy.length-2;i>=2;i-=2) {
@@ -300,7 +610,10 @@ public class RivelaGlesInstrumentedTest {
             if(remaining<=length) {double t=remaining/length;x=xy[i]+t*(xy[i-2]-xy[i]);y=xy[i+1]+t*(xy[i-1]-xy[i+1]);break;}
             remaining-=length;
         }
-        int px=Math.round((float)((x+6500)/13000*W)),py=Math.round((float)((y+8000)/16000*H)),blue=0;
+        return blueAtWorld(picture,x,y);
+    }
+    private static int blueAtWorld(ByteBuffer picture,double x,double y) {
+        int px=Math.round((float)((x+9000)/18000*W)),py=Math.round((float)((y+8000)/16000*H)),blue=0;
         for(int xx=Math.max(0,px-2);xx<=Math.min(W-1,px+2);xx++)for(int yy=Math.max(0,py-2);yy<=Math.min(H-1,py+2);yy++)blue=Math.max(blue,color(picture,xx,yy)&255);
         return blue;
     }
@@ -426,8 +739,9 @@ public class RivelaGlesInstrumentedTest {
             assertNull(r.error);assertNull(r.threeDError);assertTrue(r.threeDActive);
             r.setWheelGuidePreview(false);r.onDrawFrame(null);ByteBuffer without=pixels();
             assertTrue(differences(reverse,without,new int[]{0,0,W,H})>200);
-            for(float x:new float[]{-725,725}) {
-                int[] point=projectPoint(r,scene,x,5239.5f,-2);
+            // Bumper mode ends after 3 m of vehicle travel, at the final rear bumper.
+            for(float x:new float[]{-1030,1030}) {
+                int[] point=projectPoint(r,scene,x,5143.5f,-2);
                 assertTrue("Production floor hides far guide endpoint",differences(reverse,without,
                         new int[]{point[0]-4,point[1]-4,point[0]+5,point[1]+5})>0);
             }
@@ -643,8 +957,8 @@ public class RivelaGlesInstrumentedTest {
             r.setWheelGuidePreview(true);r.onDrawFrame(null);ByteBuffer forward=pixels();
             assertNull(r.error);assertNull(r.threeDError);
             assertTrue(differences(without,forward,new int[]{0,0,W,H})>100);
-            for(float x:new float[]{-725,725}) {
-                int[] point=projectPoint(r,scene,x,-4295.5f,-2);
+            for(float x:new float[]{-775,775}) {
+                int[] point=projectPoint(r,scene,x,-4302.5f,-2);
                 int[] rect={Math.max(0,point[0]-5),Math.max(0,point[1]-5),Math.min(W,point[0]+6),Math.min(H,point[1]+6)};
                 assertTrue(rect[2]>rect[0]&&rect[3]>rect[1]);assertTrue(differences(without,forward,rect)>0);
             }
@@ -673,8 +987,8 @@ public class RivelaGlesInstrumentedTest {
             assertNull(r.error);assertNull(r.threeDError);assertTrue(r.threeDActive);
             assertTrue(differences(without,straight,new int[]{0,0,W,H})>100);
             // Both 3.1 m-beyond-bumper endpoints must survive the ground-pass buffer and bowl depth test.
-            for(float x:new float[]{-725,725}) {
-                int[] far=projectPoint(r,scene,x,5239.5f,-2);
+            for(float x:new float[]{-775,775}) {
+                int[] far=projectPoint(r,scene,x,5243.5f,-2);
                 int[] rect={Math.max(0,far[0]-5),Math.max(0,far[1]-5),Math.min(W,far[0]+6),Math.min(H,far[1]+6)};
                 assertTrue("Guide endpoint outside view",rect[2]>rect[0]&&rect[3]>rect[1]);
                 assertTrue("Guide did not reach OEM far depth",differences(without,straight,rect)>0);

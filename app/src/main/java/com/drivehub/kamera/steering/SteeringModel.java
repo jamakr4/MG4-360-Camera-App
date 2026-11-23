@@ -1,8 +1,8 @@
 package com.drivehub.kamera.steering;
 
-/** Shared rear-axle curvature and ideal Ackermann angles. OEM radius; assumed effective track. */
+/** Shared rear-axle curvature and ideal Ackermann angles using the MG4 manual's dimensions. */
 public final class SteeringModel {
-    public static final String PROVENANCE = "OEM radius / assumed 1450 mm track; vehicle unvalidated";
+    public static final String PROVENANCE = "OEM radius / MG4 manual dimensions; ideal Ackermann model";
     public static final class Solution {
         public final boolean valid;
         /** Positive right, inverse millimetres. Zero is exactly straight. */
@@ -34,7 +34,7 @@ public final class SteeringModel {
     public Solution fromCurvature(double k) {
         if (!Double.isFinite(k) || Math.abs(k) > maxCurvature + 1e-15) return INVALID;
         if (k == 0) return new Solution(true, 0, 0, 0);
-        double halfTrack = geometry.effectiveFrontTrackMm / 2;
+        double halfTrack = geometry.frontTrackMm / 2;
         float left = (float) Math.toDegrees(Math.atan2(geometry.wheelbaseMm * k, 1 + halfTrack * k));
         float right = (float) Math.toDegrees(Math.atan2(geometry.wheelbaseMm * k, 1 - halfTrack * k));
         return new Solution(true, k, left, right);

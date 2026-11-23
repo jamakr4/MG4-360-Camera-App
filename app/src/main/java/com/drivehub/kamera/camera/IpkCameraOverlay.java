@@ -30,6 +30,7 @@ import java.util.Locale;
 
 import androidx.core.content.ContextCompat;
 import com.drivehub.kamera.CameraProbe;
+import com.drivehub.kamera.birdseye.BirdseyeCalibration;
 import com.drivehub.kamera.R;
 import com.drivehub.kamera.dev.DevRuntimeLog;
 import com.drivehub.kamera.settings.UiPrefs;
@@ -41,6 +42,11 @@ public final class IpkCameraOverlay implements AutoCloseable {
     private static final String TAG = "IpkCamera";
     private static final long POLL_MS = 100;
     private static final long FRAME_TIMEOUT_MS = 1500;
+    private static final java.util.concurrent.atomic.AtomicInteger NEXT_VIEW_OWNER=new java.util.concurrent.atomic.AtomicInteger();
+    private final int viewOwner=NEXT_VIEW_OWNER.incrementAndGet();
+    // IO-thread cache; factory calibration is revalidated when enabling Normal/reopening the output.
+    private RearviewLensMap normalMap;
+    private volatile String viewDetail="Wide";
     private final Context context;
     private final SharedPreferences prefs;
     private final Handler main = new Handler(Looper.getMainLooper());
@@ -58,7 +64,8 @@ public final class IpkCameraOverlay implements AutoCloseable {
     private volatile int desiredCamera = -1;
     private int nextSinkId;
     private volatile int generation;
-    private boolean closed, readPending, healthPending;
+    private volatile boolean closed;
+    private boolean readPending, healthPending;
     private volatile boolean screenOn;
     private Integer tab;
     private long lastTabRead, tabObservedAt, retryAfter, windowCreated, lastFreshFrame, mirrorStarted;
@@ -69,8 +76,9 @@ public final class IpkCameraOverlay implements AutoCloseable {
         final int camera, sink;
         final Surface surface;
         boolean attached;
-        long sampledAt, sampledFrames, firstFrameMs = -1;
-        double fps = -1;
+        long sampledAt, sampledFrames, textureFrames, sampledTextureFrames, firstFrameMs = -1, lastRateLog;
+        double fps = -1, textureFps = -1;
+        Boolean loggedMainVisible;
         Output(int camera, int sink, Surface surface) {
             this.camera = camera; this.sink = sink; this.surface = surface;
         }
@@ -85,6 +93,8 @@ public final class IpkCameraOverlay implements AutoCloseable {
         thread.start();
         carThread.start();
         io = new Handler(thread.getLooper());
+        // Claim synchronously so an older IO thread cannot claim ownership after a newer overlay.
+        CameraProbe.setIpkRearviewSession(viewOwner);
         carIo = new Handler(carThread.getLooper());
         car = new IpkCarClient(this.context, carIo, (value, message) -> main.post(() -> {
             readPending = false;
@@ -174,7 +184,9 @@ public final class IpkCameraOverlay implements AutoCloseable {
     }
 
     private final SharedPreferences.OnSharedPreferenceChangeListener preferenceListener = (p, key) -> {
-        if (UiPrefs.KEY_DIGITAL_REARVIEW_IPK_SCREEN.equals(key)) {
+        if (UiPrefs.KEY_DIGITAL_REARVIEW_IPK_NORMAL.equals(key)) {
+            main.post(this::refreshView);
+        } else if (UiPrefs.KEY_DIGITAL_REARVIEW_IPK_SCREEN.equals(key)) {
             main.post(() -> {
                 if (closed) return;
                 destroyWindow();
@@ -329,7 +341,8 @@ public final class IpkCameraOverlay implements AutoCloseable {
                     Output sink = new Output(desiredCamera, nextSinkId++ % 32, surface);
                     output = sink;
                     io.post(() -> {
-                        boolean ok = token == generation && CameraProbe.attachPreviewSink(sink.camera, sink.sink, surface);
+                        applyView(token);
+                        boolean ok = token == generation && CameraProbe.attachIpkRearviewSink(sink.camera, sink.sink, surface);
                         main.post(() -> {
                             if (output != sink || token != generation) return;
                             sink.attached = ok;
@@ -342,6 +355,7 @@ public final class IpkCameraOverlay implements AutoCloseable {
                 @Override public void onSurfaceTextureSizeChanged(SurfaceTexture st, int w, int h) { }
                 @Override public void onSurfaceTextureUpdated(SurfaceTexture st) {
                     if (texture != preview || token != generation || fade == null || output == null) return;
+                    output.textureFrames++;
                     long now = SystemClock.elapsedRealtime();
                     if (!allowWindow(now)) return;
                     if (now - lastFreshFrame > FRAME_TIMEOUT_MS) {
@@ -389,9 +403,33 @@ public final class IpkCameraOverlay implements AutoCloseable {
     }
 
     private void applyPreviewFraming(TextureView preview, int side) {
-        // Show the full rear image. Side-camera crop and rotation settings do not apply.
+        // Wide and Normal share the same 3:2 viewport. Side-camera settings do not apply.
         preview.setLayoutParams(new FrameLayout.LayoutParams(
                 side, IpkRoutePolicy.previewHeight(side), Gravity.CENTER));
+    }
+
+    /** Prepare off the UI/capture threads; switching never reattaches the camera or output. */
+    private void refreshView() {
+        if(!closed&&root!=null){int token=generation;io.post(()->applyView(token));}
+    }
+
+    private void applyView(int token) {
+        if(closed||token!=generation)return;
+        if(!UiPrefs.isDigitalRearviewIpkNormal(prefs)) {
+            CameraProbe.setIpkRearviewMap(viewOwner,null);viewDetail="Wide";return;
+        }
+        try {
+            BirdseyeCalibration calibration=BirdseyeCalibration.load(java.nio.file.Paths.get(BirdseyeCalibration.VEHICLE_PATH));
+            if(normalMap==null||!normalMap.calibrationSha256.equals(calibration.sha256))normalMap=new RearviewLensMap(calibration);
+            if(closed||token!=generation||!UiPrefs.isDigitalRearviewIpkNormal(prefs))return;
+            if(!CameraProbe.setIpkRearviewMap(viewOwner,normalMap.coordinates()))throw new IllegalStateException("Native map rejected");
+            viewDetail="Normal 100°";
+        }catch(java.io.IOException|RuntimeException failure) {
+            if(closed||token!=generation)return;
+            CameraProbe.setIpkRearviewMap(viewOwner,null);
+            viewDetail="Wide · Normal unavailable: "+failure.getClass().getSimpleName();
+            event(viewDetail);
+        }
     }
 
     private void onFirstFrameShown(Output sink) {
@@ -422,14 +460,23 @@ public final class IpkCameraOverlay implements AutoCloseable {
                         if (sink.sampledAt == 0) {
                             sink.sampledAt = now;
                             sink.sampledFrames = stats[1];
+                            sink.sampledTextureFrames = sink.textureFrames;
                         } else if (now - sink.sampledAt >= 500) {
                             sink.fps = (stats[1] - sink.sampledFrames) * 1000.0 / (now - sink.sampledAt);
+                            sink.textureFps = (sink.textureFrames - sink.sampledTextureFrames) * 1000.0 / (now - sink.sampledAt);
                             sink.sampledAt = now;
                             sink.sampledFrames = stats[1];
+                            sink.sampledTextureFrames = sink.textureFrames;
                         }
-                        detail = "live · " + (sink.fps < 0 ? "FPS misst…" : String.format(Locale.ROOT, "%.1f FPS", sink.fps))
+                        detail = "live · " + viewDetail + " · " + (sink.fps < 0 ? "FPS misst…" :
+                                String.format(Locale.ROOT, "%.1f FPS Ausgabe / %.1f FPS Anzeige", sink.fps, sink.textureFps))
                                 + " · Start " + sink.firstFrameMs + " ms · Alter " + age
                                 + " ms · Ausgabe " + stats[2] + "/" + stats[3] + " ms";
+                        boolean mainVisible=com.drivehub.kamera.MainActivity.isMainVisible();
+                        if(sink.fps>=0&&(sink.loggedMainVisible==null||sink.loggedMainVisible!=mainVisible||now-sink.lastRateLog>=5000)) {
+                            event("performance main="+mainVisible+" · "+detail);
+                            sink.loggedMainVisible=mainVisible;sink.lastRateLog=now;
+                        }
                     } else {
                         fade.onFrameHealth(false);
                         if (now - windowCreated > FRAME_TIMEOUT_MS) {
@@ -464,6 +511,7 @@ public final class IpkCameraOverlay implements AutoCloseable {
         main.removeCallbacks(checkFrames);
         if (desiredCamera < 0) main.removeCallbacks(tick);
         detachOutput();
+        io.post(()->CameraProbe.setIpkRearviewMap(viewOwner,null));
         if (fade != null) { fade.close(); fade = null; }
         FrameLayout view = root;
         root = null; texture = null; displayId = -1;
@@ -486,7 +534,7 @@ public final class IpkCameraOverlay implements AutoCloseable {
         prefs.unregisterOnSharedPreferenceChangeListener(preferenceListener);
         if (displays != null) displays.unregisterDisplayListener(displayListener);
         context.unregisterReceiver(screenReceiver);
-        io.post(thread::quitSafely);
+        io.post(()->{CameraProbe.setIpkRearviewSession(-viewOwner);thread.quitSafely();});
         carIo.post(() -> { car.close(); carThread.quitSafely(); });
     }
 }

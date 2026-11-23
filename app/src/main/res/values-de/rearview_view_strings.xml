@@ -1,0 +1,7 @@
+<resources>
+    <string name="shortcut_toggle_digital_rearview_view">IPK-Rückspiegel Wide/Normal umschalten</string>
+    <string name="settings_rearview_ipk_view">IPK-Ansicht</string>
+    <string name="settings_rearview_view_wide">Wide</string>
+    <string name="settings_rearview_view_normal">Normal</string>
+    <string name="settings_rearview_view_hint">Wide zeigt das vollständige Kamerabild. Normal entzerrt einen engeren 100°-Ausschnitt mit weniger seitlicher Sicht. Ist Normal nicht verfügbar, wird Wide angezeigt.</string>
+</resources>

@@ -16,6 +16,67 @@ import static androidx.test.espresso.matcher.ViewMatchers.*;
 import static org.junit.Assert.*;
 @RunWith(AndroidJUnit4.class)
 public class RivelaUiInstrumentedTest {
+    @Test public void debugWidthGeometryAndStyleCombineInBothViewsAndSurviveRecreation() throws Exception {
+        SharedPreferences prefs=UiPrefs.getPrefs(InstrumentationRegistry.getInstrumentation().getTargetContext());
+        java.util.Map<String,?> saved=prefs.getAll();
+        String[] keys={UiPrefs.KEY_PARKING_SURROUND_3D,UiPrefs.KEY_PARKING_SURROUND_WIDE,
+                UiPrefs.KEY_PARKING_GUIDE_GEOMETRY,UiPrefs.KEY_PARKING_GUIDE_STYLE,UiPrefs.KEY_PARKING_GUIDE_WIDTH_MODE};
+        prefs.edit().putBoolean(keys[0],false).putBoolean(keys[1],false)
+                .putString(keys[2],"front_bumper").putString(keys[3],"simple").putString(keys[4],"mirrors").commit();
+        java.util.List<android.graphics.Bitmap> pictures=new java.util.ArrayList<>();
+        try(ActivityScenario<BirdseyeDebugActivity> scenario=ActivityScenario.launch(BirdseyeDebugActivity.class)) {
+            scenario.onActivity(a->{a.findViewById(R.id.surroundDebugGuideForward).performClick();
+                a.findViewById(R.id.surroundDebugSteeringFullRight).performClick();
+                String dimensions=((android.widget.TextView)a.findViewById(R.id.surroundDebugVehicleGeometry)).getText().toString();
+                for(String expected:new String[]{"4287","1836","2705","841","741","1550","1551"})assertTrue(dimensions,dimensions.contains(expected));
+                a.renderer.orbit.rotate((180-35)/.35f,(75-55)/.25f);a.renderer.orbit.zoom(11000f/16000);
+            });
+            awaitSteering(scenario,-516.95f);
+            for(boolean reverse:new boolean[]{false,true}) {
+                scenario.onActivity(a->a.findViewById(reverse?R.id.surroundDebugGuideReverse:R.id.surroundDebugGuideForward).performClick());
+                awaitGuideLevel(scenario,1);
+                for(int mode=0;mode<3;mode++) {
+                    final int viewMode=mode;
+                    scenario.onActivity(a->{prefs.edit().putBoolean(keys[1],viewMode==1).apply();
+                        a.findViewById(viewMode==2?R.id.surroundMode3d:R.id.surroundMode2d).performClick();});
+                    if(mode==2)await3d(scenario);
+                    for(com.drivehub.kamera.steering.WheelGuides.Style style:new com.drivehub.kamera.steering.WheelGuides.Style[]{
+                            com.drivehub.kamera.steering.WheelGuides.Style.LINES,com.drivehub.kamera.steering.WheelGuides.Style.OUTER_LINES,com.drivehub.kamera.steering.WheelGuides.Style.SIMPLE}) {
+                        android.graphics.Bitmap previousGeometry=null;
+                        for(int geometry:new int[]{0,1}) {
+                            android.graphics.Bitmap previousWidth=null;
+                            for(int width:new int[]{0,1}) {
+                                scenario.onActivity(a->{a.findViewById(style==com.drivehub.kamera.steering.WheelGuides.Style.SIMPLE?R.id.segGuidelineSimple:
+                                        style==com.drivehub.kamera.steering.WheelGuides.Style.OUTER_LINES?R.id.segGuidelineOuterLines:R.id.segGuidelineLines).performClick();
+                                    a.findViewById(geometry==0?R.id.segGuidelineAxles:R.id.segGuidelineFrontBumper).performClick();
+                                    a.findViewById(width==0?R.id.segGuidelineWidthMirrors:R.id.segGuidelineWidthBody).performClick();});
+                                awaitDraws(scenario);android.graphics.Bitmap image=capture(scenario);pictures.add(image);
+                                if(previousWidth!=null)assertDifferent(previousWidth,image);
+                                previousWidth=image;
+                                if(width==1) {
+                                    if(previousGeometry!=null)assertDifferent(previousGeometry,image);
+                                    previousGeometry=image;
+                                    saveBlackBoxPreview(image,"guide-options-"+(reverse?"reverse-":"forward-")+mode+"-"+style.id+"-"+(geometry==0?"axles":"bumper"));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            scenario.onActivity(a->{a.findViewById(R.id.segGuidelineAxles).performClick();
+                a.findViewById(R.id.segGuidelineOuterLines).performClick();});awaitDraws(scenario);
+            scenario.recreate();await3d(scenario);awaitDraws(scenario);
+            onView(withId(R.id.segGuidelineAxles)).perform(scrollTo()).check(matches(isSelected()));
+            onView(withId(R.id.segGuidelineOuterLines)).perform(scrollTo()).check(matches(isSelected()));
+            onView(withId(R.id.segGuidelineWidthBody)).perform(scrollTo()).check(matches(isSelected()));
+            assertEquals("front_bumper",prefs.getString(keys[2],null));
+            assertEquals("simple",prefs.getString(keys[3],null));assertEquals("mirrors",prefs.getString(keys[4],null));
+        }finally {
+            for(android.graphics.Bitmap picture:pictures)picture.recycle();SharedPreferences.Editor edit=prefs.edit();
+            for(String key:keys){Object value=saved.get(key);if(value instanceof Boolean)edit.putBoolean(key,(Boolean)value);
+                else if(value instanceof String)edit.putString(key,(String)value);else edit.remove(key);}edit.commit();
+        }
+    }
     @Test public void debugBlackBoxToggleUpdatesPixelsAndPersistsAcrossRecreation() throws Exception {
         SharedPreferences prefs=UiPrefs.getPrefs(InstrumentationRegistry.getInstrumentation().getTargetContext());
         java.util.Map<String,?> saved=prefs.getAll();
@@ -85,6 +146,27 @@ public class RivelaUiInstrumentedTest {
         }while(SystemClock.elapsedRealtime()<deadline);
         fail("Color update did not reach a new rendered frame");
     }
+    @Test public void rearArtifactTestSwitchChangesOnlyThreeDAndSurvivesRecreation() throws Exception {
+        SharedPreferences prefs=UiPrefs.getPrefs(InstrumentationRegistry.getInstrumentation().getTargetContext());
+        Object saved=prefs.getAll().get(UiPrefs.KEY_PARKING_SURROUND_3D);
+        prefs.edit().putBoolean(UiPrefs.KEY_PARKING_SURROUND_3D,true).commit();
+        java.util.List<android.graphics.Bitmap> images=new java.util.ArrayList<>();
+        try(ActivityScenario<BirdseyeDebugActivity> scenario=ActivityScenario.launch(BirdseyeDebugActivity.class)) {
+            await3d(scenario);awaitDraws(scenario);android.graphics.Bitmap on=capture(scenario);images.add(on);
+            onView(withId(R.id.surroundDebugRearArtifactFix)).perform(scrollTo()).check(matches(isChecked())).perform(click());
+            awaitDraws(scenario);android.graphics.Bitmap off=capture(scenario);images.add(off);assertDifferent(on,off);
+            scenario.recreate();await3d(scenario);awaitDraws(scenario);
+            onView(withId(R.id.surroundDebugRearArtifactFix)).perform(scrollTo()).check(matches(org.hamcrest.Matchers.not(isChecked())));
+            android.graphics.Bitmap restored=capture(scenario);images.add(restored);assertEquals(0,pixelDifferences(off,restored));
+            onView(withId(R.id.surroundMode2d)).perform(scrollTo(),click());awaitDraws(scenario);
+            android.graphics.Bitmap twoD=capture(scenario);images.add(twoD);
+            onView(withId(R.id.surroundDebugRearArtifactFix)).perform(scrollTo(),click());awaitDraws(scenario);
+            android.graphics.Bitmap unchanged=capture(scenario);images.add(unchanged);assertEquals(0,pixelDifferences(twoD,unchanged));
+        }finally {
+            for(android.graphics.Bitmap image:images)image.recycle();SharedPreferences.Editor edit=prefs.edit();
+            if(saved instanceof Boolean)edit.putBoolean(UiPrefs.KEY_PARKING_SURROUND_3D,(Boolean)saved);else edit.remove(UiPrefs.KEY_PARKING_SURROUND_3D);edit.commit();
+        }
+    }
     @Test public void debugSpeedChangesDoNotAnimateVehicleAndPersistAcrossRecreation() throws Exception {
         SharedPreferences prefs=UiPrefs.getPrefs(InstrumentationRegistry.getInstrumentation().getTargetContext());
         boolean had=prefs.contains(UiPrefs.KEY_PARKING_SURROUND_3D),saved=prefs.getBoolean(UiPrefs.KEY_PARKING_SURROUND_3D,false);
@@ -143,7 +225,7 @@ public class RivelaUiInstrumentedTest {
             for(boolean threeD:new boolean[]{false,true})for(boolean simple:new boolean[]{false,true})
                 for(int direction:new int[]{R.id.surroundDebugGuideForward,R.id.surroundDebugGuideReverse}) {
                     scenario.onActivity(a->{a.findViewById(threeD?R.id.surroundMode3d:R.id.surroundMode2d).performClick();
-                        ((android.widget.CheckBox)a.findViewById(R.id.surroundDebugBlueCorridor)).setChecked(simple);
+                        a.findViewById(simple?R.id.segGuidelineSimple:R.id.segGuidelineLines).performClick();
                         ((android.widget.SeekBar)a.findViewById(R.id.surroundDebugGuideSpeed)).setProgress(100);
                         a.findViewById(direction).performClick();});
                     awaitDraws(scenario);awaitGuideLevel(scenario,1);
@@ -273,8 +355,8 @@ public class RivelaUiInstrumentedTest {
             onView(withId(R.id.surroundDebugSteeringFullLeft)).perform(scrollTo(),click());
             awaitSteering(scenario,516.95f);
             scenario.onActivity(a->{
-                assertEquals(-38.0802,a.renderer.steering.angles().left,.01);
-                assertEquals(-28.8493,a.renderer.steering.angles().right,.01);
+                assertEquals(-38.5024,a.renderer.steering.angles().left,.01);
+                assertEquals(-28.6533,a.renderer.steering.angles().right,.01);
             });
             onView(withId(R.id.surroundDebugSteeringUnavailable)).perform(scrollTo(),click());
             awaitDraws(scenario);
@@ -309,7 +391,7 @@ public class RivelaUiInstrumentedTest {
         }while(SystemClock.elapsedRealtime()<deadline);
         fail("Sensor pose did not settle: "+raw);
     }
-    @Test public void blueCorridorCheckboxChangesOnlyStyleAndPersistsAcrossRecreation() throws Exception {
+    @Test public void styleSelectionChangesOnlyStyleAndPersistsAcrossRecreation() throws Exception {
         SharedPreferences prefs=UiPrefs.getPrefs(InstrumentationRegistry.getInstrumentation().getTargetContext());
         boolean had=prefs.contains(UiPrefs.KEY_PARKING_SURROUND_3D),saved=prefs.getBoolean(UiPrefs.KEY_PARKING_SURROUND_3D,false);
         String savedStyle=prefs.getString(UiPrefs.KEY_PARKING_GUIDE_STYLE,null);
@@ -317,7 +399,8 @@ public class RivelaUiInstrumentedTest {
         java.util.List<android.graphics.Bitmap> pictures=new java.util.ArrayList<>();
         try(ActivityScenario<BirdseyeDebugActivity> scenario=ActivityScenario.launch(BirdseyeDebugActivity.class)) {
             await3d(scenario);awaitDraws(scenario);
-            onView(withId(R.id.surroundDebugBlueCorridor)).check(matches(isChecked())).perform(scrollTo(),click());
+            onView(withId(R.id.segGuidelineOuterLines)).check(matches(isSelected()));
+            onView(withId(R.id.segGuidelineLines)).perform(scrollTo(),click());
             awaitDraws(scenario);android.graphics.Bitmap separate=capture(scenario);pictures.add(separate);
             scenario.onActivity(a->a.findViewById(R.id.surroundDebugReverseGuides).performClick());
             awaitGuideLevel(scenario,0);
@@ -326,12 +409,13 @@ public class RivelaUiInstrumentedTest {
             assertLightBlueGuidelines(separate,bare.get());
             scenario.onActivity(a->a.findViewById(R.id.surroundDebugReverseGuides).performClick());
             awaitGuideLevel(scenario,1);
-            onView(withId(R.id.surroundDebugBlueCorridor)).check(matches(org.hamcrest.Matchers.not(isChecked()))).perform(scrollTo(),click());
+            onView(withId(R.id.segGuidelineLines)).check(matches(isSelected()));
+            onView(withId(R.id.segGuidelineSimple)).perform(scrollTo(),click());
             awaitDraws(scenario);android.graphics.Bitmap blue=capture(scenario);pictures.add(blue);assertDifferent(separate,blue);
             scenario.recreate();await3d(scenario);awaitDraws(scenario);
-            onView(withId(R.id.surroundDebugBlueCorridor)).check(matches(isChecked()));
+            onView(withId(R.id.segGuidelineSimple)).check(matches(isSelected()));
             android.graphics.Bitmap restored=capture(scenario);pictures.add(restored);assertEquals(0,pixelDifferences(blue,restored));
-            onView(withId(R.id.surroundDebugBlueCorridor)).perform(scrollTo(),click());awaitDraws(scenario);
+            onView(withId(R.id.segGuidelineLines)).perform(scrollTo(),click());awaitDraws(scenario);
             android.graphics.Bitmap comparison=capture(scenario);pictures.add(comparison);assertEquals(0,pixelDifferences(separate,comparison));
         }finally {
             for(android.graphics.Bitmap b:pictures)b.recycle();

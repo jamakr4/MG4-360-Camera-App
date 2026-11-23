@@ -174,9 +174,31 @@ Java_com_drivehub_kamera_CameraProbe_attachPreviewSink(JNIEnv* env, jclass, jint
            ? JNI_TRUE : JNI_FALSE;
 }
 
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_drivehub_kamera_CameraProbe_attachIpkRearviewSink(JNIEnv* env,jclass,jint videoIndex,jint sinkId,jobject surface) {
+    return camera_stream_manager::attachPreviewSink(env,videoIndex,sinkId,surface,true);
+}
+
 extern "C" JNIEXPORT void JNICALL
 Java_com_drivehub_kamera_CameraProbe_detachPreviewSink(JNIEnv*, jclass, jint videoIndex, jint sinkId) {
     camera_stream_manager::detachPreviewSink(videoIndex, sinkId);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_drivehub_kamera_CameraProbe_setIpkRearviewSession(JNIEnv*,jclass,jint token) {
+    camera_stream_manager::setIpkRearviewSession(token);
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_drivehub_kamera_CameraProbe_setIpkRearviewMap(JNIEnv* env,jclass,jint token,jfloatArray input) {
+    if(!input)return camera_stream_manager::setIpkRearviewMap(token,nullptr);
+    if(env->GetArrayLength(input)!=ipk_rearview::FLOATS)return false;
+    try {
+        std::vector<float> uv(ipk_rearview::FLOATS);
+        env->GetFloatArrayRegion(input,0,uv.size(),uv.data());
+        if(env->ExceptionCheck())return false;
+        return camera_stream_manager::setIpkRearviewMap(token,&uv);
+    }catch(const std::exception&){return false;}
 }
 
 extern "C" JNIEXPORT jlong JNICALL

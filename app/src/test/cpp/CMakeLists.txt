@@ -12,6 +12,12 @@ if(ANDROID)
 endif()
 
 add_executable(latest_preview_frame_test latest_preview_frame_test.cpp)
+add_executable(ipk_rearview_test ipk_rearview_test.cpp)
+target_include_directories(ipk_rearview_test PRIVATE ${OpenCV_INCLUDE_DIRS})
+target_link_libraries(ipk_rearview_test ${OpenCV_LIBS})
+if(ANDROID)
+    target_link_libraries(ipk_rearview_test log android)
+endif()
 add_executable(camera_access_gate_test camera_access_gate_test.cpp)
 
 add_executable(birdseye_mailbox_test birdseye_mailbox_test.cpp)

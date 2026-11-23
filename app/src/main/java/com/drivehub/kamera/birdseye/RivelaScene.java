@@ -5,11 +5,14 @@ import com.drivehub.kamera.rivela.FisheyeCamera;
 /** Adapter for PR #102; the independently validated calibration parser stays unchanged. */
 public final class RivelaScene {
     public static final int BOWL_THETA=144,BOWL_RINGS=56;
-    public static final double GUIDANCE_FLAT_MM=4000;
+    // Continued front/inner-rear preview arcs reach about 6.2 m at tight lock
+    // with the widest 3 m setting. Keep the complete bands on metric ground.
+    public static final double GUIDANCE_FLAT_MM=6500;
     public final BirdseyeCalibration calibration;
     public final CarFrame car;
     private final FisheyeCamera[] cameras=new FisheyeCamera[4];
     private volatile Bowl bowl;
+    private float[] rearGround;
     private final double flatMm;
     public RivelaScene(BirdseyeCalibration calibration) {
         this(calibration,Bowl.FLAT_MM);
@@ -27,12 +30,14 @@ public final class RivelaScene {
     }
     public FisheyeCamera camera(int index) { return cameras[index]; }
     public Bowl bowl() { return bowl; }
+    float[] rearGround() { return rearGround; }
     /** Scene IO worker only, never capture/UI/GL. Validate the extended lens range independently. */
     public synchronized void prepareBowl() {
         if(bowl!=null)return;
         validateBowlLenses();
         Bowl built=Bowl.build(cameras,car,BOWL_THETA,BOWL_RINGS,flatMm,Bowl.CURVE_MM);
         for(float f:built.vertices)if(!Float.isFinite(f))throw new IllegalArgumentException("Non-finite bowl vertex");
+        rearGround=RearGroundPatch.build(this,built);
         bowl=built;
     }
     public void validateBowlLenses() {

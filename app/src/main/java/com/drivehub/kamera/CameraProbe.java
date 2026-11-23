@@ -42,6 +42,10 @@ public final class CameraProbe {
     public static native boolean attachPreviewSink(int videoIndex, int sinkId,
             android.view.Surface surface);
     public static native void detachPreviewSink(int videoIndex, int sinkId);
+    public static native boolean attachIpkRearviewSink(int videoIndex,int sinkId,android.view.Surface surface);
+    /** Applies only to independent IPK rearview sinks; null selects the original Wide view. */
+    public static native void setIpkRearviewSession(int token);
+    public static native boolean setIpkRearviewMap(int token,float[] coordinates);
     /** -1 until this output has posted a frame, otherwise its age in milliseconds. */
     public static native long previewSinkFrameAgeMs(int videoIndex, int sinkId);
     /** Age (ms), posted-frame count, capture-to-post (ms), window-post cost (ms). */
