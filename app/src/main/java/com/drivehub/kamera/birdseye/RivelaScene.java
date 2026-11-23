@@ -5,7 +5,9 @@ import com.drivehub.kamera.rivela.FisheyeCamera;
 /** Adapter for PR #102; the independently validated calibration parser stays unchanged. */
 public final class RivelaScene {
     public static final int BOWL_THETA=144,BOWL_RINGS=56;
-    public static final double GUIDANCE_FLAT_MM=4000;
+    // Continued front/inner-rear preview arcs reach about 6.2 m at tight lock
+    // with the widest 3 m setting. Keep the complete bands on metric ground.
+    public static final double GUIDANCE_FLAT_MM=6500;
     public final BirdseyeCalibration calibration;
     public final CarFrame car;
     private final FisheyeCamera[] cameras=new FisheyeCamera[4];

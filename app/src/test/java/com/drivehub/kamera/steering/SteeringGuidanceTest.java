@@ -20,7 +20,7 @@ public class SteeringGuidanceTest {
         SteeringGuidance.Frame reverse=guidance.update(raw,GearSnapshot.value(2,1000),true,1000);
         assertTrue(reverse.guidanceAvailable);assertTrue(reverse.steeringAvailable);
         assertEquals(WheelGuides.Direction.REVERSE,reverse.direction);
-        assertEquals(28.8493,reverse.wheels.leftDegrees,.001);assertEquals(38.0802,reverse.wheels.rightDegrees,.001);
+        assertEquals(28.6533,reverse.wheels.leftDegrees,.001);assertEquals(38.5024,reverse.wheels.rightDegrees,.001);
         SteeringGuidance.Frame forward=guidance.update(raw,GearSnapshot.value(4,1010),true,1010);
         assertEquals(WheelGuides.Direction.FORWARD,forward.direction);assertTrue(forward.guidanceAvailable);
         assertEquals(reverse.wheels.curvaturePerMm,forward.wheels.curvaturePerMm,0);

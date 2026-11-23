@@ -7,7 +7,6 @@ import android.widget.EditText;
 import android.widget.Switch;
 import com.drivehub.kamera.R;
 import com.drivehub.kamera.steering.GuidelinePolicy;
-import com.drivehub.kamera.steering.WheelGuides;
 
 /** Parking preferences for both orthographic and orbit guidance. */
 final class GuidelineSettings {
@@ -19,7 +18,10 @@ final class GuidelineSettings {
                         .putInt(UiPrefs.KEY_PARKING_GUIDE_CUSTOM_WIDTH_MM,customMm).apply());
         Switch limit=dialog.findViewById(R.id.switchGuidelineSpeedLimit);
         EditText speed=dialog.findViewById(R.id.etGuidelineSpeed);
-        SegmentedControl style=dialog.findViewById(R.id.segGuidelineStyle);
+        new GuidelineAppearanceControl(dialog.findViewById(R.id.guidelineAppearanceControl),
+                UiPrefs.getParkingGuideGeometry(prefs),UiPrefs.getParkingGuideStyle(prefs),
+                (geometry,style)->prefs.edit().putString(UiPrefs.KEY_PARKING_GUIDE_GEOMETRY,geometry.id)
+                        .putString(UiPrefs.KEY_PARKING_GUIDE_STYLE,style.id).apply());
         limit.setChecked(UiPrefs.isParkingGuideSpeedLimitEnabled(prefs));
         speed.setText(String.valueOf(UiPrefs.getParkingGuideSpeedKmh(prefs)));
         enabled(speed,limit.isChecked());
@@ -42,14 +44,7 @@ final class GuidelineSettings {
             if(action!=EditorInfo.IME_ACTION_DONE)return false;
             speed.clearFocus();return false;
         });
-        style.check(UiPrefs.getParkingGuideStyle(prefs)==WheelGuides.Style.LINES?R.id.segGuidelineLines:R.id.segGuidelineSimple);
-        for(int i=0;i<style.getChildCount();i++) {
-            android.widget.TextView child=(android.widget.TextView)style.getChildAt(i);
-            child.setContentDescription(dialog.getContext().getString(R.string.guidelines_style)+": "+child.getText());
-        }
-        style.addOnButtonCheckedListener((group,id,checked)->{
-            if(checked)prefs.edit().putString(UiPrefs.KEY_PARKING_GUIDE_STYLE,id==R.id.segGuidelineLines?"lines":"simple").apply();
-        });
+
     }
     private static void enabled(EditText speed,boolean enabled){speed.setEnabled(enabled);speed.setAlpha(enabled?1f:.45f);}
 }

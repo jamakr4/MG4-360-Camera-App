@@ -8,6 +8,7 @@ final class GuidelineFrame {
         final WheelGuides.Direction direction;
         WheelSteering.Angles angles;
         WheelGuides.Style style;
+        WheelGuides.Geometry geometry;
         int widthMm;
         float level,progress,opacity=1;
         Layer(WheelGuides.Direction direction){this.direction=direction;}
@@ -15,9 +16,12 @@ final class GuidelineFrame {
     final Layer reverse=new Layer(WheelGuides.Direction.REVERSE),forward=new Layer(WheelGuides.Direction.FORWARD);
     private WheelGuides.Direction direction=WheelGuides.Direction.REVERSE;
     void update(WheelSteering.Angles angles,WheelGuides.Style style,int widthMm,WheelGuides.Direction direction,GuidelineAnimation animation) {
+        update(angles,style,widthMm,WheelGuides.Geometry.FRONT_BUMPER,direction,animation);
+    }
+    void update(WheelSteering.Angles angles,WheelGuides.Style style,int widthMm,WheelGuides.Geometry geometry,WheelGuides.Direction direction,GuidelineAnimation animation) {
         this.direction=direction;
         Layer current=direction==WheelGuides.Direction.REVERSE?reverse:forward;
-        if(angles.guidanceAvailable){current.angles=angles;current.style=style;current.widthMm=widthMm;}
+        if(angles.guidanceAvailable){current.angles=angles;current.style=style;current.widthMm=widthMm;current.geometry=geometry;}
         update(reverse,animation);update(forward,animation);
     }
     private static void update(Layer layer,GuidelineAnimation animation) {

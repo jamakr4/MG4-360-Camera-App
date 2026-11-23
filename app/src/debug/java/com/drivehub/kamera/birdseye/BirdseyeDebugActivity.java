@@ -51,17 +51,19 @@ public final class BirdseyeDebugActivity extends Activity {
     private TextView speedValue;
     private Button steeringReset;
     private TextView steeringValue;
-    private CheckBox liveSteering, unavailableSteering, reverseGuides, blueCorridor,guideSpeedLimit,blackBox;
+    private CheckBox liveSteering, unavailableSteering, reverseGuides,guideSpeedLimit,blackBox;
     private CheckBox rearArtifactFix;
     private RadioGroup guideDirection;
     private TextView guideHorizon;
     private GuidelineWidthControl guideWidth;
+    private com.drivehub.kamera.settings.GuidelineAppearanceControl guideAppearance;
     private final java.util.List<Button> steeringPresets=new java.util.ArrayList<>();
     private ScrollView controlScroll;
     private TextView steeringStatus;
     private SteeringReader steeringReader;
     private SteeringSnapshot steeringSnapshot=SteeringSnapshot.EMPTY;
     private final SteeringModel steeringModel=new SteeringModel();
+    private final com.drivehub.kamera.steering.VehicleSweep vehicleSweep=new com.drivehub.kamera.steering.VehicleSweep();
     private final SteeringModelPose steeringPose=new SteeringModelPose(steeringModel);
     SteeringModelPose.Frame steeringFrame;
     // 0.05 degree sensor steps, including both Float sensor endpoints.
@@ -86,9 +88,9 @@ public final class BirdseyeDebugActivity extends Activity {
         boolean park=guideDirection.getCheckedRadioButtonId()==R.id.surroundDebugGuidePark;
         boolean forward=guideDirection.getCheckedRadioButtonId()==R.id.surroundDebugGuideForward;
         if(!park)renderer.setGuideDirection(forward?WheelGuides.Direction.FORWARD:WheelGuides.Direction.REVERSE);
-        guideHorizon.setText(park?getString(R.string.birdseye_debug_park_horizon):getString(blueCorridor.isChecked()
-                ?(forward?R.string.birdseye_debug_blue_forward_horizon:R.string.birdseye_debug_blue_reverse_horizon)
-                :(forward?R.string.birdseye_debug_forward_horizon:R.string.birdseye_debug_reverse_horizon),guideWidth.widthMm()));
+        guideHorizon.setText(park?getString(R.string.birdseye_debug_park_horizon):getString(
+                forward?R.string.guidelines_forward_horizon:guideAppearance.geometry()==WheelGuides.Geometry.FRONT_BUMPER
+                        ?R.string.guidelines_reverse_bumper_horizon:R.string.guidelines_reverse_horizon,guideWidth.widthMm()));
         gl.requestRender();
     }
     private void updateSteeringFrame() {
@@ -120,6 +122,11 @@ public final class BirdseyeDebugActivity extends Activity {
         String status=getString(R.string.birdseye_debug_model_values,
                 OemSteeringCurve.magnitudeDegrees(Math.abs(sample.rawDegrees)),displayed.curvaturePerMm*1000,
                 radius,displayed.leftDegrees,displayed.rightDegrees);
+        if(!park&&guideAppearance.geometry()==WheelGuides.Geometry.FRONT_BUMPER) {
+            double cornerRadius=vehicleSweep.outerFrontRadius(displayed,guideWidth.widthMm());
+            status+="\n"+getString(R.string.birdseye_debug_corner_radius,Double.isInfinite(cornerRadius)?"∞":
+                    String.format(java.util.Locale.getDefault(),"%.3f m",cornerRadius/1000));
+        }
         if(!steeringFrame.available)status=getString(R.string.birdseye_debug_steering_unavailable)+"\n"+status;
         if(liveSteering.isChecked())status+="\n"+sample.state;
         if(!status.contentEquals(steeringStatus.getText()))steeringStatus.setText(status);
@@ -259,10 +266,6 @@ public final class BirdseyeDebugActivity extends Activity {
         guideSpeedLimit.setChecked(state==null?UiPrefs.isParkingGuideSpeedLimitEnabled(prefs):state.getBoolean("guideSpeedLimitTest",false));
         updateSpeedLimit();
         guideSpeedLimit.setOnCheckedChangeListener((v,checked)->{updateSteeringFrame();gl.requestRender();});
-        blueCorridor=new CheckBox(this);blueCorridor.setId(R.id.surroundDebugBlueCorridor);
-        blueCorridor.setText(R.string.birdseye_debug_blue_corridor);blueCorridor.setTextColor(Color.WHITE);
-        blueCorridor.setChecked(state==null?UiPrefs.getParkingGuideStyle(prefs)==WheelGuides.Style.SIMPLE:state.getBoolean("blueGuideCorridor",true));controls.addView(blueCorridor);
-        renderer.setBlueGuideCorridor(blueCorridor.isChecked());
         android.view.View widthView=getLayoutInflater().inflate(R.layout.view_guideline_width,controls,false);
         controls.addView(widthView);
         GuidelineWidth.Mode widthMode=state==null?UiPrefs.getParkingGuideWidthMode(prefs)
@@ -275,6 +278,22 @@ public final class BirdseyeDebugActivity extends Activity {
             gl.requestRender();
         });
         renderer.setGuideWidthMm(guideWidth.widthMm());
+        android.view.View appearanceView=getLayoutInflater().inflate(R.layout.view_guideline_appearance,controls,false);
+        controls.addView(appearanceView);
+        WheelGuides.Geometry geometry=state==null?UiPrefs.getParkingGuideGeometry(prefs)
+                :WheelGuides.Geometry.fromId(state.getString("guideGeometry",UiPrefs.getParkingGuideGeometry(prefs).id));
+        WheelGuides.Style style=UiPrefs.getParkingGuideStyle(prefs);
+        if(state!=null) {
+            if(state.containsKey("guideStyle"))style=WheelGuides.Style.fromId(state.getString("guideStyle"));
+            else if(state.containsKey("blueGuideCorridor"))style=state.getBoolean("blueGuideCorridor")
+                    ?WheelGuides.Style.SIMPLE:WheelGuides.Style.LINES;
+        }
+        guideAppearance=new com.drivehub.kamera.settings.GuidelineAppearanceControl(appearanceView,geometry,style,(selected,appearance)->{
+            renderer.setGuideGeometry(selected);renderer.setGuideStyle(appearance);
+            if(guideHorizon!=null)updateGuideDirection();
+            gl.requestRender();
+        });
+        renderer.setGuideGeometry(geometry);renderer.setGuideStyle(style);
         guideDirection=new RadioGroup(this);guideDirection.setOrientation(RadioGroup.HORIZONTAL);
         RadioButton park=new RadioButton(this),reverse=new RadioButton(this),forward=new RadioButton(this);
         park.setId(R.id.surroundDebugGuidePark);reverse.setId(R.id.surroundDebugGuideReverse);forward.setId(R.id.surroundDebugGuideForward);
@@ -286,7 +305,6 @@ public final class BirdseyeDebugActivity extends Activity {
         guideDirection.check(state!=null&&state.getBoolean("guidePark",false)?R.id.surroundDebugGuidePark:
                 state!=null&&state.getBoolean("guideForward",false)?R.id.surroundDebugGuideForward:R.id.surroundDebugGuideReverse);
         guideDirection.setOnCheckedChangeListener((group,id)->updateGuideDirection());updateGuideDirection();
-        blueCorridor.setOnCheckedChangeListener((v,checked)->{renderer.setBlueGuideCorridor(checked);updateGuideDirection();});
         steeringValue=new TextView(this);steeringValue.setId(R.id.surroundDebugSteeringValue);
         steeringValue.setTextColor(Color.WHITE);steeringValue.setTextSize(16);controls.addView(steeringValue);
         LinearLayout steeringRow=new LinearLayout(this);
@@ -329,6 +347,12 @@ public final class BirdseyeDebugActivity extends Activity {
         unavailableSteering.setChecked(state!=null&&state.getBoolean("interruptSteering",false));controls.addView(unavailableSteering);
         unavailableSteering.setOnCheckedChangeListener((v,checked)->{updateSteeringFrame();gl.requestRender();});
         controls.addView(steeringStatus);
+        com.drivehub.kamera.steering.VehicleGeometry dimensions=steeringModel.geometry;
+        TextView geometryInfo=new TextView(this);geometryInfo.setId(R.id.surroundDebugVehicleGeometry);
+        geometryInfo.setTextColor(Color.WHITE);geometryInfo.setTextSize(13);
+        geometryInfo.setText(getString(R.string.birdseye_debug_vehicle_geometry,dimensions.lengthMm,dimensions.widthMm,dimensions.heightMm,
+                dimensions.wheelbaseMm,dimensions.frontOverhangMm,dimensions.rearOverhangMm,dimensions.frontTrackMm,dimensions.rearTrackMm));
+        controls.addView(geometryInfo);
         TextView modelNote=new TextView(this);modelNote.setText(R.string.birdseye_debug_model_note);modelNote.setTextColor(0xFFFFD180);modelNote.setTextSize(12);controls.addView(modelNote);
         steeringReader=new SteeringReader(this,snapshot->steeringSnapshot=snapshot);
         liveSteering.setOnCheckedChangeListener((view,checked)->updateLiveSteering());
@@ -405,7 +429,8 @@ public final class BirdseyeDebugActivity extends Activity {
         out.putInt("guideSpeed",speedSlider.getProgress());
         out.putBoolean("reverseGuidePreview",reverseGuides.isChecked());
         out.putBoolean("guideSpeedLimitTest",guideSpeedLimit.isChecked());
-        out.putBoolean("blueGuideCorridor",blueCorridor.isChecked());
+        out.putString("guideStyle",guideAppearance.style().id);
+        out.putString("guideGeometry",guideAppearance.geometry().id);
         out.putBoolean("rearArtifactFix3d",rearArtifactFix.isChecked());
         out.putString("guideWidthMode",guideWidth.mode().id);
         out.putInt("guideCustomWidthMm",guideWidth.customMm());

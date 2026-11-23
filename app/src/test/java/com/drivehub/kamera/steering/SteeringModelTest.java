@@ -25,14 +25,14 @@ public class SteeringModelTest {
     @Test public void oemRadiusIncludesInnerGuidelineReferenceInsteadOfAssumingAnEquivalentWheel() {
         SteeringModel.Solution right=model.solve(-516.95f);
         assertTrue(right.valid);
-        assertEquals(4158.1313,1/right.curvaturePerMm,.002);
-        assertEquals(38.08016,right.rightDegrees,.0001);
-        assertEquals(28.84932,right.leftDegrees,.0001);
+        assertEquals(4175.3624,1/right.curvaturePerMm,.002);
+        assertEquals(38.50237,right.rightDegrees,.0001);
+        assertEquals(28.65328,right.leftDegrees,.0001);
         assertTrue(right.rightDegrees>WheelSteering.MAX_DEGREES);
         // Independent native construction: near-side radius L/tan(a), plus half (body width + 300).
-        double nativeRadius=2690/Math.tan(Math.toRadians(OemSteeringCurve.magnitudeDegrees(516.95f)))+(1836+300)/2.0;
+        double nativeRadius=2705/Math.tan(Math.toRadians(OemSteeringCurve.magnitudeDegrees(516.95f)))+(1836+300)/2.0;
         assertEquals(nativeRadius,1/right.curvaturePerMm,1e-8);
-        assertEquals(-3534,model.geometry.frontY(),0);assertEquals(745,model.geometry.rearY(),0);
+        assertEquals(-3546,model.geometry.frontY(),0);assertEquals(741,model.geometry.rearY(),0);
     }
 
     @Test public void fullSensorSweepIsMonotonicSymmetricAndBothWheelNormalsMeetAtOneCenter() {
@@ -46,8 +46,8 @@ public class SteeringModelTest {
             assertEquals(-right.rightDegrees,left.leftDegrees,0);
             assertEquals(-right.leftDegrees,left.rightDegrees,0);
             assertEquals(-right.curvaturePerMm,left.curvaturePerMm,0);
-            double fromLeft=-725+2690/Math.tan(Math.toRadians(right.leftDegrees));
-            double fromRight=725+2690/Math.tan(Math.toRadians(right.rightDegrees));
+            double fromLeft=-775+2705/Math.tan(Math.toRadians(right.leftDegrees));
+            double fromRight=775+2705/Math.tan(Math.toRadians(right.rightDegrees));
             double expected=1/right.curvaturePerMm;
             assertEquals(expected,fromLeft,expected*2e-7);
             assertEquals(expected,fromRight,expected*2e-7);

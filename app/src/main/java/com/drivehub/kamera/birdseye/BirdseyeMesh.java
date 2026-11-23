@@ -7,7 +7,8 @@ import java.nio.ShortBuffer;
 
 /** Static 4-pixel mesh, rebuilt only for calibration/view changes, never per frame. */
 public final class BirdseyeMesh {
-    public static final float CAR_WIDTH = 1836, CAR_LENGTH = 4287, MARGIN = 1500;
+    public static final float CAR_WIDTH = (float)com.drivehub.kamera.steering.VehicleGeometry.MG4.widthMm,
+            CAR_LENGTH = (float)com.drivehub.kamera.steering.VehicleGeometry.MG4.lengthMm, MARGIN = 1500;
     public static final float GROUND_HEIGHT = CAR_LENGTH + 2*MARGIN;
     public static final float GROUND_WIDTH = GROUND_HEIGHT * 450/640;
     public static final int FLOATS = 14, COLS = 113, ROWS = 160;

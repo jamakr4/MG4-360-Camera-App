@@ -21,6 +21,10 @@ public final class UiPrefs {
     public static final String KEY_PARKING_GUIDE_SPEED_LIMIT = "parkingGuideSpeedLimit";
     public static final String KEY_PARKING_GUIDE_SPEED_KMH = "parkingGuideSpeedKmh";
     public static final String KEY_PARKING_GUIDE_STYLE = "parkingGuideStyle";
+    public static final String KEY_PARKING_GUIDE_GEOMETRY = "parkingGuideGeometry";
+    public static com.drivehub.kamera.steering.WheelGuides.Geometry getParkingGuideGeometry(SharedPreferences prefs) {
+        return com.drivehub.kamera.steering.WheelGuides.Geometry.fromId(prefs.getString(KEY_PARKING_GUIDE_GEOMETRY,"front_bumper"));
+    }
     public static final String KEY_PARKING_GUIDE_WIDTH_MODE = "parkingGuideWidthMode";
     public static final String KEY_PARKING_GUIDE_CUSTOM_WIDTH_MM = "parkingGuideCustomWidthMm";
     public static GuidelineWidth.Mode getParkingGuideWidthMode(SharedPreferences prefs) {
@@ -40,8 +44,10 @@ public final class UiPrefs {
                 com.drivehub.kamera.steering.GuidelinePolicy.DEFAULT_SPEED_KMH));
     }
     public static com.drivehub.kamera.steering.WheelGuides.Style getParkingGuideStyle(SharedPreferences prefs) {
-        return "lines".equals(prefs.getString(KEY_PARKING_GUIDE_STYLE,"simple"))
-                ?com.drivehub.kamera.steering.WheelGuides.Style.LINES:com.drivehub.kamera.steering.WheelGuides.Style.SIMPLE;
+        com.drivehub.kamera.steering.WheelGuides.Style style=com.drivehub.kamera.steering.WheelGuides.Style.fromId(
+                prefs.getString(KEY_PARKING_GUIDE_STYLE,com.drivehub.kamera.steering.WheelGuides.Style.DEFAULT.id));
+        return style==com.drivehub.kamera.steering.WheelGuides.Style.COLORED
+                ?com.drivehub.kamera.steering.WheelGuides.Style.DEFAULT:style;
     }
     public static final String KEY_PARKING_AUTO_CLOSE = "parkingAutoClose";
     public static final String KEY_PARKING_REVERSE_FOREGROUND = "parkingReverseForeground";

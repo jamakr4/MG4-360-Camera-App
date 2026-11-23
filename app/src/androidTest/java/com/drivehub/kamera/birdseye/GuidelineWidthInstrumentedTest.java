@@ -13,13 +13,9 @@ import java.util.Map;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import static androidx.test.espresso.Espresso.onView;
-import static androidx.test.espresso.Espresso.onData;
 import static androidx.test.espresso.action.ViewActions.*;
 import static androidx.test.espresso.assertion.ViewAssertions.matches;
 import static androidx.test.espresso.matcher.ViewMatchers.*;
-import static androidx.test.espresso.matcher.RootMatchers.isPlatformPopup;
-import static org.hamcrest.Matchers.anything;
-import static org.hamcrest.Matchers.containsString;
 import static org.junit.Assert.*;
 
 @RunWith(AndroidJUnit4.class)
@@ -27,6 +23,29 @@ public class GuidelineWidthInstrumentedTest {
     private static final String MODE=UiPrefs.KEY_PARKING_GUIDE_WIDTH_MODE;
     private static final String CUSTOM=UiPrefs.KEY_PARKING_GUIDE_CUSTOM_WIDTH_MM;
     private static SharedPreferences prefs(){return UiPrefs.getPrefs(InstrumentationRegistry.getInstrumentation().getTargetContext());}
+
+    @Test public void parkingGeometryStyleAndWidthPersistIndependently() {
+        SharedPreferences prefs=prefs();Map<String,?> saved=prefs.getAll();
+        String geometry=UiPrefs.KEY_PARKING_GUIDE_GEOMETRY,style=UiPrefs.KEY_PARKING_GUIDE_STYLE;
+        prefs.edit().putString(geometry,"unknown").putString(style,"simple").putString(MODE,"body").putInt(CUSTOM,2475).commit();
+        assertEquals(com.drivehub.kamera.steering.WheelGuides.Geometry.FRONT_BUMPER,UiPrefs.getParkingGuideGeometry(prefs));
+        try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)) {
+            openParking();
+            chooseGeometry(0);assertEquals("axles",prefs.getString(geometry,null));assertEquals(1836,UiPrefs.getParkingGuideWidthMm(prefs));
+            onView(withId(R.id.segGuidelineLines)).perform(scrollTo(),click());
+            assertEquals("lines",prefs.getString(style,null));assertEquals("axles",prefs.getString(geometry,null));
+            chooseWidth(2);assertEquals(2475,UiPrefs.getParkingGuideWidthMm(prefs));
+            chooseGeometry(1);assertEquals("front_bumper",prefs.getString(geometry,null));
+            assertEquals("lines",prefs.getString(style,null));assertEquals(2475,UiPrefs.getParkingGuideWidthMm(prefs));
+            onView(withId(R.id.segGuidelineOuterLines)).perform(scrollTo(),click());
+            assertEquals("outer_lines",prefs.getString(style,null));chooseGeometry(0);
+            onView(withId(R.id.btnClose)).perform(click());scenario.recreate();openParking();
+            onView(withId(R.id.segGuidelineAxles)).perform(scrollTo()).check(matches(isSelected()));
+            onView(withId(R.id.segGuidelineOuterLines)).perform(scrollTo()).check(matches(isSelected()));
+            onView(withId(R.id.etGuidelineCustomWidth)).perform(scrollTo()).check(matches(withText("2475")));
+            onView(withId(R.id.btnClose)).perform(click());
+        }finally{restore(prefs,saved,MODE,CUSTOM,geometry,style);}
+    }
 
     @Test public void parkingWidthPresetsCustomValidationAndReopeningKeepTheLastValidWidth() {
         SharedPreferences prefs=prefs();Map<String,?> saved=prefs.getAll();
@@ -36,7 +55,8 @@ public class GuidelineWidthInstrumentedTest {
         prefs.edit().remove(MODE).remove(CUSTOM).commit();
         try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)) {
             openParking();
-            onView(withId(R.id.spinnerGuidelineWidth)).perform(scrollTo()).check(matches(withSpinnerText(
+            onView(withId(R.id.segGuidelineWidthMirrors)).perform(scrollTo()).check(matches(isSelected()));
+            onView(withId(R.id.textGuidelineWidthValue)).check(matches(withText(
                     InstrumentationRegistry.getInstrumentation().getTargetContext().getString(R.string.guidelines_width_mirrors,2060))));
             onView(withId(R.id.rowGuidelineCustomWidth)).check(matches(withEffectiveVisibility(Visibility.GONE)));
             chooseWidth(1);assertEquals(1836,UiPrefs.getParkingGuideWidthMm(prefs));
@@ -75,7 +95,7 @@ public class GuidelineWidthInstrumentedTest {
                 onView(withId(R.id.etGuidelineCustomWidth)).perform(scrollTo()).check(matches(withText("2475")))
                         .perform(replaceText("2500"),pressImeActionButton(),closeSoftKeyboard());
                 scenario.onActivity(a->assertEquals(2500,rendererWidth(a.renderer)));
-                onView(withText(containsString("2500 mm"))).perform(scrollTo()).check(matches(isDisplayed()));
+                onView(withId(R.id.textGuidelineWidthValue)).check(matches(withEffectiveVisibility(Visibility.GONE)));
                 scenario.moveToState(Lifecycle.State.STARTED);scenario.moveToState(Lifecycle.State.RESUMED);
                 scenario.onActivity(a->assertEquals(2500,rendererWidth(a.renderer)));
                 scenario.recreate();
@@ -108,6 +128,13 @@ public class GuidelineWidthInstrumentedTest {
                     prefs.edit().putString(MODE,"body").apply();assertEquals(1836,rendererWidth(renderer));
                     prefs.edit().putString(MODE,"custom").putInt(CUSTOM,2800).apply();assertEquals(2800,rendererWidth(renderer));
                     prefs.edit().putInt(CUSTOM,2500).apply();assertEquals(2500,rendererWidth(renderer));
+                    for(com.drivehub.kamera.steering.WheelGuides.Geometry geometry:com.drivehub.kamera.steering.WheelGuides.Geometry.values())
+                        for(String style:new String[]{"simple","lines","outer_lines"}) {
+                            prefs.edit().putString(UiPrefs.KEY_PARKING_GUIDE_GEOMETRY,geometry.id).putString(UiPrefs.KEY_PARKING_GUIDE_STYLE,style).apply();
+                            assertEquals(geometry,rendererOption(renderer,"guideGeometry"));
+                            assertEquals(UiPrefs.getParkingGuideStyle(prefs),rendererOption(renderer,"guideStyle"));
+                            assertEquals(2500,rendererWidth(renderer));
+                        }
                 }
             });
             scenario.recreate();scenario.onActivity(a->{
@@ -116,13 +143,24 @@ public class GuidelineWidthInstrumentedTest {
                     assertEquals(2500,rendererWidth((BirdseyeRenderer)field.get(a.findViewById(R.id.birdseyeView))));
                 }catch(ReflectiveOperationException e){throw new AssertionError(e);}
             });
-        }finally{restore(prefs,saved,MODE,CUSTOM,UiPrefs.KEY_PARKING_SURROUND_3D,UiPrefs.KEY_PARKING_SURROUND_WIDE);}
+        }finally{restore(prefs,saved,MODE,CUSTOM,UiPrefs.KEY_PARKING_SURROUND_3D,UiPrefs.KEY_PARKING_SURROUND_WIDE,
+                UiPrefs.KEY_PARKING_GUIDE_GEOMETRY,UiPrefs.KEY_PARKING_GUIDE_STYLE);}
     }
 
     private static void openParking(){onView(withId(R.id.btnSettings)).perform(click());onView(withId(R.id.tabParking)).perform(click());}
     private static void chooseWidth(int position) {
-        onView(withId(R.id.spinnerGuidelineWidth)).perform(scrollTo(),click());
-        onData(anything()).inRoot(isPlatformPopup()).atPosition(position).perform(click());
+        int[] choices={R.id.segGuidelineWidthMirrors,R.id.segGuidelineWidthBody,R.id.segGuidelineWidthCustom};
+        onView(withId(choices[position])).perform(scrollTo(),click()).check(matches(isSelected()));
+    }
+    private static void chooseGeometry(int position) {
+        onView(withId(position==0?R.id.segGuidelineAxles:R.id.segGuidelineFrontBumper))
+                .perform(scrollTo(),click()).check(matches(isSelected()));
+    }
+    private static Object rendererOption(BirdseyeRenderer renderer,String name) {
+        try {
+            java.lang.reflect.Field field=BirdseyeRenderer.class.getDeclaredField(name);field.setAccessible(true);
+            return field.get(renderer);
+        }catch(ReflectiveOperationException e){throw new AssertionError(e);}
     }
     private static int rendererWidth(BirdseyeRenderer renderer) {
         try {

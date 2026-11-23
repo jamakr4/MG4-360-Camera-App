@@ -120,6 +120,7 @@ public final class BirdseyeView extends FrameLayout {
         guideSpeedKmh=UiPrefs.getParkingGuideSpeedKmh(prefs);
         renderer.setGuideStyle(UiPrefs.getParkingGuideStyle(prefs));
         renderer.setGuideWidthMm(UiPrefs.getParkingGuideWidthMm(prefs));
+        renderer.setGuideGeometry(UiPrefs.getParkingGuideGeometry(prefs));
         updateGuideVisibility(com.drivehub.kamera.signal.SignalService.vehicleMotion(),SystemClock.elapsedRealtime());
         if(guidesToggle!=null) {
             guidesToggle.setSelected(enabled);
@@ -175,7 +176,8 @@ public final class BirdseyeView extends FrameLayout {
         if(UiPrefs.KEY_PARKING_SURROUND_3D.equals(key)||UiPrefs.KEY_PARKING_SURROUND_WIDE.equals(key))applyMode();
         if(UiPrefs.KEY_PARKING_SURROUND_GUIDES.equals(key)||UiPrefs.KEY_PARKING_GUIDE_SPEED_LIMIT.equals(key)
                 ||UiPrefs.KEY_PARKING_GUIDE_SPEED_KMH.equals(key)||UiPrefs.KEY_PARKING_GUIDE_STYLE.equals(key)
-                ||UiPrefs.KEY_PARKING_GUIDE_WIDTH_MODE.equals(key)||UiPrefs.KEY_PARKING_GUIDE_CUSTOM_WIDTH_MM.equals(key))applyGuides();
+                ||UiPrefs.KEY_PARKING_GUIDE_WIDTH_MODE.equals(key)||UiPrefs.KEY_PARKING_GUIDE_CUSTOM_WIDTH_MM.equals(key)
+                ||UiPrefs.KEY_PARKING_GUIDE_GEOMETRY.equals(key))applyGuides();
         if (UiPrefs.KEY_ACCENT_COLOR.equals(key)) styleModeToggle();
         if (UiPrefs.KEY_PARKING_BIRDSEYE_CAR_COLOR.equals(key)) {
             renderer.setCarColor(UiPrefs.getBirdseyeCarColor(p));

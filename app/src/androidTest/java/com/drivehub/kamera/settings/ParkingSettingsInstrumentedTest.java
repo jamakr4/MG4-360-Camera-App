@@ -63,13 +63,19 @@ public class ParkingSettingsInstrumentedTest {
     @Test public void guidelineDefaultsAndSelectionsPersistAcrossReopening() {
         SharedPreferences prefs=UiPrefs.getPrefs(InstrumentationRegistry.getInstrumentation().getTargetContext());
         Map<String,?> saved=prefs.getAll();
-        String[] keys={UiPrefs.KEY_PARKING_GUIDE_SPEED_LIMIT,UiPrefs.KEY_PARKING_GUIDE_SPEED_KMH,UiPrefs.KEY_PARKING_GUIDE_STYLE};
+        String[] keys={UiPrefs.KEY_PARKING_GUIDE_SPEED_LIMIT,UiPrefs.KEY_PARKING_GUIDE_SPEED_KMH,UiPrefs.KEY_PARKING_GUIDE_STYLE,
+                UiPrefs.KEY_PARKING_GUIDE_WIDTH_MODE,UiPrefs.KEY_PARKING_GUIDE_CUSTOM_WIDTH_MM,UiPrefs.KEY_PARKING_GUIDE_GEOMETRY};
         SharedPreferences.Editor clear=prefs.edit();for(String key:keys)clear.remove(key);clear.commit();
         try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)) {
             openParking(scenario);
             dialogView(R.id.switchGuidelineSpeedLimit).perform(scrollTo()).check(matches(isChecked()));
             dialogView(R.id.etGuidelineSpeed).check(matches(withText("25"))).check(matches(isEnabled()));
-            dialogView(R.id.segGuidelineSimple).perform(scrollTo()).check(matches(isSelected()));
+            dialogView(R.id.segGuidelineWidthMirrors).perform(scrollTo()).check(matches(isSelected()));
+            dialogView(R.id.segGuidelineFrontBumper).perform(scrollTo()).check(matches(isSelected()));
+            dialogView(R.id.segGuidelineOuterLines).perform(scrollTo()).check(matches(isSelected()));
+            assertEquals(2060,UiPrefs.getParkingGuideWidthMm(prefs));
+            assertEquals(com.drivehub.kamera.steering.WheelGuides.Geometry.FRONT_BUMPER,UiPrefs.getParkingGuideGeometry(prefs));
+            assertEquals(com.drivehub.kamera.steering.WheelGuides.Style.OUTER_LINES,UiPrefs.getParkingGuideStyle(prefs));
             dialogView(R.id.etGuidelineSpeed).perform(replaceText("18"),pressImeActionButton(),closeSoftKeyboard());
             dialogView(R.id.segGuidelineLines).perform(scrollTo(),click()).check(matches(isSelected()));
             assertEquals(18,UiPrefs.getParkingGuideSpeedKmh(prefs));assertTrue(UiPrefs.isParkingGuideSpeedLimitEnabled(prefs));

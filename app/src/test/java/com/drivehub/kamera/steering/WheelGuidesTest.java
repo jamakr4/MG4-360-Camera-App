@@ -19,9 +19,9 @@ public class WheelGuidesTest {
         List<PdcBars.Bar> lines=guides.lines(model.solve(0),100,200);
         assertEquals(4,lines.size());
         for(int side=0;side<2;side++) {
-            double[] xy=lines.get(side).xy;double x=100+(side==0?-725:725);
-            assertEquals(x,xy[0],0);assertEquals(200-1295.5,xy[1],0);
-            assertEquals(200+5239.5,xy[xy.length-1],1e-8);
+            double[] xy=lines.get(side).xy;double x=100+(side==0?-775:775);
+            assertEquals(x,xy[0],0);assertEquals(200-1302.5,xy[1],0);
+            assertEquals(200+5243.5,xy[xy.length-1],1e-8);
             for(int i=0;i<xy.length;i+=2)assertEquals(x,xy[i],0);
             assertTrue(xy.length/2>100); // Exercises longer strips than the original 16-segment PDC arcs.
         }
@@ -31,7 +31,7 @@ public class WheelGuidesTest {
         for(float raw:new float[]{-516.95f,-199.3f,199.3f,516.95f}) {
             SteeringModel.Solution pose=model.solve(raw);
             List<PdcBars.Bar> lines=guides.lines(pose,0,0);
-            double centerX=1/pose.curvaturePerMm,centerY=1394.5;
+            double centerX=1/pose.curvaturePerMm,centerY=1402.5;
             for(int side=0;side<2;side++) {
                 double[] xy=lines.get(side).xy;
                 double radius=Math.hypot(xy[0]-centerX,xy[1]-centerY);
@@ -47,8 +47,8 @@ public class WheelGuidesTest {
 
     @Test public void farEndpointsFollowOemLongitudinalDepthAndMirrorWithSteeringDirection() {
         List<PdcBars.Bar> right=guides.lines(model.solve(-516.95f),0,0),left=guides.lines(model.solve(516.95f),0,0);
-        assertEquals(1394.5+3540.5756,lastY(right.get(0)),.002);
-        assertEquals(1394.5+3039.4603,lastY(right.get(1)),.002);
+        assertEquals(1402.5+3539.3544,lastY(right.get(0)),.002);
+        assertEquals(1402.5+3045.3168,lastY(right.get(1)),.002);
         for(int side=0;side<2;side++) {
             double[] a=right.get(side).xy,b=left.get(1-side).xy;
             assertEquals(a.length,b.length);
@@ -91,13 +91,13 @@ public class WheelGuidesTest {
                 int side=index%2;boolean rear=index>=2;double[] xy=forward.get(index).xy;
                 int[] colours={WheelGuides.LEFT_COLOR,WheelGuides.RIGHT_COLOR,WheelGuides.REAR_LEFT_COLOR,WheelGuides.REAR_RIGHT_COLOR};
                 assertEquals(colours[index],forward.get(index).color);
-                assertEquals(side==0?-725:725,xy[0],0);assertEquals(rear?1394.5:-1295.5,xy[1],0);
+                assertEquals((side==0?-1:1)*(rear?775.5:775),xy[0],0);assertEquals(rear?1402.5:-1302.5,xy[1],0);
                 assertTrue(xy[3]<xy[1]);
                 double angle=Math.toDegrees(Math.atan2(xy[2]-xy[0],-(xy[3]-xy[1])));
                 assertEquals(rear?0:side==0?pose.leftDegrees:pose.rightDegrees,angle,rear?.5:.4);
                 for(int i=2;i<xy.length;i+=2)
                     assertTrue(Math.hypot(xy[i]-xy[i-2],xy[i+1]-xy[i-1])<=50.0001);
-                if(raw==0){assertEquals(xy[0],xy[xy.length-2],0);assertEquals(-4295.5,lastY(forward.get(index)),1e-8);}
+                if(raw==0){assertEquals(xy[0],xy[xy.length-2],0);assertEquals(rear?-1597.5:-4302.5,lastY(forward.get(index)),1e-8);}
             }
         }
     }
@@ -107,31 +107,32 @@ public class WheelGuidesTest {
             List<PdcBars.Bar> forward=guides.lines(pose,0,0,WheelGuides.Direction.FORWARD);
             double yaw=pose.curvaturePerMm*3000;
             double rearX=yaw==0?0:(1-Math.cos(yaw))/pose.curvaturePerMm;
-            double rearY=1394.5+(yaw==0?-3000:-Math.sin(yaw)/pose.curvaturePerMm);
+            double rearY=1402.5+(yaw==0?-3000:-Math.sin(yaw)/pose.curvaturePerMm);
             double[] left=forward.get(0).xy,right=forward.get(1).xy;
             double lx=left[left.length-2],ly=left[left.length-1],rx=right[right.length-2],ry=right[right.length-1];
-            assertEquals(1450,Math.hypot(rx-lx,ry-ly),1e-8);
+            assertEquals(1550,Math.hypot(rx-lx,ry-ly),1e-8);
             assertEquals(yaw,Math.atan2(ry-ly,rx-lx),1e-12);
-            assertEquals(rearX+2690*Math.sin(yaw),(lx+rx)/2,1e-8);
-            assertEquals(rearY-2690*Math.cos(yaw),(ly+ry)/2,1e-8);
+            assertEquals(rearX+2705*Math.sin(yaw),(lx+rx)/2,1e-8);
+            assertEquals(rearY-2705*Math.cos(yaw),(ly+ry)/2,1e-8);
             if(raw!=0)for(PdcBars.Bar line:forward.subList(0,2)){
-                double radius=Math.hypot(line.xy[0]-1/pose.curvaturePerMm,line.xy[1]-1394.5);
+                double radius=Math.hypot(line.xy[0]-1/pose.curvaturePerMm,line.xy[1]-1402.5);
                 for(int i=0;i<line.xy.length;i+=2)
-                    assertEquals(radius,Math.hypot(line.xy[i]-1/pose.curvaturePerMm,line.xy[i+1]-1394.5),1e-8);
+                    assertEquals(radius,Math.hypot(line.xy[i]-1/pose.curvaturePerMm,line.xy[i+1]-1402.5),1e-8);
             }
         }
     }
-    @Test public void forwardRearDisplayCurvesShareExactFrontEndpointsAndArrivalDirections() {
+    @Test public void forwardRearTracksUseTheActualRearAxleMotionInsteadOfJoiningFrontEndpoints() {
         for(float raw:new float[]{0,-.0001f,.0001f,-.45f,.45f,-199.3f,199.3f,-516.95f,516.95f}) {
             List<PdcBars.Bar> lines=guides.lines(model.solve(raw),125,-300,WheelGuides.Direction.FORWARD);
             for(int side=0;side<2;side++) {
                 double[] front=lines.get(side).xy,rear=lines.get(side+2).xy;
                 int f=front.length-2,r=rear.length-2;
-                assertEquals(front[f],rear[r],0);assertEquals(front[f+1],rear[r+1],0);
-                assertEquals(125+(side==0?-725:725),rear[0],0);assertEquals(1094.5,rear[1],0);
-                double fx=front[f]-front[f-2],fy=front[f+1]-front[f-1];
-                double rx=rear[r]-rear[r-2],ry=rear[r+1]-rear[r-1];
-                assertTrue(Math.abs(Math.toDegrees(Math.atan2(cross(fx,fy,rx,ry),fx*rx+fy*ry)))<2);
+                assertEquals(125+(side==0?-775.5:775.5),rear[0],0);assertEquals(1102.5,rear[1],0);
+                assertEquals(Math.hypot(2705,.5),Math.hypot(front[f]-rear[r],front[f+1]-rear[r+1]),1e-8);
+                double k=model.solve(raw).curvaturePerMm;
+                if(k!=0)for(int i=0;i<rear.length;i+=2)
+                    assertEquals(Math.abs(1/k-(side==0?-775.5:775.5)),
+                            Math.hypot(rear[i]-125-1/k,rear[i+1]-1102.5),Math.max(1e-7,Math.abs(1/k)*1e-12));
                 for(int i=2;i<rear.length;i+=2) {
                     assertTrue(Double.isFinite(rear[i]));assertTrue(Double.isFinite(rear[i+1]));
                     assertTrue(rear[i+1]<rear[i-1]);
@@ -156,7 +157,7 @@ public class WheelGuidesTest {
             assertEquals(4,lines.size());
             for(int side=0;side<2;side++) {
                 PdcBars.Bar rear=lines.get(2+side);double[] xy=rear.xy;
-                assertEquals(side==0?-725:725,xy[0],0);assertEquals(1394.5,xy[1],0);
+                assertEquals(side==0?-775.5:775.5,xy[0],0);assertEquals(1402.5,xy[1],0);
                 assertEquals(side==0?WheelGuides.REAR_LEFT_COLOR:WheelGuides.REAR_RIGHT_COLOR,rear.color);
                 assertEquals(lastY(lines.get(side)),lastY(rear),1e-8);
                 assertTrue(xy[3]>xy[1]);
@@ -168,7 +169,7 @@ public class WheelGuidesTest {
                 if(pose.curvaturePerMm==0)for(int i=0;i<xy.length;i+=2)assertEquals(xy[0],xy[i],0);
                 else {
                     double turnCenter=1/pose.curvaturePerMm,radius=Math.abs(turnCenter-xy[0]);
-                    for(int i=0;i<xy.length;i+=2)assertEquals(radius,Math.hypot(xy[i]-turnCenter,xy[i+1]-1394.5),1e-8);
+                    for(int i=0;i<xy.length;i+=2)assertEquals(radius,Math.hypot(xy[i]-turnCenter,xy[i+1]-1402.5),1e-8);
                     double[] front=lines.get(side).xy;
                     assertEquals(Math.signum(pose.curvaturePerMm),Math.signum(xy[2]-xy[0]),0);
                     assertEquals(-Math.signum(pose.curvaturePerMm),Math.signum(front[2]-front[0]),0);
@@ -179,8 +180,8 @@ public class WheelGuidesTest {
     @Test public void rearTracesMirrorAndUseInnerAndOuterRearWheelRadii() {
         List<PdcBars.Bar> right=guides.lines(model.solve(-516.95f),0,0),left=guides.lines(model.solve(516.95f),0,0);
         double center=1/model.solve(-516.95f).curvaturePerMm;
-        assertEquals(4883.1313,Math.abs(center-right.get(2).xy[0]),.002);
-        assertEquals(3433.1313,Math.abs(center-right.get(3).xy[0]),.002);
+        assertEquals(4950.8624,Math.abs(center-right.get(2).xy[0]),.002);
+        assertEquals(3399.8624,Math.abs(center-right.get(3).xy[0]),.002);
         for(int side=0;side<2;side++) {
             double[] a=right.get(2+side).xy,b=left.get(2+1-side).xy;assertEquals(a.length,b.length);
             for(int i=0;i<a.length;i+=2){assertEquals(-a[i],b[i],1e-8);assertEquals(a[i+1],b[i+1],1e-8);}
@@ -191,7 +192,7 @@ public class WheelGuidesTest {
             assertEquals(a[a.length-2],b[b.length-2],.01);assertEquals(a[a.length-1],b[b.length-1],.01);
         }
     }
-    @Test public void individualClearanceLinesShareMirrorWidthAndFarEndpointsWithSimple() {
+    @Test public void individualClearanceLinesShareMirrorWidthAndVehicleMotionWithSimple() {
         for(WheelGuides.Direction direction:WheelGuides.Direction.values())for(float raw:new float[]{0,-.45f,.45f,-199.3f,199.3f,-516.95f,516.95f}) {
             SteeringModel.Solution pose=model.solve(raw);
             List<PdcBars.Bar> lines=guides.clearanceLines(pose,125,-300,direction);
@@ -201,20 +202,16 @@ public class WheelGuidesTest {
                 PdcBars.Bar line=lines.get(i);
                 assertEquals(WheelGuides.CORRIDOR_EDGE_COLOR,line.color);
                 assertEquals(125+(i%2==0?-1030:1030),line.xy[0],1e-8);
-                assertEquals(-300+(i<2?-1295.5:1394.5),line.xy[1],1e-8);
-                if(direction==WheelGuides.Direction.FORWARD&&i>=2) {
-                    double[] front=lines.get(i-2).xy;
-                    assertEquals(front[front.length-2],line.xy[line.xy.length-2],1e-8);
-                    assertEquals(front[front.length-1],line.xy[line.xy.length-1],1e-8);
-                }
+                assertEquals(-300+(i<2?-2143.5:1402.5),line.xy[1],1e-8);
             }
-            for(PdcBars.Bar edge:simple.boundaries) {
-                boolean sameEndpoint=false;
-                for(PdcBars.Bar line:lines)sameEndpoint|=Math.hypot(edge.xy[edge.xy.length-2]-line.xy[line.xy.length-2],
-                        edge.xy[edge.xy.length-1]-line.xy[line.xy.length-1])<1e-8;
-                assertTrue("Simple must use the same mirror-width curves",sameEndpoint);
+            if(direction==WheelGuides.Direction.REVERSE)for(int side=0;side<2;side++) {
+                double[] edge=simple.boundaries.get(side).xy;
+                int lineIndex=pose.curvaturePerMm==0?side:(side==0?pose.curvaturePerMm>0:pose.curvaturePerMm<0)?side:side+2;
+                double[] line=lines.get(lineIndex).xy;
+                assertEquals(line[line.length-2],edge[edge.length-2],1e-8);
+                assertEquals(line[line.length-1],edge[edge.length-1],1e-8);
             }
-            assertEquals(725,guides.lines(pose,0,0,direction).get(1).xy[0],0);
+            assertEquals(775,guides.lines(pose,0,0,direction).get(1).xy[0],0);
         }
         assertTrue(guides.clearanceLines(SteeringModel.INVALID,0,0,WheelGuides.Direction.REVERSE).isEmpty());
     }
@@ -231,27 +228,22 @@ public class WheelGuidesTest {
             for(int side=0;side<2;side++) {
                 double x=(side==0?-1:1)*car.widthWithMirrorsMm/2;
                 double[] edge=area.boundaries.get(side).xy;
-                assertEquals(x,edge[0],0);
-                assertEquals(direction==WheelGuides.Direction.REVERSE?-1295.5:1394.5,edge[1],0);
-                assertEquals((side==0?-1:1)*725,traces.get(side).xy[0],0);
+                assertEquals(x,edge[0],1e-8);
+                assertEquals(direction==WheelGuides.Direction.REVERSE?-2143.5:2143.5,edge[1],1e-8);
+                assertEquals((side==0?-1:1)*775,traces.get(side).xy[0],0);
                 int end=edge.length-2;
                 double k=pose.curvaturePerMm;
-                if(direction==WheelGuides.Direction.FORWARD) {
-                    double angle=-k*WheelGuides.FORWARD_TRAVEL_MM;
-                    double tx=k==0?0:2*Math.pow(Math.sin(angle/2),2)/k;
-                    double ty=k==0?-WheelGuides.FORWARD_TRAVEL_MM:Math.sin(angle)/k;
-                    assertEquals(tx+x*Math.cos(angle)-car.wheelbaseMm*Math.sin(angle),edge[end],1e-8);
-                    assertEquals(1394.5+ty-x*Math.sin(angle)-car.wheelbaseMm*Math.cos(angle),edge[end+1],1e-8);
-                }else {
-                    assertEquals(1394.5+guides.oemEndY(k,side==0?-1:1),edge[end+1],1e-8);
-                    boolean rear=side==0?k<0:k>0;
-                    if(k!=0)assertEquals(Math.hypot(1/k-x,rear?0:car.wheelbaseMm),
-                            Math.hypot(edge[end]-1/k,edge[end+1]-1394.5),1e-8);
-                }
+                double travel=(direction==WheelGuides.Direction.FORWARD?-1:1)*WheelGuides.VEHICLE_TRAVEL_MM;
+                double y=direction==WheelGuides.Direction.FORWARD?car.frontY():car.rearY();
+                if(direction==WheelGuides.Direction.FORWARD&&k!=0)y=Math.max(y,-(1/Math.abs(k)-car.widthWithMirrorsMm/2));
+                double angle=k*travel;
+                double tx=k==0?0:2*Math.pow(Math.sin(angle/2),2)/k;
+                double ty=k==0?travel:Math.sin(angle)/k;
+                assertEquals(y,(edge[end]-tx)*Math.sin(angle)+(edge[end+1]-1402.5-ty)*Math.cos(angle),1e-8);
                 if(raw==0)for(int i=0;i<edge.length;i+=2)assertEquals(x,edge[i],1e-8);
                 assertEquals(WheelGuides.CORRIDOR_EDGE_COLOR,area.boundaries.get(side).color);
             }
-            if(direction==WheelGuides.Direction.FORWARD) {
+            if(raw==0) {
                 double[] left=area.boundaries.get(0).xy,right=area.boundaries.get(1).xy;
                 assertEquals(car.widthWithMirrorsMm,Math.hypot(left[left.length-2]-right[right.length-2],
                         left[left.length-1]-right[right.length-1]),1e-8);
@@ -335,7 +327,8 @@ public class WheelGuidesTest {
         for(WheelGuides.Direction direction:WheelGuides.Direction.values())for(float raw:new float[]{0,-.45f,.45f,-199.3f,199.3f,-398.61f,398.61f,-516.95f,516.95f}) {
             SteeringModel.Solution pose=model.solve(raw);
             List<PdcBars.Bar> traces=guides.lines(pose,0,0,direction);
-            WheelGuides.Corridor area=guides.corridor(pose,0,0,direction);
+            WheelGuides.Corridor area=guides.corridor(pose,0,0,direction,2060,direction==WheelGuides.Direction.REVERSE
+                    ?WheelGuides.Geometry.AXLES:WheelGuides.Geometry.FRONT_BUMPER);
             double[] left=area.boundaries.get(0).xy,right=area.boundaries.get(1).xy;
             double capStartY=Math.min(left[left.length-1],right[right.length-1]);
             for(int side=0;side<2;side++)for(int index:new int[]{side,side+2}) {
@@ -387,8 +380,13 @@ public class WheelGuidesTest {
                 for(int i=0;i<xy.length;i+=2) {
                     assertEquals(-xy[i],mirror[i],1e-8);assertEquals(xy[i+1],mirror[i+1],1e-8);
                     if(i<2)continue;
-                    double dx=xy[i]-xy[i-2],dy=xy[i+1]-xy[i-1];
-                    assertTrue("Reversing outer guide at "+raw,dy<=0);
+                    // Continued inner arcs can pass their Y extremum at tight lock;
+                    // they must still progress around the same turning centre.
+                    double k=left.curvaturePerMm;
+                    if(k==0)assertTrue(xy[i+1]<=xy[i-1]);
+                    else assertTrue("Reversing guide around turning centre at "+raw,
+                            Math.atan2(-Math.abs(k)*(xy[i+1]-1402.5),1-k*xy[i])+1e-12
+                            >=Math.atan2(-Math.abs(k)*(xy[i-1]-1402.5),1-k*xy[i-2]));
                 }
             }
         }

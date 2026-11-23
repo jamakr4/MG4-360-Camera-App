@@ -1,0 +1,4 @@
+<resources>
+    <string name="birdseye_debug_corner_radius">Äußerer Front-Eckradius (gewählte Breite): %1$s</string>
+    <string name="birdseye_debug_vehicle_geometry">MG4-Handbuch: %1$.0f × %2$.0f × %3$.0f mm\nRadstand %4$.0f mm · Überhang v/h %5$.0f / %6$.0f mm\nSpurweite v/h %7$.0f / %8$.0f mm</string>
+</resources>

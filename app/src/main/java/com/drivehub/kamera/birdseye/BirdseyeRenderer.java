@@ -52,13 +52,15 @@ public final class BirdseyeRenderer implements GLSurfaceView.Renderer {
     private volatile boolean rearArtifactFix3d=true;
     public void setRearArtifactFix3d(boolean enabled){rearArtifactFix3d=enabled;}
     volatile float guideProgress,outgoingGuideProgress;
-    private volatile com.drivehub.kamera.steering.WheelGuides.Style guideStyle=com.drivehub.kamera.steering.WheelGuides.Style.SIMPLE;
+    private volatile com.drivehub.kamera.steering.WheelGuides.Style guideStyle=com.drivehub.kamera.steering.WheelGuides.Style.DEFAULT;
     private volatile int guideWidthMm=com.drivehub.kamera.steering.GuidelineWidth.DEFAULT_MM;
+    private volatile com.drivehub.kamera.steering.WheelGuides.Geometry guideGeometry=com.drivehub.kamera.steering.WheelGuides.Geometry.FRONT_BUMPER;
     private volatile com.drivehub.kamera.steering.WheelGuides.Direction guideDirection=com.drivehub.kamera.steering.WheelGuides.Direction.REVERSE;
     public void setWheelGuidePreview(boolean enabled){wheelGuidePreview=enabled;}
     public void setBlueGuideCorridor(boolean enabled){guideStyle=enabled?com.drivehub.kamera.steering.WheelGuides.Style.SIMPLE:com.drivehub.kamera.steering.WheelGuides.Style.LINES;}
     public void setGuideStyle(com.drivehub.kamera.steering.WheelGuides.Style style){guideStyle=java.util.Objects.requireNonNull(style);}
     public void setGuideWidthMm(int widthMm){guideWidthMm=com.drivehub.kamera.steering.GuidelineWidth.validOrDefault(widthMm);}
+    public void setGuideGeometry(com.drivehub.kamera.steering.WheelGuides.Geometry geometry){guideGeometry=java.util.Objects.requireNonNull(geometry);}
     public void setGuideDirection(com.drivehub.kamera.steering.WheelGuides.Direction direction){guideDirection=java.util.Objects.requireNonNull(direction);}
     private RivelaBowlPass bowlPass;
     private PdcGroundPass pdcPass;
@@ -264,7 +266,7 @@ public final class BirdseyeRenderer implements GLSurfaceView.Renderer {
                     guideAvailability==0,direction,guideClock.getAsLong());
             if((guideMask&4)==0)guideAnimation.invalidateOutgoing(com.drivehub.kamera.steering.WheelGuides.Direction.FORWARD);
             if((guideMask&8)==0)guideAnimation.invalidateOutgoing(com.drivehub.kamera.steering.WheelGuides.Direction.REVERSE);
-            guideFrame.update(angles,style,guideWidthMm,direction,guideAnimation);
+            guideFrame.update(angles,style,guideWidthMm,guideGeometry,direction,guideAnimation);
             outgoingGuideProgress=guideFrame.outgoing().level;
             if(threeDRequested&&currentScene!=null&&currentScene.bowl()!=null&&currentModel!=null) {
                 ThreeDFailure.Kind stage=ThreeDFailure.Kind.DEPTH;
