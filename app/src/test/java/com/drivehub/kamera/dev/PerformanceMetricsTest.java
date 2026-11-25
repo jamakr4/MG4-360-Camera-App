@@ -89,4 +89,33 @@ public class PerformanceMetricsTest {
                 "CPU – · App –\nRAM – · App –\nLoad 1m – · Temp –",
                 snapshot.format(null));
     }
+
+    @Test
+    public void parseThermalZoneCelsius_handlesMilliAndWholeDegrees() {
+        assertEquals(48.5d, PerformanceMetrics.parseThermalZoneCelsius("48500\n"), 0.001d);
+        assertEquals(52d, PerformanceMetrics.parseThermalZoneCelsius(" 52 "), 0.001d);
+        assertEquals(-5d, PerformanceMetrics.parseThermalZoneCelsius("-5000"), 0.001d);
+    }
+
+    @Test
+    public void parseThermalZoneCelsius_rejectsPlaceholdersAndGarbage() {
+        assertTrue(Double.isNaN(PerformanceMetrics.parseThermalZoneCelsius(null)));
+        assertTrue(Double.isNaN(PerformanceMetrics.parseThermalZoneCelsius("")));
+        assertTrue(Double.isNaN(PerformanceMetrics.parseThermalZoneCelsius("0")));
+        assertTrue(Double.isNaN(PerformanceMetrics.parseThermalZoneCelsius("-127000")));
+        assertTrue(Double.isNaN(PerformanceMetrics.parseThermalZoneCelsius("127000")));
+        assertTrue(Double.isNaN(PerformanceMetrics.parseThermalZoneCelsius("n/a")));
+    }
+
+    @Test
+    public void thermalZonePriority_prefersCpuThenSocAndSkipsUnrelatedSensors() {
+        assertEquals(3, PerformanceMetrics.thermalZonePriority("mtktscpu"));
+        assertEquals(3, PerformanceMetrics.thermalZonePriority("cpu_thermal"));
+        assertEquals(2, PerformanceMetrics.thermalZonePriority("mtktsAP"));
+        assertEquals(2, PerformanceMetrics.thermalZonePriority("soc_thermal"));
+        assertEquals(1, PerformanceMetrics.thermalZonePriority("thermal-zone7"));
+        assertEquals(0, PerformanceMetrics.thermalZonePriority("mtktsbattery"));
+        assertEquals(0, PerformanceMetrics.thermalZonePriority("mtktspmic"));
+        assertEquals(0, PerformanceMetrics.thermalZonePriority("mtktswmt"));
+    }
 }

@@ -156,6 +156,48 @@ final class PerformanceMetrics {
         return Math.max(0d, Math.min(100d, value));
     }
 
+    /**
+     * Parses the content of a Linux {@code thermal_zone*}/temp file. Kernels report millidegrees
+     * Celsius; a few legacy drivers report whole degrees. Returns NaN for unused or bogus zones
+     * (e.g. -127000 / 127000 placeholders).
+     */
+    static double parseThermalZoneCelsius(String raw) {
+        if (raw == null) return Double.NaN;
+        String trimmed = raw.trim();
+        if (trimmed.isEmpty()) return Double.NaN;
+        double value;
+        try {
+            value = Double.parseDouble(trimmed);
+        } catch (NumberFormatException ignored) {
+            return Double.NaN;
+        }
+        if (!Double.isFinite(value)) return Double.NaN;
+        double celsius = Math.abs(value) >= 1000d ? value / 1000d : value;
+        return isFiniteInRange(celsius, -40d, 125d) && celsius != 0d ? celsius : Double.NaN;
+    }
+
+    /**
+     * Ranks a thermal zone by its {@code type} for the "CPU temperature" readout:
+     * 3 = CPU, 2 = SoC/AP die, 1 = unknown zone, 0 = unrelated sensor (battery, PMIC, radio, ...).
+     */
+    static int thermalZonePriority(String type) {
+        if (type == null) return 1;
+        String t = type.trim().toLowerCase(Locale.US);
+        if (t.isEmpty()) return 1;
+        if (t.contains("batt") || t.contains("pmic") || t.contains("charg") || t.contains("wmt")
+                || t.contains("wifi") || t.contains("modem") || t.contains("abb")
+                || t.contains("btsmdpa") || t.contains("tspa") || t.contains("usb")
+                || t.contains("skin") || t.contains("ambient")) {
+            return 0;
+        }
+        if (t.contains("cpu")) return 3;
+        if (t.contains("soc") || t.contains("tsap") || t.equals("ap") || t.contains("gpu")
+                || t.contains("tsall") || t.contains("die")) {
+            return 2;
+        }
+        return 1;
+    }
+
     static boolean isFiniteInRange(double value, double minimum, double maximum) {
         return Double.isFinite(value) && value >= minimum && value <= maximum;
     }
