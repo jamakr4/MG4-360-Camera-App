@@ -3,13 +3,40 @@ package com.drivehub.kamera.ota;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
 final class OtaReleaseAssets {
 
+    private static final String GITHUB_ASSET_PREFIX = "/jamakr4/mg4-360-camera-app/releases/download/";
+    private static final String GITLAB_PROJECT_PREFIX = "/jamakr4/mg4-360-camera-app/";
+
     private OtaReleaseAssets() {
+    }
+
+    /**
+     * The release JSON names the APK and its checksum by URL. Both must belong to this
+     * project, over https: a release entry pointing anywhere else is not this app's release,
+     * and the checksum would vouch for whatever it pointed at.
+     */
+    static boolean isTrustedAssetUrl(String url) {
+        if (url == null || url.isEmpty()) return false;
+        try {
+            URI uri = new URI(url);
+            if (!"https".equalsIgnoreCase(uri.getScheme()) || uri.getRawUserInfo() != null
+                    || (uri.getPort() != -1 && uri.getPort() != 443)) return false;
+            String host = uri.getHost();
+            String path = uri.getPath();
+            if (host == null || path == null || path.contains("/../")) return false;
+            path = path.toLowerCase(Locale.US);
+            if ("github.com".equalsIgnoreCase(host)) return path.startsWith(GITHUB_ASSET_PREFIX);
+            if ("gitlab.com".equalsIgnoreCase(host)) return path.startsWith(GITLAB_PROJECT_PREFIX);
+            return false;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     static ApkAsset selectGitHubApkAsset(JSONArray assets) {
@@ -21,7 +48,7 @@ final class OtaReleaseAssets {
             if (asset == null) continue;
             String name = asset.optString("name", "");
             String downloadUrl = asset.optString("browser_download_url", "");
-            if (!name.toLowerCase(Locale.US).endsWith(".apk") || downloadUrl.isEmpty()) continue;
+            if (!name.toLowerCase(Locale.US).endsWith(".apk") || !isTrustedAssetUrl(downloadUrl)) continue;
             candidates.add(new ApkAsset(name, downloadUrl));
         }
         return chooseBestApkAsset(candidates);
@@ -39,7 +66,7 @@ final class OtaReleaseAssets {
                     link.optString("direct_asset_url", ""),
                     link.optString("url", "")
             );
-            if (!name.toLowerCase(Locale.US).endsWith(".apk") || downloadUrl.isEmpty()) continue;
+            if (!name.toLowerCase(Locale.US).endsWith(".apk") || !isTrustedAssetUrl(downloadUrl)) continue;
             candidates.add(new ApkAsset(name, downloadUrl));
         }
         return chooseBestApkAsset(candidates);
@@ -54,7 +81,7 @@ final class OtaReleaseAssets {
             if (asset == null) continue;
             String name = asset.optString("name", "");
             String downloadUrl = asset.optString("browser_download_url", "");
-            if (downloadUrl.isEmpty()) continue;
+            if (!isTrustedAssetUrl(downloadUrl)) continue;
             if (expectedSidecarName.equalsIgnoreCase(name)) {
                 return new HashAsset(name, downloadUrl);
             }
@@ -77,7 +104,7 @@ final class OtaReleaseAssets {
                     link.optString("direct_asset_url", ""),
                     link.optString("url", "")
             );
-            if (downloadUrl.isEmpty()) continue;
+            if (!isTrustedAssetUrl(downloadUrl)) continue;
             if (expectedSidecarName.equalsIgnoreCase(name)) {
                 return new HashAsset(name, downloadUrl);
             }
