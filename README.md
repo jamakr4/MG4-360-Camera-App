@@ -531,13 +531,13 @@ external pause, without independent sessions for multiple companion apps.
 >
 > Use the signed release APK. The app uses the system shared user to access the vehicle cameras, so an unsigned or differently signed build cannot be installed as a drop-in replacement.
 
-OpenCV is referenced from a local path, so Android builds can fail if `OpenCV_DIR` is not set correctly.
+OpenCV is referenced from a local path, so Android builds fail if it cannot be found.
 
 Before building:
 
 1. Download the Android SDK package from [opencv/opencv releases](https://github.com/opencv/opencv/releases).
 2. Use `opencv-android-sdk.zip`, not the Windows or macOS packages.
-3. Update `OpenCV_DIR` in [`app/src/main/cpp/CMakeLists.txt`](app/src/main/cpp/CMakeLists.txt) so it matches your local OpenCV Android SDK path.
+3. Set `OPENCV_ANDROID_SDK` to the unpacked `OpenCV-android-sdk` directory, or keep it at the default `~/Projekts/OpenCV-android-sdk` that [`app/src/main/cpp/CMakeLists.txt`](app/src/main/cpp/CMakeLists.txt) falls back to. CI uses OpenCV 4.9.0.
 
 Android Studio creates the ignored `local.properties` file with your local Android SDK path (`sdk.dir`). After preparing the local assets below, [tools/build_sign_release.sh](tools/build_sign_release.sh) builds and signs the release APK and writes its SHA-256 sidecar.
 
