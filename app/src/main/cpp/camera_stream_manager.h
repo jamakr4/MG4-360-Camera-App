@@ -42,6 +42,8 @@ void releaseCameraHold(int owner);
 std::array<int64_t,6> copyBirdseyeSnapshot(int owner,int camera,uint8_t* into,size_t capacity,int64_t afterUs);
 void detachBirdseye(int owner);
 int64_t copyBirdseye(int owner, int camera, uint8_t* destination, size_t capacity, int64_t afterUs);
+// Newest receipt per camera without copying pixels; false when the registry is busy.
+bool latestBirdseye(int owner, int64_t (&latestUs)[4]);
 int64_t birdseyeClockUs();
 
 bool attachPreview(JNIEnv* env, int videoIndex, jobject surface, bool enhanced = false);

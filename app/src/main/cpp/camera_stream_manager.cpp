@@ -3960,6 +3960,20 @@ namespace camera_stream_manager
         return info.capturedUs;
     }
 
+    bool latestBirdseye(int owner, int64_t (&latestUs)[4]) {
+        for (auto& value : latestUs) value = 0;
+        if (owner < 1 || owner > 1000000 || gCameraAccess.blocked()) return false;
+        // Called once per display frame on the GL thread: never wait for attach/detach.
+        std::unique_lock<std::mutex> lock(gBirdseyeOwnerMutex, std::try_to_lock);
+        if (!lock) return false;
+        for (int camera = 0; camera < 4; ++camera) {
+            auto it = gBirdseyeTaps.find(birdseyeId(owner, camera));
+            if (it != gBirdseyeTaps.end() && !it->second->snapshot)
+                latestUs[camera] = it->second->mailbox.capturedUs();
+        }
+        return true;
+    }
+
     std::array<int64_t,6> copyBirdseyeSnapshot(int owner,int camera,uint8_t* into,size_t capacity,int64_t afterUs) {
         if(owner<1||owner>1000000||camera<0||camera>3||gCameraAccess.blocked())return {};
         std::shared_ptr<BirdseyeTap> tap;

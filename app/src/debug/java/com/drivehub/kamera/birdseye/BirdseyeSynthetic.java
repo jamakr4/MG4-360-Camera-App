@@ -17,10 +17,10 @@ public final class BirdseyeSynthetic implements BirdseyeRenderer.Frames {
     private static final class Pattern {
         static final byte[][] FIELDS=create();
         private static byte[][] create() {
-            byte[][] fields=new byte[4][720*240*2];
+            byte[][] fields=new byte[4][720*480*2];
             BirdseyeCalibration calibration=BirdseyeCalibration.parse(calibrationBytes());
-            for (int c = 0; c < 4; c++) for (int y = 0; y < 240; y++) for (int x = 0; x < 720; x += 2) {
-                int a = pixel(calibration,c, x, y*2), b = pixel(calibration,c, x+1, y*2);
+            for (int c = 0; c < 4; c++) for (int y = 0; y < 480; y++) for (int x = 0; x < 720; x += 2) {
+                int a = pixel(calibration,c, x, y), b = pixel(calibration,c, x+1, y);
                 double[] ya = yuv(a), yb = yuv(b);
                 int i = (y*720+x)*2;
                 fields[c][i] = channel((ya[1]+yb[1])/2);

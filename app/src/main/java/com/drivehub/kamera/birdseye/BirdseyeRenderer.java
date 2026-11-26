@@ -20,13 +20,15 @@ public final class BirdseyeRenderer implements GLSurfaceView.Renderer {
         long copy(int camera, ByteBuffer destination, long afterUs);
         long clockUs();
         boolean allowed();
+        /** Newest receipt per camera without copying; false = unknown, so every display frame draws. */
+        default boolean latest(long[] latestUs) { return false; }
     }
     private final Frames frames;
     private final BirdseyeCarArtwork.Source artworkSource;
     private final java.util.function.LongSupplier guideClock;
     private final GuidelineAnimation guideAnimation;
     private final GuidelineFrame guideFrame=new GuidelineFrame();
-    private final ByteBuffer upload = ByteBuffer.allocateDirect(720*240*2).order(ByteOrder.nativeOrder());
+    private final ByteBuffer upload = ByteBuffer.allocateDirect(720*480*2).order(ByteOrder.nativeOrder());
     private final long[] capturedUs = new long[4];
     private final int[] textures = new int[5], buffers = new int[2];
     private final int[] attributes = new int[5];
@@ -84,7 +86,11 @@ public final class BirdseyeRenderer implements GLSurfaceView.Renderer {
     public volatile long renderedFrames, lastDrawCpuUs, lastDrawElapsedMs;
     public volatile int contextGeneration;
     public volatile boolean hasCarArtwork;
-    private long statsStartedNs, statsFrames, statsSubmitUs;
+    private long statsStartedNs, statsFrames, statsSubmitUs, statsPacedSkips;
+    // 2D frame pacing (GL thread only). See shouldDraw().
+    private final long[] latestUs=new long[4];
+    private final BirdseyeFramePacing pacing=new BirdseyeFramePacing();
+    private long lastDrawUs;
     private final long[] statsUploads = new long[4];
     private static volatile String latestTiming = "Birdseye: no active renderer";
     private static volatile String samplingDevice = "UYVY/GPU: not initialized";
@@ -99,10 +105,28 @@ public final class BirdseyeRenderer implements GLSurfaceView.Renderer {
         double seconds=(now-statsStartedNs)/1e9;
         if(seconds<1)return;
         latestTiming=String.format(java.util.Locale.ROOT,
-                "Birdseye %s: %.1f draw FPS, %.2f ms submit\nSampled camera FPS L/R/F/B: %.1f / %.1f / %.1f / %.1f",
-                threeDActive?"3D":"2D",statsFrames/seconds,statsSubmitUs/(1000.0*statsFrames),
+                "Birdseye %s: %.1f draw FPS, %.2f ms submit, %.1f paced waits/s\nSampled camera FPS L/R/F/B: %.1f / %.1f / %.1f / %.1f",
+                threeDActive?"3D":"2D",statsFrames/seconds,statsSubmitUs/(1000.0*statsFrames),statsPacedSkips/seconds,
                 statsUploads[0]/seconds,statsUploads[1]/seconds,statsUploads[2]/seconds,statsUploads[3]/seconds);
-        timingAtMs=SystemClock.elapsedRealtime();statsStartedNs=now;statsFrames=0;statsSubmitUs=0;Arrays.fill(statsUploads,0);
+        timingAtMs=SystemClock.elapsedRealtime();statsStartedNs=now;statsFrames=0;statsSubmitUs=0;statsPacedSkips=0;Arrays.fill(statsUploads,0);
+    }
+
+    /**
+     * GL thread, before each display frame. 2D draws once per camera round instead of on
+     * every vsync, as late as possible without letting any camera skip an image (see
+     * {@link BirdseyeFramePacing}). The four
+     * cameras are not synchronized, so at 60 Hz almost every vsync used to carry one new
+     * camera and the whole 4-camera composite was redrawn ~60 times a second, each region
+     * refreshed at a different moment. This mirrors the stock ArcSoft app, which reads all
+     * four cameras and then draws once (~30 Hz), and roughly halves GPU and TextureView
+     * composition load. 3D keeps drawing every frame for touch orbiting.
+     */
+    public boolean shouldDraw() {
+        if(threeDRequested||error!=null||program==0||requestedMesh==null||resetGeneration!=appliedGeneration)return true;
+        if(!frames.allowed()||!frames.latest(latestUs))return true;
+        boolean draw=pacing.shouldDraw(latestUs,capturedUs,frames.clockUs(),lastDrawUs);
+        if(!draw)statsPacedSkips++;
+        return draw;
     }
 
     public BirdseyeRenderer(Frames frames) { this(frames, (BirdseyeCarArtwork.Source)null); }
@@ -136,8 +160,7 @@ public final class BirdseyeRenderer implements GLSurfaceView.Renderer {
             "#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n" +
             "uniform sampler2D uCam0,uCam1,uCam2,uCam3; uniform vec4 uFresh; uniform float uCarReady,uBlackBox;\n" +
             "varying vec3 vCam0,vCam1,vCam2,vCam3; varying vec2 vGround;\n" +
-            // Reference (u,v) -> top-field (u,v/2). Top-field pixels occupy rows
-            // 0,2,...478; interpolate between those actual positions, clamp the last line.
+            // Reference (u,v) samples the woven 720x480 frame directly.
             PackedUyvyShader.SAMPLING + BirdseyeRearMask.GLSL +
             "void main(){vec2 car=vec2(" + BirdseyeMesh.CAR_WIDTH/2 + "," + BirdseyeMesh.CAR_LENGTH/2 + ");" +
             // Cover the calibrated vehicle footprint before composing the transparent car artwork.
@@ -164,7 +187,7 @@ public final class BirdseyeRenderer implements GLSurfaceView.Renderer {
         bowlPass=null;pdcPass=null;guidePass=null;carPass=null;carArtworkGeometry=null;
         pdcUnavailable=false;guidesUnavailable=false;threeDActive=false;
         int[] depth=new int[1];GLES20.glGetIntegerv(GLES20.GL_DEPTH_BITS,depth,0);depthAvailable=depth[0]>=16;
-        Arrays.fill(capturedUs, 0); freshMask = 0; displayMask = 0;
+        Arrays.fill(capturedUs, 0); freshMask = 0; displayMask = 0; pacing.reset(); lastDrawUs=0;
         statsStartedNs=0;statsFrames=0;statsSubmitUs=0;Arrays.fill(statsUploads,0);
         try {
             program = link(VERTEX, FRAGMENT);
@@ -186,7 +209,7 @@ public final class BirdseyeRenderer implements GLSurfaceView.Renderer {
                 GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, cameraFilter);
                 GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE);
                 GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE);
-                GLES20.glTexImage2D(GLES20.GL_TEXTURE_2D, 0, GLES20.GL_RGBA, 360, 240, 0,
+                GLES20.glTexImage2D(GLES20.GL_TEXTURE_2D, 0, GLES20.GL_RGBA, 360, 480, 0,
                         GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, null);
                 GLES20.glUniform1i(GLES20.glGetUniformLocation(program, "uCam"+i), i);
             }
@@ -233,7 +256,7 @@ public final class BirdseyeRenderer implements GLSurfaceView.Renderer {
                     long captured = frames.copy(i, upload, capturedUs[i]);
                     if (captured > capturedUs[i]) {
                         upload.position(0);
-                        GLES20.glTexSubImage2D(GLES20.GL_TEXTURE_2D, 0, 0, 0, 360, 240,
+                        GLES20.glTexSubImage2D(GLES20.GL_TEXTURE_2D, 0, 0, 0, 360, 480,
                                 GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, upload);
                         capturedUs[i] = captured; statsUploads[i]++;
                     }
@@ -336,6 +359,7 @@ public final class BirdseyeRenderer implements GLSurfaceView.Renderer {
             wideActive=!drewThreeD&&useWide;
             freshMask = mask;displayMask = visibleMask;
             renderedFrames++; lastDrawElapsedMs = SystemClock.elapsedRealtime();
+            lastDrawUs = frames.clockUs();
         } catch (RuntimeException e) { fail(e); }
         lastDrawCpuUs = (System.nanoTime()-start)/1000;
         recordTiming(System.nanoTime());

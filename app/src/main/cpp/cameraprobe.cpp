@@ -274,6 +274,15 @@ Java_com_drivehub_kamera_birdseye_BirdseyeNative_copy(JNIEnv* env, jclass, jint 
     if (!data || size < 0) return 0;
     return camera_stream_manager::copyBirdseye(owner, camera, data, static_cast<size_t>(size), afterUs);
 }
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_drivehub_kamera_birdseye_BirdseyeNative_latest(JNIEnv* env, jclass, jint owner, jlongArray output) {
+    if (!output || env->GetArrayLength(output) < 4) return false;
+    int64_t latest[4];
+    if (!camera_stream_manager::latestBirdseye(owner, latest)) return false;
+    jlong values[4] = {latest[0], latest[1], latest[2], latest[3]};
+    env->SetLongArrayRegion(output, 0, 4, values);
+    return true;
+}
 extern "C" JNIEXPORT jlong JNICALL
 Java_com_drivehub_kamera_birdseye_BirdseyeNative_clockUs(JNIEnv*, jclass) {
     return camera_stream_manager::birdseyeClockUs();

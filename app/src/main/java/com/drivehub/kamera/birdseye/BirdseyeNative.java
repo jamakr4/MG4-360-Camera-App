@@ -13,5 +13,7 @@ final class BirdseyeNative {
     static native long[] copySnapshot(int owner,int camera,ByteBuffer output,long afterUs);
     static native void detach(int owner);
     static native long copy(int owner, int camera, ByteBuffer output, long afterUs);
+    /** Newest receipt per camera (0 = none) without copying pixels; false if the registry is busy. */
+    static native boolean latest(int owner, long[] latestUs);
     static native long clockUs();
 }

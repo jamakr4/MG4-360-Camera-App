@@ -40,8 +40,8 @@ public class PrivateCaptureDebugInstrumentedTest {
             try(PrivateCameraCapture capture=PrivateCameraCapture.load(context,fixture.getName())){
                 assertEquals(720,capture.image(0).getWidth());assertEquals(480,capture.image(0).getHeight());
                 assertEquals(0xFF000000,capture.image(0).getPixel(0,0));assertEquals(0xFFFFFFFF,capture.image(0).getPixel(0,1));
-                ByteBuffer output=ByteBuffer.allocateDirect(720*240*2);long time=capture.copy(0,output,0);assertEquals(capture.clockUs(),time);
-                for(int y=0;y<240;y++)assertEquals(16,output.get(y*1440+1)&255);
+                ByteBuffer output=ByteBuffer.allocateDirect(720*480*2);long time=capture.copy(0,output,0);assertEquals(capture.clockUs(),time);
+                for(int y=0;y<480;y++)assertEquals(y%2==0?16:235,output.get(y*1440+1)&255);
                 assertEquals(0,capture.copy(0,output,time));assertTrue(capture.allowed());
             }
             try{PrivateCameraCapture.load(context,"../outside");fail();}catch(IOException expected){}
