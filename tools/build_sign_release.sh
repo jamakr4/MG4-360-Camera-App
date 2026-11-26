@@ -19,6 +19,16 @@ if [[ -z "${APKSIGNER}" ]]; then
   exit 1
 fi
 
+# The AOSP test platform key is not in the repository: keep a local copy in tools/,
+# or point PLATFORM_KEYS_DIR at the directory that holds platform.pk8 and platform.x509.pem.
+PLATFORM_KEYS_DIR="${PLATFORM_KEYS_DIR:-${ROOT_DIR}/tools}"
+for key_file in platform.pk8 platform.x509.pem; do
+  if [[ ! -f "${PLATFORM_KEYS_DIR}/${key_file}" ]]; then
+    echo "Missing ${PLATFORM_KEYS_DIR}/${key_file} (AOSP build/target/product/security)" >&2
+    exit 1
+  fi
+done
+
 UNSIGNED_APK="app/build/outputs/apk/release/app-release-unsigned.apk"
 RELEASE_DIR="app/build/outputs/apk/release"
 ARTIFACT_BASENAME="MG4-360-Camera-App-v${VERSION_NAME}-release.apk"
@@ -28,8 +38,8 @@ SHA_FILE="${SIGNED_APK}.sha256"
 ./gradlew --no-daemon clean assembleRelease
 
 "${APKSIGNER}" sign \
-  --key tools/platform.pk8 \
-  --cert tools/platform.x509.pem \
+  --key "${PLATFORM_KEYS_DIR}/platform.pk8" \
+  --cert "${PLATFORM_KEYS_DIR}/platform.x509.pem" \
   --out "${SIGNED_APK}" \
   "${UNSIGNED_APK}"
 
