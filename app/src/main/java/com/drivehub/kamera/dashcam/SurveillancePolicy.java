@@ -56,6 +56,19 @@ public final class SurveillancePolicy {
                 || a.equals("/") || b.equals("/");
     }
 
+    /**
+     * A directory named by another app (the START_CONTINUOUS extra) must sit on shared or
+     * removable storage. The receiver is open to every app and this one runs as the system
+     * user, so an unchecked path could fill /data, which the head unit needs to stay stable.
+     */
+    public static boolean isRemoteDirectoryAllowed(String path) {
+        if (path == null || !path.startsWith("/")) return false;
+        for (String segment : path.split("/")) if (segment.equals("..") || segment.equals(".")) return false;
+        String normalized = path.replaceAll("/+", "/");
+        return (normalized.startsWith("/storage/") && normalized.length() > "/storage/".length())
+                || (normalized.startsWith("/mnt/media_rw/") && normalized.length() > "/mnt/media_rw/".length());
+    }
+
     public static boolean isClip(String name) {
         return name.matches("surv_[0-9]{17}_[a-f0-9]{8}\\.mp4");
     }
