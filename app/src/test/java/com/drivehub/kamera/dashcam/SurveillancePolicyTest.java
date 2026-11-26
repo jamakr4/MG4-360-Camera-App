@@ -23,6 +23,16 @@ public class SurveillancePolicyTest {
             assertEquals(120, minutes(value));
     }
 
+    @Test public void remoteDirectoryMustBeSharedOrRemovableStorage() {
+        assertTrue(isRemoteDirectoryAllowed("/storage/USB/surveillance"));
+        assertTrue(isRemoteDirectoryAllowed("/storage/emulated/0/Download/surveillance"));
+        assertTrue(isRemoteDirectoryAllowed("/mnt/media_rw/1234-ABCD/surveillance"));
+        for (String path : new String[]{null, "", "surveillance", "/data/system", "/data/local/tmp",
+                "/storage", "/storage/", "/mnt/media_rw/", "/storage/../data/system",
+                "/storage/emulated/0/./x", "//data/system", "/storagex/y"})
+            assertFalse(String.valueOf(path), isRemoteDirectoryAllowed(path));
+    }
+
     @Test public void explicitStoragePoliciesAndSafeDefault() {
         assertEquals("recycle", policy(null));
         assertEquals("recycle", policy("  "));

@@ -326,6 +326,8 @@ public class RecordingService extends Service {
                 try {
                     String policy = SurveillancePolicy.policy(RemoteRecording.string(intent, "storage_policy"));
                     String directory = RemoteRecording.string(intent, "directory").trim();
+                    if (!directory.isEmpty() && !SurveillancePolicy.isRemoteDirectoryAllowed(directory))
+                        throw new IllegalArgumentException("invalid_directory");
                     if (directory.isEmpty()) directory = prefs().getString(SurveillanceStore.KEY_DIRECTORY, "").trim();
                     if (!directory.isEmpty() && !new File(directory).isAbsolute())
                         throw new IllegalArgumentException("invalid_directory");
