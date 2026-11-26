@@ -81,8 +81,8 @@ public class BirdseyeGlesInstrumentedTest {
     @Test public void linearPackedSamplerMatchesFourTapReferenceAtParityRowsAndBorders() {
         // High-frequency luma/chroma reveal accidental interpolation between
         // packed columns, even/odd Y selection and clamping errors at field edges.
-        ByteBuffer input=ByteBuffer.allocateDirect(720*240*2);
-        for(int y=0;y<240;y++)for(int pair=0;pair<360;pair++) {
+        ByteBuffer input=ByteBuffer.allocateDirect(720*480*2);
+        for(int y=0;y<480;y++)for(int pair=0;pair<360;pair++) {
             input.put((byte)(32+(pair*31+y*17)%190));
             input.put((byte)(32+(pair*34+y*29)%190));
             input.put((byte)(32+(pair*13+y*37)%190));
@@ -94,12 +94,12 @@ public class BirdseyeGlesInstrumentedTest {
                 +"uniform sampler2D tex;uniform vec2 uv;";
         String output="void main(){gl_FragColor=vec4(camera(tex,uv),1.0);}";
         String reference="vec3 pixel(sampler2D t,vec2 p){"
-                +"vec4 q=texture2D(t,vec2((floor(p.x/2.0)+0.5)/360.0,(p.y+0.5)/240.0));"
+                +"vec4 q=texture2D(t,vec2((floor(p.x/2.0)+0.5)/360.0,(p.y+0.5)/480.0));"
                 +"return vec3(mod(p.x,2.0)<0.5?q.g:q.a,q.r,q.b);}"
                 +"vec3 camera(sampler2D t,vec2 uv){"
-                +"vec2 p=clamp(vec2(uv.x,uv.y*0.5),vec2(0.0),vec2(719.0,239.0)),a=floor(p),d=fract(p);"
+                +"vec2 p=clamp(uv,vec2(0.0),vec2(719.0,479.0)),a=floor(p),d=fract(p);"
                 +"vec3 c=mix(mix(pixel(t,a),pixel(t,vec2(min(a.x+1.0,719.0),a.y)),d.x),"
-                +"mix(pixel(t,vec2(a.x,min(a.y+1.0,239.0))),pixel(t,min(a+1.0,vec2(719.0,239.0))),d.x),d.y);"
+                +"mix(pixel(t,vec2(a.x,min(a.y+1.0,479.0))),pixel(t,min(a+1.0,vec2(719.0,479.0))),d.x),d.y);"
                 +"float y=1.16438356*(c.x-16.0/255.0),u=c.y-128.0/255.0,v=c.z-128.0/255.0;"
                 +"return clamp(vec3(y+1.59602678*v,y-0.39176229*u-0.81296765*v,y+2.01723214*u),0.0,1.0);}";
         try(Pbuffer egl=new Pbuffer()) {
@@ -109,7 +109,7 @@ public class BirdseyeGlesInstrumentedTest {
             GLES20.glActiveTexture(GLES20.GL_TEXTURE0);GLES20.glBindTexture(GLES20.GL_TEXTURE_2D,texture[0]);
             GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D,GLES20.GL_TEXTURE_WRAP_S,GLES20.GL_CLAMP_TO_EDGE);
             GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D,GLES20.GL_TEXTURE_WRAP_T,GLES20.GL_CLAMP_TO_EDGE);
-            GLES20.glTexImage2D(GLES20.GL_TEXTURE_2D,0,GLES20.GL_RGBA,360,240,0,GLES20.GL_RGBA,GLES20.GL_UNSIGNED_BYTE,input);
+            GLES20.glTexImage2D(GLES20.GL_TEXTURE_2D,0,GLES20.GL_RGBA,360,480,0,GLES20.GL_RGBA,GLES20.GL_UNSIGNED_BYTE,input);
             java.nio.FloatBuffer quad=ByteBuffer.allocateDirect(8*4).order(java.nio.ByteOrder.nativeOrder()).asFloatBuffer();
             quad.put(new float[]{-1,-1,1,-1,-1,1,1,1}).flip();
             ByteBuffer pixel=ByteBuffer.allocateDirect(4);int[] expected=new int[3];

@@ -22,9 +22,12 @@ int main() {
         assert(!mailbox.copy(output.data(), output.size()-1, 0, info));
         assert(mailbox.copy(output.data(), output.size(), 0, info));
         assert(info.capturedUs==1000000 && info.sequence==5);
-        for (int y=0;y<240;++y) for(int x=0;x<1440;++x) {
-            int row = layout==BirdseyeMailbox::Layout::WOVEN ? 2*y
-                : y+(layout==BirdseyeMailbox::Layout::STACKED_BOTTOM_FIRST ? 240 : 0);
+        // Woven output: even rows = top field, odd rows = bottom field.
+        for (int y=0;y<480;++y) for(int x=0;x<1440;++x) {
+            const bool top = y%2==0;
+            const bool topFirst = layout!=BirdseyeMailbox::Layout::STACKED_BOTTOM_FIRST;
+            int row = layout==BirdseyeMailbox::Layout::WOVEN ? y
+                : (top==topFirst ? 0 : 240)+y/2;
             assert(output[y*1440+x]==source[row*STRIDE+x]);
         }
         assert(source==original);
@@ -56,6 +59,14 @@ int main() {
         if(mailbox.copy(output.data(),output.size(),0,info))
             assert(info.capturedUs==1000000+info.sequence*50000LL);
     }
-    producer.join();mailbox.stop();
-    std::cout << "Birdseye mailbox: full 25 fps, monotonic timestamps, padded stride, spatial fields, ownership and concurrent copies passed\n";
+    producer.join();
+    // Triple buffering: a concurrent reader never costs the producer a frame.
+    assert(mailbox.dropped()==0);
+    assert(mailbox.capturedUs()==1000000+999*50000LL);
+    {
+        BirdseyeMailbox::Info last;
+        assert(mailbox.copy(output.data(),output.size(),0,last)&&last.sequence==999);
+    }
+    mailbox.stop();assert(mailbox.capturedUs()==0);
+    std::cout << "Birdseye mailbox: full 25 fps, monotonic timestamps, padded stride, woven fields, ownership, drop-free concurrent copies passed\n";
 }

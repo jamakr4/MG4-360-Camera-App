@@ -41,8 +41,9 @@ public final class BirdseyeSurface extends TextureView implements TextureView.Su
         if (canDraw() && (continuous || dirty)) {
             if (beforeFrame != null) beforeFrame.run();
             displayCallbacks++;
+            boolean forced = dirty;
             dirty = false;
-            run.draw(time); // One pending GL job at most; a slow GPU never builds a queue.
+            run.draw(time, forced); // One pending GL job at most; a slow GPU never builds a queue.
         }
         scheduleFrame();
     };
@@ -140,7 +141,7 @@ public final class BirdseyeSurface extends TextureView implements TextureView.Su
                 } catch (Throwable error) { fail(error); stopped=true; closeOnThread(); }
             });
         }
-        void draw(long frameNs) {
+        void draw(long frameNs, boolean forced) {
             if (stopped) return;
             if (!queued.compareAndSet(false,true)) { busyCallbacks.incrementAndGet(); return; }
             final long requestedNs = System.nanoTime();
@@ -148,10 +149,13 @@ public final class BirdseyeSurface extends TextureView implements TextureView.Su
                 try {
                     if (stopped || surface == EGL14.EGL_NO_SURFACE) return;
                     long startedNs = System.nanoTime();
-                    if (width != lastWidth || height != lastHeight) {
+                    boolean resized = width != lastWidth || height != lastHeight;
+                    if (resized) {
                         lastWidth=width; lastHeight=height;
                         renderer.onSurfaceChanged(null,lastWidth,lastHeight);
                     }
+                    // No new camera round yet: keep the last frame, no draw and no swap.
+                    if (!forced && !resized && !renderer.shouldDraw()) return;
                     renderer.onDrawFrame(null);
                     if (renderer.error != null) { stopped=true; closeOnThread(); return; }
                     long swapStartNs = System.nanoTime();

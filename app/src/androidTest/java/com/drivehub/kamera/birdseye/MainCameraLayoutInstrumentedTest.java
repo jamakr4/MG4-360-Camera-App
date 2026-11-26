@@ -58,7 +58,7 @@ public class MainCameraLayoutInstrumentedTest {
         try {
             CameraProbe.setOemCameraAccessBlocked(true);
             for(int camera=0;camera<4;camera++) assertFalse(BirdseyeNative.attach(99999,camera));
-            assertEquals(0,BirdseyeNative.copy(99999,0,ByteBuffer.allocateDirect(720*240*2),0));
+            assertEquals(0,BirdseyeNative.copy(99999,0,ByteBuffer.allocateDirect(720*480*2),0));
             assertFalse(BirdseyeNative.attach(0,0));assertFalse(BirdseyeNative.attach(1,4));
             BirdseyeNative.detach(99999);
         } finally {CameraProbe.setOemCameraAccessBlocked(previous);}
@@ -75,7 +75,7 @@ public class MainCameraLayoutInstrumentedTest {
                 assertFalse(BirdseyeNative.attach(owner,camera));
                 assertFalse(BirdseyeNative.attachSnapshot(owner,camera));
                 assertFalse(BirdseyeNative.hold(owner,camera));
-                assertEquals(0,BirdseyeNative.copy(owner,camera,ByteBuffer.allocateDirect(720*240*2),0));
+                assertEquals(0,BirdseyeNative.copy(owner,camera,ByteBuffer.allocateDirect(720*480*2),0));
             }
             assertArrayEquals(new int[]{0,0,1},CameraProbe.cameraOwnershipSnapshot());
         } finally {

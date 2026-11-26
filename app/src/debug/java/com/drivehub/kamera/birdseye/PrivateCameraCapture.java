@@ -51,8 +51,8 @@ public final class PrivateCameraCapture implements BirdseyeRenderer.Frames, Auto
                 byte[] raw=read(dir,name+".uyvy",CameraSnapshotCapture.BYTES);
                 if(raw.length!=CameraSnapshotCapture.BYTES)throw new IOException("Incomplete raw frame");
                 checkHash(raw,row.getString("raw_sha256"));int field=row.getInt("v4l2_field");SnapshotPixels.layout(field);
-                fields[camera]=new byte[720*240*2];
-                for(int y=0;y<240;y++)System.arraycopy(raw,SnapshotPixels.sourceRow(y*2,480,field)*1440,fields[camera],y*1440,1440);
+                fields[camera]=new byte[720*480*2];
+                for(int y=0;y<480;y++)System.arraycopy(raw,SnapshotPixels.sourceRow(y,480,field)*1440,fields[camera],y*1440,1440);
                 byte[] png=read(dir,name+".png",4*1024*1024);checkHash(png,row.getString("png_sha256"));
                 BitmapFactory.Options bounds=new BitmapFactory.Options();bounds.inJustDecodeBounds=true;BitmapFactory.decodeByteArray(png,0,png.length,bounds);
                 if(bounds.outWidth!=720||bounds.outHeight!=480)throw new IOException("Expected 720x480 PNG");

@@ -445,6 +445,7 @@ public final class BirdseyeView extends FrameLayout {
             return allowed() ? BirdseyeNative.copy(owner, camera, output, afterUs) : 0;
         }
         @Override public long clockUs() { return BirdseyeNative.clockUs(); }
+        @Override public boolean latest(long[] latestUs) { return allowed() && BirdseyeNative.latest(owner, latestUs); }
         @Override public boolean allowed() { return active && ready && !CameraProbe.isOemCameraAccessBlocked(); }
     }
 }
