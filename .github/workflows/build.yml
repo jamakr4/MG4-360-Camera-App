@@ -1,0 +1,56 @@
+name: Build
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      OPENCV_VERSION: 4.9.0
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.2.2
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4.7.1
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4.4.1
+
+      - name: Cache OpenCV Android SDK
+        id: opencv-cache
+        uses: actions/cache@v4.2.3
+        with:
+          path: ${{ runner.temp }}/OpenCV-android-sdk
+          key: opencv-android-sdk-${{ env.OPENCV_VERSION }}
+
+      - name: Download OpenCV Android SDK
+        if: steps.opencv-cache.outputs.cache-hit != 'true'
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/opencv.zip" \
+            "https://github.com/opencv/opencv/releases/download/${OPENCV_VERSION}/opencv-${OPENCV_VERSION}-android-sdk.zip"
+          unzip -q "$RUNNER_TEMP/opencv.zip" -d "$RUNNER_TEMP"
+          rm "$RUNNER_TEMP/opencv.zip"
+
+      - name: Unit tests and debug build
+        env:
+          OPENCV_ANDROID_SDK: ${{ runner.temp }}/OpenCV-android-sdk
+        run: ./gradlew --no-daemon testDebugUnitTest assembleDebug
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: unit-test-reports
+          path: app/build/reports/tests/
+          retention-days: 7
