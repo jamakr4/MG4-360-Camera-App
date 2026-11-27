@@ -56,6 +56,7 @@ bool attachPreviewSink(JNIEnv* env, int videoIndex, int sinkId, jobject surface,
 void setIpkRearviewSession(int token);
 bool setIpkRearviewMap(int token,const std::vector<float>* uv);
 void detachPreviewSink(int videoIndex, int sinkId);
+int64_t previewSinkCaptureAgeMs(int videoIndex, int sinkId);
 int64_t previewSinkFrameAgeMs(int videoIndex, int sinkId);
 // age ms (-1 until first post), posted frames, last capture-to-post ms, last post cost ms.
 std::array<int64_t, 4> previewSinkStats(int videoIndex, int sinkId);

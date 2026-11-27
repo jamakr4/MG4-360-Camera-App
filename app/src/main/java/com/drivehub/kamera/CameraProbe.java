@@ -38,6 +38,11 @@ public final class CameraProbe {
      */
     public static native long mainPreviewFrameAgeMs(int videoIndex);
 
+    // IPK cycles through 0..31. The activity uses its own output across camera switches.
+    public static final int MAIN_ACTIVITY_SINK = 32;
+    /** Capture age of the last frame actually presented by this sink, or -1 if unavailable. */
+    public static native long previewSinkCaptureAgeMs(int videoIndex, int sinkId);
+
     /** Additional display output; attaching/detaching it leaves the main preview intact. */
     public static native boolean attachPreviewSink(int videoIndex, int sinkId,
             android.view.Surface surface);

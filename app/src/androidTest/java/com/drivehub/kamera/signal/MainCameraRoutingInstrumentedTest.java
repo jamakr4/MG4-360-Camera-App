@@ -15,6 +15,8 @@ import com.drivehub.kamera.MainActivity;
 import com.drivehub.kamera.R;
 import com.drivehub.kamera.camera.CameraIndex;
 import com.drivehub.kamera.camera.OverlayService;
+import com.drivehub.kamera.dev.DevRuntimeLog;
+import com.drivehub.kamera.side.SideCameraView;
 import com.drivehub.kamera.settings.UiPrefs;
 
 import org.junit.Test;
@@ -23,6 +25,10 @@ import org.junit.runner.RunWith;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.Assert.*;
@@ -49,6 +55,40 @@ public class MainCameraRoutingInstrumentedTest {
             sample(f.service,TurnSignal.OFF,4);
             f.scenario.moveToState(Lifecycle.State.RESUMED);
             assertCamera(f.scenario,CameraIndex.FRONT);
+        }
+    }
+
+    @Test public void slowPreviewWorkersAllowRoutingAndClosingBeforeAnyQueuedOpen() throws Exception {
+        try (Fixture f = new Fixture()) {
+            f.scenario.moveToState(Lifecycle.State.CREATED);
+            ExecutorService main = (ExecutorService) field(MainActivity.class, "PREVIEW_IO").get(null);
+            ExecutorService sides = (ExecutorService) field(SideCameraView.class, "IO").get(null);
+            CountDownLatch release = new CountDownLatch(1);
+            Future<Boolean> mainHeld = main.submit(() -> release.await(12, TimeUnit.SECONDS));
+            Future<Boolean> sidesHeld = sides.submit(() -> release.await(12, TimeUnit.SECONDS));
+            try {
+                DevRuntimeLog.add("Test", "begin delayed preview opens");
+                f.scenario.moveToState(Lifecycle.State.RESUMED);
+                sample(f.service, TurnSignal.LEFT, 4);
+                assertCamera(f.scenario, CameraIndex.LEFT);
+                Field request = field(MainActivity.class, "previewRequest");
+                f.scenario.onActivity(activity -> {
+                    try { assertNotNull("An open should be queued", request.get(activity)); }
+                    catch (IllegalAccessException error) { throw new AssertionError(error); }
+                });
+                f.scenario.moveToState(Lifecycle.State.CREATED);
+            } finally {
+                release.countDown();
+            }
+            assertTrue("UI waited for main preview IO", mainHeld.get());
+            assertTrue("UI waited for side preview IO", sidesHeld.get());
+            main.submit(() -> {}).get(3, TimeUnit.SECONDS);
+            sides.submit(() -> {}).get(3, TimeUnit.SECONDS);
+            String log = DevRuntimeLog.snapshot();
+            int marker = log.lastIndexOf("begin delayed preview opens");
+            assertTrue(marker >= 0);
+            assertFalse(log.substring(marker).contains("[Main preview]"));
+            assertFalse(log.substring(marker).contains("[Side preview]"));
         }
     }
 

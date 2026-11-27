@@ -10,7 +10,7 @@ import java.io.IOException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.CompletableFuture;
-import java.nio.file.Paths;
+import com.drivehub.kamera.side.AdvancedWheelProjection;
 
 /** Process-wide immutable CPU assets; model work never occupies the camera attach/detach worker. */
 public final class RivelaAssets {
@@ -35,10 +35,16 @@ public final class RivelaAssets {
     public static synchronized CompletableFuture<WarmupResult> prewarm(Context context) {
         if(warmup!=null)return warmup;
         AssetManager assets=context.getApplicationContext().getAssets();
+        CalibrationStore store=CalibrationStore.get(context);
+        ProjectionAssets.useDiskCache(CalibrationStore.directory(context));
         CompletableFuture<WarmupResult> pending=new CompletableFuture<>();warmup=pending;
         try {
             IO.execute(()->{
-                WarmupResult result=warm(assets,()->BirdseyeCalibration.load(Paths.get(BirdseyeCalibration.VEHICLE_PATH)));
+                WarmupResult result=warm(assets,()->{
+                    BirdseyeCalibration calibration = store.loadVehicle();
+                    AdvancedWheelProjection.prewarm(context, calibration);
+                    return calibration;
+                });
                 pending.complete(result);
             });
         }catch(RuntimeException|OutOfMemoryError error) {
@@ -51,17 +57,25 @@ public final class RivelaAssets {
     /** Independent stages: late/unreadable vehicle calibration must not prevent model preloading. */
     static WarmupResult warm(AssetManager assets,CalibrationLoader calibration) {
         long started=SystemClock.elapsedRealtime();boolean modelReady=false,projectionReady=false;
-        try {model(assets);modelReady=true;}
-        catch(Exception|OutOfMemoryError error) {Log.w("RivelaAssets","Model warmup unavailable",ThreeDFailure.at(ThreeDFailure.Kind.MODEL,error));}
-        try {
-            ProjectionAssets projection=ProjectionAssets.get(calibration.load());
-            projection.scene.prepareBowl();projectionReady=true;
-        }catch(Exception|OutOfMemoryError error) {
+        // 2D projection first: it is what the parking view needs before anything else.
+        ProjectionAssets projection=null;
+        try {projection=ProjectionAssets.get(calibration.load());}
+        catch(Exception|OutOfMemoryError error) {
             // The mount may not be ready at boot. The visible view reads/validates the file again.
             Log.i("RivelaAssets","Projection warmup deferred: "+error.getMessage());
+            com.drivehub.kamera.dev.DevRuntimeLog.add("Warmup","Projection deferred: "+error.getMessage());
+        }
+        try {model(assets);modelReady=true;}
+        catch(Exception|OutOfMemoryError error) {Log.w("RivelaAssets","Model warmup unavailable",ThreeDFailure.at(ThreeDFailure.Kind.MODEL,error));}
+        if(projection!=null) {
+            try {projection.scene.prepareBowl();projectionReady=true;}
+            catch(Exception|OutOfMemoryError error) {Log.i("RivelaAssets","Bowl warmup deferred: "+error.getMessage());}
         }
         WarmupResult result=new WarmupResult(modelReady,projectionReady,SystemClock.elapsedRealtime()-started);
-        Log.i("RivelaAssets","Startup warmup: model="+result.modelReady+", projection="+result.projectionReady+", "+result.elapsedMs+" ms");
+        String summary="model="+result.modelReady+", projection="+result.projectionReady+", "+result.elapsedMs
+                +" ms, started boot+"+(started/1000)+" s";
+        Log.i("RivelaAssets","Startup warmup: "+summary);
+        com.drivehub.kamera.dev.DevRuntimeLog.add("Warmup",summary);
         return result;
     }
     /** IO-only entry point, also used by instrumentation to measure the actual cache path. */

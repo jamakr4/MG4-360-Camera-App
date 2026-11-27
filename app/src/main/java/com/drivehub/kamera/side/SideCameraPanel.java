@@ -113,18 +113,11 @@ public final class SideCameraPanel extends ViewGroup {
     }
 
     private void createProjectionLoader(){
-        advanced=new AdvancedWheelProjection(new AdvancedWheelProjection.Access(){
-            public com.drivehub.kamera.birdseye.BirdseyeCalibration load()throws java.io.IOException{
-                return com.drivehub.kamera.birdseye.BirdseyeCalibration.load(java.nio.file.Paths.get(com.drivehub.kamera.birdseye.BirdseyeCalibration.VEHICLE_PATH));
-            }
-            public void session(int token){SideCameraNative.setAdvancedSession(token);}
-            public boolean maps(int token,String key,float[][] maps){return SideCameraNative.setAdvancedMaps(token,key,
-                    maps==null?null:maps[0],maps==null?null:maps[1],maps==null?null:maps[2],maps==null?null:maps[3],maps==null?null:maps[4],maps==null?null:maps[5]);}
-        },message->com.drivehub.kamera.dev.DevRuntimeLog.add("Curbside",message));
+        advanced = AdvancedWheelProjection.forView(getContext());
     }
     private void updateProjectionState(){
         if(advanced!=null)advanced.setActive(displaying&&!UiPrefs.isOemCameraAccessBlocked(prefs)
-                &&(wheels?(UiPrefs.getParkingWheelMode(prefs,true)==WheelAlignmentMode.ADVANCED||UiPrefs.getParkingWheelMode(prefs,false)==WheelAlignmentMode.ADVANCED):UiPrefs.isParkingSideCorrectionEnabled(prefs)));
+                &&AdvancedWheelProjection.requested(prefs));
     }
     @Override protected void onDetachedFromWindow(){if(advanced!=null){advanced.close();advanced=null;}super.onDetachedFromWindow();}
 

@@ -1,13 +1,18 @@
 package com.drivehub.kamera.side;
 
+import android.content.Context;
+import android.content.SharedPreferences;
 import com.drivehub.kamera.birdseye.BirdseyeCalibration;
+import com.drivehub.kamera.birdseye.CalibrationStore;
+import com.drivehub.kamera.dev.DevRuntimeLog;
+import com.drivehub.kamera.settings.UiPrefs;
 import java.io.IOException;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.*;
 
-/** Visible-view calibration loader only. Late work cannot publish into a newer native session. */
-final class AdvancedWheelProjection implements AutoCloseable {
+/** Warmup prepares maps; only the visible session may activate them. */
+public final class AdvancedWheelProjection implements AutoCloseable {
     interface Access {
         BirdseyeCalibration load()throws IOException;
         void session(int signedToken);
@@ -27,7 +32,38 @@ final class AdvancedWheelProjection implements AutoCloseable {
     private boolean closed;
     private String status="";
     private long failureSince=-1;
-    AdvancedWheelProjection(Access access,Consumer<String> log){this(access,WheelLensMaps::get,()->System.nanoTime()/1_000_000,log,1000);}
+    static boolean requested(SharedPreferences prefs) {
+        if (!prefs.getBoolean(UiPrefs.KEY_MAIN_SIDE_CAMERA_WHEELS, false)) return UiPrefs.isParkingSideCorrectionEnabled(prefs);
+        return UiPrefs.getParkingWheelMode(prefs, true) == WheelAlignmentMode.ADVANCED
+                || UiPrefs.getParkingWheelMode(prefs, false) == WheelAlignmentMode.ADVANCED;
+    }
+
+    static AdvancedWheelProjection forView(Context context) {
+        CalibrationStore store = CalibrationStore.get(context);
+        WheelLensMapCache disk = new WheelLensMapCache(CalibrationStore.directory(context));
+        return new AdvancedWheelProjection(new Access() {
+            public BirdseyeCalibration load() throws IOException { return store.loadVehicle(); }
+            public void session(int token) { SideCameraNative.setAdvancedSession(token); }
+            public boolean maps(int token, String key, float[][] maps) { return SideCameraNative.maps(token, key, maps); }
+        }, calibration -> WheelLensMaps.get(calibration, disk, IO), () -> System.nanoTime() / 1_000_000,
+                message -> DevRuntimeLog.add("Curbside", message), 1000);
+    }
+
+    /** Runs alongside Birdseye initialization, without attaching a camera or owning a view session. */
+    public static void prewarm(Context context, BirdseyeCalibration calibration) {
+        if (!requested(UiPrefs.getPrefs(context))) return;
+        WheelLensMapCache disk = new WheelLensMapCache(CalibrationStore.directory(context));
+        IO.execute(() -> {
+            try {
+                String key = WheelLensMaps.key(calibration);
+                if (!SideCameraNative.maps(0, key, null)) {
+                    SideCameraNative.maps(0, key, WheelLensMaps.get(calibration, disk, IO));
+                }
+            } catch (RuntimeException | LinkageError | OutOfMemoryError failure) {
+                DevRuntimeLog.add("Curbside", "Map warmup deferred: " + failure.getClass().getSimpleName());
+            }
+        });
+    }
     AdvancedWheelProjection(Access access,Function<BirdseyeCalibration,float[][]> factory,LongSupplier clock,Consumer<String> log,long intervalMs){this.access=access;this.factory=factory;this.clock=clock;this.log=log;this.intervalMs=intervalMs;}
     synchronized void setActive(boolean active){
         if(closed||active==(token!=0))return;

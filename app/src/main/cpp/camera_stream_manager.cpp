@@ -1053,6 +1053,8 @@ namespace camera_stream_manager
         public:
             virtual ~FrameConsumer() = default;
             virtual void processFrame(const cv::Mat &rgbaFrame) = 0;
+            virtual void processFrameAt(const cv::Mat& frame, int64_t /*capturedUs*/) { processFrame(frame); }
+            virtual int64_t presentedFrameUs() const { return 0; }
             virtual bool isPreview() const { return false; }
             virtual bool isCameraLease() const { return false; }
             virtual int64_t lastPreviewPostUs() const { return 0; }
@@ -1175,7 +1177,7 @@ namespace camera_stream_manager
             bool wantsPackedFrame() const override { return ipkRearview_; }
             bool isLatestFrameTap() const override { return ipkRearview_; }
             int64_t lastPreviewPostUs() const override { return lastPostUs_.load(); }
-            int64_t presentedFrameUs() const {
+            int64_t presentedFrameUs() const override {
                 return stopping_.load() ? 0 : lastPresentedFrameUs_.load();
             }
             std::array<int64_t, 4> previewStats() const override {
@@ -1185,7 +1187,7 @@ namespace camera_stream_manager
             void processFrame(const cv::Mat &rgba) override {
                 processFrameAt(rgba, nowUs());
             }
-            void processFrameAt(const cv::Mat &rgba, int64_t captured) {
+            void processFrameAt(const cv::Mat &rgba, int64_t captured) override {
                 frames_.submit(captured, [&] { return Frame{rgba.clone(), captured}; });
             }
             void processPackedFrameAt(const cv::Mat& packed,int64_t captured,uint32_t,uint32_t) override {
@@ -2907,6 +2909,12 @@ namespace camera_stream_manager
                 return it == consumers_.end() ? 0 : it->second->lastPreviewPostUs();
             }
 
+            int64_t previewCaptureUs(int id) {
+                std::lock_guard<std::mutex> lock(mutex_);
+                auto it = consumers_.find(id);
+                return it == consumers_.end() ? 0 : it->second->presentedFrameUs();
+            }
+
             int64_t mainPreviewFrameUs() {
                 std::lock_guard<std::mutex> lock(mutex_);
                 return mainPreview_ ? mainPreview_->presentedFrameUs() : 0;
@@ -3604,7 +3612,7 @@ namespace camera_stream_manager
                             }
                             else
                             {
-                                consumer->processFrame(rgbaScratch_);
+                                consumer->processFrameAt(rgbaScratch_, workStartUs);
                             }
                         }
 
@@ -3775,6 +3783,7 @@ namespace camera_stream_manager
 
         static constexpr int COMBINED_CONSUMER_ID_BASE = 1000;
         static constexpr int PREVIEW_CONSUMER_ID_BASE = 2000;
+        static constexpr int LAST_PREVIEW_SINK = 32; // CameraProbe.MAIN_ACTIVITY_SINK
         static constexpr int COMBINED_CAMERA_MASK_ALL = 0x0F;
         static constexpr std::array<int, 4> COMBINED_VIDEO_INDICES = {
             CAMERA_VIDEO_INDEX_FRONT, CAMERA_VIDEO_INDEX_RIGHT,
@@ -4015,8 +4024,11 @@ namespace camera_stream_manager
     void setSideCameraCorrection(bool enabled){gSideCameraCorrection.store(enabled);}
     void setSideAdvancedSession(int token){gSideAdvanced.session(token);}
     bool setSideAdvancedMaps(int token,const std::string& key,const side_camera_advanced::Inputs* uv){
-        if(!uv)return gSideAdvanced.activate(token,key);
-        try{return gSideAdvanced.install(token,std::make_shared<const side_camera_advanced::Maps>(key,*uv));}
+        if(!uv)return token==0 ? gSideAdvanced.hasCached(key) : gSideAdvanced.activate(token,key);
+        try{
+            auto maps=std::make_shared<const side_camera_advanced::Maps>(key,*uv);
+            return token==0 ? gSideAdvanced.warm(maps) : gSideAdvanced.install(token,maps);
+        }
         catch(const std::exception& error){loge("Advanced curbside maps unavailable: %s",error.what());gSideAdvanced.activate(token,"");return false;}
     }
 
@@ -4116,7 +4128,7 @@ namespace camera_stream_manager
     bool attachPreviewSink(JNIEnv *env, int videoIndex, int sinkId, jobject surface,bool ipkRearview) {
         if (gCameraAccess.blocked()) return false;
         if(ipkRearview&&videoIndex!=CAMERA_INDEX_REAR)return false;
-        if (sinkId < 0 || sinkId > 31 || surface == nullptr) return false;
+        if (sinkId < 0 || sinkId > LAST_PREVIEW_SINK || surface == nullptr) return false;
         ANativeWindow *window = ANativeWindow_fromSurface(env, surface);
         if (window == nullptr) return false;
         auto consumer = std::make_shared<ParallelPreviewConsumer>(window, videoIndex == CAMERA_INDEX_REAR,
@@ -4142,15 +4154,23 @@ namespace camera_stream_manager
     }
 
     void detachPreviewSink(int videoIndex, int sinkId) {
-        if (sinkId < 0 || sinkId > 31) return;
+        if (sinkId < 0 || sinkId > LAST_PREVIEW_SINK) return;
         auto session = getSession(videoIndex);
         if (session == nullptr) return;
         session->detachConsumer(PREVIEW_CONSUMER_ID_BASE + sinkId);
         eraseSessionIfIdle(videoIndex, session);
     }
 
+    int64_t previewSinkCaptureAgeMs(int videoIndex, int sinkId) {
+        if (sinkId < 0 || sinkId > LAST_PREVIEW_SINK) return -1;
+        auto session = getSession(videoIndex);
+        const int64_t captured = session ? session->previewCaptureUs(PREVIEW_CONSUMER_ID_BASE + sinkId) : 0;
+        const int64_t now = nowUs();
+        return captured <= 0 || captured > now ? -1 : (now - captured) / 1000;
+    }
+
     int64_t previewSinkFrameAgeMs(int videoIndex, int sinkId) {
-        if (sinkId < 0 || sinkId > 31) return -1;
+        if (sinkId < 0 || sinkId > LAST_PREVIEW_SINK) return -1;
         auto session = getSession(videoIndex);
         if (session == nullptr) return -1;
         const int64_t posted = session->previewPostUs(PREVIEW_CONSUMER_ID_BASE + sinkId);
@@ -4158,7 +4178,7 @@ namespace camera_stream_manager
     }
 
     std::array<int64_t, 4> previewSinkStats(int videoIndex, int sinkId) {
-        if (sinkId < 0 || sinkId > 31) return {-1, 0, 0, 0};
+        if (sinkId < 0 || sinkId > LAST_PREVIEW_SINK) return {-1, 0, 0, 0};
         auto session = getSession(videoIndex);
         if (session == nullptr) return {-1, 0, 0, 0};
         auto stats = session->previewSnapshot(PREVIEW_CONSUMER_ID_BASE + sinkId);

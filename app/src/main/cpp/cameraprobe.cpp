@@ -207,6 +207,11 @@ Java_com_drivehub_kamera_CameraProbe_mainPreviewFrameAgeMs(JNIEnv*, jclass, jint
 }
 
 extern "C" JNIEXPORT jlong JNICALL
+Java_com_drivehub_kamera_CameraProbe_previewSinkCaptureAgeMs(JNIEnv*, jclass, jint videoIndex, jint sinkId) {
+    return camera_stream_manager::previewSinkCaptureAgeMs(videoIndex, sinkId);
+}
+
+extern "C" JNIEXPORT jlong JNICALL
 Java_com_drivehub_kamera_CameraProbe_previewSinkFrameAgeMs(JNIEnv*, jclass, jint videoIndex, jint sinkId) {
     return camera_stream_manager::previewSinkFrameAgeMs(videoIndex, sinkId);
 }
