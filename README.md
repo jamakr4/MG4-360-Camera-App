@@ -541,6 +541,8 @@ Before building:
 
 Android Studio creates the ignored `local.properties` file with your local Android SDK path (`sdk.dir`). After preparing the local assets below, [tools/build_sign_release.sh](tools/build_sign_release.sh) builds and signs the release APK and writes its SHA-256 sidecar.
 
+The release is signed with the public AOSP test platform key (`platform.pk8` and `platform.x509.pem` from AOSP `build/target/product/security`), which the MG4 firmware trusts. The key is not in this repository: keep a local copy in `tools/`, which Git ignores, or set `PLATFORM_KEYS_DIR` to the directory that holds it. The signing scripts read it from there.
+
 </details>
 
 <details>

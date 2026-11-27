@@ -17,8 +17,11 @@ set PROJECT_DIR=%SCRIPT_DIR%..
 REM DriveHub_Kadran icin standart release APK yolu
 set APK_IN=%PROJECT_DIR%\app\build\outputs\apk\release\app-release-unsigned.apk
 set APK_OUT=%PROJECT_DIR%\app\build\outputs\apk\release\app-release-signed.apk
-set PLATFORM_PK8=%SCRIPT_DIR%platform.pk8
-set PLATFORM_PEM=%SCRIPT_DIR%platform.x509.pem
+:: PLATFORM_KEYS_DIR may point at the AOSP test key; default is a local copy in tools\
+if not defined PLATFORM_KEYS_DIR set PLATFORM_KEYS_DIR=%SCRIPT_DIR%
+if not "%PLATFORM_KEYS_DIR:~-1%"=="\" set PLATFORM_KEYS_DIR=%PLATFORM_KEYS_DIR%\
+set PLATFORM_PK8=%PLATFORM_KEYS_DIR%platform.pk8
+set PLATFORM_PEM=%PLATFORM_KEYS_DIR%platform.x509.pem
 
 REM build.gradle icinden versionName oku (DriveHub_{versionName}.apk icin)
 set VERSION_NAME=unknown

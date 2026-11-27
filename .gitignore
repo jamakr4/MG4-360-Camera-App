@@ -38,6 +38,10 @@ local.properties
 # Signing keys / certificates
 *.jks
 *.keystore
+*.pk8
+*.p12
+# The AOSP test platform key: keep a local copy in tools/, never commit it.
+tools/platform.*
 
 # OS / editor noise
 .DS_Store
