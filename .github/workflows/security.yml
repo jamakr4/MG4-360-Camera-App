@@ -1,0 +1,92 @@
+name: Security
+
+# Security checks for an app that runs as the system user on the car.
+# Blocking: permission drift and secrets. Informational (SARIF): mobile SAST.
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  permission-gate:
+    name: Permission-drift gate (blocking)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check manifest permissions against the allowlist
+        run: bash .github/security/check-permissions.sh
+
+  secrets:
+    name: Secret scan (blocking)
+    runs-on: ubuntu-latest
+    env:
+      GITLEAKS_VERSION: 8.21.2
+      GITLEAKS_SHA256: 5bc41815076e6ed6ef8fbecc9d9b75bcae31f39029ceb55da08086315316e3ba
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # The CLI, pinned and checksum-verified, rather than gitleaks-action: it
+      # needs no token and behaves the same on a pull request from a fork.
+      - name: Install gitleaks
+        run: |
+          curl -sSfL -o gitleaks.tgz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  gitleaks.tgz" | sha256sum -c -
+          tar xzf gitleaks.tgz gitleaks
+      - name: Scan the whole history
+        run: ./gitleaks git . --config .gitleaks.toml --redact --no-banner --verbose
+
+  sast:
+    name: SAST (mobsfscan + semgrep)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run scanners (SARIF, non-blocking)
+        run: |
+          # Always leave a valid SARIF behind so the upload step never breaks.
+          empty_sarif() {
+            printf '%s' '{"version":"2.1.0","$schema":"https://json.schemastore.org/sarif-2.1.0.json","runs":[{"tool":{"driver":{"name":"'"$1"'","rules":[]}},"results":[]}]}' > "$2"
+          }
+          pip install --quiet mobsfscan semgrep
+          mobsfscan --sarif -o mobsfscan.sarif app/src/main || true
+          [ -s mobsfscan.sarif ] || empty_sarif mobsfscan mobsfscan.sarif
+          semgrep --config p/java --config p/security-audit \
+            --sarif -o semgrep.sarif app/src/main app/src/debug || true
+          [ -s semgrep.sarif ] || empty_sarif semgrep semgrep.sarif
+          for f in mobsfscan semgrep; do
+            python3 -c "import json,sys;d=json.load(open('$f.sarif'));print('$f findings:',sum(len(r.get('results',[])) for r in d.get('runs',[])))"
+          done | tee -a "$GITHUB_STEP_SUMMARY"
+      # A pull request from a fork gets a read-only token: SARIF goes to the
+      # Security tab only for branches of this repository, and to an artifact always.
+      - name: Upload mobsfscan SARIF
+        if: always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: mobsfscan.sarif
+          category: mobsfscan
+      - name: Upload Semgrep SARIF
+        if: always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sast-sarif
+          path: '*.sarif'

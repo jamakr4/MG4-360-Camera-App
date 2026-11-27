@@ -1,0 +1,30 @@
+# Permissions this app may declare. A manifest permission missing here fails CI.
+# One full permission name per line, '#' starts a comment. Say why next to each
+# group: the app runs as the system user, so this list is the reviewed answer to
+# "what can this app do on the car".
+
+# --- Cameras and the recording/overlay services ---
+android.permission.CAMERA
+android.permission.FOREGROUND_SERVICE
+android.permission.FOREGROUND_SERVICE_CAMERA
+android.permission.FOREGROUND_SERVICE_DATA_SYNC
+# Turn-signal tile, digital rearview, dashcam status icon.
+android.permission.SYSTEM_ALERT_WINDOW
+# Start the signal service after boot.
+android.permission.RECEIVE_BOOT_COMPLETED
+
+# --- Storage: dashcam clips on USB or internal storage, OTA APK in Downloads ---
+android.permission.READ_EXTERNAL_STORAGE
+android.permission.WRITE_EXTERNAL_STORAGE
+
+# --- Network: update check and download only ---
+android.permission.INTERNET
+android.permission.ACCESS_NETWORK_STATE
+
+# --- System-user capabilities (signature|privileged; granted by the platform key) ---
+# Vehicle signals (gear, lamps) read through the car service.
+android.car.permission.CAR_VENDOR_EXTENSION
+# Disables and restores the OEM 360-camera receiver during a camera takeover.
+android.permission.CHANGE_COMPONENT_ENABLED_STATE
+# Detects whether the OEM 360-camera app is in the foreground.
+android.permission.REAL_GET_TASKS

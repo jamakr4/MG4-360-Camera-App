@@ -1,0 +1,15 @@
+# Secret scan configuration (gitleaks). The default rules apply; the entries
+# below are reviewed material that is public by design.
+# Every new entry needs a one-line reason: an allowlist is a security decision.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Reviewed: the public AOSP test platform key"
+paths = [
+  # AOSP test platform key (build/target/product/security in AOSP), public since 2008.
+  # The MG4 firmware trusts it, which is why the release is signed with it.
+  # History keeps it even once it leaves the tree.
+  '''^tools/platform\.(key|pk8|p12|x509\.pem)$''',
+]
