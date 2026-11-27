@@ -1,0 +1,136 @@
+name: Release
+
+# A tag push builds, tests and signs the APK, then opens a *draft* release with the
+# APK and its .sha256 sidecar (the names the OTA updater looks for). Publishing stays
+# a human decision: review the notes and press "Publish release". Publishing by hand
+# also triggers the GitLab release mirror, which a release created with GITHUB_TOKEN
+# would not.
+#
+# Signing uses the platform key the car accepts. Set the secrets PLATFORM_PK8_BASE64
+# (base64 -w0 platform.pk8) and PLATFORM_X509_PEM_BASE64 (base64 -w0 platform.x509.pem);
+# without them the workflow falls back to tools/platform.pk8 and tools/platform.x509.pem.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      OPENCV_VERSION: 4.9.0
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.2.2
+
+      - name: Read the version and check the tag
+        id: version
+        run: |
+          version="$(sed -n 's/.*versionName "\(.*\)".*/\1/p' app/build.gradle | head -n 1)"
+          test -n "$version" || { echo "::error::No versionName in app/build.gradle"; exit 1; }
+          if [ "$GITHUB_REF_TYPE" = tag ] && [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match versionName $version (expected v$version)"
+            exit 1
+          fi
+          beta=false
+          grep -q 'buildConfigField "boolean", "IS_BETA", "true"' app/build.gradle && beta=true
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "beta=$beta" >> "$GITHUB_OUTPUT"
+          echo "apk=MG4-360-Camera-App-v$version-release.apk" >> "$GITHUB_OUTPUT"
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4.7.1
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4.4.1
+
+      - name: Cache OpenCV Android SDK
+        id: opencv-cache
+        uses: actions/cache@v4.2.3
+        with:
+          path: ${{ runner.temp }}/OpenCV-android-sdk
+          key: opencv-android-sdk-${{ env.OPENCV_VERSION }}
+
+      - name: Download OpenCV Android SDK
+        if: steps.opencv-cache.outputs.cache-hit != 'true'
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/opencv.zip" \
+            "https://github.com/opencv/opencv/releases/download/${OPENCV_VERSION}/opencv-${OPENCV_VERSION}-android-sdk.zip"
+          unzip -q "$RUNNER_TEMP/opencv.zip" -d "$RUNNER_TEMP"
+          rm "$RUNNER_TEMP/opencv.zip"
+
+      - name: Unit tests and release build
+        env:
+          OPENCV_ANDROID_SDK: ${{ runner.temp }}/OpenCV-android-sdk
+        run: ./gradlew --no-daemon testDebugUnitTest assembleRelease
+
+      - name: Platform key
+        env:
+          PLATFORM_PK8_BASE64: ${{ secrets.PLATFORM_PK8_BASE64 }}
+          PLATFORM_X509_PEM_BASE64: ${{ secrets.PLATFORM_X509_PEM_BASE64 }}
+        run: |
+          keys="$RUNNER_TEMP/platform-keys"
+          mkdir -p "$keys"
+          if [ -n "$PLATFORM_PK8_BASE64" ] && [ -n "$PLATFORM_X509_PEM_BASE64" ]; then
+            # Tolerate newlines/spaces in the secrets; printf avoids a stray trailing newline.
+            printf '%s' "$PLATFORM_PK8_BASE64" | tr -d '[:space:]' | base64 -d > "$keys/platform.pk8"
+            printf '%s' "$PLATFORM_X509_PEM_BASE64" | tr -d '[:space:]' | base64 -d > "$keys/platform.x509.pem"
+            echo "Signing key: repository secrets"
+          elif [ -f tools/platform.pk8 ] && [ -f tools/platform.x509.pem ]; then
+            cp tools/platform.pk8 tools/platform.x509.pem "$keys/"
+            echo "Signing key: tools/"
+          else
+            echo "::error::No platform key. Set PLATFORM_PK8_BASE64 and PLATFORM_X509_PEM_BASE64."
+            exit 1
+          fi
+          # A PKCS#8 DER key starts with 0x30 (SEQUENCE); anything else is a corrupt secret.
+          if [ "$(head -c1 "$keys/platform.pk8" | od -An -tx1 | tr -d ' ')" != "30" ]; then
+            echo "::error::platform.pk8 is not a DER key. Recreate the secret with: base64 -w0 platform.pk8"
+            exit 1
+          fi
+          openssl x509 -in "$keys/platform.x509.pem" -noout \
+            || { echo "::error::platform.x509.pem is not a PEM certificate."; exit 1; }
+          echo "PLATFORM_KEYS=$keys" >> "$GITHUB_ENV"
+
+      - name: Sign, verify and hash
+        run: |
+          apksigner="$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -n 1)"
+          mkdir -p dist
+          apk="dist/${{ steps.version.outputs.apk }}"
+          "$apksigner" sign --v4-signing-enabled false --key "$PLATFORM_KEYS/platform.pk8" --cert "$PLATFORM_KEYS/platform.x509.pem" \
+            --out "$apk" app/build/outputs/apk/release/app-release-unsigned.apk
+          rm -rf "$PLATFORM_KEYS"
+          "$apksigner" verify --print-certs "$apk" | tee -a "$GITHUB_STEP_SUMMARY"
+          # Same "<sha>  <name>" line as tools/build_sign_release.sh; the OTA verifier reads it.
+          (cd dist && sha256sum "${{ steps.version.outputs.apk }}" > "${{ steps.version.outputs.apk }}.sha256")
+          cat dist/*.sha256 | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: release-apk
+          path: dist/
+
+      - name: Open a draft release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="360 Cam ${GITHUB_REF_NAME}"
+          prerelease=()
+          if [ "${{ steps.version.outputs.beta }}" = true ]; then
+            title="$title - BETA"; prerelease=(--prerelease)
+          fi
+          gh release create "$GITHUB_REF_NAME" dist/* --draft --verify-tag --generate-notes \
+            --title "$title" "${prerelease[@]}"
