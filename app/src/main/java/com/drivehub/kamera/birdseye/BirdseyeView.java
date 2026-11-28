@@ -33,7 +33,6 @@ import com.drivehub.kamera.R;
 import com.drivehub.kamera.settings.UiPrefs;
 
 import java.nio.ByteBuffer;
-import java.nio.file.Paths;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -51,7 +50,7 @@ public final class BirdseyeView extends FrameLayout {
     private final BirdseyeSurface gl;
     private final TextView message, cameraWarning;
     private final Source source = new Source(BirdseyeOwnerIds.next());
-    private final BirdseyeRenderer renderer = new BirdseyeRenderer(source, getContext().getAssets());
+    private final BirdseyeRenderer renderer;
     private ScheduledFuture<?> task;
     private volatile int generation;
     private long handoffGeneration;
@@ -182,7 +181,8 @@ public final class BirdseyeView extends FrameLayout {
         failure.report(getContext());
         Toast.makeText(getContext(),failure.userMessage(getContext()),Toast.LENGTH_LONG).show();
     }
-    private final SharedPreferences.OnSharedPreferenceChangeListener preferences = (p, key) -> {
+    private final SharedPreferences.OnSharedPreferenceChangeListener preferences = this::onPreferenceChanged;
+    private void onPreferenceChanged(SharedPreferences p, String key) {
         if(UiPrefs.KEY_PARKING_SURROUND_3D.equals(key)||UiPrefs.KEY_PARKING_SURROUND_WIDE.equals(key))applyMode();
         if(UiPrefs.KEY_PARKING_SURROUND_GUIDES.equals(key)||UiPrefs.KEY_PARKING_GUIDE_SPEED_LIMIT.equals(key)
                 ||UiPrefs.KEY_PARKING_GUIDE_SPEED_KMH.equals(key)||UiPrefs.KEY_PARKING_GUIDE_STYLE.equals(key)
@@ -197,7 +197,7 @@ public final class BirdseyeView extends FrameLayout {
         }
         if (UiPrefs.KEY_OEM_CAMERA_ACCESS_BLOCKED.equals(key) || UiPrefs.KEY_OEM_AVM_ACTIVE.equals(key)
                 || UiPrefs.KEY_OEM_AVM_COEXIST.equals(key) || UiPrefs.KEY_EXTERNAL_CAMERA_PAUSED.equals(key)) updateOemState();
-    };
+    }
     private final Runnable tick = new Runnable() {
         @Override public void run() {
             if (!resumed) return;
@@ -230,48 +230,62 @@ public final class BirdseyeView extends FrameLayout {
             int fresh = drawAgeMs > 500 ? 0 : renderer.freshMask;
             CameraHandoffController.ready("birdseye", !blocked && source.ready && !renderFailed && fresh != 0,
                     handoffGeneration);
-            // Retain the camera image through short gaps; predictions and handoff still require fresh data.
-            int mask = drawAgeMs > BirdseyeFrameHealth.DISPLAY_HOLD_US/1000 ? 0 : renderer.displayMask;
-            int displayState=mask|(calibrationRetrying?16:0);
-            if (displayState != lastMask && !blocked && source.ready && !renderFailed) {
-                lastMask = displayState;
-                message.setVisibility(mask == 0 ? VISIBLE : GONE);
-                if(mask!=0&&traceStart>=0){trace("first camera image, overlay hidden (mask="+mask+")");traceStart=-1;}
-                message.setText(R.string.birdseye_waiting);
-                cameraWarning.setVisibility(mask != 0 && (mask != 15 || calibrationRetrying) ? VISIBLE : GONE);
-                if(mask==15&&calibrationRetrying)cameraWarning.setText(R.string.birdseye_calibration_rechecking);
-                if (mask != 0 && mask != 15) {
-                    int[] labels = {R.string.main_camera_label_left, R.string.main_camera_label_right,
-                            R.string.main_camera_label_front, R.string.main_camera_label_rear};
-                    StringBuilder missing = new StringBuilder();
-                    for (int i = 0; i < 4; i++) if ((mask & (1 << i)) == 0) {
-                        if (missing.length() > 0) missing.append(", ");
-                        missing.append(getContext().getString(labels[i]));
-                    }
-                    cameraWarning.setText(getContext().getString(R.string.birdseye_partial, missing.toString()));
-                }
-            }
-            if(!blocked&&source.ready&&!renderFailed&&renderer.threeDRequested&&!renderer.threeDActive) {
-                message.setText(R.string.surround_3d_loading);message.setVisibility(VISIBLE);lastMask=-1;
-            }
+            updateCameraMessage();
             main.postDelayed(this, 50);
         }
     };
+
+    private void updateCameraMessage() {
+        if (!resumed || blocked || !source.ready || renderFailed || renderer.error != null) return;
+        // Retain the camera image through short gaps; predictions and handoff still require fresh data.
+        int mask = gl.presentedMask();
+        int displayState=mask|(calibrationRetrying?16:0);
+        if (displayState != lastMask) {
+            lastMask = displayState;
+            message.setVisibility(mask == 0 ? VISIBLE : GONE);
+            if(mask!=0&&traceStart>=0 && (!renderer.threeDRequested || renderer.threeDActive)) {
+                trace("first camera image, overlay hidden (mask="+mask+", frame observed to UI "+gl.presentationDelayMs()+" ms)");
+                traceStart=-1;
+            }
+            message.setText(R.string.birdseye_waiting);
+            cameraWarning.setVisibility(mask != 0 && (mask != 15 || calibrationRetrying) ? VISIBLE : GONE);
+            if(mask==15&&calibrationRetrying)cameraWarning.setText(R.string.birdseye_calibration_rechecking);
+            if (mask != 0 && mask != 15) {
+                int[] labels = {R.string.main_camera_label_left, R.string.main_camera_label_right,
+                        R.string.main_camera_label_front, R.string.main_camera_label_rear};
+                StringBuilder missing = new StringBuilder();
+                for (int i = 0; i < 4; i++) if ((mask & (1 << i)) == 0) {
+                    if (missing.length() > 0) missing.append(", ");
+                    missing.append(getContext().getString(labels[i]));
+                }
+                cameraWarning.setText(getContext().getString(R.string.birdseye_partial, missing.toString()));
+            }
+        }
+        if(renderer.threeDRequested&&!renderer.threeDActive) {
+            message.setText(R.string.surround_3d_loading);message.setVisibility(VISIBLE);lastMask=-1;
+        }
+    }
 
     public BirdseyeView(Context context, AttributeSet attrs) {
         this(context,attrs,CalibrationStore.get(context));
     }
     private BirdseyeView(Context context, AttributeSet attrs, CalibrationStore store) {
-        this(context,attrs,()->store.load(Paths.get(BirdseyeCalibration.VEHICLE_PATH)),store);
+        this(context,attrs,store::loadVehicle,store,null);
         ProjectionAssets.useDiskCache(CalibrationStore.directory(context));
     }
     BirdseyeView(Context context, AttributeSet attrs, CalibrationLoader calibrationLoader) {
-        this(context,attrs,calibrationLoader,null);
+        this(context,attrs,calibrationLoader,null,null);
+    }
+
+    BirdseyeView(Context context, CalibrationLoader loader, BirdseyeRenderer.Frames frames) {
+        this(context, null, loader, null, frames);
     }
 
     @android.annotation.SuppressLint("ClickableViewAccessibility")
-    private BirdseyeView(Context context, AttributeSet attrs, CalibrationLoader calibrationLoader, CalibrationStore store) {
+    private BirdseyeView(Context context, AttributeSet attrs, CalibrationLoader calibrationLoader, CalibrationStore store,
+                         BirdseyeRenderer.Frames frames) {
         super(context, attrs);
+        renderer = new BirdseyeRenderer(frames == null ? source : frames, context.getAssets());
         this.calibrationLoader=calibrationLoader;this.calibrationStore=store;
         setBackgroundColor(Color.BLACK);
         prefs = UiPrefs.getPrefs(context);
@@ -281,7 +295,8 @@ public final class BirdseyeView extends FrameLayout {
             if (!ready) stopSource();
             else if (resumed && !blocked && !renderFailed) startSource();
         });
-        gl.setBeforeFrame(this::updateSteeringFrame);
+        gl.setOnImageChanged(this::updateCameraMessage);
+        gl.setPoseUpdate(this::updateSteeringFrame);
         gl.setContinuousRendering(false);
         addView(gl, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
         cameraWarning = text(context, 12);
@@ -430,6 +445,8 @@ public final class BirdseyeView extends FrameLayout {
                         if (generation != token) return;
                         scene=projection.scene;renderer.setScene(projection.scene);
                         renderer.setMesh(projection.mesh);renderer.setWideMesh(projection.wideMesh,projection.wideError); source.ready = true; lastMask = -1;
+                        gl.setContinuousRendering(true);
+                        gl.requestRender();
                         if(renderer.threeDRequested)prepareThreeD();
                         showMessage(R.string.birdseye_waiting);trace("mesh set, waiting for cameras");
                         Log.i("Birdseye", "Vehicle calibration SHA-256="+c.sha256);

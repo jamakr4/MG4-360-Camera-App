@@ -190,7 +190,7 @@ public final class BirdseyeDebugActivity extends Activity {
         };
         root.setBackgroundColor(Color.BLACK);
         gl = new BirdseyeSurface(this,renderer,null);gl.setId(R.id.surroundDebugSurface);
-        gl.setBeforeFrame(this::updateSteeringFrame);
+        gl.setPoseUpdate(this::updateSteeringFrame);
         GestureDetector gestures=new GestureDetector(this,new GestureDetector.SimpleOnGestureListener(){
             @Override public boolean onDown(MotionEvent e){return true;}
             @Override public boolean onDoubleTap(MotionEvent e){renderer.orbit.reset();return true;}

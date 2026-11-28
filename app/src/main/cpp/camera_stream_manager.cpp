@@ -3853,6 +3853,9 @@ namespace camera_stream_manager
         std::mutex gBirdseyeOwnerMutex;
         constexpr int BIRDSEYE_VIDEO_INDICES[] = {16, 14, 15, 17};
         // Each Activity owns separate IDs, including during recreation.
+        // The owner lock serializes device lifecycle operations. Readers only share this
+        // short map lock with writers, so one cold open cannot hide other cameras' frames.
+        std::mutex gBirdseyeTapMutex;
         std::map<int, std::shared_ptr<BirdseyeTap>> gBirdseyeTaps;
         std::map<int, std::shared_ptr<CameraLeaseTap>> gCameraLeases;
         int birdseyeId(int owner, int camera) { return 10000 + owner * 4 + camera; }
@@ -3925,10 +3928,12 @@ namespace camera_stream_manager
             if (!tap->isStopRequested() && nowUs() - (captured ? captured : tap->createdUs) < 1500000)
                 return true;
             session->detachConsumer(id);
+            std::lock_guard<std::mutex> taps(gBirdseyeTapMutex);
             gBirdseyeTaps.erase(found);
         }
         auto tap = std::make_shared<BirdseyeTap>(fullSnapshot);
         if (session->attachConsumer(id, tap)) {
+            std::lock_guard<std::mutex> taps(gBirdseyeTapMutex);
             gBirdseyeTaps[id] = tap;
             return true;
         }
@@ -3947,6 +3952,7 @@ namespace camera_stream_manager
             found->second->requestStop();
             auto session = getSession(video);
             if (session) { session->detachConsumer(id); eraseSessionIfIdle(video, session); }
+            std::lock_guard<std::mutex> taps(gBirdseyeTapMutex);
             gBirdseyeTaps.erase(found);
         }
     }
@@ -3957,7 +3963,7 @@ namespace camera_stream_manager
         std::shared_ptr<BirdseyeTap> tap;
         {
             // No camera opening/teardown on the GL thread: skip a busy registry.
-            std::unique_lock<std::mutex> lock(gBirdseyeOwnerMutex, std::try_to_lock);
+            std::unique_lock<std::mutex> lock(gBirdseyeTapMutex, std::try_to_lock);
             if (!lock) return 0;
             auto it = gBirdseyeTaps.find(birdseyeId(owner, camera));
             if (it == gBirdseyeTaps.end()) return 0;
@@ -3973,7 +3979,7 @@ namespace camera_stream_manager
         for (auto& value : latestUs) value = 0;
         if (owner < 1 || owner > 1000000 || gCameraAccess.blocked()) return false;
         // Called once per display frame on the GL thread: never wait for attach/detach.
-        std::unique_lock<std::mutex> lock(gBirdseyeOwnerMutex, std::try_to_lock);
+        std::unique_lock<std::mutex> lock(gBirdseyeTapMutex, std::try_to_lock);
         if (!lock) return false;
         for (int camera = 0; camera < 4; ++camera) {
             auto it = gBirdseyeTaps.find(birdseyeId(owner, camera));
@@ -3987,7 +3993,7 @@ namespace camera_stream_manager
         if(owner<1||owner>1000000||camera<0||camera>3||gCameraAccess.blocked())return {};
         std::shared_ptr<BirdseyeTap> tap;
         {
-            std::unique_lock<std::mutex> lock(gBirdseyeOwnerMutex,std::try_to_lock);
+            std::unique_lock<std::mutex> lock(gBirdseyeTapMutex,std::try_to_lock);
             if(!lock)return {};
             auto found=gBirdseyeTaps.find(birdseyeId(owner,camera));
             if(found==gBirdseyeTaps.end())return {};tap=found->second;
@@ -4194,7 +4200,10 @@ namespace camera_stream_manager
         const bool releaseLeases=gCameraAccess.blocked();
         if(releaseLeases){for(const auto& entry:gCameraLeases)entry.second->requestStop();gCameraLeases.clear();}
         for (const auto& entry : gBirdseyeTaps) entry.second->requestStop();
-        gBirdseyeTaps.clear();
+        {
+            std::lock_guard<std::mutex> taps(gBirdseyeTapMutex);
+            gBirdseyeTaps.clear();
+        }
         std::lock_guard<std::mutex> sideOwner(gSideCameraOwnerMutex);
         gSideCameraEnabled = false;
         std::vector<std::pair<int, std::shared_ptr<CameraSession>>> sessions;

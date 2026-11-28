@@ -675,11 +675,15 @@ public class RivelaGlesInstrumentedTest {
     @Test public void missingDepthFallsBackToProvenTwoDWithoutStoppingFrames() {
         try(Egl egl=new Egl()) {
             // An impossible depth request forces the actual EGL chooser's fallback on this driver.
-            EGLConfig fallback=BirdseyeSurface.chooseWindowConfig(egl.d,65536);int[] attribute=new int[1];
-            assertTrue(EGL14.eglGetConfigAttrib(egl.d,fallback,EGL14.EGL_RENDERABLE_TYPE,attribute,0));assertTrue((attribute[0]&4)!=0);
-            assertTrue(EGL14.eglGetConfigAttrib(egl.d,fallback,EGL14.EGL_SURFACE_TYPE,attribute,0));assertTrue((attribute[0]&EGL14.EGL_WINDOW_BIT)!=0);
-            EGLContext context=EGL14.eglCreateContext(egl.d,fallback,EGL14.EGL_NO_CONTEXT,new int[]{EGL14.EGL_CONTEXT_CLIENT_VERSION,2,EGL14.EGL_NONE},0);
-            assertNotEquals(EGL14.EGL_NO_CONTEXT,context);assertTrue(EGL14.eglDestroyContext(egl.d,context));
+            javax.microedition.khronos.egl.EGL10 api=(javax.microedition.khronos.egl.EGL10)javax.microedition.khronos.egl.EGLContext.getEGL();
+            javax.microedition.khronos.egl.EGLDisplay display=api.eglGetCurrentDisplay();
+            javax.microedition.khronos.egl.EGLConfig fallback=BirdseyeSurface.chooseWindowConfig(api,display,65536);
+            int[] attribute=new int[1];
+            assertTrue(api.eglGetConfigAttrib(display,fallback,EGL14.EGL_RENDERABLE_TYPE,attribute));assertTrue((attribute[0]&4)!=0);
+            assertTrue(api.eglGetConfigAttrib(display,fallback,EGL14.EGL_SURFACE_TYPE,attribute));assertTrue((attribute[0]&EGL14.EGL_WINDOW_BIT)!=0);
+            javax.microedition.khronos.egl.EGLContext context=api.eglCreateContext(display,fallback,javax.microedition.khronos.egl.EGL10.EGL_NO_CONTEXT,
+                    new int[]{EGL14.EGL_CONTEXT_CLIENT_VERSION,2,EGL14.EGL_NONE});
+            assertNotEquals(javax.microedition.khronos.egl.EGL10.EGL_NO_CONTEXT,context);assertTrue(api.eglDestroyContext(display,context));
             BirdseyeSynthetic frames=new BirdseyeSynthetic();frames.fixedClockUs=1_000_000;
             RivelaScene scene=new RivelaScene(frames.calibration);scene.prepareBowl();BirdseyeRenderer r=renderer(frames,scene);
             r.onSurfaceCreated(null,null);r.onSurfaceChanged(null,W,H);r.depthAvailable=false;r.setThreeD(true);r.onDrawFrame(null);

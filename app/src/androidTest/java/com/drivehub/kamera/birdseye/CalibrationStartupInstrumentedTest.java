@@ -40,6 +40,10 @@ public class CalibrationStartupInstrumentedTest {
     }
     private static void withView(BirdseyeView.CalibrationLoader loader,
                                   java.util.function.BiConsumer<ActivityScenario<BirdseyeDebugActivity>,BirdseyeView> test) {
+        withView(loader, null, test);
+    }
+    private static void withView(BirdseyeView.CalibrationLoader loader, BirdseyeRenderer.Frames frames,
+                                  java.util.function.BiConsumer<ActivityScenario<BirdseyeDebugActivity>,BirdseyeView> test) {
         try(ActivityScenario<BirdseyeDebugActivity> scenario=ActivityScenario.launch(BirdseyeDebugActivity.class)) {
             BirdseyeView[] view=new BirdseyeView[1];
             scenario.onActivity(a->{
@@ -49,7 +53,7 @@ public class CalibrationStartupInstrumentedTest {
                     }
                 };
                 UiPrefs.getPrefs(isolated).edit().clear().commit();
-                view[0]=new BirdseyeView(isolated,null,loader);
+                view[0]=new BirdseyeView(isolated,loader,frames);
                 ((FrameLayout)a.gl.getParent()).addView(view[0],new FrameLayout.LayoutParams(180,256));
                 view[0].resumeDisplay();
             });
@@ -57,6 +61,33 @@ public class CalibrationStartupInstrumentedTest {
             finally {scenario.onActivity(a->{view[0].pauseDisplay();((FrameLayout)view[0].getParent()).removeView(view[0]);});}
         }
     }
+    @Test public void firstPartialCameraImageDismissesWaitingWithoutStatusPoll() {
+        BirdseyeSynthetic frames = new BirdseyeSynthetic();
+        frames.missingMask = 15;
+        withView(() -> frames.calibration, frames, (scenario, view) -> {
+            await(scenario, view, v -> v.scene() != null);
+            scenario.onActivity(a -> {
+                assertEquals(android.view.View.VISIBLE, message(view).getVisibility());
+                try {
+                    java.lang.reflect.Field tick = BirdseyeView.class.getDeclaredField("tick");
+                    java.lang.reflect.Field main = BirdseyeView.class.getDeclaredField("main");
+                    tick.setAccessible(true);
+                    main.setAccessible(true);
+                    ((android.os.Handler) main.get(view)).removeCallbacks((Runnable) tick.get(view));
+                } catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
+                frames.missingMask = 14; // Only the left camera delivers frames.
+            });
+            await(scenario, view, v -> message(v).getVisibility() == android.view.View.GONE);
+            scenario.onActivity(a -> {
+                BirdseyeSurface surface = (BirdseyeSurface) view.getChildAt(0);
+                assertEquals(1, surface.presentedMask());
+                assertEquals(android.view.View.VISIBLE, view.getChildAt(1).getVisibility());
+            });
+            frames.missingMask = 15;
+            await(scenario, view, v -> message(v).getVisibility() == android.view.View.VISIBLE);
+        });
+    }
+
     @Test public void missingThenPartiallyWrittenCalibrationLoadsWithoutReopening() throws Exception {
         Path directory=Files.createTempDirectory(InstrumentationRegistry.getInstrumentation()
                 .getTargetContext().getCacheDir().toPath(),"calibration-startup-");

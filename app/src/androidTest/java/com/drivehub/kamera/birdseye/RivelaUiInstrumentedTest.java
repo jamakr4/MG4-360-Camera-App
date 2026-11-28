@@ -270,8 +270,17 @@ public class RivelaUiInstrumentedTest {
     private static android.graphics.Bitmap capture(ActivityScenario<BirdseyeDebugActivity> scenario,float guideLevel) throws Exception {
         awaitGuideLevel(scenario,guideLevel); // Compare settled styles/paint rather than different reveal frames.
         java.util.concurrent.atomic.AtomicReference<android.graphics.Bitmap> bitmap=new java.util.concurrent.atomic.AtomicReference<>();
-        scenario.onActivity(a->bitmap.set(a.gl.getBitmap()));
-        assertNotNull("TextureView did not expose the rendered vehicle",bitmap.get());
+        java.util.concurrent.CountDownLatch copied = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.atomic.AtomicInteger result = new java.util.concurrent.atomic.AtomicInteger();
+        scenario.onActivity(a -> {
+            bitmap.set(android.graphics.Bitmap.createBitmap(a.gl.getWidth(), a.gl.getHeight(), android.graphics.Bitmap.Config.ARGB_8888));
+            android.view.PixelCopy.request(a.gl, bitmap.get(), status -> {
+                result.set(status);
+                copied.countDown();
+            }, new android.os.Handler(android.os.Looper.getMainLooper()));
+        });
+        assertTrue("Timed out copying the GL surface", copied.await(5, java.util.concurrent.TimeUnit.SECONDS));
+        assertEquals(android.view.PixelCopy.SUCCESS, result.get());
         return bitmap.get();
     }
     private static void saveBlackBoxPreview(android.graphics.Bitmap bitmap,String name) throws Exception {
@@ -403,10 +412,8 @@ public class RivelaUiInstrumentedTest {
             onView(withId(R.id.segGuidelineLines)).perform(scrollTo(),click());
             awaitDraws(scenario);android.graphics.Bitmap separate=capture(scenario);pictures.add(separate);
             scenario.onActivity(a->a.findViewById(R.id.surroundDebugReverseGuides).performClick());
-            awaitGuideLevel(scenario,0);
-            java.util.concurrent.atomic.AtomicReference<android.graphics.Bitmap> bare=new java.util.concurrent.atomic.AtomicReference<>();
-            scenario.onActivity(a->bare.set(a.gl.getBitmap()));assertNotNull(bare.get());pictures.add(bare.get());
-            assertLightBlueGuidelines(separate,bare.get());
+            android.graphics.Bitmap bare=capture(scenario,0);pictures.add(bare);
+            assertLightBlueGuidelines(separate,bare);
             scenario.onActivity(a->a.findViewById(R.id.surroundDebugReverseGuides).performClick());
             awaitGuideLevel(scenario,1);
             onView(withId(R.id.segGuidelineLines)).check(matches(isSelected()));

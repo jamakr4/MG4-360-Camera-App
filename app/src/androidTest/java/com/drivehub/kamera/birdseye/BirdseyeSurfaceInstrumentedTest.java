@@ -11,7 +11,7 @@ import org.junit.runner.RunWith;
 import java.util.concurrent.atomic.AtomicBoolean;
 import static org.junit.Assert.*;
 
-/** The production TextureView/EGL worker, in addition to the pixel-level pbuffer tests. */
+/** The production GLSurfaceView, in addition to the pixel-level pbuffer tests. */
 @RunWith(AndroidJUnit4.class)
 public class BirdseyeSurfaceInstrumentedTest {
     private void waitFor(ActivityScenario<BirdseyeDebugActivity> scenario,
@@ -30,11 +30,7 @@ public class BirdseyeSurfaceInstrumentedTest {
         } while(SystemClock.uptimeMillis()<deadline);
         fail("Window renderer did not reach expected state: "+status.get());
     }
-    private long workers() {
-        return Thread.getAllStackTraces().keySet().stream()
-                .filter(t->t.isAlive() && t.getName().equals("Birdseye-EGL")).count();
-    }
-    @Test public void bothModesFollowDisplayCallbacksAndPauseWithoutPendingFrames() {
+    @Test public void bothModesRenderWhileUiIsBusyAndStopWhenIdle() {
         android.content.SharedPreferences prefs=com.drivehub.kamera.settings.UiPrefs.getPrefs(
                 androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().getTargetContext());
         boolean saved=prefs.getBoolean(com.drivehub.kamera.settings.UiPrefs.KEY_PARKING_SURROUND_3D,false);
@@ -45,25 +41,21 @@ public class BirdseyeSurfaceInstrumentedTest {
                 // Allow cold model/shader preparation in the full software-GPU suite.
                 waitFor(scenario,a->{assertNull(a.preparationError);assertNull(a.renderer.threeDError);
                     assertNull(a.renderer.error);return a.renderer.threeDActive==threeD;},20000);
-                long[] before=new long[3];
-                scenario.onActivity(a->{before[0]=a.gl.displayCallbacks();before[1]=a.renderer.renderedFrames;before[2]=SystemClock.uptimeMillis();});
-                SystemClock.sleep(2000);
                 scenario.onActivity(a->{
-                    long callbacks=a.gl.displayCallbacks()-before[0],draws=a.renderer.renderedFrames-before[1];
-                    double seconds=(SystemClock.uptimeMillis()-before[2])/1000.0;
-                    android.util.Log.i("BirdseyeCadence",(threeD?"3D":"2D")+" callbacks/s="+callbacks/seconds+" draws/s="+draws/seconds);
-                    String timing=BirdseyeSurface.presentationStatus();
-                    android.util.Log.i("BirdseyeCadence",timing);
-                    assertTrue("Successful swaps must report output waits separately from CPU submission",timing.contains("EGL:")&&timing.contains("swap wait")&&timing.contains("busy skips"));
-                    assertNull(a.renderer.error);assertTrue("Display callbacks must progress independently of 50 ms state polling",callbacks>0);
-                    assertTrue("Frames must progress without a UI requestRender timer",draws>2);
-                    assertTrue("No more than one job per display callback",draws<=callbacks+1);
+                    assertEquals(android.opengl.GLSurfaceView.RENDERMODE_CONTINUOUSLY,a.gl.getRenderMode());
+                    long before=a.renderer.renderedFrames;
+                    // The production GL loop must progress even without any UI callbacks.
+                    long deadline=SystemClock.uptimeMillis()+1500;
+                    while(a.renderer.renderedFrames<=before+2 && SystemClock.uptimeMillis()<deadline)
+                        SystemClock.sleep(10);
+                    assertTrue("GL rendering stalled on the UI thread",a.renderer.renderedFrames>before+2);
                     a.gl.setContinuousRendering(false);
                 });
-                SystemClock.sleep(150); // Drain the single in-flight render.
-                long[] idle=new long[2];scenario.onActivity(a->{idle[0]=a.gl.displayCallbacks();idle[1]=a.renderer.renderedFrames;});
                 SystemClock.sleep(200);
-                scenario.onActivity(a->{assertEquals(idle[0],a.gl.displayCallbacks());assertEquals(idle[1],a.renderer.renderedFrames);a.gl.setContinuousRendering(true);});
+                long[] idle=new long[1];
+                scenario.onActivity(a->idle[0]=a.renderer.renderedFrames);
+                SystemClock.sleep(200);
+                scenario.onActivity(a->{assertEquals(idle[0],a.renderer.renderedFrames);a.gl.setContinuousRendering(true);});
             }
             scenario.moveToState(Lifecycle.State.CREATED);
             SystemClock.sleep(200);
@@ -72,7 +64,7 @@ public class BirdseyeSurfaceInstrumentedTest {
         }finally{prefs.edit().putBoolean(com.drivehub.kamera.settings.UiPrefs.KEY_PARKING_SURROUND_3D,saved).commit();}
     }
     @Test public void windowEglResumesAndOneFailedOutputLeavesAnotherWorkerHealthy() {
-        long initialWorkers=workers();
+        java.util.concurrent.atomic.AtomicReference<Thread> otherWorker=new java.util.concurrent.atomic.AtomicReference<>();
         try(ActivityScenario<BirdseyeDebugActivity> scenario=ActivityScenario.launch(BirdseyeDebugActivity.class)) {
             waitFor(scenario,a->a.renderer.freshMask==15);
             for(int i=0;i<3;i++) {
@@ -89,8 +81,8 @@ public class BirdseyeSurfaceInstrumentedTest {
                     BirdseyeSynthetic frames=new BirdseyeSynthetic();
                     healthy[0]=new BirdseyeRenderer(frames);healthy[0].setMesh(new BirdseyeMesh(frames.calibration));
                     other[0]=new BirdseyeSurface(a,healthy[0],null);
-                    assertTrue(android.view.TextureView.class.isInstance(other[0]));
-                    other[0].setBeforeFrame(()->{
+                    other[0].queueEvent(()->otherWorker.set(Thread.currentThread()));
+                    other[0].setPoseUpdate(()->{
                         updates.incrementAndGet();
                         if(android.os.Looper.myLooper()!=android.os.Looper.getMainLooper())updateOffUi.set(true);
                     });
@@ -111,8 +103,7 @@ public class BirdseyeSurfaceInstrumentedTest {
             }
             scenario.recreate();waitFor(scenario,a->a.renderer.freshMask==15);
         }
-        long deadline=SystemClock.uptimeMillis()+5000;
-        while(workers()>initialWorkers && SystemClock.uptimeMillis()<deadline)SystemClock.sleep(25);
-        assertTrue("EGL workers must terminate after window/Activity close",workers()<=initialWorkers);
+        assertNotNull(otherWorker.get());
+        assertFalse("Detached surface retained its GL thread",otherWorker.get().isAlive());
     }
 }
