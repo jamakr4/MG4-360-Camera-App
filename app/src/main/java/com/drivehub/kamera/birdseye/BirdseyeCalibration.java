@@ -23,6 +23,7 @@ public final class BirdseyeCalibration {
     public final double header, centerX, centerY;
     public final String sha256;
     private final Camera[] cameras;
+    private final byte[] raw;
 
     private static final class Camera {
         double fx, fy, cx, cy;
@@ -39,8 +40,8 @@ public final class BirdseyeCalibration {
         Projection(double u, double v, double weight) { this.u = u; this.v = v; this.weight = weight; }
     }
 
-    private BirdseyeCalibration(Camera[] cameras, double header, String sha256) {
-        this.cameras = cameras; this.header = header; this.sha256 = sha256;
+    private BirdseyeCalibration(Camera[] cameras, double header, String sha256, byte[] raw) {
+        this.cameras = cameras; this.header = header; this.sha256 = sha256; this.raw = raw;
         centerX = cameras[0].center[0]/2 + cameras[1].center[0]/2;
         centerY = cameras[2].center[1]/2 + cameras[3].center[1]/2;
     }
@@ -99,9 +100,12 @@ public final class BirdseyeCalibration {
             StringBuilder hash = new StringBuilder();
             for (byte v : MessageDigest.getInstance("SHA-256").digest(bytes))
                 hash.append(String.format(Locale.ROOT, "%02x", v & 255));
-            return new BirdseyeCalibration(cameras, a[0], hash.toString());
+            return new BirdseyeCalibration(cameras, a[0], hash.toString(), bytes.clone());
         } catch (NoSuchAlgorithmException e) { throw new AssertionError(e); }
     }
+
+    /** The validated 520 source bytes, e.g. to keep a last-known-good copy. */
+    public byte[] bytes() { return raw.clone(); }
 
     private static double[][] rotation(double x, double y, double z) {
         double angle = Math.hypot(Math.hypot(x, y), z);

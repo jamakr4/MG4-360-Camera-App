@@ -1,5 +1,8 @@
 package com.drivehub.kamera.birdseye;
 
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
@@ -53,13 +56,52 @@ public final class BirdseyeMesh {
             if (weight > 1e-8 && (Math.abs(x-calibration.centerX) > CAR_WIDTH/2
                     || Math.abs(y-calibration.centerY) > CAR_LENGTH/2)) covered++;
         }
+        fillIndices(indices);
+        coveredVertices = covered;
+        if (covered == 0) throw new IllegalArgumentException("Calibration has no ground coverage");
+        vertices.position(0); indices.position(0);
+    }
+
+    private BirdseyeMesh(FloatBuffer vertices,int coveredVertices,float groundWidth,float groundHeight) {
+        this.vertices=vertices;this.coveredVertices=coveredVertices;
+        this.groundWidth=groundWidth;this.groundHeight=groundHeight;
+        indices = ByteBuffer.allocateDirect(indexCount*2).order(ByteOrder.nativeOrder()).asShortBuffer();
+        fillIndices(indices);indices.position(0);
+    }
+
+    private static void fillIndices(ShortBuffer indices) {
         for (int row = 0; row < ROWS; row++) for (int col = 0; col < COLS; col++) {
             int a = row*(COLS+1)+col, b = a+COLS+1;
             indices.put((short)a).put((short)b).put((short)(a+1));
             indices.put((short)(a+1)).put((short)b).put((short)(b+1));
         }
-        coveredVertices = covered;
-        if (covered == 0) throw new IllegalArgumentException("Calibration has no ground coverage");
-        vertices.position(0); indices.position(0);
+    }
+
+    static final int VERTEX_FLOATS=(COLS+1)*(ROWS+1)*FLOATS;
+
+    /** Disk-cache form: the vertex grid only; indices are deterministic and rebuilt. */
+    void write(DataOutputStream out) throws IOException {
+        out.writeFloat(groundWidth);out.writeFloat(groundHeight);out.writeInt(coveredVertices);
+        FloatBuffer source=vertices.duplicate();source.position(0);
+        ByteBuffer bytes=ByteBuffer.allocate(VERTEX_FLOATS*4).order(ByteOrder.LITTLE_ENDIAN);
+        bytes.asFloatBuffer().put(source);
+        out.write(bytes.array());
+    }
+
+    /** Rejects anything that the computing constructor could not have produced. */
+    static BirdseyeMesh read(DataInputStream in) throws IOException {
+        float width=in.readFloat(),height=in.readFloat();int covered=in.readInt();
+        if(!(width>0)||!(height>0)||!Float.isFinite(width)||!Float.isFinite(height)
+                ||covered<=0||covered>(COLS+1)*(ROWS+1))throw new IOException("Invalid cached mesh header");
+        byte[] raw=new byte[VERTEX_FLOATS*4];in.readFully(raw);
+        FloatBuffer source=ByteBuffer.wrap(raw).order(ByteOrder.LITTLE_ENDIAN).asFloatBuffer();
+        FloatBuffer vertices=ByteBuffer.allocateDirect(raw.length).order(ByteOrder.nativeOrder()).asFloatBuffer();
+        for(int i=0;i<VERTEX_FLOATS;i++) {
+            float f=source.get(i);
+            if(!Float.isFinite(f))throw new IOException("Non-finite cached vertex");
+            vertices.put(f);
+        }
+        vertices.position(0);
+        return new BirdseyeMesh(vertices,covered,width,height);
     }
 }

@@ -73,6 +73,17 @@ struct Maps {
 // OEM handoff, calibration failure or a newer Activity. No camera/session mutex is involved.
 class Registry {
 public:
+    // Warmup may fill the cache but only a validated view session can publish a map.
+    bool hasCached(const std::string& key) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return cached_ && cached_->key == key;
+    }
+    bool warm(std::shared_ptr<const Maps> maps) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (!maps || (owner_ != 0 && cached_ && cached_->key != maps->key)) return false;
+        cached_ = std::move(maps);
+        return true;
+    }
     void session(int token){
         std::lock_guard<std::mutex> lock(mutex_);
         if(token>0){owner_=token;std::atomic_store(&active_,std::shared_ptr<const Maps>{});}

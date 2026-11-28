@@ -33,7 +33,6 @@ import com.drivehub.kamera.R;
 import com.drivehub.kamera.settings.UiPrefs;
 
 import java.nio.ByteBuffer;
-import java.nio.file.Paths;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -47,10 +46,11 @@ public final class BirdseyeView extends FrameLayout {
     private final Handler main = new Handler(Looper.getMainLooper());
     private final SharedPreferences prefs;
     private final CalibrationLoader calibrationLoader;
+    private final CalibrationStore calibrationStore;
     private final BirdseyeSurface gl;
     private final TextView message, cameraWarning;
     private final Source source = new Source(BirdseyeOwnerIds.next());
-    private final BirdseyeRenderer renderer = new BirdseyeRenderer(source, getContext().getAssets());
+    private final BirdseyeRenderer renderer;
     private ScheduledFuture<?> task;
     private volatile int generation;
     private long handoffGeneration;
@@ -58,6 +58,15 @@ public final class BirdseyeView extends FrameLayout {
     private int lastContext;
     private int lastMask = -1;
     private boolean calibrationRetrying;
+    // Startup trace (issue #152): ms from resumeDisplay() to each phase, once per open.
+    private volatile long traceStart=-1;
+    private void trace(String phase) {
+        long start=traceStart;
+        if(start<0)return;
+        long now=SystemClock.elapsedRealtime();
+        String line="+"+(now-start)+" ms "+phase+" (boot+"+(now/1000)+" s)";
+        Log.i("BirdseyeStartup",line);com.drivehub.kamera.dev.DevRuntimeLog.add("2D startup",line);
+    }
     private final PdcGeometry pdc=new PdcGeometry();
     private SteeringSnapshot steeringSnapshot=SteeringSnapshot.EMPTY;
     private final SteeringGuidance steeringGuidance=new SteeringGuidance();
@@ -172,7 +181,8 @@ public final class BirdseyeView extends FrameLayout {
         failure.report(getContext());
         Toast.makeText(getContext(),failure.userMessage(getContext()),Toast.LENGTH_LONG).show();
     }
-    private final SharedPreferences.OnSharedPreferenceChangeListener preferences = (p, key) -> {
+    private final SharedPreferences.OnSharedPreferenceChangeListener preferences = this::onPreferenceChanged;
+    private void onPreferenceChanged(SharedPreferences p, String key) {
         if(UiPrefs.KEY_PARKING_SURROUND_3D.equals(key)||UiPrefs.KEY_PARKING_SURROUND_WIDE.equals(key))applyMode();
         if(UiPrefs.KEY_PARKING_SURROUND_GUIDES.equals(key)||UiPrefs.KEY_PARKING_GUIDE_SPEED_LIMIT.equals(key)
                 ||UiPrefs.KEY_PARKING_GUIDE_SPEED_KMH.equals(key)||UiPrefs.KEY_PARKING_GUIDE_STYLE.equals(key)
@@ -187,7 +197,7 @@ public final class BirdseyeView extends FrameLayout {
         }
         if (UiPrefs.KEY_OEM_CAMERA_ACCESS_BLOCKED.equals(key) || UiPrefs.KEY_OEM_AVM_ACTIVE.equals(key)
                 || UiPrefs.KEY_OEM_AVM_COEXIST.equals(key) || UiPrefs.KEY_EXTERNAL_CAMERA_PAUSED.equals(key)) updateOemState();
-    };
+    }
     private final Runnable tick = new Runnable() {
         @Override public void run() {
             if (!resumed) return;
@@ -220,50 +230,73 @@ public final class BirdseyeView extends FrameLayout {
             int fresh = drawAgeMs > 500 ? 0 : renderer.freshMask;
             CameraHandoffController.ready("birdseye", !blocked && source.ready && !renderFailed && fresh != 0,
                     handoffGeneration);
-            // Retain the camera image through short gaps; predictions and handoff still require fresh data.
-            int mask = drawAgeMs > BirdseyeFrameHealth.DISPLAY_HOLD_US/1000 ? 0 : renderer.displayMask;
-            int displayState=mask|(calibrationRetrying?16:0);
-            if (displayState != lastMask && !blocked && source.ready && !renderFailed) {
-                lastMask = displayState;
-                message.setVisibility(mask == 0 ? VISIBLE : GONE);
-                message.setText(R.string.birdseye_waiting);
-                cameraWarning.setVisibility(mask != 0 && (mask != 15 || calibrationRetrying) ? VISIBLE : GONE);
-                if(mask==15&&calibrationRetrying)cameraWarning.setText(R.string.birdseye_calibration_rechecking);
-                if (mask != 0 && mask != 15) {
-                    int[] labels = {R.string.main_camera_label_left, R.string.main_camera_label_right,
-                            R.string.main_camera_label_front, R.string.main_camera_label_rear};
-                    StringBuilder missing = new StringBuilder();
-                    for (int i = 0; i < 4; i++) if ((mask & (1 << i)) == 0) {
-                        if (missing.length() > 0) missing.append(", ");
-                        missing.append(getContext().getString(labels[i]));
-                    }
-                    cameraWarning.setText(getContext().getString(R.string.birdseye_partial, missing.toString()));
-                }
-            }
-            if(!blocked&&source.ready&&!renderFailed&&renderer.threeDRequested&&!renderer.threeDActive) {
-                message.setText(R.string.surround_3d_loading);message.setVisibility(VISIBLE);lastMask=-1;
-            }
+            updateCameraMessage();
             main.postDelayed(this, 50);
         }
     };
 
+    private void updateCameraMessage() {
+        if (!resumed || blocked || !source.ready || renderFailed || renderer.error != null) return;
+        // Retain the camera image through short gaps; predictions and handoff still require fresh data.
+        int mask = gl.presentedMask();
+        int displayState=mask|(calibrationRetrying?16:0);
+        if (displayState != lastMask) {
+            lastMask = displayState;
+            message.setVisibility(mask == 0 ? VISIBLE : GONE);
+            if(mask!=0&&traceStart>=0 && (!renderer.threeDRequested || renderer.threeDActive)) {
+                trace("first camera image, overlay hidden (mask="+mask+", frame observed to UI "+gl.presentationDelayMs()+" ms)");
+                traceStart=-1;
+            }
+            message.setText(R.string.birdseye_waiting);
+            cameraWarning.setVisibility(mask != 0 && (mask != 15 || calibrationRetrying) ? VISIBLE : GONE);
+            if(mask==15&&calibrationRetrying)cameraWarning.setText(R.string.birdseye_calibration_rechecking);
+            if (mask != 0 && mask != 15) {
+                int[] labels = {R.string.main_camera_label_left, R.string.main_camera_label_right,
+                        R.string.main_camera_label_front, R.string.main_camera_label_rear};
+                StringBuilder missing = new StringBuilder();
+                for (int i = 0; i < 4; i++) if ((mask & (1 << i)) == 0) {
+                    if (missing.length() > 0) missing.append(", ");
+                    missing.append(getContext().getString(labels[i]));
+                }
+                cameraWarning.setText(getContext().getString(R.string.birdseye_partial, missing.toString()));
+            }
+        }
+        if(renderer.threeDRequested&&!renderer.threeDActive) {
+            message.setText(R.string.surround_3d_loading);message.setVisibility(VISIBLE);lastMask=-1;
+        }
+    }
+
     public BirdseyeView(Context context, AttributeSet attrs) {
-        this(context,attrs,()->BirdseyeCalibration.load(Paths.get(BirdseyeCalibration.VEHICLE_PATH)));
+        this(context,attrs,CalibrationStore.get(context));
+    }
+    private BirdseyeView(Context context, AttributeSet attrs, CalibrationStore store) {
+        this(context,attrs,store::loadVehicle,store,null);
+        ProjectionAssets.useDiskCache(CalibrationStore.directory(context));
+    }
+    BirdseyeView(Context context, AttributeSet attrs, CalibrationLoader calibrationLoader) {
+        this(context,attrs,calibrationLoader,null,null);
+    }
+
+    BirdseyeView(Context context, CalibrationLoader loader, BirdseyeRenderer.Frames frames) {
+        this(context, null, loader, null, frames);
     }
 
     @android.annotation.SuppressLint("ClickableViewAccessibility")
-    BirdseyeView(Context context, AttributeSet attrs, CalibrationLoader calibrationLoader) {
+    private BirdseyeView(Context context, AttributeSet attrs, CalibrationLoader calibrationLoader, CalibrationStore store,
+                         BirdseyeRenderer.Frames frames) {
         super(context, attrs);
-        this.calibrationLoader=calibrationLoader;
+        renderer = new BirdseyeRenderer(frames == null ? source : frames, context.getAssets());
+        this.calibrationLoader=calibrationLoader;this.calibrationStore=store;
         setBackgroundColor(Color.BLACK);
         prefs = UiPrefs.getPrefs(context);
         renderer.setPdcGeometry(pdc);
         gl = new BirdseyeSurface(context, renderer, ready -> {
-            surfaceReady = ready;
+            surfaceReady = ready;if(ready)trace("surface available");
             if (!ready) stopSource();
             else if (resumed && !blocked && !renderFailed) startSource();
         });
-        gl.setBeforeFrame(this::updateSteeringFrame);
+        gl.setOnImageChanged(this::updateCameraMessage);
+        gl.setPoseUpdate(this::updateSteeringFrame);
         gl.setContinuousRendering(false);
         addView(gl, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
         cameraWarning = text(context, 12);
@@ -337,6 +370,7 @@ public final class BirdseyeView extends FrameLayout {
     public void resumeDisplay() {
         if (resumed) return;
         resumed = true; renderFailed = false; renderer.error = null;
+        traceStart=SystemClock.elapsedRealtime();trace("resume");
         CameraHandoffController.demand("birdseye", true);
         prefs.registerOnSharedPreferenceChangeListener(preferences);
         renderer.setCarColor(UiPrefs.getBirdseyeCarColor(prefs));
@@ -378,12 +412,14 @@ public final class BirdseyeView extends FrameLayout {
         source.active = true; source.ready = false; lastMask = -1;
         final String[] calibrationHash = {null};
         final CalibrationReadState reads=new CalibrationReadState();
+        final boolean[] attachTraced={false};
         calibrationRetrying=false;
         renderer.invalidateFrames(); showMessage(restarting?R.string.birdseye_calibration_rechecking:R.string.birdseye_loading);
         task = IO.scheduleWithFixedDelay(() -> {
             if (generation != token || !source.active) return;
+            trace("worker started");
             try {
-                reads.success(calibrationLoader.load());
+                reads.success(calibrationLoader.load());trace("calibration read");
             }catch(java.io.IOException error) {
                 reads.ioFailure(SystemClock.elapsedRealtime());
                 Log.w("Birdseye","Calibration read IO failure; retrying="+reads.retrying()+": "+error.getMessage());
@@ -391,7 +427,8 @@ public final class BirdseyeView extends FrameLayout {
                 reads.invalid();Log.w("Birdseye","Invalid vehicle calibration: "+error.getMessage());
             }
             BirdseyeCalibration c=reads.current();
-            boolean retrying=reads.retrying();
+            // A stored copy renders at once; keep the warning until the vehicle file confirms it.
+            boolean retrying=reads.retrying()||(calibrationStore!=null&&calibrationStore.isFallback(c));
             main.post(()->{if(generation==token)calibrationRetrying=retrying;});
             if(c==null) {
                 BirdseyeNative.detach(source.owner);calibrationHash[0]=null;
@@ -403,13 +440,15 @@ public final class BirdseyeView extends FrameLayout {
             }
             try {
                 if (!c.sha256.equals(calibrationHash[0])) {
-                    ProjectionAssets projection=ProjectionAssets.get(c);
+                    ProjectionAssets projection=ProjectionAssets.get(c);trace("projection ready");
                     main.post(() -> {
                         if (generation != token) return;
                         scene=projection.scene;renderer.setScene(projection.scene);
                         renderer.setMesh(projection.mesh);renderer.setWideMesh(projection.wideMesh,projection.wideError); source.ready = true; lastMask = -1;
+                        gl.setContinuousRendering(true);
+                        gl.requestRender();
                         if(renderer.threeDRequested)prepareThreeD();
-                        showMessage(R.string.birdseye_waiting);
+                        showMessage(R.string.birdseye_waiting);trace("mesh set, waiting for cameras");
                         Log.i("Birdseye", "Vehicle calibration SHA-256="+c.sha256);
                     });
                     calibrationHash[0] = c.sha256;
@@ -423,7 +462,9 @@ public final class BirdseyeView extends FrameLayout {
             for (int i = 0; i < 4 && generation == token && source.active; i++) {
                 try {BirdseyeNative.attach(source.owner,i);}
                 catch(RuntimeException error){Log.w("Birdseye","Camera "+i+" attach failed",error);}
+                if(traceStart>=0&&!attachTraced[0])trace("camera "+i+" attach returned");
             }
+            attachTraced[0]=true;
         }, restarting?2:0, 2, TimeUnit.SECONDS);
     }
 

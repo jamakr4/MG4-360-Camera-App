@@ -1,6 +1,13 @@
 package com.drivehub.kamera.side;
 
+import android.content.Context;
+import android.content.ContextWrapper;
+import android.content.SharedPreferences;
+import android.os.SystemClock;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
+import androidx.test.platform.app.InstrumentationRegistry;
+import java.io.File;
+import java.nio.file.Files;
 import com.drivehub.kamera.birdseye.*;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -65,11 +72,57 @@ public class AdvancedWheelRenderingInstrumentedTest {
             for(int i=1;i<hatch.length;i++)if(!Float.isNaN(uv[i*2]))assertEquals(0xFF000000,hatch[i]);
         }
     }
+    @Test public void bootPreparationMakesTheValidatedMapsAvailableToTheNextView() throws Exception {
+        Context base = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        File root = Files.createTempDirectory(base.getCacheDir().toPath(), "curbside-test").toFile();
+        String prefsName = root.getName();
+        Context isolated = new ContextWrapper(base) {
+            @Override public Context getApplicationContext() { return this; }
+            @Override public File getNoBackupFilesDir() { return root; }
+            @Override public SharedPreferences getSharedPreferences(String name, int mode) {
+                return base.getSharedPreferences(prefsName, mode);
+            }
+        };
+        // A distinct calibration hash even if another rendering test primed the process cache.
+        byte[] fixture = BirdseyeSynthetic.calibrationBytes();
+        fixture[0] ^= 1;
+        BirdseyeCalibration vehicle = BirdseyeCalibration.parse(fixture);
+        String key = WheelLensMaps.key(vehicle);
+        File directory = CalibrationStore.directory(isolated);
+        File cached = new File(directory, "curbside-maps.bin");
+        int session = 100_000;
+        try {
+            long start = SystemClock.elapsedRealtime();
+            AdvancedWheelProjection.prewarm(isolated, vehicle);
+            long deadline = start + 10_000;
+            while ((!SideCameraNative.maps(0, key, null) || !cached.isFile())
+                    && SystemClock.elapsedRealtime() < deadline) SystemClock.sleep(10);
+            assertTrue(cached.isFile());
+            long coldMs = SystemClock.elapsedRealtime() - start;
+            SideCameraNative.setAdvancedSession(session);
+            assertFalse(SideCameraNative.maps(session, "different-calibration", null));
+            long readyStart = System.nanoTime();
+            assertTrue(SideCameraNative.maps(session, key, null));
+            long activationUs = (System.nanoTime() - readyStart) / 1000;
+            long readStart = SystemClock.elapsedRealtime();
+            assertNotNull(new WheelLensMapCache(directory).read(key));
+            android.util.Log.i("CurbsideTest", "cold prepare and save " + coldMs + " ms, disk read " + (SystemClock.elapsedRealtime() - readStart)
+                    + " ms, prepared map activation " + activationUs + " us");
+        } finally {
+            SideCameraNative.setAdvancedSession(-session);
+            base.deleteSharedPreferences(prefsName);
+            cached.delete(); directory.delete(); root.delete();
+        }
+    }
+
     @Test public void sixMapsPublishThroughTheLiveJniAndReuseTheCalibrationCache(){
         float[][] uv=WheelLensMaps.get(calibration);String key=WheelLensMaps.key(calibration);
         int old=1_000_000_000,current=old+1;
         try{
+            assertTrue(SideCameraNative.maps(0, key, uv));
+            assertTrue(SideCameraNative.maps(0, key, null));
             SideCameraNative.setAdvancedSession(old);
+            assertTrue(SideCameraNative.maps(old, key, null));
             assertTrue(SideCameraNative.setAdvancedMaps(old,key,uv[0],uv[1],uv[2],uv[3],uv[4],uv[5]));
             assertTrue(SideCameraNative.setAdvancedMaps(old,key,null,null,null,null,null,null));
             assertFalse(SideCameraNative.setAdvancedMaps(old,key,uv[0],uv[1],uv[2],uv[3],uv[0],uv[5]));

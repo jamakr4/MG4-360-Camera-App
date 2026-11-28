@@ -86,47 +86,26 @@ public final class BirdseyeRenderer implements GLSurfaceView.Renderer {
     public volatile long renderedFrames, lastDrawCpuUs, lastDrawElapsedMs;
     public volatile int contextGeneration;
     public volatile boolean hasCarArtwork;
-    private long statsStartedNs, statsFrames, statsSubmitUs, statsPacedSkips;
-    // 2D frame pacing (GL thread only). See shouldDraw().
-    private final long[] latestUs=new long[4];
-    private final BirdseyeFramePacing pacing=new BirdseyeFramePacing();
-    private long lastDrawUs;
+    private long statsStartedNs, statsFrames, statsSubmitUs, longestFrameIntervalNs, previousFrameNs;
     private final long[] statsUploads = new long[4];
     private static volatile String latestTiming = "Birdseye: no active renderer";
     private static volatile String samplingDevice = "UYVY/GPU: not initialized";
     private static volatile long timingAtMs;
     public static String timingStatus() {
-        return latestTiming + "\n" + samplingDevice + "\nUpdated " + Math.max(0, SystemClock.elapsedRealtime()-timingAtMs) + " ms ago"
-                + "\n" + BirdseyeSurface.presentationStatus();
+        return latestTiming + "\n" + samplingDevice + "\nUpdated " + Math.max(0, SystemClock.elapsedRealtime()-timingAtMs) + " ms ago";
     }
     private void recordTiming(long now) {
         if(statsStartedNs==0)statsStartedNs=now;
+        if (previousFrameNs != 0) longestFrameIntervalNs = Math.max(longestFrameIntervalNs, now - previousFrameNs);
+        previousFrameNs = now;
         statsFrames++;statsSubmitUs+=lastDrawCpuUs;
         double seconds=(now-statsStartedNs)/1e9;
         if(seconds<1)return;
         latestTiming=String.format(java.util.Locale.ROOT,
-                "Birdseye %s: %.1f draw FPS, %.2f ms submit, %.1f paced waits/s\nSampled camera FPS L/R/F/B: %.1f / %.1f / %.1f / %.1f",
-                threeDActive?"3D":"2D",statsFrames/seconds,statsSubmitUs/(1000.0*statsFrames),statsPacedSkips/seconds,
+                "Birdseye %s: %.1f draw FPS, %.2f ms submit, %.1f ms max draw interval\nSampled camera FPS L/R/F/B: %.1f / %.1f / %.1f / %.1f",
+                threeDActive?"3D":"2D",statsFrames/seconds,statsSubmitUs/(1000.0*statsFrames),longestFrameIntervalNs/1e6,
                 statsUploads[0]/seconds,statsUploads[1]/seconds,statsUploads[2]/seconds,statsUploads[3]/seconds);
-        timingAtMs=SystemClock.elapsedRealtime();statsStartedNs=now;statsFrames=0;statsSubmitUs=0;statsPacedSkips=0;Arrays.fill(statsUploads,0);
-    }
-
-    /**
-     * GL thread, before each display frame. 2D draws once per camera round instead of on
-     * every vsync, as late as possible without letting any camera skip an image (see
-     * {@link BirdseyeFramePacing}). The four
-     * cameras are not synchronized, so at 60 Hz almost every vsync used to carry one new
-     * camera and the whole 4-camera composite was redrawn ~60 times a second, each region
-     * refreshed at a different moment. This mirrors the stock ArcSoft app, which reads all
-     * four cameras and then draws once (~30 Hz), and roughly halves GPU and TextureView
-     * composition load. 3D keeps drawing every frame for touch orbiting.
-     */
-    public boolean shouldDraw() {
-        if(threeDRequested||error!=null||program==0||requestedMesh==null||resetGeneration!=appliedGeneration)return true;
-        if(!frames.allowed()||!frames.latest(latestUs))return true;
-        boolean draw=pacing.shouldDraw(latestUs,capturedUs,frames.clockUs(),lastDrawUs);
-        if(!draw)statsPacedSkips++;
-        return draw;
+        timingAtMs=SystemClock.elapsedRealtime();statsStartedNs=now;statsFrames=0;statsSubmitUs=0;longestFrameIntervalNs=0;Arrays.fill(statsUploads,0);
     }
 
     public BirdseyeRenderer(Frames frames) { this(frames, (BirdseyeCarArtwork.Source)null); }
@@ -147,6 +126,8 @@ public final class BirdseyeRenderer implements GLSurfaceView.Renderer {
     public void setMesh(BirdseyeMesh mesh) { requestedMesh = mesh; invalidateFrames(); }
     public void setWideMesh(BirdseyeMesh mesh,String error){wideMesh=mesh;wideError=error;}
     public void setWide(boolean enabled){wideRequested=enabled;}
+    int drawnGeneration() { return appliedGeneration; } // GL thread only
+    boolean isCurrentGeneration(int generation) { return generation == resetGeneration; }
     public void invalidateFrames() { resetGeneration++; freshMask = 0; displayMask = 0; }
 
     private static final String VERTEX =
@@ -187,7 +168,7 @@ public final class BirdseyeRenderer implements GLSurfaceView.Renderer {
         bowlPass=null;pdcPass=null;guidePass=null;carPass=null;carArtworkGeometry=null;
         pdcUnavailable=false;guidesUnavailable=false;threeDActive=false;
         int[] depth=new int[1];GLES20.glGetIntegerv(GLES20.GL_DEPTH_BITS,depth,0);depthAvailable=depth[0]>=16;
-        Arrays.fill(capturedUs, 0); freshMask = 0; displayMask = 0; pacing.reset(); lastDrawUs=0;
+        Arrays.fill(capturedUs, 0); freshMask = 0; displayMask = 0; previousFrameNs=0; longestFrameIntervalNs=0;
         statsStartedNs=0;statsFrames=0;statsSubmitUs=0;Arrays.fill(statsUploads,0);
         try {
             program = link(VERTEX, FRAGMENT);
@@ -359,7 +340,6 @@ public final class BirdseyeRenderer implements GLSurfaceView.Renderer {
             wideActive=!drewThreeD&&useWide;
             freshMask = mask;displayMask = visibleMask;
             renderedFrames++; lastDrawElapsedMs = SystemClock.elapsedRealtime();
-            lastDrawUs = frames.clockUs();
         } catch (RuntimeException e) { fail(e); }
         lastDrawCpuUs = (System.nanoTime()-start)/1000;
         recordTiming(System.nanoTime());

@@ -1,225 +1,162 @@
 package com.drivehub.kamera.birdseye;
 
 import android.content.Context;
-import android.graphics.SurfaceTexture;
-import android.opengl.EGL14;
-import android.opengl.EGLConfig;
-import android.opengl.EGLContext;
-import android.opengl.EGLDisplay;
-import android.opengl.EGLSurface;
-import android.os.Handler;
-import android.os.HandlerThread;
-import android.os.Looper;
-import android.view.TextureView;
-import android.view.Choreographer;
+import android.opengl.GLSurfaceView;
+import android.os.SystemClock;
+import android.view.SurfaceHolder;
 
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
+import javax.microedition.khronos.egl.EGL10;
+import javax.microedition.khronos.egl.EGLConfig;
+import javax.microedition.khronos.egl.EGLDisplay;
+import javax.microedition.khronos.opengles.GL10;
 
-/** One bounded render queue and owned EGL thread. Even EGL startup failures are
- * contained here; no GL/driver wait or thread join occurs on capture or UI threads. */
-@android.annotation.SuppressLint("ViewConstructor") // Programmatic only: requires a renderer instance.
-public final class BirdseyeSurface extends TextureView implements TextureView.SurfaceTextureListener {
+/** The framework GL thread draws continuously while the camera source is active. */
+@android.annotation.SuppressLint("ViewConstructor")
+public final class BirdseyeSurface extends GLSurfaceView {
     public interface Listener { void available(boolean ready); }
-    private final Handler main = new Handler(Looper.getMainLooper());
+
     private final BirdseyeRenderer renderer;
     private final Listener listener;
-    private SurfaceTexture texture;
-    private Run run;
-    private boolean resumed, continuous = true, dirty = true, framePosted;
-    private Runnable beforeFrame;
-    private final Choreographer choreographer = Choreographer.getInstance();
-    private long displayCallbacks;
-    private static volatile String latestPresentation = "Birdseye output: no completed timing sample";
-    private static volatile long presentationAtMs;
-    static String presentationStatus() {
-        return latestPresentation + "\nOutput timing updated " + Math.max(0,
-                android.os.SystemClock.elapsedRealtime()-presentationAtMs) + " ms ago";
-    }
-    private final Choreographer.FrameCallback frame = time -> {
-        framePosted = false;
-        if (canDraw() && (continuous || dirty)) {
-            if (beforeFrame != null) beforeFrame.run();
-            displayCallbacks++;
-            boolean forced = dirty;
-            dirty = false;
-            run.draw(time, forced); // One pending GL job at most; a slow GPU never builds a queue.
+    private boolean resumed, surfaceReady, trackingPose;
+    private Runnable updatePose, onImageChanged;
+    private volatile PresentedImage presented;
+    private volatile long lastPresentedDrawMs;
+
+    private static final class PresentedImage {
+        final int generation, mask;
+        final long observedAt;
+
+        PresentedImage(int generation, int mask) {
+            this.generation = generation;
+            this.mask = mask;
+            observedAt = SystemClock.elapsedRealtime();
         }
-        scheduleFrame();
-    };
-    private volatile int width, height;
+    }
 
     public BirdseyeSurface(Context context, BirdseyeRenderer renderer, Listener listener) {
-        super(context); this.renderer = renderer; this.listener = listener;
-        setOpaque(true); setSurfaceTextureListener(this);
+        super(context);
+        this.renderer = renderer;
+        this.listener = listener;
+        setEGLContextClientVersion(2);
+        setEGLConfigChooser((egl, display) -> chooseWindowConfig(egl, display, 16));
+        setRenderer(new WindowRenderer());
+        setRenderMode(RENDERMODE_CONTINUOUSLY);
     }
 
-    public void onResume() { resumed = true; dirty = true; startIfReady(); scheduleFrame(); }
-    public void onPause() { resumed = false; cancelFrame(); if (run != null) run.stop(); }
-    public void requestRender() { dirty = true; scheduleFrame(); }
-    /** UI-thread snapshot update before submitting the next coalesced EGL render. */
-    public void setBeforeFrame(Runnable update) { beforeFrame = update; }
-    public void setContinuousRendering(boolean enabled) { continuous = enabled; scheduleFrame(); }
-    long displayCallbacks() { return displayCallbacks; }
-    private boolean canDraw() { return resumed && texture != null && run != null && !run.stopped; }
-    private void scheduleFrame() {
-        if (!framePosted && canDraw() && (continuous || dirty)) {
-            framePosted = true; choreographer.postFrameCallback(frame);
+    // Keep UI-owned steering state current independently of the GL draw loop.
+    private final Runnable poseTick = new Runnable() {
+        @Override public void run() {
+            if (!trackingPose) return;
+            updatePose.run();
+            postOnAnimation(this);
         }
-    }
-    private void cancelFrame() {
-        choreographer.removeFrameCallback(frame); framePosted = false;
+    };
+
+    void setPoseUpdate(Runnable update) {
+        updatePose = update;
+        updatePoseTracking();
     }
 
-    private void startIfReady() {
-        // Wait for an old producer to disconnect before reusing its SurfaceTexture.
-        if (!resumed || texture == null || run != null) return;
-        renderer.error = null;
-        run = new Run(texture);
-        run.start(); scheduleFrame();
+    private void updatePoseTracking() {
+        boolean active = resumed && surfaceReady && updatePose != null && getRenderMode() == RENDERMODE_CONTINUOUSLY;
+        if (trackingPose == active) return;
+        trackingPose = active;
+        if (active) postOnAnimation(poseTick);
+        else removeCallbacks(poseTick);
     }
 
-    @Override public void onSurfaceTextureAvailable(SurfaceTexture surface, int w, int h) {
-        texture = surface; width = w; height = h;
-        startIfReady(); if (listener != null) listener.available(true);
+    public void setContinuousRendering(boolean enabled) {
+        int mode = enabled ? RENDERMODE_CONTINUOUSLY : RENDERMODE_WHEN_DIRTY;
+        if (getRenderMode() != mode) setRenderMode(mode);
+        updatePoseTracking();
     }
-    @Override public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int w, int h) { width=w; height=h; requestRender(); }
-    @Override public boolean onSurfaceTextureDestroyed(SurfaceTexture surface) {
-        texture = null; cancelFrame();
-        if (listener != null) listener.available(false);
+
+    @Override public void onResume() {
+        super.onResume();
+        resumed = true;
+        updatePoseTracking();
+    }
+
+    @Override public void onPause() {
+        resumed = false;
+        updatePoseTracking();
+        super.onPause();
         renderer.invalidateFrames();
-        if (run != null && run.input == surface) { run.releaseTexture = true; run.stop(); }
-        else surface.release();
-        // We release it only after the old GL producer has finished/disconnected.
-        return false;
-    }
-    @Override public void onSurfaceTextureUpdated(SurfaceTexture surface) {}
-
-    /** Retry without depth while retaining the GLES2/window requirements for the working 2D path. */
-    static EGLConfig chooseWindowConfig(EGLDisplay display,int preferredDepth) {
-        EGLConfig[] configs=new EGLConfig[1];int[] count=new int[1];
-        for(int depth:new int[]{preferredDepth,0}) {
-            int[] attrs={EGL14.EGL_RED_SIZE,8,EGL14.EGL_GREEN_SIZE,8,EGL14.EGL_BLUE_SIZE,8,
-                    EGL14.EGL_DEPTH_SIZE,depth,EGL14.EGL_RENDERABLE_TYPE,4,EGL14.EGL_SURFACE_TYPE,EGL14.EGL_WINDOW_BIT,EGL14.EGL_NONE};
-            if(EGL14.eglChooseConfig(display,attrs,0,configs,0,1,count,0)&&count[0]>0)return configs[0];
-        }
-        throw new IllegalStateException("EGL config: 0x"+Integer.toHexString(EGL14.eglGetError()));
+        presented = null;
     }
 
-    private final class Run {
-        final SurfaceTexture input;
-        final HandlerThread thread = new HandlerThread("Birdseye-EGL");
-        final AtomicBoolean queued = new AtomicBoolean();
-        final AtomicLong busyCallbacks = new AtomicLong();
-        long statsStartNs, statsFrames, statsQueueNs, statsSwapNs, maxSwapNs, statsCallbackNs, previousBusy;
-        Handler handler;
-        volatile boolean stopped, releaseTexture;
-        boolean closing;
-        EGLDisplay display = EGL14.EGL_NO_DISPLAY;
-        EGLContext context = EGL14.EGL_NO_CONTEXT;
-        EGLSurface surface = EGL14.EGL_NO_SURFACE;
-        int lastWidth, lastHeight;
+    @Override public void surfaceCreated(SurfaceHolder holder) {
+        super.surfaceCreated(holder);
+        surfaceReady = true;
+        updatePoseTracking();
+        if (listener != null) listener.available(true);
+    }
 
-        Run(SurfaceTexture input) { this.input = input; }
-        void start() {
-            // A private handler also contains failures before/around Looper dispatch.
-            thread.setUncaughtExceptionHandler((t, error) -> { fail(error); stopped=true; closeOnThread(); });
-            thread.start(); handler = new Handler(thread.getLooper());
-            handler.post(() -> {
-                try {
-                    if (stopped) return;
-                    display = EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY);
-                    require(EGL14.eglInitialize(display, new int[2],0,new int[2],0), "initialize");
-                    EGLConfig config=chooseWindowConfig(display,16);
-                    context = EGL14.eglCreateContext(display,config,EGL14.EGL_NO_CONTEXT,
-                            new int[]{EGL14.EGL_CONTEXT_CLIENT_VERSION,2,EGL14.EGL_NONE},0);
-                    require(context != null && context != EGL14.EGL_NO_CONTEXT, "context");
-                    surface = EGL14.eglCreateWindowSurface(display,config,input,new int[]{EGL14.EGL_NONE},0);
-                    require(surface != null && surface != EGL14.EGL_NO_SURFACE, "surface");
-                    require(EGL14.eglMakeCurrent(display,surface,surface,context), "makeCurrent");
-                    renderer.onSurfaceCreated(null,null);
-                } catch (Throwable error) { fail(error); stopped=true; closeOnThread(); }
-            });
+    @Override public void surfaceDestroyed(SurfaceHolder holder) {
+        surfaceReady = false;
+        updatePoseTracking();
+        if (listener != null) listener.available(false);
+        super.surfaceDestroyed(holder);
+        renderer.invalidateFrames();
+        presented = null;
+    }
+
+    void setOnImageChanged(Runnable callback) { onImageChanged = callback; }
+
+    int presentedMask() {
+        PresentedImage image = presented;
+        if (!resumed || !surfaceReady || image == null || !renderer.isCurrentGeneration(image.generation)
+                || SystemClock.elapsedRealtime() - lastPresentedDrawMs > BirdseyeFrameHealth.DISPLAY_HOLD_US / 1000)
+            return 0;
+        return image.mask;
+    }
+
+    long presentationDelayMs() {
+        PresentedImage image = presented;
+        return image == null ? -1 : SystemClock.elapsedRealtime() - image.observedAt;
+    }
+
+    static EGLConfig chooseWindowConfig(EGL10 egl, EGLDisplay display, int preferredDepth) {
+        EGLConfig[] configs = new EGLConfig[1];
+        int[] count = new int[1];
+        for (int depth : new int[]{preferredDepth, 0}) {
+            int[] attrs = {EGL10.EGL_RED_SIZE, 8, EGL10.EGL_GREEN_SIZE, 8, EGL10.EGL_BLUE_SIZE, 8,
+                    EGL10.EGL_DEPTH_SIZE, depth, EGL10.EGL_RENDERABLE_TYPE, 4,
+                    EGL10.EGL_SURFACE_TYPE, EGL10.EGL_WINDOW_BIT, EGL10.EGL_NONE};
+            if (egl.eglChooseConfig(display, attrs, configs, 1, count) && count[0] > 0) return configs[0];
         }
-        void draw(long frameNs, boolean forced) {
-            if (stopped) return;
-            if (!queued.compareAndSet(false,true)) { busyCallbacks.incrementAndGet(); return; }
-            final long requestedNs = System.nanoTime();
-            handler.post(() -> {
-                try {
-                    if (stopped || surface == EGL14.EGL_NO_SURFACE) return;
-                    long startedNs = System.nanoTime();
-                    boolean resized = width != lastWidth || height != lastHeight;
-                    if (resized) {
-                        lastWidth=width; lastHeight=height;
-                        renderer.onSurfaceChanged(null,lastWidth,lastHeight);
-                    }
-                    // No new camera round yet: keep the last frame, no draw and no swap.
-                    if (!forced && !resized && !renderer.shouldDraw()) return;
-                    renderer.onDrawFrame(null);
-                    if (renderer.error != null) { stopped=true; closeOnThread(); return; }
-                    long swapStartNs = System.nanoTime();
-                    require(EGL14.eglSwapBuffers(display,surface), "swapBuffers");
-                    recordPresentation(frameNs, requestedNs, startedNs, swapStartNs, System.nanoTime());
-                } catch (Throwable error) { fail(error); stopped=true; closeOnThread(); }
-                finally { queued.set(false); }
-            });
+        throw new IllegalStateException("EGL config: 0x" + Integer.toHexString(egl.eglGetError()));
+    }
+
+    private final class WindowRenderer implements Renderer {
+        private int previousGeneration, previousMask;
+        private long previousDrawMs;
+
+        @Override public void onSurfaceCreated(GL10 gl, EGLConfig config) {
+            previousDrawMs = 0;
+            renderer.onSurfaceCreated(gl, config);
         }
-        // Wall times, not GPU timestamps. In particular, swap can include GPU and
-        // BufferQueue waits that the renderer's existing CPU submission time omits.
-        void recordPresentation(long frameNs,long requestedNs,long startedNs,long swapStartNs,long endNs) {
-            if(statsStartNs==0)statsStartNs=startedNs;
-            statsFrames++;
-            statsQueueNs+=Math.max(0,startedNs-requestedNs);
-            statsCallbackNs+=Math.max(0,requestedNs-frameNs);
-            long swapNs=endNs-swapStartNs;
-            statsSwapNs+=swapNs;maxSwapNs=Math.max(maxSwapNs,swapNs);
-            double seconds=(endNs-statsStartNs)/1e9;
-            if(seconds<1)return;
-            long busy=busyCallbacks.get();
-            latestPresentation=String.format(java.util.Locale.ROOT,
-                    "EGL: %.1f swaps/s; swap wait %.2f ms avg / %.2f ms max\n"
-                            + "UI callback delay %.2f ms; GL queue %.2f ms; busy skips %d",
-                    statsFrames/seconds,statsSwapNs/(1e6*statsFrames),maxSwapNs/1e6,
-                    statsCallbackNs/(1e6*statsFrames),statsQueueNs/(1e6*statsFrames),busy-previousBusy);
-            presentationAtMs=android.os.SystemClock.elapsedRealtime();
-            statsStartNs=endNs;previousBusy=busy;
-            statsFrames=statsQueueNs=statsSwapNs=maxSwapNs=statsCallbackNs=0;
+
+        @Override public void onSurfaceChanged(GL10 gl, int width, int height) {
+            renderer.onSurfaceChanged(gl, width, height);
         }
-        void stop() {
-            stopped=true;
-            renderer.invalidateFrames();
-            handler.post(this::closeOnThread);
-        }
-        void fail(Throwable error) {
-            renderer.error = error.getMessage() == null ? error.getClass().getSimpleName() : error.getMessage();
-            renderer.invalidateFrames();
-        }
-        void require(boolean ok, String operation) {
-            if (!ok) throw new IllegalStateException("EGL "+operation+": 0x"+Integer.toHexString(EGL14.eglGetError()));
-        }
-        void closeOnThread() {
-            if (closing) return;
-            closing=true;
-            try {
-                if (display != EGL14.EGL_NO_DISPLAY) {
-                    EGL14.eglMakeCurrent(display,EGL14.EGL_NO_SURFACE,EGL14.EGL_NO_SURFACE,EGL14.EGL_NO_CONTEXT);
-                    if (surface != null && surface != EGL14.EGL_NO_SURFACE) EGL14.eglDestroySurface(display,surface);
-                    if (context != null && context != EGL14.EGL_NO_CONTEXT) EGL14.eglDestroyContext(display,context);
-                    EGL14.eglTerminate(display); EGL14.eglReleaseThread();
+
+        @Override public void onDrawFrame(GL10 gl) {
+            // GLSurfaceView swaps after onDrawFrame returns. On the next callback the
+            // previous swap has finished, so the loading overlay can release that image.
+            if (previousDrawMs != 0 && renderer.isCurrentGeneration(previousGeneration)) {
+                lastPresentedDrawMs = previousDrawMs;
+                PresentedImage image = presented;
+                if (image == null || image.generation != previousGeneration || image.mask != previousMask) {
+                    presented = new PresentedImage(previousGeneration, previousMask);
+                    post(() -> { if (onImageChanged != null) onImageChanged.run(); });
                 }
-            } catch (Throwable error) { fail(error); }
-            finally {
-                thread.quit();
-                main.post(() -> {
-                    if (releaseTexture) input.release();
-                    if (run == this) {
-                        cancelFrame(); run=null;
-                        // An explicit pause/resume or a new Surface can recover a failed run.
-                        if (renderer.error == null || texture != input) startIfReady();
-                    }
-                });
             }
+            long before = renderer.renderedFrames;
+            renderer.onDrawFrame(gl);
+            previousMask = before == renderer.renderedFrames ? 0 : renderer.displayMask;
+            previousGeneration = renderer.drawnGeneration();
+            previousDrawMs = SystemClock.elapsedRealtime();
         }
     }
 }

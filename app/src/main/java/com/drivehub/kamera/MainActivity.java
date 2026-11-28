@@ -6,6 +6,7 @@ import com.drivehub.kamera.camera.OverlayService;
 import com.drivehub.kamera.dashcam.DashcamSettingsController;
 import com.drivehub.kamera.dashcam.RecordingService;
 import com.drivehub.kamera.ota.OtaController;
+import com.drivehub.kamera.dev.DevRuntimeLog;
 import com.drivehub.kamera.settings.SettingsAppearanceController;
 import com.drivehub.kamera.settings.SettingsDialogController;
 import com.drivehub.kamera.settings.UiPrefs;
@@ -22,7 +23,10 @@ import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.SystemClock;
+import android.util.Log;
 import android.view.MotionEvent;
+import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
@@ -37,6 +41,9 @@ import androidx.core.content.ContextCompat;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
+
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class MainActivity extends AppCompatActivity implements SurfaceHolder.Callback {
 
@@ -167,7 +174,23 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private int currentVideoIndex = CameraIndex.FRONT.getVideoIndex();
     private int activePreviewCameraIndex = -1;
     private boolean previewRunning = false;
-    private long previewHandoffGeneration = -1;
+    // A dedicated sink keeps a delayed detach isolated from the overlay and tile outputs.
+    private static final ExecutorService PREVIEW_IO = Executors.newSingleThreadExecutor(
+            job -> new Thread(job, "Main-preview"));
+    private volatile PreviewRequest previewRequest;
+
+    private static final class PreviewRequest {
+        final int camera;
+        final Surface surface;
+        final long handoff;
+        boolean attached; // Accessed only on PREVIEW_IO.
+
+        PreviewRequest(int camera, Surface surface, long handoff) {
+            this.camera = camera;
+            this.surface = surface;
+            this.handoff = handoff;
+        }
+    }
     private boolean previewPausedForTestClip = false;
     private boolean previewResumed = false;
     private final android.os.Handler previewRetryHandler=new android.os.Handler(android.os.Looper.getMainLooper());
@@ -309,7 +332,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         pdcOverlay.bind(birdseyeView::scene,birdseyeView.pdcGeometry(),findViewById(R.id.pdcStatus),
                 ()->SignalService.isReverseActive()&&currentVideoIndex==CameraIndex.REAR.getVideoIndex(),
                 ()->previewResumed&&previewRunning&&activePreviewCameraIndex==CameraIndex.REAR.getVideoIndex()
-                        ?CameraProbe.mainPreviewFrameAgeMs(CameraIndex.REAR.getVideoIndex()):-1);
+                        ?CameraProbe.previewSinkCaptureAgeMs(activePreviewCameraIndex, CameraProbe.MAIN_ACTIVITY_SINK):-1);
         pdcReader=new com.drivehub.kamera.parking.PdcReader(this,birdseyeView::setPdcSnapshot);
         steeringReader=new com.drivehub.kamera.steering.SteeringReader(this,birdseyeView::setSteeringSnapshot);
         SurfaceView surfaceView = findViewById(R.id.surfaceView);
@@ -624,22 +647,51 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             if (tvStatus != null) tvStatus.setText(R.string.main_surface_not_ready);
             return;
         }
-        if (previewRunning && activePreviewCameraIndex == currentVideoIndex
-                && previewHandoffGeneration == handoffGeneration) {
-            CameraHandoffController.ready("main", true, handoffGeneration);
+        Surface surface = surfaceHolder.getSurface();
+        PreviewRequest previous = previewRequest;
+        if (previous != null && previous.camera == currentVideoIndex && previous.surface == surface
+                && previous.handoff == handoffGeneration) {
+            CameraHandoffController.ready("main", previewRunning, handoffGeneration);
             return;
         }
-        if (activePreviewCameraIndex != -1 && (activePreviewCameraIndex != currentVideoIndex
-                || previewHandoffGeneration != handoffGeneration)) {
-            CameraProbe.detachPreview(activePreviewCameraIndex);
-            activePreviewCameraIndex = -1;
-        }
+        releasePreviewRequest();
         CameraHandoffController.ready("main", false, handoffGeneration);
-        boolean ok = CameraProbe.attachPreview(currentVideoIndex, surfaceHolder.getSurface());
-        CameraHandoffController.ready("main", ok, handoffGeneration);
+        PreviewRequest request = new PreviewRequest(currentVideoIndex, surface, handoffGeneration);
+        previewRequest = request;
+        PREVIEW_IO.execute(() -> openPreview(request));
+    }
+
+    private void openPreview(PreviewRequest request) {
+        if (previewRequest != request) return;
+        if (request.handoff != CameraHandoffController.generation()) {
+            previewRetryHandler.post(() -> previewOpened(request, false));
+            return;
+        }
+        long started = SystemClock.elapsedRealtime();
+        try {
+            request.attached = request.surface.isValid()
+                    && CameraProbe.attachPreviewSink(request.camera, CameraProbe.MAIN_ACTIVITY_SINK, request.surface);
+        } catch (RuntimeException failure) {
+            Log.w("MainPreview", "Cannot attach camera " + request.camera, failure);
+        }
+        String timing = "main camera " + request.camera + " attach " + (request.attached ? "ready" : "failed")
+                + " in " + (SystemClock.elapsedRealtime() - started) + " ms";
+        Log.i("PreviewStartup", timing);
+        DevRuntimeLog.add("Main preview", timing);
+        boolean ok = request.attached;
+        previewRetryHandler.post(() -> previewOpened(request, ok));
+    }
+
+    private void previewOpened(PreviewRequest request, boolean ok) {
+        if (previewRequest != request) return;
+        if (request.handoff != CameraHandoffController.generation()) {
+            startPreviewIfReady();
+            return;
+        }
+        if (!ok) previewRequest = null;
+        CameraHandoffController.ready("main", ok, request.handoff);
         previewRunning = ok;
-        previewHandoffGeneration = handoffGeneration;
-        activePreviewCameraIndex = ok ? currentVideoIndex : -1;
+        activePreviewCameraIndex = ok ? request.camera : -1;
         previewRetryHandler.removeCallbacks(previewRetry);
         if(ok)previewRetryAttempts=0;
         else if(SignalService.isReverseActive()&&!UiPrefs.shouldYieldToOem(UiPrefs.getPrefs(this))
@@ -654,13 +706,21 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         }
     }
 
+    private void releasePreviewRequest() {
+        PreviewRequest request = previewRequest;
+        previewRequest = null;
+        previewRunning = false;
+        activePreviewCameraIndex = -1;
+        if (request != null) PREVIEW_IO.execute(() -> {
+            if (request.attached) CameraProbe.detachPreviewSink(request.camera, CameraProbe.MAIN_ACTIVITY_SINK);
+        });
+    }
+
     private void stopPreview() {
         CameraHandoffController.ready("main", false, CameraHandoffController.generation());
         previewRetryHandler.removeCallbacks(previewRetry);previewRetryAttempts=0;
-        if (activePreviewCameraIndex == -1) return;
-        CameraProbe.detachPreview(activePreviewCameraIndex);
-        activePreviewCameraIndex = -1;
-        previewRunning = false;
+        if (previewRequest == null) return;
+        releasePreviewRequest();
         if (tvStatus != null) tvStatus.setText(R.string.main_preview_stopped);
     }
 
