@@ -270,7 +270,11 @@ With OEM coexist **off**, the app also disables only the stock app's `CarBroadca
 
 If reverse is engaged and our rear camera has no fresh frame for **2.5 seconds**, the app releases its camera consumers, restores the receiver and requests the OEM view **once**. This fallback survives a process restart and remains active until R has been left for at least 500 ms with a valid P/N/D reading. Interrupted takeovers restore OEM access and require acknowledging the fault by enabling OEM coexist before another attempt.
 
-**Before uninstalling this app or updating vehicle firmware**, use **Parking → Restore OEM camera** (also enables the existing Allow OEM setting) and check the status. A disabled component remains disabled after uninstalling the app that changed it. If the app cannot open, restore from ADB:
+#### Restore the OEM 360° camera app
+
+Before uninstalling this app or updating the vehicle firmware, select **Parking → Restore OEM camera** and check the status. This also enables **Allow OEM 360° camera app**.
+
+If this app no longer opens or you already uninstalled it, the OEM camera receiver may still be disabled. Run this command from your computer with the head unit connected via ADB to re-enable the receiver.
 
 ```sh
 adb shell pm enable com.saicmotor.hmi.aroundview/.car.CarBroadcastReceiver
@@ -667,8 +671,9 @@ This is an independent community project and is **not affiliated with SAIC, MG M
 
 - Analysis based on community research from [XDA Forums: MG4 Electric AAOS 9](https://xdaforums.com/t/mg4-electric-aaos-9-playing-and-possibly-other-mg-models.4697712/)
 - Tile view inspired by [merth4n on XDA](https://xdaforums.com/m/merth4n.13350648/) and the original [merthankaraman/DriveHub_Kamera](https://github.com/merthankaraman/DriveHub_Kamera) project
-- Thanks to  Tommaso Vietina/[Tommasov](https://github.com/Tommasov) for helping with and contributing to the project
-- Thanks to **Andrew N / [andneg7](https://github.com/andneg7)**, creator of [Rivela 360](https://github.com/andneg7/rivela360-mg4), for contributing the PDC geometry and animation, camera projection and 3D bowl foundation in [PR #102](https://github.com/jamakr4/MG4-360-Camera-App/pull/102)
+- Thanks to  **Tommaso Vietina/[Tommasov](https://github.com/Tommasov)** for helping with and contributing to the project
+- Thanks to **Andrew N/[andneg7](https://github.com/andneg7)**, creator of [Rivela 360](https://github.com/andneg7/rivela360-mg4), for contributing the PDC geometry and animation, camera projection and 3D bowl foundation in [PR #102](https://github.com/jamakr4/MG4-360-Camera-App/pull/102)
+- Thanks to **[Malys](https://github.com/malys)** for helping with software engineering, great ideas, and other contributions.
 - Thanks to **[MattDoesBlender](https://sketchfab.com/MattDoesBlender)** for creating the [MG4 model](https://sketchfab.com/3d-models/2025-mg-mg4-glbmgmotorcommx-ee2e3b0e1a7b481cb2c08e6fc6d2ed9e) used for our 2D vehicle artwork and 3D model, available under [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/)
 - Thanks to **HenryCena82595** for creating [notification-sound-7062 on Freesound](https://freesound.org/s/731783/), used for the app's notification sound and available under [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/)
 - OpenCV 4.9.0 - Apache License 2.0
